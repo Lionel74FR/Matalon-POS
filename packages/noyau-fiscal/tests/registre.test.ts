@@ -67,6 +67,17 @@ describe("tickets", () => {
     expect(t.numero).toBe(1);
   });
 
+  it("journalise les suppressions de lignes et les additions avant encaissement", async () => {
+    const { registre, stockage, resoudreCle } = await nouveauRegistre();
+    await registre.journaliser("SUPPRESSION_LIGNE", { table: "T4", article: "Spritz Aperol", montantTTC: 1100 }, "lea");
+    await registre.journaliser("IMPRESSION_ADDITION", { table: "T4", totalTTC: 400 }, "lea");
+    expect((await stockage.lister("evenements")).map((e) => [e.code, e.operateurId])).toEqual([
+      ["SUPPRESSION_LIGNE", "lea"],
+      ["IMPRESSION_ADDITION", "lea"],
+    ]);
+    expect((await verifierRegistre(stockage, resoudreCle)).integre).toBe(true);
+  });
+
   it("journalise les remises", async () => {
     const { registre, stockage } = await nouveauRegistre();
     await registre.enregistrerVente({

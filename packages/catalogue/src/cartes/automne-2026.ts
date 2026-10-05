@@ -3,7 +3,7 @@ import { TVA, type Catalogue } from "../types.js";
 const { RESTAURATION, NORMAL } = TVA;
 
 /**
- * Carte automne 2026, transcrite du PDF « Charles_Carte_v5 » fourni le 5 octobre 2026.
+ * Carte automne 2026 du Moka (ex-« Charles »), transcrite du PDF « Charles_Carte_v5 » fourni le 5 octobre 2026.
  * Prix TTC en centimes, service compris. Taux de TVA sur place.
  *
  * Points marqués `aCompleter` : à fournir avant la mise en caisse.
@@ -429,7 +429,6 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
           description: "Format 2 h, 6 à 8 personnes",
           prixTTC: 7000,
           tauxTVA: NORMAL,
-          aCompleter: "Taux de TVA à valider avec Audrex (prestation incluant de l'alcool : 20 % retenu par défaut)",
         },
       ],
     },

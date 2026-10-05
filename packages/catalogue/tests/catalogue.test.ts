@@ -38,7 +38,6 @@ describe("carte automne 2026", () => {
       "vin-verre",
       "vin-bouteille",
       "biere-artisanale",
-      "atelier-cocktails",
     ]);
   });
 

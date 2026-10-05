@@ -126,6 +126,10 @@ export type CodeEvenement =
   | "ANNULATION"
   | "IMPRESSION_TICKET"
   | "REIMPRESSION_TICKET"
+  /** Article retiré d'une commande ouverte avant encaissement. */
+  | "SUPPRESSION_LIGNE"
+  /** Addition (note provisoire) imprimée avant encaissement. */
+  | "IMPRESSION_ADDITION"
   | "OUVERTURE_TIROIR"
   | "LECTURE_X"
   | "CLOTURE"
