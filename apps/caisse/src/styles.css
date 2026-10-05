@@ -372,10 +372,16 @@ fieldset {
 legend {
   float: left;
   width: 100%;
+  padding: 0;
   font-family: var(--police-chiffres);
   font-weight: 700;
   font-size: 1.1rem;
   margin-bottom: 12px;
+}
+
+/* La légende flotte (rendu Safari/Chrome homogène) : le contenu repart dessous. */
+legend + * {
+  clear: both;
 }
 
 .champ {
