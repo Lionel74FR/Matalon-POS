@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Tester la caisse du Moka</title>
+<link rel="icon" href="/icone.svg" type="image/svg+xml">
+<style>
+  :root {
+    --espresso: #2b1e18;
+    --espresso-2: #3a2a22;
+    --papier: #f7eee3;
+    --papier-2: #efe3d3;
+    --encre: #2b1e18;
+    --encre-douce: #6d5a4c;
+    --terre: #c0562e;
+    --vert: #4f7a3f;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--papier);
+    color: var(--encre);
+    font: 17px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  header {
+    background: var(--espresso);
+    color: var(--papier);
+    padding: 40px 20px 32px;
+  }
+  .colonne { max-width: 760px; margin: 0 auto; }
+  header img { width: 56px; height: 56px; }
+  h1 { font-size: 2rem; line-height: 1.15; margin: 14px 0 10px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: #d9c3a5; max-width: 60ch; }
+  main { padding: 8px 20px 64px; }
+  h2 {
+    font-size: 1.35rem;
+    margin: 44px 0 12px;
+    padding-top: 20px;
+    border-top: 2px dashed #d8c7b2;
+  }
+  h3 { font-size: 1.05rem; margin: 22px 0 6px; }
+  p, li { max-width: 68ch; }
+  .encadre {
+    background: #fff8ee;
+    border-left: 5px solid var(--terre);
+    padding: 14px 18px;
+    margin: 20px 0;
+  }
+  .encadre strong { color: var(--terre); }
+  .bouton {
+    font-weight: 700;
+    white-space: nowrap;
+    background: var(--espresso-2);
+    color: var(--papier);
+    padding: 1px 8px;
+    border-radius: 5px;
+    font-size: 0.92em;
+  }
+  ol.etapes { padding-left: 1.3em; }
+  ol.etapes li { margin: 8px 0; }
+  a { color: var(--terre); }
+  .lien-caisse {
+    display: inline-block;
+    margin: 6px 0 2px;
+    padding: 12px 18px;
+    background: var(--terre);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    border-radius: 8px;
+  }
+  /* Scénarios : cases à cocher, mémorisées sur cet appareil. */
+  .scenario {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px 18px 14px;
+    margin: 14px 0;
+    box-shadow: 0 0 0 1px #e6d8c6;
+  }
+  .scenario.fait { box-shadow: 0 0 0 2px var(--vert); }
+  .scenario > label {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+  }
+  .scenario input {
+    width: 24px;
+    height: 24px;
+    margin: 1px 0 0;
+    flex: none;
+    accent-color: var(--vert);
+  }
+  .scenario ol { margin: 10px 0 6px; padding-left: 1.3em; }
+  .scenario li { margin: 5px 0; }
+  .attendu {
+    margin: 8px 0 0;
+    padding: 8px 12px;
+    background: var(--papier);
+    border-radius: 6px;
+    font-size: 0.95rem;
+  }
+  .attendu b { color: var(--vert); }
+  .progression { font-weight: 700; color: var(--encre-douce); }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #e0d1bf; vertical-align: top; }
+  th { color: var(--encre-douce); font-weight: 600; }
+  footer { color: var(--encre-douce); font-size: 0.9rem; padding: 0 20px 40px; }
+  @media (max-width: 520px) {
+    h1 { font-size: 1.6rem; }
+    body { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="colonne">
+    <img src="/icone.svg" alt="">
+    <h1>Tester la caisse du Moka</h1>
+    <p>Guide pour le service test de la nouvelle caisse sur iPad, avant l'ouverture du jeudi 15 octobre. Comptez 45 minutes pour tout parcourir.</p>
+  </div>
+</header>
+
+<main class="colonne">
+  <div class="encadre">
+    <strong>Caisse de test.</strong> Rien de ce que vous saisissez n'a de valeur : chaque ticket porte la mention « CAISSE DE TEST – SANS VALEUR » et les données restent séparées de la vraie caisse. N'encaissez aucun vrai client avec.
+  </div>
+
+  <h2>1. Ce qu'il vous faut</h2>
+  <ul>
+    <li>L'iPad de la caisse, connecté au Wi-Fi du Moka.</li>
+    <li>L'imprimante Epson TM-m30III allumée, avec du papier, reliée à la box. Le tiroir-caisse branché à l'arrière de l'imprimante.</li>
+    <li>Votre code PIN, transmis par Lionel. Si l'iPad n'a pas encore été mis en service, voir l'étape 3.</li>
+  </ul>
+
+  <h2>2. Installer la caisse sur l'iPad</h2>
+  <ol class="etapes">
+    <li>Sur l'iPad, ouvrez Safari à cette adresse :<br>
+      <a class="lien-caisse" href="https://moka-caisse-test.vercel.app">moka-caisse-test.vercel.app</a></li>
+    <li>Touchez le bouton Partager (le carré avec une flèche), puis <b>Sur l'écran d'accueil</b>, puis <b>Ajouter</b>.</li>
+    <li>Fermez Safari et lancez la caisse depuis la nouvelle icône Moka. Travaillez toujours depuis cette icône : dans Safari, l'iPad peut effacer les données.</li>
+  </ol>
+
+  <h2>3. Mise en service (une seule fois par iPad)</h2>
+  <p>Si la caisse affiche « Qui prend le service ? », elle est déjà en service : passez à l'étape 4.</p>
+  <p>Sinon, remplissez l'écran « Mise en service de la caisse de test ». Pour un test, des informations fictives conviennent (un SIRET compte 14 chiffres). Choisissez un code PIN à 4 chiffres pour le responsable et notez-le.</p>
+
+  <h2>4. Connecter l'imprimante</h2>
+  <p>L'assistant <b>Connecter l'imprimante</b> s'ouvre après la mise en service. On le retrouve dans <span class="bouton">Réglages</span> › <span class="bouton">Assistant de connexion</span>. Suivez ses six étapes à l'écran.</p>
+  <div class="encadre">
+    <strong>Étape à surveiller : « Autoriser ».</strong> Safari affiche « Cette connexion n'est pas privée » : touchez Afficher les détails, puis consulter ce site web, puis confirmez. Si le test de connexion échoue ensuite malgré tout, faites une capture d'écran de l'assistant et envoyez-la à Lionel : c'est le point le plus important de ce test.
+  </div>
+
+  <h2>5. Scénarios à dérouler</h2>
+  <p>Cochez chaque scénario une fois terminé. Les cases restent cochées sur cet appareil. <span class="progression" id="progression"></span></p>
+
+  <section class="scenario" data-id="s1">
+    <label><input type="checkbox">Vente au comptoir, payée par carte</label>
+    <ol>
+      <li>Touchez <span class="bouton">Vente comptoir</span>.</li>
+      <li>Ajoutez un Cappuccino et un Croissant (rayon Cuisine, catégorie Viennoiseries).</li>
+      <li><span class="bouton">Encaisser</span> › <span class="bouton">Carte bancaire</span> › <span class="bouton">Valider l'encaissement</span>. Saisissez le même montant sur le TPE.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> « Encaissé 6,00 € ». La note ne sort pas toute seule sous 25 € : <span class="bouton">Imprimer la note</span> l'imprime.</p>
+  </section>
+
+  <section class="scenario" data-id="s2">
+    <label><input type="checkbox">Table avec choix, formule et addition</label>
+    <ol>
+      <li>Depuis <span class="bouton">Salle</span>, ouvrez la table 4, puis <b>Indiquer les couverts</b> : 2.</li>
+      <li>Ajoutez un Bubble tea : choisissez Taro et le supplément Perles popping.</li>
+      <li>Rayon Formules : Brunch Moka, faites les quatre choix demandés.</li>
+      <li>Rayon Bar, catégorie Spritz : un Spritz Aperol.</li>
+      <li>Revenez à la salle : la table 4 apparaît occupée, avec son montant.</li>
+      <li>Rouvrez-la et touchez <span class="bouton">Addition</span>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> l'addition s'imprime avec la mention « Note provisoire, ne vaut pas ticket de caisse ». Gardez la table ouverte pour le scénario suivant.</p>
+  </section>
+
+  <section class="scenario" data-id="s3">
+    <label><input type="checkbox">Offert, retrait d'un article, paiement en espèces</label>
+    <ol>
+      <li>Table 4 : touchez la ligne Spritz Aperol › <b>Offert</b> › motif <b>Offert maison</b> › Valider.</li>
+      <li>Touchez la ligne Bubble tea Taro › <span class="bouton">Retirer de la commande</span>, puis la même chose pour la ligne Suppl. Perles popping.</li>
+      <li><span class="bouton">Encaisser</span> › billet de 50 € › <span class="bouton">Valider l'encaissement</span>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> le spritz apparaît « Offert » à 0 €, la monnaie à rendre s'affiche en grand, le tiroir s'ouvre et la table redevient libre.</p>
+  </section>
+
+  <section class="scenario" data-id="s4">
+    <label><input type="checkbox">Paiement en plusieurs fois</label>
+    <ol>
+      <li>Ouvrez une autre table, ajoutez un Déjeuner Moka (19 €, faites les trois choix) et deux Cheesecake citron.</li>
+      <li><span class="bouton">Encaisser</span> : tapez 10,00 au pavé (1000) › <span class="bouton">Titre-restaurant papier</span>.</li>
+      <li>Le reste s'affiche : <span class="bouton">Carte bancaire</span> pour solder, puis validez.</li>
+      <li>Essayez aussi de payer en carte plus que le reste : la caisse doit refuser.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> deux paiements sur le même ticket, note imprimée d'office (plus de 25 €).</p>
+  </section>
+
+  <section class="scenario" data-id="s5">
+    <label><input type="checkbox">Compte serveur et validation responsable</label>
+    <ol>
+      <li><span class="bouton">Réglages</span> › Équipe : ajoutez un serveur avec un code PIN, puis <span class="bouton">Ajouter à l'équipe</span>.</li>
+      <li>En haut à droite, <span class="bouton">Quitter</span>, puis connectez-vous avec ce serveur.</li>
+      <li>Vérifiez que l'onglet Réglages n'apparaît plus.</li>
+      <li>Sur une table, tentez une remise de 20 % sur une ligne.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la caisse demande le code PIN d'un responsable avant d'accepter la remise.</p>
+  </section>
+
+  <section class="scenario" data-id="s6">
+    <label><input type="checkbox">Annulation et duplicata</label>
+    <ol>
+      <li>Onglet <span class="bouton">Tickets</span> : touchez le ticket du scénario 1.</li>
+      <li><span class="bouton">Imprimer un duplicata</span>.</li>
+      <li>Puis <span class="bouton">Annuler ce ticket</span>, choisissez un motif et validez.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> le duplicata porte « DUPLICATA n° 1 ». L'annulation crée un nouveau ticket négatif ; le ticket d'origine apparaît barré, il n'est jamais supprimé.</p>
+  </section>
+
+  <section class="scenario" data-id="s7">
+    <label><input type="checkbox">Imprimante en défaut</label>
+    <ol>
+      <li>Ouvrez le capot de l'imprimante, puis lancez <span class="bouton">Addition</span> sur une table.</li>
+      <li>Refermez le capot et recommencez.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> un message clair (« capot ouvert ») et l'addition affichée à l'écran ; tout repart une fois le capot refermé.</p>
+  </section>
+
+  <section class="scenario" data-id="s8">
+    <label><input type="checkbox">Clôture de la journée</label>
+    <ol>
+      <li>Onglet <span class="bouton">Clôtures</span> › <span class="bouton">Lecture X</span> : vérifiez les totaux par moyen de paiement.</li>
+      <li><span class="bouton">Clôturer la journée (Z)</span> › <span class="bouton">Clôturer et imprimer le Z</span>.</li>
+      <li><span class="bouton">Vérifier l'intégrité</span>.</li>
+      <li><span class="bouton">Export comptable CSV</span> : le fichier se télécharge.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> le ticket Z sort avec le total, la TVA à 10 % et 20 % et les encaissements par mode ; le contrôle affiche « Chaînes intactes ». Comparez le total CB du Z avec le relevé du TPE.</p>
+  </section>
+
+  <h2>6. Signaler un problème</h2>
+  <p>Pour chaque souci, envoyez à Lionel :</p>
+  <table>
+    <tr><th>Quoi</th><th>Exemple</th></tr>
+    <tr><td>L'heure</td><td>14 h 32</td></tr>
+    <tr><td>L'écran et le bouton touché</td><td>Encaissement, bouton Titre-restaurant carte</td></tr>
+    <tr><td>Ce qui s'est passé</td><td>Rien ne se passe, le montant reste à 0</td></tr>
+    <tr><td>Ce que vous attendiez</td><td>Le paiement s'ajoute à la liste</td></tr>
+    <tr><td>Une capture d'écran</td><td>Bouton du haut + bouton volume en même temps</td></tr>
+  </table>
+  <p>Les remarques d'usage comptent autant que les pannes : un bouton trop petit, un article introuvable, un libellé peu clair.</p>
+</main>
+
+<footer class="colonne">Matalon POS · caisse de test du Moka · ce guide ne contient aucune donnée de caisse.</footer>
+
+<script>
+  (function () {
+    var cle = "guide-moka-scenarios";
+    var etat = {};
+    try { etat = JSON.parse(localStorage.getItem(cle) || "{}"); } catch (e) {}
+    var scenarios = document.querySelectorAll(".scenario");
+    function majProgression() {
+      var faits = 0;
+      scenarios.forEach(function (s) { if (s.classList.contains("fait")) faits++; });
+      document.getElementById("progression").textContent = faits + " sur " + scenarios.length + " faits.";
+    }
+    scenarios.forEach(function (s) {
+      var c = s.querySelector("input");
+      c.checked = !!etat[s.dataset.id];
+      s.classList.toggle("fait", c.checked);
+      c.addEventListener("change", function () {
+        etat[s.dataset.id] = c.checked;
+        s.classList.toggle("fait", c.checked);
+        try { localStorage.setItem(cle, JSON.stringify(etat)); } catch (e) {}
+        majProgression();
+      });
+    });
+    majProgression();
+  })();
+</script>
+</body>
+</html>
