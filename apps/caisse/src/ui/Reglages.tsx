@@ -22,7 +22,7 @@ const CHAMPS: Array<[keyof Etablissement, string]> = [
   ["tvaIntracom", "N° de TVA intracommunautaire"],
 ];
 
-export function Reglages() {
+export function Reglages(props: { onAssistant: () => void }) {
   const { caisse, config, majConfig, notifier, imprimer } = useCaisse();
   const [etablissement, setEtablissement] = useState(config.etablissement);
   const [imprimante, setImprimante] = useState(config.imprimante);
@@ -98,6 +98,9 @@ export function Reglages() {
         <div>
           <fieldset>
             <legend>Imprimante Epson</legend>
+            <button className="bouton principal" onClick={props.onAssistant}>
+              Assistant de connexion
+            </button>
             <label className="champ">
               <span>
                 Adresse IP
@@ -114,10 +117,6 @@ export function Reglages() {
               <input type="checkbox" checked={imprimante.sansAccents} onChange={(e) => setImprimante({ ...imprimante, sansAccents: e.target.checked })} />
               Imprimer sans accents (si l'impression les déforme)
             </label>
-            <p className="explication">
-              Avant le premier test, ouvrez https://{imprimante.adresse || "adresse-ip"} dans Safari sur cet iPad et acceptez le
-              certificat de l'imprimante.
-            </p>
             <button
               className="bouton"
               onClick={() =>

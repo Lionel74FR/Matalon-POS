@@ -18,10 +18,10 @@ describe("carte automne 2026", () => {
     const prix = (id: string) => trouverArticle(CARTE_AUTOMNE_2026, id)?.prixTTC;
     expect(prix("espresso")).toBe(250);
     expect(prix("pain-au-chocolat")).toBe(220);
-    expect(prix("egg-muffin-charles")).toBe(950);
+    expect(prix("egg-muffin-moka")).toBe(950);
     expect(prix("moscow-mule")).toBe(1300);
     expect(prix("planche-mer")).toBe(2400);
-    expect(prix("dejeuner-charles")).toBe(1900);
+    expect(prix("dejeuner-moka")).toBe(1900);
   });
 
   it("applique 20 % aux boissons alcoolisées et 10 % au reste", () => {

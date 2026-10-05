@@ -165,7 +165,7 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
         { id: "golden-hour", nom: "Golden Hour", description: "Bourbon, abricot, citron, miel, romarin brûlé", prixTTC: 1300, tauxTVA: NORMAL },
         { id: "disco-sour", nom: "Disco Sour", description: "Patrón Silver, citron vert, hibiscus, blanc d'œuf", prixTTC: 1300, tauxTVA: NORMAL },
         { id: "le-refuge", nom: "Le Refuge", description: "Bombay Sapphire, camomille infusée, citron, tonic", prixTTC: 1300, tauxTVA: NORMAL },
-        { id: "cafe-charles", nom: "Café Charles", description: "Grey Goose, liqueur de café, espresso maison", prixTTC: 1300, tauxTVA: NORMAL },
+        { id: "cafe-moka", nom: "Café Moka", description: "Grey Goose, liqueur de café, espresso maison", prixTTC: 1300, tauxTVA: NORMAL },
         { id: "perles-rhum", nom: "Perles & Rhum", description: "Bacardí Carta Blanca, fraise, citron vert, perles popping", prixTTC: 1300, tauxTVA: NORMAL },
       ],
     },
@@ -174,7 +174,7 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
       nom: "Spritz",
       rayon: "Bar",
       articles: [
-        { id: "charles-spritz", nom: "Charles Spritz St-Germain", description: "St-Germain, prosecco, sureau maison, écorce d'orange", prixTTC: 1100, tauxTVA: NORMAL },
+        { id: "moka-spritz", nom: "Moka Spritz St-Germain", description: "St-Germain, prosecco, sureau maison, écorce d'orange", prixTTC: 1100, tauxTVA: NORMAL },
         { id: "martini-fiero-spritz", nom: "Martini Fiero Spritz", prixTTC: 1100, tauxTVA: NORMAL },
         { id: "limoncello-spritz", nom: "Limoncello Spritz", prixTTC: 1100, tauxTVA: NORMAL },
         { id: "martini-bianco-spritz", nom: "Martini Bianco Spritz", prixTTC: 1100, tauxTVA: NORMAL },
@@ -280,7 +280,7 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
       nom: "Œufs & egg muffins",
       rayon: "Cuisine",
       articles: [
-        { id: "egg-muffin-charles", nom: "Egg muffin Charles", description: "Muffin toasté, œuf poché, bacon grillé, cheddar affiné", prixTTC: 950, tauxTVA: RESTAURATION },
+        { id: "egg-muffin-moka", nom: "Egg muffin Moka", description: "Muffin toasté, œuf poché, bacon grillé, cheddar affiné", prixTTC: 950, tauxTVA: RESTAURATION },
         { id: "egg-muffin-vege", nom: "Egg muffin végétarien", description: "Muffin toasté, œuf poché, avocat, épinards, graines", prixTTC: 850, tauxTVA: RESTAURATION },
         { id: "oeufs-poches-saumon", nom: "Œufs pochés, saumon fumé", description: "Deux œufs pochés, saumon fumé, crème d'aneth, pain de campagne", prixTTC: 1400, tauxTVA: RESTAURATION },
         { id: "oeufs-brouilles", nom: "Œufs brouillés & pain de campagne", description: "Ciboulette, beurre demi-sel", prixTTC: 1100, tauxTVA: RESTAURATION },
@@ -302,7 +302,7 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
       nom: "Salades",
       rayon: "Cuisine",
       articles: [
-        { id: "salade-charles", nom: "Salade Charles", description: "Comté affiné, noix, pomme verte, sucrine, vinaigrette au miel", prixTTC: 1400, tauxTVA: RESTAURATION },
+        { id: "salade-moka", nom: "Salade Moka", description: "Comté affiné, noix, pomme verte, sucrine, vinaigrette au miel", prixTTC: 1400, tauxTVA: RESTAURATION },
         { id: "cesar", nom: "César revisitée", description: "Poulet fermier grillé, sucrine, parmesan, croûtons de focaccia", prixTTC: 1500, tauxTVA: RESTAURATION },
         { id: "salade-du-lac", nom: "Salade du Lac", description: "Truite fumée, avocat, quinoa, aneth, citron", prixTTC: 1600, tauxTVA: RESTAURATION },
         { id: "bowl-vegetal", nom: "Bowl végétal", description: "Céréales, légumes de saison, houmous, graines torréfiées", prixTTC: 1300, tauxTVA: RESTAURATION },
@@ -345,7 +345,7 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
       nom: "Planches pour deux",
       rayon: "À partager",
       articles: [
-        { id: "planche-charles", nom: "Planche Charles", description: "Charcuterie de Savoie, comté affiné, focaccia, olives, pickles maison", prixTTC: 2200, tauxTVA: RESTAURATION },
+        { id: "planche-moka", nom: "Planche Moka", description: "Charcuterie de Savoie, comté affiné, focaccia, olives, pickles maison", prixTTC: 2200, tauxTVA: RESTAURATION },
         { id: "planche-bergere", nom: "Planche Bergère", description: "Trois fromages, confiture maison, noix, pain de campagne", prixTTC: 1800, tauxTVA: RESTAURATION },
         { id: "planche-mer", nom: "Planche Mer", description: "Saumon fumé, truite, terrine de poisson, focaccia, citron", prixTTC: 2400, tauxTVA: RESTAURATION },
       ],
@@ -369,8 +369,8 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
       rayon: "Formules",
       articles: [
         {
-          id: "brunch-charles",
-          nom: "Brunch Charles",
+          id: "brunch-moka",
+          nom: "Brunch Moka",
           description: "9 h — 14 h",
           prixTTC: 1600,
           tauxTVA: RESTAURATION,
@@ -390,8 +390,8 @@ export const CARTE_AUTOMNE_2026: Catalogue = {
           formule: [{ id: "boisson-chaude", nom: "Boisson chaude", categories: ["cafes", "latte-creations", "thes"] }],
         },
         {
-          id: "dejeuner-charles",
-          nom: "Déjeuner Charles",
+          id: "dejeuner-moka",
+          nom: "Déjeuner Moka",
           description: "12 h — 15 h",
           prixTTC: 1900,
           tauxTVA: RESTAURATION,

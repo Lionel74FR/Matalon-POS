@@ -19,6 +19,13 @@ import { StockageIndexedDB } from "../donnees/stockage-idb";
 declare const __BUILD__: string;
 export const VERSION_APPLICATION = typeof __BUILD__ === "string" ? __BUILD__ : "dev";
 
+/**
+ * Caisse de test (déploiement de préversion) : données séparées de la
+ * production (autre adresse, donc autre stockage), bandeau permanent et
+ * mention « sans valeur » sur chaque ticket.
+ */
+export const MODE_TEST = import.meta.env.VITE_MODE_TEST === "1";
+
 /** Heure de Paris à laquelle bascule la journée comptable. */
 export const HEURE_BASCULE = 5;
 
@@ -86,7 +93,7 @@ export interface SaisieInstallation {
 export async function installer(db: BaseCaisse, s: SaisieInstallation): Promise<Caisse> {
   if (await db.get("config", "configuration")) throw new Error("Cette caisse est déjà installée.");
   const caisseId = identifiantAleatoire("ipad");
-  const etablissementId = "moka";
+  const etablissementId = MODE_TEST ? "moka-test" : "moka";
   const paire = await genererPaireCles(`${etablissementId}-${caisseId}-k1`);
   const responsableId = identifiantAleatoire("u");
   const config: Configuration = {

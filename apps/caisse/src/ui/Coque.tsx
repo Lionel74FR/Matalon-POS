@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ID_COMPTOIR } from "../donnees/configuration";
 import { nouvelleCommande, type Commande } from "../metier/commande";
 import { nomTable } from "../impression/gabarits";
+import { MODE_TEST } from "../fiscal/caisse";
+import { AssistantImprimante } from "./AssistantImprimante";
 import { Clotures } from "./Clotures";
 import { useCaisse } from "./contexte";
 import { PriseCommande } from "./PriseCommande";
@@ -21,7 +23,8 @@ function useHorloge() {
 }
 
 export function Coque() {
-  const { caisse, config, utilisateur, deconnecter } = useCaisse();
+  const { caisse, config, utilisateur, deconnecter, majConfig, notifier } = useCaisse();
+  const [assistant, setAssistant] = useState(false);
   const [vue, setVue] = useState<Vue>({ nom: "salle" });
   const [commandes, setCommandes] = useState<Map<string, Commande>>(new Map());
   const [horlogeSuspecte, setHorlogeSuspecte] = useState(false);
@@ -93,10 +96,21 @@ export function Coque() {
           </button>
         </div>
       </nav>
+      {MODE_TEST && (
+        <div className="bandeau-test">Caisse de test : les tickets n'ont aucune valeur et restent séparés de la vraie caisse.</div>
+      )}
       {horlogeSuspecte && (
         <div className="bandeau-alerte">
           L'heure de l'iPad est antérieure au dernier ticket. Réglez la date et l'heure dans les réglages de l'iPad avant
           d'encaisser.
+        </div>
+      )}
+      {!config.imprimante.adresse && utilisateur.role === "responsable" && (
+        <div className="bandeau-info">
+          Aucune imprimante connectée : les notes et les Z s'affichent à l'écran.
+          <button className="bouton" onClick={() => setAssistant(true)}>
+            Connecter l'imprimante
+          </button>
         </div>
       )}
       <main className="contenu">
@@ -116,8 +130,20 @@ export function Coque() {
         )}
         {vue.nom === "tickets" && <Tickets />}
         {vue.nom === "clotures" && <Clotures commandesOuvertes={commandes.size} />}
-        {vue.nom === "reglages" && <Reglages />}
+        {vue.nom === "reglages" && <Reglages onAssistant={() => setAssistant(true)} />}
       </main>
+      {assistant && (
+        <div className="assistant-calque">
+          <AssistantImprimante
+            config={config}
+            onTerminer={(imprimante) => {
+              void majConfig({ ...config, imprimante }).then(() => notifier("Imprimante connectée."));
+              setAssistant(false);
+            }}
+            onPlusTard={() => setAssistant(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

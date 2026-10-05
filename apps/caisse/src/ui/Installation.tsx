@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { BaseCaisse } from "../donnees/base";
 import { genererTables, type Etablissement } from "../donnees/configuration";
-import { installer, type Caisse } from "../fiscal/caisse";
+import { installer, MODE_TEST, type Caisse } from "../fiscal/caisse";
 
 const CHAMPS: Array<{ cle: keyof Etablissement; libelle: string; aide?: string; requis?: boolean }> = [
   { cle: "enseigne", libelle: "Enseigne", requis: true },
@@ -56,7 +56,7 @@ export function Installation(props: { db: BaseCaisse; onInstallee: (c: Caisse) =
   return (
     <div className="ecran-installation">
       <header>
-        <h1>Mise en service de la caisse</h1>
+        <h1>Mise en service de la caisse{MODE_TEST ? " de test" : ""}</h1>
         <p>
           Ces informations figurent sur chaque note client. Elles se modifient ensuite dans les réglages, sauf l'identité de
           cette caisse et sa clé de signature, créées une fois pour toutes.

@@ -30,6 +30,16 @@ await champ("Confirmer le code").fill("1234");
 await capture("01-installation");
 await clic("Mettre la caisse en service");
 
+// Assistant imprimante : on parcourt les premières étapes puis on remet à plus tard.
+await p.getByText("Connecter l'imprimante").first().waitFor();
+await capture("01b-assistant-brancher");
+await clic("C'est branché");
+await p.locator(".champ-ip input").fill("192.168.1.50");
+await capture("01c-assistant-adresse");
+await clic("Continuer");
+await capture("01d-assistant-certificat");
+await clic("Configurer plus tard");
+
 await p.getByText("Qui prend le service ?").waitFor();
 await capture("02-connexion");
 await p.locator(".carte-personne", { hasText: "Lionel" }).click();
@@ -50,9 +60,9 @@ await clic("Spritz");
 await p.locator(".tuile", { hasText: "Spritz Aperol" }).click();
 await p.getByRole("tab", { name: "Cuisine", exact: true }).click();
 await clic("Œufs & egg muffins");
-await p.locator(".tuile", { hasText: "Egg muffin Charles" }).click();
+await p.locator(".tuile", { hasText: "Egg muffin Moka" }).click();
 await p.getByRole("tab", { name: "Formules", exact: true }).click();
-await p.locator(".tuile", { hasText: "Déjeuner Charles" }).click();
+await p.locator(".tuile", { hasText: "Déjeuner Moka" }).click();
 await capture("03-formule");
 for (const choix of ["Plat du jour", "Cheesecake citron", "Flat white"]) await clic(choix);
 await p.getByRole("button", { name: /^Ajouter/ }).click();

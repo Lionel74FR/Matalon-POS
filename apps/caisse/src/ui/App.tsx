@@ -5,6 +5,7 @@ import type { Configuration, Utilisateur } from "../donnees/configuration";
 import { demarrer, enregistrerConfiguration, prendreVerrouCaisse, type Caisse } from "../fiscal/caisse";
 import { envoyerEpson } from "../impression/epson";
 import type { Recu } from "../impression/recu";
+import { AssistantImprimante } from "./AssistantImprimante";
 import { Connexion } from "./Connexion";
 import { Contexte, type ContexteCaisse } from "./contexte";
 import { Coque } from "./Coque";
@@ -17,6 +18,7 @@ type Phase =
   | { nom: "autreOnglet" }
   | { nom: "erreur"; message: string }
   | { nom: "installation"; db: BaseCaisse }
+  | { nom: "assistantImprimante"; caisse: Caisse }
   | { nom: "connexion"; caisse: Caisse }
   | { nom: "caisse"; caisse: Caisse; utilisateur: Utilisateur };
 
@@ -113,7 +115,20 @@ export function App() {
       );
       break;
     case "installation":
-      contenu = <Installation db={phase.db} onInstallee={(caisse) => setPhase({ nom: "connexion", caisse })} />;
+      contenu = <Installation db={phase.db} onInstallee={(caisse) => setPhase({ nom: "assistantImprimante", caisse })} />;
+      break;
+    case "assistantImprimante":
+      contenu = (
+        <AssistantImprimante
+          config={phase.caisse.config}
+          onTerminer={(imprimante) =>
+            void enregistrerConfiguration(phase.caisse, { ...phase.caisse.config, imprimante }).then((caisse) =>
+              setPhase({ nom: "connexion", caisse }),
+            )
+          }
+          onPlusTard={() => setPhase({ nom: "connexion", caisse: phase.caisse })}
+        />
+      );
       break;
     case "connexion":
       contenu = (

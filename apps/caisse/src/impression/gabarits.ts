@@ -9,6 +9,7 @@ import {
   type VentilationTVA,
 } from "@matalon/noyau-fiscal";
 import type { Configuration } from "../donnees/configuration";
+import { MODE_TEST } from "../fiscal/caisse";
 import { totauxCommande, versSaisie, type Commande } from "../metier/commande";
 import { Recu } from "./recu";
 
@@ -31,6 +32,7 @@ export const nomUtilisateur = (config: Configuration, id: string | null) =>
 
 function entete(r: Recu, config: Configuration): void {
   const e = config.etablissement;
+  if (MODE_TEST) r.texte("CAISSE DE TEST - SANS VALEUR", { align: "centre", gras: true }).filet();
   r.texte(e.enseigne, { align: "centre", gras: true, grand: true }).saut();
   for (const l of [e.raisonSociale, e.adresse, e.codePostalVille, e.telephone && `Tél. ${e.telephone}`]) {
     if (l) r.texte(l, { align: "centre" });

@@ -137,3 +137,15 @@ describe("impression", () => {
     expect(texteZ.join("\n")).toContain("Grand total perpétuel");
   });
 });
+
+describe("réponses de l'imprimante", () => {
+  it("interprète l'état ePOS-Print", async () => {
+    const { lireReponse } = await import("../src/impression/epson");
+    expect(lireReponse('<response success="true" code="" status="251658262"/>')).toMatchObject({ succes: true, pret: true, problemes: [] });
+    const capot = lireReponse('<response success="false" code="EPTR_COVER_OPEN" status="${0x20 | 0x8}"/>'.replace("${0x20 | 0x8}", String(0x20 | 0x8)));
+    expect(capot.pret).toBe(false);
+    expect(capot.problemes).toEqual(["imprimante hors ligne", "capot ouvert"]);
+    expect(lireReponse(`<response success="true" code="" status="${0x00020000}"/>`).papierBientotFini).toBe(true);
+    expect(lireReponse('<response success="false" code="EPTR_REC_EMPTY" status="0"/>').problemes).toEqual(["plus de papier"]);
+  });
+});
