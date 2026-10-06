@@ -1,4 +1,6 @@
 import {
+  fusionImpossible,
+  fusionnerCategories,
   identifiantDepuisNom,
   lireCatalogue,
   tousLesArticles,
@@ -10,7 +12,7 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, Pencil, Plus, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, Merge, Pencil, Plus, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ResumeCarte } from "@matalon/serveur/partage";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -257,6 +259,19 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
     if (supprimer([c.id], c.articles.map((a) => a.id), libelle)) setCatId(carte.categories.find((x) => x.id !== c.id)?.id ?? null);
   };
 
+  /** Fusionne la catégorie affichée dans une autre (même taux de TVA) ; elle disparaît, ses articles passent dans l'autre. */
+  const fusionnerDans = (source: Categorie, cibleId: string) => {
+    const cible = carte.categories.find((c) => c.id === cibleId);
+    if (!cible) return;
+    const raison = fusionImpossible(source, cible);
+    if (raison) return window.alert(`Fusion impossible : ${raison}.`);
+    const n = source.articles.length;
+    if (!window.confirm(`Fusionner « ${source.nom} » dans « ${cible.nom} » ? ${n ? `Ses ${n} article${n > 1 ? "s" : ""} passent dans « ${cible.nom} », ` : ""}les formules qui la proposaient proposeront « ${cible.nom} », et « ${source.nom} » disparaît.`)) return;
+    setCarte(fusionnerCategories(carte, source.id, cible.id));
+    setEtat("");
+    setCatId(cible.id);
+  };
+
   const ajouterArticle = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!categorie) return;
@@ -399,6 +414,30 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                 <button className="bouton danger" onClick={() => supprimerCategorie(categorie)} title="Supprimer la catégorie">
                   <AvecIcone icone={Trash2}>Supprimer</AvecIcone>
                 </button>
+                <label className="champ editeur-fusion">
+                  <span>
+                    <Merge className="icone en-ligne" size={18} aria-hidden="true" /> Fusionner dans…
+                  </span>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) fusionnerDans(categorie, e.target.value);
+                    }}
+                  >
+                    <option value="">Choisir une catégorie</option>
+                    {carte.categories
+                      .filter((c) => c.id !== categorie.id)
+                      .map((c) => {
+                        const raison = fusionImpossible(categorie, c);
+                        return (
+                          <option key={c.id} value={c.id} disabled={!!raison}>
+                            {c.rayon} › {c.nom}
+                            {raison ? ` (${raison})` : ""}
+                          </option>
+                        );
+                      })}
+                  </select>
+                </label>
               </div>
               <table className="tableau admin-tableau editeur-table">
                 <thead>

@@ -1,4 +1,4 @@
-import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type ChoixFormule, type Supplement, type Variante } from "./types.js";
+import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type Supplement, type Variante } from "./types.js";
 
 export * from "./types.js";
 export { lireCatalogue, LIMITES_CARTE } from "./lecture.js";
@@ -143,4 +143,46 @@ export function optionsChoix(c: Catalogue, choix: ChoixFormule): Array<Article &
 /** Un article se vend s'il est disponible et si chaque choix de sa formule a au moins une option. */
 export function articleVendable(c: Catalogue, a: Article): boolean {
   return !a.indisponible && (a.formule ?? []).every((choix) => optionsChoix(c, choix).length > 0);
+}
+
+/** Taux de TVA des articles d'une catégorie (une catégorie vide n'en a aucun). */
+export function tauxDeCategorie(c: Categorie): number[] {
+  return [...new Set(c.articles.map((a) => a.tauxTVA))].sort((a, b) => a - b);
+}
+
+/**
+ * Pourquoi deux catégories ne peuvent pas être fusionnées, ou `null` si elles
+ * le peuvent : il faut qu'elles n'aient qu'un seul et même taux de TVA.
+ */
+export function fusionImpossible(source: Categorie, cible: Categorie): string | null {
+  if (source.id === cible.id) return "une catégorie ne se fusionne pas avec elle-même";
+  const taux = [...new Set([...tauxDeCategorie(source), ...tauxDeCategorie(cible)])];
+  if (taux.length > 1) return `taux de TVA différents (${taux.map((t) => `${t / 100} %`).join(" et ")})`;
+  return null;
+}
+
+/**
+ * Fusionne `sourceId` dans `cibleId` : les articles de la source passent à la
+ * suite de ceux de la cible, les formules qui proposaient la source proposent
+ * la cible, puis la source disparaît. La cible garde son nom et son rayon.
+ */
+export function fusionnerCategories(c: Catalogue, sourceId: string, cibleId: string): Catalogue {
+  const source = c.categories.find((x) => x.id === sourceId);
+  const cible = c.categories.find((x) => x.id === cibleId);
+  if (!source || !cible) throw new Error("Catégorie introuvable.");
+  const raison = fusionImpossible(source, cible);
+  if (raison) throw new Error(`Fusion impossible : ${raison}.`);
+  const redirige = (ids?: string[]) => (ids ? [...new Set(ids.map((x) => (x === sourceId ? cibleId : x)))] : ids);
+  return {
+    ...c,
+    categories: c.categories
+      .filter((x) => x.id !== sourceId)
+      .map((x) => (x.id === cibleId ? { ...x, articles: [...x.articles, ...source.articles] } : x))
+      .map((x) => ({
+        ...x,
+        articles: x.articles.map((a) =>
+          a.formule ? { ...a, formule: a.formule.map((ch) => (ch.categories ? { ...ch, categories: redirige(ch.categories) } : ch)) } : a,
+        ),
+      })),
+  };
 }

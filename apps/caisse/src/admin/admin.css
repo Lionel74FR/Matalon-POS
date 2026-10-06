@@ -519,6 +519,11 @@ select {
   gap: 4px;
 }
 
+/* Fusion : sous les champs de la catégorie, sur toute la largeur. */
+.editeur-cat-entete .editeur-fusion {
+  grid-column: 1 / -1;
+}
+
 .editeur-table td small {
   display: block;
   color: var(--sable);

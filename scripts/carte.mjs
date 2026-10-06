@@ -46,12 +46,20 @@ await a.getByRole("button", { name: "Valider" }).click();
 // Suppression d'une catégorie citée par des formules : les références sont retirées, la carte s'enregistre.
 await a.locator(".editeur-cat-nom", { hasText: "Thés" }).click();
 await a.getByRole("button", { name: "Supprimer", exact: true }).click();
+// Fusion : Bières dans Vins (même taux de 20 %) ; Cafés (10 %) n'est pas proposé.
+await a.locator(".editeur-cat-nom", { hasText: "Bières" }).click();
+const optionsFusion = await a.locator(".editeur-fusion select option").evaluateAll((os) => os.map((o) => [o.textContent, o.disabled]));
+const cafesInterdit = optionsFusion.some(([texte, interdit]) => /› Cafés/.test(texte) && interdit);
+await a.locator(".editeur-fusion select").selectOption("vins");
 await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistrée").waitFor();
 const enregistree = (await appel("GET", "/cartes/carte-automne-2026")).carte;
 const articlesEnregistres = enregistree.categories.flatMap((c) => c.articles);
 const varianteDouble = articlesEnregistres.find((x) => x.id === "ristretto")?.variantes?.[0]?.prixTTC;
 const thesPurges = !JSON.stringify(enregistree).includes('"thes"');
+const vinsFusionnes = enregistree.categories.some((c) => c.id === "bieres")
+  ? false
+  : enregistree.categories.find((c) => c.id === "vins")?.articles.length;
 
 // ── iPad : la carte arrive avec le rattachement ──
 const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
@@ -75,6 +83,7 @@ const avant = {
 await p.screenshot({ path: `${sortie}/c02-ipad-carte.png` });
 
 // ── Nouvelle version publiée pendant le service ──
+await a.locator(".editeur-cat-nom", { hasText: "Cafés" }).click();
 await a.getByRole("button", { name: "Espresso", exact: true }).click();
 await a.locator(".fiche-article label.champ", { hasText: "Prix TTC" }).locator("input").fill("2,80");
 await a.getByRole("button", { name: "Valider" }).click();
@@ -85,7 +94,7 @@ await p.locator(".tuile", { hasText: "2,80" }).first().waitFor({ timeout: 15000 
 const apres = await tuile("Espresso").textContent();
 
 await b.close();
-const resultat = { avant, apres, refusPrix: refusPrix > 0, varianteDouble, thesPurges, erreurs };
+const resultat = { avant, apres, refusPrix: refusPrix > 0, varianteDouble, thesPurges, cafesInterdit, vinsFusionnes, erreurs };
 console.log(JSON.stringify(resultat, null, 2));
-const ok = avant.espresso.includes("2,70") && avant.ristretto === 1 && avant.cortado.includes("Indisponible") && apres.includes("2,80") && refusPrix && varianteDouble === 350 && thesPurges && !erreurs.length;
+const ok = avant.espresso.includes("2,70") && avant.ristretto === 1 && avant.cortado.includes("Indisponible") && apres.includes("2,80") && refusPrix && varianteDouble === 350 && thesPurges && cafesInterdit && vinsFusionnes === 5 && !erreurs.length;
 if (!ok) process.exit(1);

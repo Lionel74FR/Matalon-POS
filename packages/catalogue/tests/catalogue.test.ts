@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   articlesACompleter,
+  fusionImpossible,
+  fusionnerCategories,
   CARTE_AUTOMNE_2026,
   ligneDepuisArticle,
   ligneSupplement,
@@ -129,5 +131,37 @@ describe("règles de la relecture du lot 2", () => {
     expect(articleVendable(c, c.categories[0]!.articles[1]!)).toBe(false);
     expect(identifiantDepuisNom("A", [])).toBe("a-1");
     expect(identifiantDepuisNom(`${"x".repeat(49)} y`, [])).toBe("x".repeat(49));
+  });
+});
+
+describe("fusion de catégories", () => {
+  const art = (id: string, tauxTVA: number) => ({ id, nom: id, prixTTC: 300, tauxTVA });
+  const carte = {
+    id: "c",
+    nom: "C",
+    categories: [
+      { id: "cafes", nom: "Cafés", rayon: "Boissons", articles: [art("espresso", 1000)] },
+      { id: "thes", nom: "Thés", rayon: "Boissons", articles: [art("the-vert", 1000)] },
+      { id: "vins", nom: "Vins", rayon: "Bar", articles: [art("rouge", 2000)] },
+      {
+        id: "formules",
+        nom: "Formules",
+        rayon: "Formules",
+        articles: [{ id: "pause", nom: "Pause", prixTTC: 500, tauxTVA: 1000, formule: [{ id: "boisson", nom: "Boisson", categories: ["thes", "cafes"] }] }],
+      },
+    ],
+  };
+
+  it("fusionne deux catégories au même taux et redirige les formules", () => {
+    const f = fusionnerCategories(carte as never, "thes", "cafes");
+    expect(f.categories.map((c) => c.id)).toEqual(["cafes", "vins", "formules"]);
+    expect(f.categories[0]!.articles.map((a) => a.id)).toEqual(["espresso", "the-vert"]);
+    expect(f.categories[2]!.articles[0]!.formule![0]!.categories).toEqual(["cafes"]);
+    expect(validerCatalogue(f)).toEqual([]);
+  });
+
+  it("refuse des taux de TVA différents", () => {
+    expect(fusionImpossible(carte.categories[0] as never, carte.categories[2] as never)).toContain("taux de TVA différents");
+    expect(() => fusionnerCategories(carte as never, "vins", "cafes")).toThrow(/Fusion impossible/);
   });
 });
