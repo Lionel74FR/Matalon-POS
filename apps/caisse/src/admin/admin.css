@@ -1,12 +1,23 @@
-/* Administration : page web d'ordinateur, défilante, texte sélectionnable. */
+/*
+ * Administration : page web d'ordinateur, défilante, texte sélectionnable.
+ * La caisse fige html, body et #racine (plein écran iPad) ; ici on lève tous
+ * ces verrous et seul le document défile. Avoir html, body et #racine en
+ * `overflow: auto` créait trois zones de défilement imbriquées, et la page
+ * ne défilait plus chez Lionel (alors que Chromium la faisait défiler).
+ */
 html,
 body,
 #racine {
   height: auto;
   min-height: 100%;
-  overflow: auto;
+  overflow: visible;
+  overscroll-behavior: auto;
   user-select: text;
   -webkit-user-select: text;
+}
+
+html {
+  overflow-y: auto;
 }
 
 :root {
