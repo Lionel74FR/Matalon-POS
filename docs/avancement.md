@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 6 octobre 2026 (commit 172907c).
+Dernière mise à jour : 6 octobre 2026.
 
 ## Règle de conduite
 
@@ -38,7 +38,7 @@ Dernière mise à jour : 6 octobre 2026 (commit 172907c).
 
 ## Actions en attente côté Lionel
 
-- [ ] Créer le compte administrateur sur `/admin` (toujours `initialise:false` en ligne).
+- [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
 - [ ] Remplir les mentions légales des factures dans l'administration.
 - [ ] Pousser le tag `noyau-fiscal@0.4.0` (le proxy refuse le push de tags depuis la session).
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.
