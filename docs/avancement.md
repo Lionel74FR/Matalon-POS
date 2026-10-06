@@ -24,7 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (retours du 6 octobre) | Couverts saisissables avant tout article (table installée gardée, « Libérer la table »), écran des couverts en un toucher, lignes retirées gardées barrées à l'écran, aucun paiement une fois le total réglé, confirmation au-delà de 20 € de rendu |
+| 6db3a32 | Couverts saisissables avant tout article (table installée gardée, « Libérer la table »), écran des couverts en un toucher, lignes retirées gardées barrées à l'écran, aucun paiement une fois le total réglé, confirmation au-delà de 20 € de rendu |
 | b6912c9 | Icônes dans les menus et les actions (caisse et administration), rattachement d'un iPad ou d'un iPhone (type d'appareil reconnu et affiché), administration défilante au doigt |
 | 172907c | Lot 2 : éditeur de cartes dans l'administration, cartes envoyées aux iPad (versionnées, gardées hors ligne), archives par Z côté serveur vérifiables seules, journal d'administration en ajout seul |
 | 0396872 | Lot 1 : fond de caisse et comptage au Z, facture sur demande et avoir, notes et transfert de table, CI GitHub |
