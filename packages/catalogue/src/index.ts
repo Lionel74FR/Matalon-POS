@@ -1,7 +1,13 @@
 import type { Article, Catalogue, Supplement, Variante } from "./types.js";
 
 export * from "./types.js";
-export { CARTE_AUTOMNE_2026 } from "./cartes/automne-2026.js";
+import { CARTE_AUTOMNE_2026 } from "./cartes/automne-2026.js";
+export { CARTE_AUTOMNE_2026 };
+
+/** Cartes disponibles, par identifiant. Un établissement référence sa carte par cet identifiant. */
+export const CARTES: Record<string, Catalogue> = {
+  [CARTE_AUTOMNE_2026.id]: CARTE_AUTOMNE_2026,
+};
 
 export function tousLesArticles(c: Catalogue): Array<Article & { categorieId: string }> {
   return c.categories.flatMap((cat) => cat.articles.map((a) => ({ ...a, categorieId: cat.id })));
