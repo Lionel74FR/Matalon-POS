@@ -1,4 +1,5 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
+import { CARTES, type Catalogue } from "@matalon/catalogue";
 import type { IdentiteEtablissement, ReponseEtat, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
 
 export type { Role, Table };
@@ -19,8 +20,11 @@ export interface Configuration {
   etablissement: Etablissement;
   utilisateurs: Utilisateur[];
   tables: Table[];
-  /** Identifiant de la carte de l'établissement (voir `CARTES`). */
+  /** Identifiant de la carte de l'établissement. */
   carteId: string;
+  /** Carte reçue du serveur (éditée dans l'administration) et sa version. */
+  carte?: Catalogue;
+  carteVersion?: number;
   imprimante: {
     /** Adresse IP de l'imprimante Epson (ePOS-Print), ex. 192.168.1.50. */
     adresse: string;
@@ -39,10 +43,24 @@ export function fusionnerReferentiel(config: Configuration, etat: Pick<ReponseEt
     etablissement: etat.etablissement.identite,
     utilisateurs: etat.utilisateurs,
     tables: etat.etablissement.tables,
-    carteId: etat.etablissement.carteId,
+    // La carte (et son identifiant) ne change qu'une fois la nouvelle carte téléchargée.
     seuilNoteAutomatique: etat.etablissement.seuilNote,
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
+}
+
+/**
+ * Carte utilisée pour vendre : la dernière reçue du serveur, même si une
+ * nouvelle est annoncée et pas encore téléchargée (hors ligne, on continue
+ * de vendre). La carte livrée avec l'application ne sert qu'avant la première réception.
+ */
+export function carteDe(config: Configuration): Catalogue | undefined {
+  return config.carte ?? CARTES[config.carteId];
+}
+
+/** Vrai quand la caisse doit télécharger la carte (nouvelle version ou autre carte). */
+export function carteATelecharger(config: Configuration, etat: Pick<ReponseEtat, "etablissement">): boolean {
+  return config.carte?.id !== etat.etablissement.carteId || config.carteVersion !== etat.etablissement.carteVersion;
 }
 
 export const ID_COMPTOIR = "comptoir";

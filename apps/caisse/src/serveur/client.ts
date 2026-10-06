@@ -3,6 +3,7 @@ import type {
   EtablissementApi,
   IdentiteEtablissement,
   ReponseEtat,
+  ReponseCarte,
   ReponseRattachement,
   ReponseSynchro,
   Table,
@@ -75,6 +76,10 @@ export class ClientApi {
 
   synchroniser(lot: EntreeSynchro[]) {
     return this.appel<ReponseSynchro>("POST", "/api/caisse/synchro", { lot });
+  }
+
+  carte() {
+    return this.appel<ReponseCarte>("GET", "/api/caisse/carte");
   }
 
   enregistrerEquipe(utilisateurs: UtilisateurApi[]) {

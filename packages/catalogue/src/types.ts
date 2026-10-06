@@ -46,6 +46,8 @@ export interface Article {
   fourchette?: { min: number; max: number };
   /** Information manquante avant mise en caisse. */
   aCompleter?: string;
+  /** Article retiré temporairement (rupture, hors saison) : grisé en caisse, non vendable. */
+  indisponible?: boolean;
 }
 
 export interface Categorie {
@@ -59,7 +61,12 @@ export interface Categorie {
 export interface Catalogue {
   id: string;
   nom: string;
+  /** Origine de la carte (document fourni, édition dans l'administration). */
   source: string;
+  /** Établissement pour lequel la carte a été créée (indicatif : plusieurs peuvent la partager). */
   etablissementId: string;
   categories: Categorie[];
 }
+
+/** Taux de TVA acceptés en caisse, en points de base. */
+export const TAUX_TVA_AUTORISES = [550, 1000, 2000] as const;

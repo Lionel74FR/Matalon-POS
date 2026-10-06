@@ -9,7 +9,7 @@ Caisse tactile iPad multi-établissements du groupe Matalon, conforme à l'artic
 | Dossier | Contenu | Périmètre fiscal |
 | --- | --- | --- |
 | `packages/noyau-fiscal` | Tickets chaînés et signés, journal des événements, clôtures Z / mois / exercice, vérification, archives, export CSV | **Oui**, couvert par l'attestation |
-| `packages/catalogue` | Cartes des établissements, prix, TVA, variantes, formules | Non |
+| `packages/catalogue` | Format des cartes (prix, TVA, variantes, suppléments, formules), lecture stricte et contrôles, carte d'origine du Moka | Non |
 | `packages/serveur` | API (fonction Edge Vercel, Postgres Neon) : établissements, équipes, rattachement des iPad, réplication vérifiée des chaînes, administration 2FA | Non, vérifie avec le noyau |
 | `apps/caisse` | PWA iPad (`/`), note client (`/n`), administration (`/admin`), guide de test (`/guide`) | Non, consomme le noyau |
 
@@ -35,6 +35,10 @@ Caisse tactile iPad multi-établissements du groupe Matalon, conforme à l'artic
 2. Sur l'iPad : ouvrir l'adresse dans Safari, Partager › Sur l'écran d'accueil, lancer la caisse depuis cette icône (sinon iPadOS peut purger les données), saisir le code. L'iPad crée sa clé de signature non exportable et reçoit établissement, équipe, tables et carte.
 3. Imprimante Epson TM-m30III (facultative) : relever son adresse IP (page d'état), ouvrir `https://<adresse>` dans Safari et accepter le certificat, puis suivre l'assistant de connexion.
 
+Les cartes se modifient dans l'administration (Cartes et prix) : catégories et rayons, articles, prix, TVA, disponibilité, variantes, suppléments, formules. Chaque enregistrement crée une nouvelle version (contrôle de version : deux personnes ne peuvent pas s'écraser), que les iPad téléchargent à la synchronisation suivante et gardent pour le hors ligne. La carte livrée avec le code ne sert qu'à amorcer la base.
+
+Archives : l'iPad produit l'archive signée de chaque clôture (Clôtures › Télécharger l'archive). L'administration produit aussi, sans l'iPad, l'archive d'une clôture depuis la copie du serveur : même contenu, chaque enregistrement signé par l'iPad, empreinte de la clé de l'iPad à comparer avec celle affichée dans l'administration ; `verifierArchiveServeur` (packages/serveur) la contrôle seule.
+
 L'équipe et l'identité de l'établissement sont communes à toutes ses caisses : elles se modifient dans l'administration ou dans les Réglages d'un iPad (connexion requise) et arrivent sur les autres iPad à la synchronisation suivante.
 
 L'imprimante est facultative. Sans elle, rien ne s'imprime d'office : après chaque encaissement, la note s'affiche en QR code. Le client le scanne et ouvre sa note sur `/n`, la note entière étant contenue dans le lien (aucun stockage, aucune donnée personnelle). Les Z et les additions restent consultables à l'écran. Rappel : au-delà de 25 € TTC, la note de restaurant doit être remise imprimée.
@@ -50,6 +54,10 @@ pnpm typecheck   # TypeScript strict
 pnpm --filter @matalon/caisse build
 (cd apps/caisse && node scripts/serveur-local.mjs 4180)   # caisse + API sur Postgres embarqué (PGlite)
 URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs captures   # administration, rattachement, service, Z, synchro
+# (serveur local relancé à vide entre chaque scénario)
+URL=… node scripts/carte.mjs captures              # carte éditée dans l'administration, reçue par l'iPad
+URL=… node scripts/journee-hors-ligne.mjs captures # journée entière hors ligne, copie serveur identique à l'iPad
+URL=… node scripts/note-et-iphone.mjs captures     # note client et écrans iPhone
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

@@ -2,6 +2,7 @@
  * Contrat d'API partagé entre le serveur, la caisse et l'administration.
  * Ce module ne dépend d'aucune bibliothèque serveur : la caisse l'importe.
  */
+import type { Catalogue } from "@matalon/catalogue";
 import type { Chaine, Enregistrement } from "@matalon/noyau-fiscal";
 
 export type Role = "serveur" | "responsable";
@@ -28,6 +29,8 @@ export interface EtablissementApi {
   id: string;
   identite: IdentiteEtablissement;
   carteId: string;
+  /** Version de la carte : la caisse la télécharge quand elle change. */
+  carteVersion: number;
   tables: Table[];
   /** Montant TTC (centimes) à partir duquel la note est imprimée d'office. */
   seuilNote: number;
@@ -72,6 +75,21 @@ export interface EntreeSynchro {
 export interface ReponseSynchro {
   acceptes: number;
   derniers: Derniers;
+}
+
+export interface ReponseCarte {
+  carte: Catalogue;
+  version: number;
+}
+
+export interface ResumeCarte {
+  id: string;
+  nom: string;
+  version: number;
+  majLe: string;
+  majPar: string | null;
+  nbArticles: number;
+  etablissements: string[];
 }
 
 export interface ErreurApi {

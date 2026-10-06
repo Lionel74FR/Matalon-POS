@@ -4,7 +4,7 @@ import type { SaisieLigne } from "@matalon/noyau-fiscal";
 import { _oublierMigration, codeTotp, traiter, type Db } from "@matalon/serveur";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ouvrirBase } from "../src/donnees/base";
-import { fusionnerReferentiel } from "../src/donnees/configuration";
+import { carteATelecharger, carteDe, fusionnerReferentiel } from "../src/donnees/configuration";
 import { rattacher } from "../src/fiscal/caisse";
 import { ClientApi, ErreurApi } from "../src/serveur/client";
 import { blocageEncaissement, Synchroniseur } from "../src/serveur/synchro";
@@ -140,6 +140,19 @@ describe("rattachement et synchronisation de la caisse", () => {
     const config = fusionnerReferentiel(caisse.config, etat);
     expect(config?.utilisateurs.map((u) => u.nom)).toEqual(["Léa", "Tom"]);
     expect(fusionnerReferentiel(config!, etat)).toBeNull();
+
+    // Carte reçue au rattachement, puis nouvelle version publiée dans l'administration.
+    expect(caisse.config.carteVersion).toBe(1);
+    expect(carteATelecharger(caisse.config, etat)).toBe(false);
+    const lue = await admin("GET", "/api/admin/cartes/carte-automne-2026", undefined, cookie);
+    lue.corps.carte.categories[0].articles[0].indisponible = true;
+    await admin("PUT", "/api/admin/cartes/carte-automne-2026", { carte: lue.corps.carte, version: 1 }, cookie);
+    const etat2 = await caisse.client.etat();
+    expect(carteATelecharger(caisse.config, etat2)).toBe(true);
+    const { carte, version } = await caisse.client.carte();
+    const avecCarte = { ...caisse.config, carte, carteVersion: version };
+    expect(carteDe(avecCarte)?.categories[0]?.articles[0]?.indisponible).toBe(true);
+    expect(carteATelecharger(avecCarte, etat2)).toBe(false);
 
     // Modification depuis la caisse : refusée hors ligne, avec un message clair.
     horsLigne = true;

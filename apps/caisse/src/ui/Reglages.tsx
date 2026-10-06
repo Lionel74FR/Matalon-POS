@@ -62,7 +62,8 @@ export function Reglages(props: { onAssistant: () => void }) {
           tables,
           seuilNote,
         });
-        suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote, carteId: e.carteId };
+        // La carte suit sa propre mise à jour (téléchargement à la synchronisation).
+        suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote };
         setEtablissement(e.identite);
       }
       await majConfig(suivante);

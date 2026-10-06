@@ -16,6 +16,11 @@ export function totp(secret) {
 }
 
 export async function codeDeRattachement(url, nomCaisse = "iPhone") {
+  return (await preparerServeur(url, nomCaisse)).code;
+}
+
+/** Serveur vierge prêt à l'emploi : renvoie le code de rattachement et le cookie de session administrateur. */
+export async function preparerServeur(url, nomCaisse = "iPad") {
   let cookie = "";
   const appel = async (methode, chemin, corps) => {
     const r = await fetch(`${url}/api/admin${chemin}`, {
@@ -24,7 +29,7 @@ export async function codeDeRattachement(url, nomCaisse = "iPhone") {
       body: corps ? JSON.stringify(corps) : undefined,
     });
     cookie = r.headers.get("set-cookie")?.split(";")[0] ?? cookie;
-    const json = await r.json();
+    const json = (r.headers.get("content-type") ?? "").includes("json") ? await r.json() : await r.text();
     if (!r.ok) throw new Error(`${chemin} : ${json.message}`);
     return json;
   };
@@ -36,7 +41,21 @@ export async function codeDeRattachement(url, nomCaisse = "iPhone") {
   } else {
     throw new Error("Serveur déjà initialisé : relancez scripts/serveur-local.mjs pour repartir d'une base vierge.");
   }
+  await appel("PUT", "/etablissements/moka", {
+    identite: {
+      enseigne: "Moka",
+      raisonSociale: "SAS Moka Annecy",
+      adresse: "6 rue Vaugelas",
+      codePostalVille: "74000 Annecy",
+      telephone: "04 56 19 02 68",
+      siret: "12345678900012",
+      tvaIntracom: "FR12123456789",
+      mentionsLegales: "SAS au capital de 10 000 € · RCS Annecy 123 456 789",
+    },
+    tables: Array.from({ length: 12 }, (_, i) => ({ id: `t${i + 1}`, nom: String(i + 1), zone: "Salle" })),
+    seuilNote: 2500,
+  });
   await appel("POST", "/etablissements/moka/utilisateurs", { nom: "Lionel", role: "responsable", pin: "1234", actif: true });
   const { code } = await appel("POST", "/etablissements/moka/codes", { nomCaisse });
-  return code;
+  return { code, cookie, appel };
 }

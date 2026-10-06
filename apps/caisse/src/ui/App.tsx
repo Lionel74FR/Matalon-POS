@@ -1,7 +1,8 @@
+import type { Catalogue } from "@matalon/catalogue";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import type { BaseCaisse, ConnexionServeur } from "../donnees/base";
-import { fusionnerReferentiel, type Configuration, type Utilisateur } from "../donnees/configuration";
+import { carteATelecharger, fusionnerReferentiel, type Configuration, type Utilisateur } from "../donnees/configuration";
 import {
   demarrer,
   effacerCaisseDeTest,
@@ -85,8 +86,20 @@ export function App() {
           async surReferentiel(etat) {
             const actuelle = caisseCourante.current;
             if (!actuelle) return;
-            const config = fusionnerReferentiel(actuelle.config, etat);
-            if (config) remplacerCaisse(await enregistrerConfiguration(actuelle, config));
+            // Nouvelle carte publiée dans l'administration : téléchargée une fois, gardée pour le hors ligne.
+            let carteRecue: { carte: Catalogue; version: number } | null = null;
+            if (carteATelecharger(actuelle.config, etat)) {
+              try {
+                carteRecue = await actuelle.client.carte();
+              } catch {
+                /* nouvel essai à la prochaine synchronisation ; on garde la carte en place */
+              }
+            }
+            // Relue après l'attente réseau : une modification locale faite entre-temps (imprimante…) est conservée.
+            const fraiche = caisseCourante.current ?? actuelle;
+            let config = fusionnerReferentiel(fraiche.config, etat);
+            if (carteRecue) config = { ...(config ?? fraiche.config), carteId: carteRecue.carte.id, carte: carteRecue.carte, carteVersion: carteRecue.version };
+            if (config) remplacerCaisse(await enregistrerConfiguration(fraiche, config));
           },
         },
         connexion,

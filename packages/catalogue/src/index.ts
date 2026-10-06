@@ -1,6 +1,7 @@
-import type { Article, Catalogue, Supplement, Variante } from "./types.js";
+import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type ChoixFormule, type Supplement, type Variante } from "./types.js";
 
 export * from "./types.js";
+export { lireCatalogue, LIMITES_CARTE } from "./lecture.js";
 import { CARTE_AUTOMNE_2026 } from "./cartes/automne-2026.js";
 export { CARTE_AUTOMNE_2026 };
 
@@ -61,7 +62,12 @@ export function ligneSupplement(article: Article, supplement: Supplement, quanti
 export function validerCatalogue(c: Catalogue): string[] {
   const erreurs: string[] = [];
   const ids = new Set<string>();
-  const categories = new Set(c.categories.map((x) => x.id));
+  const categories = new Set<string>();
+  for (const cat of c.categories) {
+    if (categories.has(cat.id)) erreurs.push(`catégorie en double : ${cat.id}`);
+    categories.add(cat.id);
+    if (!cat.rayon?.trim()) erreurs.push(`catégorie ${cat.nom} : rayon manquant`);
+  }
   const articles = tousLesArticles(c);
   for (const a of articles) {
     if (ids.has(a.id)) erreurs.push(`identifiant en double : ${a.id}`);
@@ -71,7 +77,27 @@ export function validerCatalogue(c: Catalogue): string[] {
     for (const p of prix) {
       if (p != null && (!Number.isSafeInteger(p) || p < 0)) erreurs.push(`prix invalide sur ${a.id}`);
     }
-    if (![550, 1000, 2000].includes(a.tauxTVA)) erreurs.push(`taux de TVA inattendu sur ${a.id}`);
+    if (!(TAUX_TVA_AUTORISES as readonly number[]).includes(a.tauxTVA)) erreurs.push(`taux de TVA inattendu sur ${a.id}`);
+    for (const [nom, liste] of [
+      ["variante", a.variantes ?? []],
+      ["supplément", a.supplements ?? []],
+      ["choix", a.formule ?? []],
+    ] as const) {
+      const vus = new Set<string>();
+      for (const x of liste) {
+        if (vus.has(x.id)) erreurs.push(`${nom} en double sur ${a.id} : ${x.id}`);
+        vus.add(x.id);
+      }
+    }
+    if (a.variantes?.length && a.prixTTC == null && a.variantes.some((v) => v.prixTTC == null) && !a.aCompleter) {
+      erreurs.push(`${a.id} : une variante sans prix demande un prix d'article`);
+    }
+    if (a.formule?.length) {
+      if (a.variantes?.length) erreurs.push(`${a.id} : une formule ne peut pas avoir de variantes`);
+      if (a.prixTTC == null && !a.aCompleter) erreurs.push(`${a.id} : une formule doit avoir un prix`);
+    }
+    const sansPrix = a.prixTTC == null && !(a.variantes ?? []).some((v) => v.prixTTC != null);
+    if (sansPrix && !a.aCompleter) erreurs.push(`${a.id} : prix manquant (ou indiquer ce qui reste à compléter)`);
   }
   for (const a of articles) {
     for (const choix of a.formule ?? []) {
@@ -84,4 +110,37 @@ export function validerCatalogue(c: Catalogue): string[] {
     }
   }
   return erreurs;
+}
+
+/** Nombre d'articles d'une carte. */
+export const nombreArticles = (c: Catalogue) => c.categories.reduce((n, cat) => n + cat.articles.length, 0);
+
+/** Identifiant lisible et unique tiré d'un nom (« Flat white » → « flat-white », « flat-white-2 »…). */
+export function identifiantDepuisNom(nom: string, existants: Iterable<string>): string {
+  const base =
+    nom
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/œ/g, "oe")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 50)
+      .replace(/-+$/, "") || "article";
+  const pris = new Set(existants);
+  if (base.length < 2) return identifiantDepuisNom(`${base}-1`, pris);
+  if (!pris.has(base)) return base;
+  for (let n = 2; ; n++) if (!pris.has(`${base}-${n}`)) return `${base}-${n}`;
+}
+
+/** Articles proposés pour un choix de formule : ceux des catégories et articles visés, disponibles, hors formules. */
+export function optionsChoix(c: Catalogue, choix: ChoixFormule): Array<Article & { categorieId: string }> {
+  return tousLesArticles(c).filter(
+    (a) => !a.indisponible && !a.formule?.length && (choix.articles?.includes(a.id) || choix.categories?.includes(a.categorieId)),
+  );
+}
+
+/** Un article se vend s'il est disponible et si chaque choix de sa formule a au moins une option. */
+export function articleVendable(c: Catalogue, a: Article): boolean {
+  return !a.indisponible && (a.formule ?? []).every((choix) => optionsChoix(c, choix).length > 0);
 }

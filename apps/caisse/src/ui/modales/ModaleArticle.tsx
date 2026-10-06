@@ -1,11 +1,4 @@
-import {
-  ligneDepuisArticle,
-  ligneSupplement,
-  tousLesArticles,
-  type Article,
-  type Catalogue,
-  type ChoixFormule,
-} from "@matalon/catalogue";
+import { ligneDepuisArticle, ligneSupplement, tousLesArticles, type Article, type Catalogue, type ChoixFormule, optionsChoix } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
 import type { LigneCommande } from "../../metier/commande";
 import { Modale } from "../communs";
@@ -15,9 +8,7 @@ type NouvelleLigne = Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">;
 
 /** Options proposées pour un choix de formule : articles des catégories visées, variantes dépliées. */
 function optionsDuChoix(carte: Catalogue, choix: ChoixFormule): string[] {
-  const articles = tousLesArticles(carte).filter(
-    (a) => choix.articles?.includes(a.id) || choix.categories?.includes(a.categorieId),
-  );
+  const articles = optionsChoix(carte, choix);
   return articles.flatMap((a) =>
     a.variantes?.length ? a.variantes.map((v) => v.libelle ?? `${a.nom} ${v.nom}`) : [a.nom],
   );

@@ -128,6 +128,17 @@ export async function rattacher(
     derniers: null,
     divergence: null,
   };
+  // La carte vient avec le rattachement ; si le téléchargement échoue, la synchronisation la reprendra.
+  for (let essai = 0; essai < 3 && !config.carte; essai++) {
+    try {
+      const { carte, version } = await client.avecJeton(r.jeton).carte();
+      config.carte = carte;
+      config.carteId = carte.id;
+      config.carteVersion = version;
+    } catch {
+      /* repli sur la carte livrée avec l'application, signalé à l'écran, repris à la synchronisation */
+    }
+  }
   const tx = db.transaction(["cles", "config", "serveur"], "readwrite");
   await tx.objectStore("cles").put({ ...paire, creeeLe: maintenant }, "caisse");
   await tx.objectStore("config").put(config, "configuration");

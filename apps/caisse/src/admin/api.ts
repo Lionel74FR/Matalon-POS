@@ -1,4 +1,14 @@
-import type { Derniers, EtablissementApi, IdentiteEtablissement, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { Catalogue } from "@matalon/catalogue";
+import type { Derniers, EtablissementApi, IdentiteEtablissement, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+
+export interface ResumeCloture {
+  numero: number;
+  periode: "JOUR" | "MOIS" | "EXERCICE";
+  identifiantPeriode: string;
+  horodatage: string;
+  totalTTC: number;
+  nbVentes: number;
+}
 
 export interface CaisseAdmin {
   id: string;
@@ -8,6 +18,8 @@ export interface CaisseAdmin {
   derniereSynchro: string | null;
   revoqueeLe: string | null;
   divergence: string | null;
+  /** Empreinte de la clé de signature enregistrée au rattachement (comparable à celle des réglages de l'iPad). */
+  empreinteCle: string;
   derniers: Derniers;
 }
 
@@ -69,6 +81,12 @@ export const api = {
     appel<{ code: string; expireLe: string; nomCaisse: string }>("POST", `/etablissements/${etablissementId}/codes`, { nomCaisse }),
   revoquer: (caisseId: string) => appel("POST", `/caisses/${caisseId}/revoquer`, {}),
   verifier: (caisseId: string) => appel<RapportVerification>("GET", `/caisses/${caisseId}/verification`),
+  cartes: () => appel<{ cartes: ResumeCarte[] }>("GET", "/cartes"),
+  carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),
+  enregistrerCarte: (id: string, carte: Catalogue, version: number) => appel<ReponseCarte>("PUT", `/cartes/${id}`, { carte, version }),
+  creerCarte: (corps: { id: string; nom: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
+  clotures: (caisseId: string) => appel<{ clotures: ResumeCloture[] }>("GET", `/caisses/${caisseId}/clotures`),
+  urlArchive: (caisseId: string, numero: number) => `/api/admin/caisses/${caisseId}/clotures/${numero}/archive.json`,
   urlCsv: (caisseId: string) => `/api/admin/caisses/${caisseId}/clotures.csv`,
   urlJournal: (caisseId: string) => `/api/admin/caisses/${caisseId}/journal.json`,
 };

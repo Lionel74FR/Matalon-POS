@@ -1,6 +1,6 @@
-import { CARTES, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
+import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
-import { ID_COMPTOIR } from "../donnees/configuration";
+import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
 import { ajouterLigne, montantLigne, totauxCommande, type Commande, type LigneCommande } from "../metier/commande";
 import { Vide } from "./communs";
@@ -35,13 +35,13 @@ interface ProprietesCommande {
 /** La carte vient de l'établissement (référentiel serveur). */
 export function PriseCommande(props: ProprietesCommande) {
   const { config } = useCaisse();
-  const carte = CARTES[config.carteId];
+  const carte = carteDe(config);
   if (!carte) {
     return (
       <div className="page">
         <Vide>
-          La carte « {config.carteId} » n'existe pas dans cette version de la caisse. Mettez la caisse à jour (bandeau en bas de
-          l'écran) ou choisissez une autre carte dans l'administration.
+          La carte de l'établissement n'a pas encore été reçue. Connectez l'iPad à Internet, puis touchez la pastille de
+          synchronisation en haut à droite.
         </Vide>
         <button className="bouton" onClick={props.onRetour}>
           Retour à la salle
@@ -76,6 +76,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
     props.onChange(ajouterLigne(c, { ...l, ajouteePar: utilisateur.id }));
 
   const toucherArticle = (a: Article) => {
+    if (!articleVendable(CARTE, a)) return notifier(`${a.nom} est indisponible pour le moment.`, "erreur");
     if (a.prixTTC == null && !a.variantes?.some((v) => v.prixTTC != null)) {
       return notifier(`${a.nom} n'a pas encore de prix : à compléter dans la carte.`, "erreur");
     }
@@ -197,10 +198,14 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         )}
         <div className={`grille-articles teinte-${TEINTES[rayon] ?? "cafe"}`}>
           {categorie.articles.map((a) => (
-            <button key={a.id} className={`tuile${a.prixTTC == null ? " incomplete" : ""}`} onClick={() => toucherArticle(a)}>
+            <button
+              key={a.id}
+              className={`tuile${a.prixTTC == null && !a.variantes?.some((v) => v.prixTTC != null) ? " incomplete" : ""}${!articleVendable(CARTE, a) ? " indisponible" : ""}`}
+              onClick={() => toucherArticle(a)}
+            >
               <span className="tuile-nom">{a.nom}</span>
               <span className="tuile-prix">
-                {a.prixTTC != null ? euros(a.prixTTC) : "Prix à venir"}
+                {!articleVendable(CARTE, a) ? "Indisponible" : a.prixTTC != null ? euros(a.prixTTC) : "Prix à venir"}
                 {(a.variantes?.length || a.formule?.length) && <span className="tuile-plus"> · choix</span>}
               </span>
             </button>

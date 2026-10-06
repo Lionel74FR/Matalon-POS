@@ -1,3 +1,4 @@
+import { CARTES } from "@matalon/catalogue";
 import type { Db } from "./db.js";
 
 /**
@@ -76,6 +77,15 @@ export const MIGRATIONS: string[] = [
       for each row execute function interdire_modification_fiscale();
     end if;
   end $$`,
+  // Cartes des établissements, éditées dans l'administration. Chaque enregistrement incrémente la version.
+  `create table if not exists cartes (
+    id text primary key,
+    nom text not null,
+    contenu jsonb not null,
+    version integer not null default 1,
+    maj_le text not null,
+    maj_par text
+  )`,
   `create table if not exists admins (
     id text primary key,
     identifiant text not null unique,
@@ -98,6 +108,18 @@ export const MIGRATIONS: string[] = [
     action text not null,
     details jsonb not null default '{}'::jsonb
   )`,
+  // Le journal d'administration (exports, empreintes d'archives, modifications de carte) est lui aussi en ajout seul.
+  `create or replace function interdire_modification_journal() returns trigger as $$
+    begin
+      raise exception 'Le journal d''administration est en ajout seul';
+    end;
+  $$ language plpgsql`,
+  `do $$ begin
+    if not exists (select 1 from pg_trigger where tgname = 'journal_admin_ajout_seul') then
+      create trigger journal_admin_ajout_seul before update or delete on journal_admin
+      for each row execute function interdire_modification_journal();
+    end if;
+  end $$`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',
@@ -112,6 +134,13 @@ let enCours: Promise<void> | null = null;
 export function migrer(db: Db): Promise<void> {
   enCours ??= (async () => {
     for (const instruction of MIGRATIONS) await db.requete(instruction);
+    // Cartes livrées avec le logiciel : chargées une seule fois, ensuite seule l'administration les modifie.
+    for (const carte of Object.values(CARTES)) {
+      await db.requete(
+        `insert into cartes (id, nom, contenu, version, maj_le) values ($1, $2, $3::jsonb, 1, $4) on conflict (id) do nothing`,
+        [carte.id, carte.nom, JSON.stringify(carte), new Date().toISOString()],
+      );
+    }
   })().catch((e) => {
     enCours = null;
     throw e;

@@ -196,6 +196,14 @@ export function Coque() {
           </span>
         </div>
       )}
+      {!config.carte && utilisateur.role === "responsable" && (
+        <div className="bandeau-info">
+          <span className="bandeau-texte">
+            Carte de l'établissement non reçue : la caisse utilise la carte livrée avec l'application. Elle se mettra à jour dès la
+            prochaine synchronisation.
+          </span>
+        </div>
+      )}
       {horlogeSuspecte && (
         <div className="bandeau-alerte">
           L'heure de l'iPad est antérieure au dernier ticket. Réglez la date et l'heure dans les réglages de l'iPad avant

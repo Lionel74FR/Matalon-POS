@@ -1,6 +1,10 @@
-import { CARTES } from "@matalon/catalogue";
+import { lireCatalogue, nombreArticles, validerCatalogue, type Catalogue } from "@matalon/catalogue";
 import {
+  canonique,
+  NOM_LOGICIEL,
+  VERSION_NOYAU_FISCAL,
   exporterCloturesCSV,
+  sha256Hex,
   HASH_GENESE,
   verifierRegistre,
   verifierScellement,
@@ -22,7 +26,9 @@ import {
   type EtablissementApi,
   type IdentiteEtablissement,
   type ReponseEtat,
+  type ReponseCarte,
   type ReponseRattachement,
+  type ResumeCarte,
   type ReponseSynchro,
   type Table,
   type UtilisateurApi,
@@ -38,6 +44,7 @@ import {
   verifierMotDePasse,
   verifierTotp,
 } from "./securite.js";
+import { empreinteCle, FORMAT_ARCHIVE_SERVEUR, type ContenuArchiveServeur } from "./archive.js";
 import { StockageServeur } from "./stockage-db.js";
 
 export interface Environnement {
@@ -93,9 +100,13 @@ interface LigneEtablissement {
   tva_intracom: string;
   mentions_legales: string;
   carte_id: string;
+  /** Version de la carte (jointure). */
+  carte_version: number | null;
   tables: Table[];
   seuil_note: number;
 }
+
+const SELECT_ETABLISSEMENT = `select e.*, c.version as carte_version from etablissements e left join cartes c on c.id = e.carte_id`;
 
 function versEtablissement(l: LigneEtablissement): EtablissementApi {
   return {
@@ -111,6 +122,7 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
       mentionsLegales: l.mentions_legales ?? "",
     },
     carteId: l.carte_id,
+    carteVersion: l.carte_version ?? 0,
     tables: l.tables,
     seuilNote: l.seuil_note,
   };
@@ -171,7 +183,7 @@ function lireSeuil(v: unknown): number {
 // ───────── Requêtes communes ─────────
 
 async function etablissement(db: Db, id: string): Promise<EtablissementApi> {
-  const [l] = await db.requete<LigneEtablissement>("select * from etablissements where id = $1", [id]);
+  const [l] = await db.requete<LigneEtablissement>(`${SELECT_ETABLISSEMENT} where e.id = $1`, [id]);
   if (!l) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
   return versEtablissement(l);
 }
@@ -437,7 +449,7 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
   ];
   if (creation) {
     const carteId = texte(corps.carteId, "carteId", 60);
-    if (!CARTES[carteId]) throw new ErreurHttp(400, "CARTE_INCONNUE", "Carte inconnue.");
+    await exigerCarte(env.db, carteId);
     await env.db.requete(
       `insert into etablissements (id, enseigne, raison_sociale, adresse, code_postal_ville, telephone, siret, tva_intracom,
          tables, seuil_note, cree_le, maj_le, mentions_legales, carte_id)
@@ -454,10 +466,117 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
     if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
     if (corps.carteId !== undefined) {
       const carteId = texte(corps.carteId, "carteId", 60);
-      if (!CARTES[carteId]) throw new ErreurHttp(400, "CARTE_INCONNUE", "Carte inconnue.");
+      await exigerCarte(env.db, carteId);
       await env.db.requete("update etablissements set carte_id = $2 where id = $1", [id, carteId]);
     }
   }
+}
+
+// ───────── Cartes ─────────
+
+async function exigerCarte(db: Db, id: string): Promise<{ contenu: Catalogue; version: number }> {
+  const [c] = await db.requete<{ contenu: Catalogue; version: number }>("select contenu, version from cartes where id = $1", [id]);
+  if (!c) throw new ErreurHttp(400, "CARTE_INCONNUE", "Carte inconnue.");
+  return c;
+}
+
+/** Carte de l'établissement de la caisse, téléchargée quand sa version change. */
+async function carteCaisse(env: Environnement, requete: Request): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const [e] = await env.db.requete<{ carte_id: string }>("select carte_id from etablissements where id = $1", [c.etablissement_id]);
+  const carte = await exigerCarte(env.db, e!.carte_id);
+  const reponse: ReponseCarte = { carte: carte.contenu, version: carte.version };
+  return json(200, reponse);
+}
+
+async function listeCartes(env: Environnement): Promise<Response> {
+  const lignes = await env.db.requete<{ id: string; nom: string; version: number; maj_le: string; maj_par: string | null; contenu: Catalogue }>(
+    "select id, nom, version, maj_le, maj_par, contenu from cartes order by nom",
+  );
+  const etabs = await env.db.requete<{ id: string; carte_id: string }>("select id, carte_id from etablissements");
+  const cartes: ResumeCarte[] = lignes.map((l) => ({
+    id: l.id,
+    nom: l.nom,
+    version: l.version,
+    majLe: l.maj_le,
+    majPar: l.maj_par,
+    nbArticles: nombreArticles(l.contenu),
+    etablissements: etabs.filter((e) => e.carte_id === l.id).map((e) => e.id),
+  }));
+  return json(200, { cartes });
+}
+
+async function lireCarteAdmin(env: Environnement, id: string): Promise<Response> {
+  const c = await exigerCarte(env.db, id).catch(() => {
+    throw new ErreurHttp(404, "CARTE_INCONNUE", "Carte introuvable.");
+  });
+  const reponse: ReponseCarte = { carte: c.contenu, version: c.version };
+  return json(200, reponse);
+}
+
+/** Lecture stricte et contrôles de cohérence ; lève une erreur 400 qui liste les problèmes. */
+function carteValide(v: unknown, id: string): Catalogue {
+  const { catalogue, erreurs } = lireCatalogue(v);
+  const toutes = catalogue ? validerCatalogue(catalogue) : erreurs;
+  if (catalogue && catalogue.id !== id) toutes.push("identifiant de carte modifié");
+  if (!catalogue || toutes.length) {
+    throw new ErreurHttp(400, "CARTE_INVALIDE", `Carte refusée : ${toutes.slice(0, 8).join(" ; ")}${toutes.length > 8 ? ` (et ${toutes.length - 8} autres)` : ""}.`);
+  }
+  return catalogue;
+}
+
+/**
+ * Enregistre une carte entière. `version` est celle sur laquelle l'éditeur a
+ * travaillé : si quelqu'un a enregistré entre-temps, la modification est
+ * refusée plutôt que d'écraser la sienne.
+ */
+async function enregistrerCarte(env: Environnement, requete: Request, admin: { id: string; identifiant: string }, id: string): Promise<Response> {
+  controlerOrigine(requete);
+  const corps = await lireJson<{ carte?: unknown; version?: unknown }>(requete);
+  if (typeof corps.version !== "number" || !Number.isSafeInteger(corps.version)) {
+    throw new ErreurHttp(400, "CHAMP_INVALIDE", "Version de la carte manquante : rechargez la carte.");
+  }
+  const carte = carteValide(corps.carte, id);
+  const [maj] = await env.db.requete<{ version: number }>(
+    `update cartes set nom = $2, contenu = $3::jsonb, version = version + 1, maj_le = $4, maj_par = $5
+     where id = $1 and version = $6 returning version`,
+    [id, carte.nom, JSON.stringify(carte), horloge(env).toISOString(), admin.identifiant, corps.version],
+  );
+  if (!maj) {
+    await exigerCarte(env.db, id).catch(() => {
+      throw new ErreurHttp(404, "CARTE_INCONNUE", "Carte introuvable.");
+    });
+    throw new ErreurHttp(409, "VERSION_DEPASSEE", "La carte a été modifiée entre-temps : rechargez-la avant d'enregistrer.");
+  }
+  await journaliserAdmin(env, admin.id, "carte_enregistree", { carte: id, version: maj.version, articles: nombreArticles(carte) });
+  const reponse: ReponseCarte = { carte, version: maj.version };
+  return json(200, reponse);
+}
+
+/** Nouvelle carte, vide ou copiée d'une autre (carte de saison, autre établissement). */
+async function creerCarte(env: Environnement, requete: Request, admin: { id: string; identifiant: string }): Promise<Response> {
+  controlerOrigine(requete);
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const id = texte(corps.id, "id", 60);
+  if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(id)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Identifiant de carte : minuscules, chiffres et tirets.");
+  const nom = texte(corps.nom, "nom", 80);
+  if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le nom de la carte est obligatoire.");
+  const depuis = typeof corps.depuis === "string" && corps.depuis ? (await exigerCarte(env.db, corps.depuis)).contenu : null;
+  const carte = carteValide(
+    depuis
+      ? { ...depuis, id, nom, source: `Copie de « ${depuis.nom} »` }
+      : { id, nom, source: "Administration", etablissementId: "", categories: [] },
+    id,
+  );
+  // Insertion conditionnelle : deux créations simultanées du même identifiant donnent un 409, pas une erreur serveur.
+  const [cree] = await env.db.requete<{ id: string }>(
+    "insert into cartes (id, nom, contenu, version, maj_le, maj_par) values ($1, $2, $3::jsonb, 1, $4, $5) on conflict (id) do nothing returning id",
+    [id, nom, JSON.stringify(carte), horloge(env).toISOString(), admin.identifiant],
+  );
+  if (!cree) throw new ErreurHttp(409, "DEJA_EXISTANT", "Une carte porte déjà cet identifiant.");
+  await journaliserAdmin(env, admin.id, "carte_creee", { carte: id, depuis: depuis?.id ?? null });
+  const reponse: ReponseCarte = { carte, version: 1 };
+  return json(201, reponse);
 }
 
 // ───────── Administration ─────────
@@ -589,7 +708,7 @@ async function deconnexionAdmin(env: Environnement, requete: Request): Promise<R
 }
 
 async function listeEtablissements(env: Environnement): Promise<Response> {
-  const etabs = await env.db.requete<LigneEtablissement>("select * from etablissements order by enseigne");
+  const etabs = await env.db.requete<LigneEtablissement>(`${SELECT_ETABLISSEMENT} order by e.enseigne`);
   const caisses = await env.db.requete<{
     id: string;
     etablissement_id: string;
@@ -599,7 +718,8 @@ async function listeEtablissements(env: Environnement): Promise<Response> {
     derniere_synchro: string | null;
     revoquee_le: string | null;
     divergence: string | null;
-  }>("select id, etablissement_id, nom, appareil, rattachee_le, derniere_synchro, revoquee_le, divergence from caisses order by rattachee_le");
+    cle_publique: JsonWebKey;
+  }>("select id, etablissement_id, nom, appareil, rattachee_le, derniere_synchro, revoquee_le, divergence, cle_publique from caisses order by rattachee_le");
   const codes = await env.db.requete<{ code: string; etablissement_id: string; nom_caisse: string; expire_le: string }>(
     "select code, etablissement_id, nom_caisse, expire_le from codes_rattachement where utilise_le is null and expire_le > $1",
     [horloge(env).toISOString()],
@@ -621,12 +741,14 @@ async function listeEtablissements(env: Environnement): Promise<Response> {
             derniereSynchro: c.derniere_synchro,
             revoqueeLe: c.revoquee_le,
             divergence: c.divergence,
+            empreinteCle: await empreinteCle(c.cle_publique),
             derniers: await derniers(env.db, c.id),
           })),
       ),
     });
   }
-  return json(200, { etablissements: resultat, cartes: Object.values(CARTES).map((c) => ({ id: c.id, nom: c.nom })) });
+  const cartes = await env.db.requete<{ id: string; nom: string }>("select id, nom from cartes order by nom");
+  return json(200, { etablissements: resultat, cartes });
 }
 
 async function creerOuModifierEtablissement(env: Environnement, requete: Request, admin: { id: string }, id?: string): Promise<Response> {
@@ -757,6 +879,75 @@ async function exporterJournal(env: Environnement, admin: { id: string }, caisse
   });
 }
 
+/** Clôtures reçues d'une caisse, de la plus récente à la plus ancienne. */
+async function listeCloturesCaisse(env: Environnement, caisseId: string): Promise<Response> {
+  await cleDeCaisse(env, caisseId);
+  const clotures = (await new StockageServeur(env.db, caisseId).lister("clotures")).reverse();
+  return json(200, {
+    clotures: clotures.map((c) => ({
+      numero: c.numero,
+      periode: c.periode,
+      identifiantPeriode: c.identifiantPeriode,
+      horodatage: c.horodatage,
+      totalTTC: c.totalTTC,
+      nbVentes: c.nbVentes,
+    })),
+  });
+}
+
+/**
+ * Archive d'une clôture produite depuis la copie du serveur, sans l'iPad :
+ * même contenu que l'archive de l'iPad (clôture, tickets et événements
+ * couverts, ancrages), chaque enregistrement gardant la signature de l'iPad.
+ * Le serveur ne signe pas : l'empreinte du fichier est tracée au journal
+ * d'administration au moment de l'export.
+ */
+async function archiveCloture(env: Environnement, admin: { id: string }, caisseId: string, numero: number): Promise<Response> {
+  const c = await cleDeCaisse(env, caisseId);
+  const stockage = new StockageServeur(env.db, caisseId);
+  const cloture = await stockage.trouver("clotures", numero);
+  if (!cloture) throw new ErreurHttp(404, "CLOTURE_INCONNUE", "Clôture introuvable.");
+  const agregees = await Promise.all(cloture.cloturesAgregees.map((n) => stockage.trouver("clotures", n)));
+  if (agregees.some((x) => !x)) throw new ErreurHttp(500, "ARCHIVE_INCOMPLETE", "Une clôture agrégée manque dans la copie du serveur.");
+  const tickets = cloture.premierTicket != null && cloture.dernierTicket != null ? await stockage.lister("tickets", cloture.premierTicket, cloture.dernierTicket) : [];
+  const evenements =
+    cloture.premierEvenement != null && cloture.dernierEvenement != null ? await stockage.lister("evenements", cloture.premierEvenement, cloture.dernierEvenement) : [];
+  const tPrec = cloture.premierTicket && cloture.premierTicket > 1 ? await stockage.trouver("tickets", cloture.premierTicket - 1) : null;
+  const ePrec = cloture.premierEvenement && cloture.premierEvenement > 1 ? await stockage.trouver("evenements", cloture.premierEvenement - 1) : null;
+  const contenu: ContenuArchiveServeur = {
+    format: FORMAT_ARCHIVE_SERVEUR,
+    logiciel: NOM_LOGICIEL,
+    versionLogiciel: VERSION_NOYAU_FISCAL,
+    etablissementId: cloture.etablissementId,
+    caisseId,
+    genereeLe: horloge(env).toISOString(),
+    cleId: c.cle_id,
+    clePublique: c.cle_publique,
+    empreinteCle: await empreinteCle(c.cle_publique),
+    cloture,
+    cloturesAgregees: agregees as Cloture[],
+    tickets,
+    evenements,
+    ancrages: {
+      ticketPrecedent: tPrec
+        ? { numero: tPrec.numero, hash: tPrec.hash, grandTotalPerpetuel: tPrec.grandTotalPerpetuel, cumulPerpetuelAbsolu: tPrec.cumulPerpetuelAbsolu }
+        : null,
+      evenementPrecedent: ePrec ? { numero: ePrec.numero, hash: ePrec.hash } : null,
+    },
+  };
+  const empreinte = await sha256Hex(canonique(contenu));
+  await journaliserAdmin(env, admin.id, "export_archive", { caisse: caisseId, cloture: numero, empreinte });
+  const nom = `archive-${cloture.etablissementId}-${caisseId}-${cloture.periode.toLowerCase()}-${cloture.identifiantPeriode}.json`;
+  return new Response(JSON.stringify({ ...contenu, empreinte }, null, 1), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${nom}"`,
+      "Cache-Control": "no-store",
+      "X-Empreinte-Archive": empreinte,
+    },
+  });
+}
+
 // ───────── Routage ─────────
 
 export async function traiter(requete: Request, env: Environnement): Promise<Response> {
@@ -772,6 +963,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/synchro" && m === "POST") return await synchroniser(env, requete);
     if (chemin === "/api/caisse/utilisateurs" && m === "PUT") return await majUtilisateursCaisse(env, requete);
     if (chemin === "/api/caisse/etablissement" && m === "PUT") return await majEtablissementCaisse(env, requete);
+    if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
 
     if (chemin === "/api/admin/statut" && m === "GET") return await statutAdmin(env, requete);
     if (chemin === "/api/admin/initialiser" && m === "POST") return await initialiserAdmin(env, requete);
@@ -782,6 +974,11 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin.startsWith("/api/admin/")) {
       const admin = await exigerAdmin(env, requete);
       if (chemin === "/api/admin/etablissements" && m === "GET") return await listeEtablissements(env);
+      if (chemin === "/api/admin/cartes" && m === "GET") return await listeCartes(env);
+      if (chemin === "/api/admin/cartes" && m === "POST") return await creerCarte(env, requete, admin);
+      const pc = /^\/api\/admin\/cartes\/([a-z0-9-]+)$/.exec(chemin);
+      if (pc && m === "GET") return await lireCarteAdmin(env, pc[1]!);
+      if (pc && m === "PUT") return await enregistrerCarte(env, requete, admin, pc[1]!);
       if (chemin === "/api/admin/etablissements" && m === "POST") return await creerOuModifierEtablissement(env, requete, admin);
       let p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)$/.exec(chemin);
       if (p && m === "PUT") return await creerOuModifierEtablissement(env, requete, admin, p[1]);
@@ -795,6 +992,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "GET") return await verifierCaisse(env, admin, p[1]!);
       p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/journal\.json$/.exec(chemin);
       if (p && m === "GET") return await exporterJournal(env, admin, p[1]!);
+      p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/clotures$/.exec(chemin);
+      if (p && m === "GET") return await listeCloturesCaisse(env, p[1]!);
+      p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/clotures\/(\d{1,9})\/archive\.json$/.exec(chemin);
+      if (p && m === "GET") return await archiveCloture(env, admin, p[1]!, Number(p[2]));
       p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/clotures\.csv$/.exec(chemin);
       if (p && m === "GET") return await exporterCaisse(env, admin, p[1]!);
     }

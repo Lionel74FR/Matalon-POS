@@ -2,7 +2,9 @@ import { afficherCode, ID_ETABLISSEMENT_VALIDE, PIN_VALIDE, type IdentiteEtablis
 import QRCode from "qrcode";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { genererTables } from "../donnees/configuration";
-import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification } from "./api";
+import type { ResumeCarte } from "@matalon/serveur/partage";
+import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
+import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const dateHeure = (iso: string | null) => (iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -226,14 +228,26 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 
 function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const [donnees, setDonnees] = useState<Awaited<ReturnType<typeof api.etablissements>> | null>(null);
+  const [cartes, setCartes] = useState<ResumeCarte[]>([]);
+  /** Vue courante : établissement (id ou « nouveau »), liste des cartes, ou une carte en édition. */
   const [choisi, setChoisi] = useState<string | null>(null);
+  const [carteOuverte, setCarteOuverte] = useState<string | null>(null);
+  const [carteModifiee, setCarteModifiee] = useState(false);
+  /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
+  const aller = (vue: string, carte: string | null = null) => {
+    if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return;
+    setCarteModifiee(false);
+    setChoisi(vue);
+    setCarteOuverte(carte);
+  };
   const [erreur, setErreur] = useState("");
 
   const recharger = useCallback(async () => {
     try {
-      const d = await api.etablissements();
+      const [d, c] = await Promise.all([api.etablissements(), api.cartes()]);
       setDonnees(d);
-      setChoisi((c) => c ?? d.etablissements[0]?.id ?? "nouveau");
+      setCartes(c.cartes);
+      setChoisi((x) => x ?? d.etablissements[0]?.id ?? "nouveau");
     } catch (e) {
       if (e instanceof ErreurAdmin && e.statut === 401) return props.onDeconnecte();
       setErreur(message(e));
@@ -264,7 +278,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
         <nav className="admin-liste" aria-label="Établissements">
           <h2>Établissements</h2>
           {donnees?.etablissements.map((e) => (
-            <button key={e.id} className={`admin-lien${e.id === choisi ? " actif" : ""}`} onClick={() => setChoisi(e.id)}>
+            <button key={e.id} className={`admin-lien${e.id === choisi ? " actif" : ""}`} onClick={() => aller(e.id)}>
               <strong>{e.identite.enseigne}</strong>
               <small>
                 {e.caisses.filter((c) => !c.revoqueeLe).length} iPad · {pluriel(e.utilisateurs.filter((u) => u.actif).length, "personne")}
@@ -272,14 +286,41 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
               </small>
             </button>
           ))}
-          <button className={`admin-lien${choisi === "nouveau" ? " actif" : ""}`} onClick={() => setChoisi("nouveau")}>
+          <button className={`admin-lien${choisi === "nouveau" ? " actif" : ""}`} onClick={() => aller("nouveau")}>
             + Nouvel établissement
+          </button>
+          <h2 className="admin-liste-titre">Cartes</h2>
+          <button
+            className={`admin-lien${choisi === "cartes" ? " actif" : ""}`}
+            onClick={() => aller("cartes")}
+          >
+            <strong>Cartes et prix</strong>
+            <small>{pluriel(cartes.length, "carte")}</small>
           </button>
         </nav>
         <main className="admin-contenu">
           {erreur && <p className="erreur">{erreur}</p>}
           {!donnees ? (
             <p>Chargement…</p>
+          ) : choisi === "cartes" ? (
+            carteOuverte ? (
+              <EditeurCarte
+                key={carteOuverte}
+                id={carteOuverte}
+                onRetour={() => aller("cartes")}
+                onEnregistre={() => void recharger()}
+                onModifiee={setCarteModifiee}
+              />
+            ) : (
+              <ListeCartes
+                cartes={cartes}
+                onOuvrir={setCarteOuverte}
+                onCree={(id) => {
+                  void recharger();
+                  setCarteOuverte(id);
+                }}
+              />
+            )
           ) : choisi === "nouveau" || !etablissement ? (
             <NouvelEtablissement
               cartes={donnees.cartes}
@@ -441,6 +482,16 @@ function Rattacher(props: { e: EtablissementAdmin; responsable: boolean; onChang
 
 function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> }) {
   const [rapports, setRapports] = useState<Record<string, RapportVerification | string>>({});
+  const [clotures, setClotures] = useState<Record<string, ResumeCloture[] | undefined>>({});
+  const basculerClotures = async (id: string) => {
+    if (clotures[id]) return setClotures((x) => ({ ...x, [id]: undefined }));
+    try {
+      const r = await api.clotures(id);
+      setClotures((x) => ({ ...x, [id]: r.clotures }));
+    } catch (e) {
+      setRapports((r) => ({ ...r, [id]: message(e) }));
+    }
+  };
   const verifier = async (id: string) => {
     setRapports((r) => ({ ...r, [id]: "Vérification…" }));
     try {
@@ -478,10 +529,37 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
                   </span>
                 </header>
                 <p className="admin-meta">
-                  Rattaché le {dateHeure(c.rattacheeLe)} · dernière synchronisation {dateHeure(c.derniereSynchro)} ·{" "}
+                  Clé {c.empreinteCle.slice(0, 32)} · rattaché le {dateHeure(c.rattacheeLe)} · dernière synchronisation {dateHeure(c.derniereSynchro)} ·{" "}
                   {pluriel(c.derniers.tickets?.numero ?? 0, "ticket")} · {pluriel(c.derniers.clotures?.numero ?? 0, "clôture")}
                 </p>
                 {c.divergence && !c.revoqueeLe && <p className="erreur">{c.divergence}</p>}
+                {clotures[c.id] && (
+                  <div className="admin-clotures">
+                    {clotures[c.id]!.length === 0 ? (
+                      <p className="explication">Aucune clôture reçue.</p>
+                    ) : (
+                      <table className="tableau admin-tableau">
+                        <tbody>
+                          {clotures[c.id]!.map((z) => (
+                            <tr key={z.numero}>
+                              <td>
+                                {z.periode === "JOUR" ? "Z" : z.periode === "MOIS" ? "Mois" : "Exercice"} {z.identifiantPeriode}
+                                <br />
+                                <small>n° {z.numero} · {pluriel(z.nbVentes, "vente")}</small>
+                              </td>
+                              <td className="nombre">{euros(z.totalTTC)}</td>
+                              <td>
+                                <a className="bouton discret" href={api.urlArchive(c.id, z.numero)}>
+                                  Archive (JSON)
+                                </a>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
                 {rapport && (
                   <p className={typeof rapport !== "string" && !rapport.integre ? "erreur" : "admin-ok"}>
                     {typeof rapport === "string"
@@ -504,6 +582,9 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
                   <a className="bouton" href={api.urlJournal(c.id)}>
                     Journal complet (JSON)
                   </a>
+                  <button className="bouton" onClick={() => void basculerClotures(c.id)}>
+                    {clotures[c.id] ? "Masquer les clôtures" : "Clôtures et archives"}
+                  </button>
                   {!c.revoqueeLe && (
                     <button className="bouton danger" onClick={() => void revoquer(c)}>
                       Révoquer

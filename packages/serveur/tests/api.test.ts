@@ -5,11 +5,18 @@ import {
   signataireDepuis,
   StockageMemoire,
   verifierRegistre,
+  canonique,
+  sha256Hex,
+  verifierChaine,
+  verifierScellement,
+  verifierTotauxTickets,
+  totauxTickets,
+  champsTotaux,
   type Chaine,
   type SaisieLigne,
 } from "@matalon/noyau-fiscal";
 import { beforeEach, describe, expect, it } from "vitest";
-import { traiter, type Db } from "../src/index.js";
+import { traiter, verifierArchiveServeur, type Db } from "../src/index.js";
 import type { EntreeSynchro, ReponseEtat, ReponseRattachement, ReponseSynchro } from "../src/partage.js";
 import { _oublierMigration } from "../src/schema.js";
 import { codeTotp } from "../src/securite.js";
@@ -238,5 +245,98 @@ describe("rattachement et synchronisation", () => {
     const apres = await appel("GET", "/api/caisse/etat", undefined, bearer);
     expect(apres.statut).toBe(403);
     expect(apres.corps.code).toBe("CAISSE_REVOQUEE");
+  });
+});
+
+describe("cartes", () => {
+  it("amorce la carte du code, l'édite avec contrôle de version et la diffuse aux caisses", async () => {
+    const cookie = await adminConnecte();
+    const { bearer } = await caisseRattachee(cookie);
+    const liste = await appel("GET", "/api/admin/cartes", undefined, { Cookie: cookie });
+    expect(liste.corps.cartes).toMatchObject([{ id: "carte-automne-2026", version: 1, etablissements: ["moka"] }]);
+    expect((await appel("GET", "/api/caisse/etat", undefined, bearer)).corps.etablissement.carteVersion).toBe(1);
+
+    const lue = await appel("GET", "/api/admin/cartes/carte-automne-2026", undefined, { Cookie: cookie });
+    const carte = lue.corps.carte;
+    carte.categories[0].articles[0].prixTTC = 260;
+    carte.categories[0].articles.push({ id: "ristretto", nom: "Ristretto", prixTTC: 250, tauxTVA: 1000 });
+    const maj = await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte, version: 1 }, { Cookie: cookie });
+    expect(maj.statut).toBe(200);
+    expect(maj.corps.version).toBe(2);
+    // Un second éditeur resté sur la version 1 ne peut pas écraser la modification.
+    const conflit = await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte, version: 1 }, { Cookie: cookie });
+    expect(conflit.statut).toBe(409);
+    for (const version of [undefined, "2", 1.5]) {
+      expect((await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte, version }, { Cookie: cookie })).statut).toBe(400);
+    }
+
+    const invalide = structuredClone(carte);
+    invalide.categories[0].articles[0].prixTTC = 2.6;
+    invalide.categories[0].articles.push({ id: "ristretto", nom: "Doublon", prixTTC: 100, tauxTVA: 1000 });
+    const refus = await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte: invalide, version: 2 }, { Cookie: cookie });
+    expect(refus.statut).toBe(400);
+    expect(refus.corps.message).toMatch(/prix en centimes/);
+
+    const etat = await appel("GET", "/api/caisse/etat", undefined, bearer);
+    expect(etat.corps.etablissement.carteVersion).toBe(2);
+    const telechargee = await appel("GET", "/api/caisse/carte", undefined, bearer);
+    expect(telechargee.corps.version).toBe(2);
+    expect(telechargee.corps.carte.categories[0].articles.find((a: any) => a.id === "espresso").prixTTC).toBe(260);
+  });
+
+  it("crée une carte par copie et l'attribue à un établissement", async () => {
+    const cookie = await adminConnecte();
+    const copie = await appel("POST", "/api/admin/cartes", { id: "carte-hiver-2026", nom: "Carte hiver 2026", depuis: "carte-automne-2026" }, { Cookie: cookie });
+    expect(copie.statut).toBe(201);
+    expect(copie.corps.carte).toMatchObject({ id: "carte-hiver-2026", nom: "Carte hiver 2026" });
+    expect((await appel("POST", "/api/admin/cartes", { id: "carte-hiver-2026", nom: "x" }, { Cookie: cookie })).statut).toBe(409);
+    const vide = await appel("POST", "/api/admin/cartes", { id: "carte-vide", nom: "Vide" }, { Cookie: cookie });
+    expect(vide.corps.carte.categories).toEqual([]);
+    const maj = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, tables: [], seuilNote: 2500, carteId: "carte-hiver-2026" }, { Cookie: cookie });
+    expect(maj.corps.etablissement).toMatchObject({ carteId: "carte-hiver-2026", carteVersion: 1 });
+    expect((await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, carteId: "inexistante" }, { Cookie: cookie })).statut).toBe(400);
+  });
+});
+
+describe("archives côté serveur", () => {
+  it("exporte l'archive d'une Z depuis la copie du serveur, vérifiable seule", async () => {
+    const cookie = await adminConnecte();
+    const { registre, synchro, caisseId } = await caisseRattachee(cookie);
+    await registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await registre.cloturerJournee("u-lea");
+    instant += 3_600_000;
+    await registre.enregistrerVente({ lignes: [SPRITZ, CAFE], paiements: [{ mode: "ESPECES", montant: 1500 }], operateurId: "u-lea" });
+    await registre.cloturerJournee("u-lea");
+    expect((await synchro()).statut).toBe(200);
+
+    const liste = await appel("GET", `/api/admin/caisses/${caisseId}/clotures`, undefined, { Cookie: cookie });
+    expect(liste.corps.clotures.map((c: any) => [c.numero, c.totalTTC])).toEqual([
+      [2, 1500],
+      [1, 400],
+    ]);
+    const r = await appel("GET", `/api/admin/caisses/${caisseId}/clotures/2/archive.json`, undefined, { Cookie: cookie });
+    const { empreinte, ...contenu } = r.corps;
+    expect(await sha256Hex(canonique(contenu))).toBe(empreinte);
+    const attendue = (await appel("GET", "/api/admin/etablissements", undefined, { Cookie: cookie })).corps.etablissements[0].caisses[0].empreinteCle;
+    expect(await verifierArchiveServeur(r.corps, attendue)).toEqual({ integre: true, anomalies: [] });
+    // Un fichier forgé, re-signé avec une autre clé, est démasqué par l'empreinte de clé attendue.
+    const autre = await genererPaireCles(`${caisseId}-k1`);
+    const forge = { ...r.corps, clePublique: autre.clePubliqueJwk, empreinteCle: "x" };
+    expect((await verifierArchiveServeur(forge, attendue)).anomalies.map((a) => a.code)).toContain("CLE_INATTENDUE");
+    const modifiee = structuredClone(r.corps);
+    modifiee.tickets[0].totalTTC = 1;
+    expect((await verifierArchiveServeur(modifiee, attendue)).integre).toBe(false);
+    // Le journal d'administration (où l'empreinte est tracée) est en ajout seul.
+    await expect(db.requete("delete from journal_admin")).rejects.toThrow(/ajout seul/);
+    const resoudre = (id: string) => (id === contenu.cleId ? contenu.clePublique : null);
+    const anomalies = [
+      ...(await verifierChaine("tickets", contenu.tickets, resoudre, contenu.ancrages.ticketPrecedent ?? undefined)),
+      ...(await verifierChaine("evenements", contenu.evenements, resoudre, contenu.ancrages.evenementPrecedent ?? undefined)),
+      ...verifierTotauxTickets(contenu.tickets, contenu.ancrages.ticketPrecedent.grandTotalPerpetuel, contenu.ancrages.ticketPrecedent.cumulPerpetuelAbsolu),
+      ...(await verifierScellement("clotures", contenu.cloture, resoudre)),
+    ];
+    expect(anomalies).toEqual([]);
+    expect(canonique(champsTotaux(contenu.cloture))).toBe(canonique(champsTotaux(totauxTickets(contenu.tickets))));
+    expect((await appel("GET", `/api/admin/caisses/${caisseId}/clotures/9/archive.json`, undefined, { Cookie: cookie })).statut).toBe(404);
   });
 });

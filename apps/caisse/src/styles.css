@@ -2211,3 +2211,8 @@ a.bouton {
 .grille-tables.compacte .table {
   min-height: 76px;
 }
+
+.tuile.indisponible {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
