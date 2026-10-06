@@ -24,7 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Icônes dans les menus et les actions (caisse et administration), rattachement d'un iPad ou d'un iPhone (type d'appareil reconnu et affiché), administration défilante au doigt |
+| b6912c9 | Icônes dans les menus et les actions (caisse et administration), rattachement d'un iPad ou d'un iPhone (type d'appareil reconnu et affiché), administration défilante au doigt |
 | 172907c | Lot 2 : éditeur de cartes dans l'administration, cartes envoyées aux iPad (versionnées, gardées hors ligne), archives par Z côté serveur vérifiables seules, journal d'administration en ajout seul |
 | 0396872 | Lot 1 : fond de caisse et comptage au Z, facture sur demande et avoir, notes et transfert de table, CI GitHub |
 | 867b516 et avant | Noyau fiscal, caisse PWA, serveur (rattachement, réplication vérifiée), administration 2FA, note en QR code, version iPhone, guide de test |
