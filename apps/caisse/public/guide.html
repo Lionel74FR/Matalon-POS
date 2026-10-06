@@ -134,22 +134,22 @@
 
   <h2>1. Ce qu'il vous faut</h2>
   <ul>
-    <li>L'iPad de la caisse (ou un iPhone pour un premier essai), connecté au Wi-Fi du Moka.</li>
+    <li>L'iPad de la caisse ou un iPhone, connecté au Wi-Fi du Moka.</li>
     <li>En option, l'imprimante Epson TM-m30III allumée, avec du papier, reliée à la box, et le tiroir-caisse branché à l'arrière. La caisse fonctionne aussi sans : les notes passent alors par QR code.</li>
-    <li>Votre code PIN, transmis par Lionel. Si l'iPad n'a pas encore été mis en service, un code de rattachement à 8 caractères, transmis aussi par Lionel (étape 3).</li>
+    <li>Votre code PIN, transmis par Lionel. Si l'appareil n'a pas encore été mis en service, un code de rattachement à 8 caractères, transmis aussi par Lionel (étape 3).</li>
   </ul>
 
-  <h2>2. Installer la caisse sur l'iPad</h2>
+  <h2>2. Installer la caisse sur l'iPad ou l'iPhone</h2>
   <ol class="etapes">
-    <li>Sur l'iPad, ouvrez Safari à cette adresse :<br>
+    <li>Ouvrez Safari à cette adresse :<br>
       <a class="lien-caisse" href="https://matalon-pos-test.vercel.app">matalon-pos-test.vercel.app</a></li>
-    <li>Touchez le bouton Partager (le carré avec une flèche), puis <b>Sur l'écran d'accueil</b>, puis <b>Ajouter</b>.</li>
-    <li>Fermez Safari et lancez la caisse depuis la nouvelle icône Matalon POS. Travaillez toujours depuis cette icône : dans Safari, l'iPad peut effacer les données.</li>
+    <li>Touchez le bouton Partager (le carré avec une flèche : en haut sur iPad, dans la barre d'adresse ou sous « … » sur iPhone), puis <b>Sur l'écran d'accueil</b>, puis <b>Ajouter</b>.</li>
+    <li>Fermez Safari et lancez la caisse depuis la nouvelle icône Matalon POS. Travaillez toujours depuis cette icône : dans Safari, l'appareil peut effacer les données.</li>
   </ol>
 
-  <h2>3. Mise en service (une seule fois par iPad)</h2>
+  <h2>3. Mise en service (une seule fois par appareil)</h2>
   <p>Si la caisse affiche « Qui prend le service ? », elle est déjà en service : passez à l'étape 4.</p>
-  <p>Sinon, la caisse affiche « Rattacher cet iPad à un établissement ». Saisissez le code de rattachement reçu de Lionel (par exemple K7PM-3QXA), puis <b>Rattacher l'iPad</b>. L'iPad doit être connecté à Internet pour cette étape.</p>
+  <p>Sinon, la caisse affiche « Rattacher cet iPad à un établissement » (ou « cet iPhone »). Saisissez le code de rattachement reçu de Lionel (par exemple K7PM-3QXA), puis <b>Rattacher l'iPad</b> (ou <b>l'iPhone</b>). L'appareil doit être connecté à Internet pour cette étape. Chaque appareil a son propre code.</p>
   <p>La caisse reçoit alors l'établissement (Moka), l'équipe et la carte. Un code ne sert qu'une fois et expire au bout de 48 heures : s'il est refusé, demandez-en un nouveau.</p>
 
   <h2>3 bis. Ouverture de la journée</h2>
@@ -163,11 +163,22 @@
 
   <h2>5. Scénarios à dérouler</h2>
   <p>Cochez chaque scénario une fois terminé. Les cases restent cochées sur cet appareil. <span class="progression" id="progression"></span></p>
+  <div class="encadre">
+    <strong>Repères.</strong> Les boutons les plus courants sont des icônes :
+    <ul>
+      <li>Flèche vers la gauche : retour à la salle.</li>
+      <li>Feuille au coin replié, en haut du ticket : note sur la commande.</li>
+      <li>Deux flèches opposées : transférer vers une autre table.</li>
+      <li>Porte avec une flèche, en haut à droite à côté de votre prénom : quitter (changer d'utilisateur).</li>
+      <li>Nuage, en haut à droite : synchronisation (vert : synchronisé ; orange : en attente ou hors ligne ; rouge : problème).</li>
+    </ul>
+    <strong>Sur iPhone.</strong> La carte occupe l'écran ; la commande s'ouvre en touchant le bandeau du bas. La vente comptoir se lance depuis la salle (case <b>Comptoir</b>). Les onglets défilent de côté.
+  </div>
 
   <section class="scenario" data-id="s1">
     <label><input type="checkbox">Vente au comptoir, payée par carte</label>
     <ol>
-      <li>Touchez <span class="bouton">Vente comptoir</span>.</li>
+      <li>Touchez <span class="bouton">Vente comptoir</span> (sur iPhone : <span class="bouton">Salle</span> › case Comptoir).</li>
       <li>Ajoutez un Cappuccino et un Croissant (rayon Cuisine, catégorie Viennoiseries).</li>
       <li><span class="bouton">Encaisser</span> › <span class="bouton">Carte bancaire</span> › <span class="bouton">Valider l'encaissement</span>. Saisissez le même montant sur le TPE.</li>
     </ol>
@@ -181,8 +192,8 @@
       <li>Ajoutez un Bubble tea : choisissez Taro et le supplément Perles popping.</li>
       <li>Rayon Formules : Brunch Moka, faites les quatre choix demandés.</li>
       <li>Rayon Bar, catégorie Spritz : un Spritz Aperol.</li>
-      <li>Touchez la ligne Bubble tea, choisissez la note <b>Sans sucre</b>, puis Valider. En haut du ticket, <b>Note</b> › Anniversaire › Enregistrer.</li>
-      <li>Revenez à la salle : la table 4 apparaît occupée, avec son montant et « note ».</li>
+      <li>Touchez la ligne Bubble tea, choisissez la note <b>Sans sucre</b>, puis Valider. En haut du ticket, l'icône <b>note</b> (feuille au coin replié) › Anniversaire › Enregistrer.</li>
+      <li>Revenez à la salle : la table 4 apparaît occupée, avec son montant et l'icône de note.</li>
       <li>Rouvrez-la et touchez <span class="bouton">Addition</span>.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> l'addition s'imprime (ou s'affiche à l'écran sans imprimante) avec la mention « Note provisoire, ne vaut pas ticket de caisse ». Gardez la table ouverte pour le scénario suivant.</p>
@@ -201,8 +212,8 @@
   <section class="scenario" data-id="s3b">
     <label><input type="checkbox">Transfert et regroupement de tables</label>
     <ol>
-      <li>Ouvrez la table 2, ajoutez deux cafés, puis <b>Transférer</b> › table 8 (libre) : la commande passe sur la table 8.</li>
-      <li>Ouvrez la table 9, ajoutez un thé, puis <b>Transférer</b> › table 8 (occupée) › <b>Regrouper</b>.</li>
+      <li>Ouvrez la table 2, ajoutez deux cafés, puis l'icône <b>transférer</b> (deux flèches) › table 8 (libre) : la commande passe sur la table 8.</li>
+      <li>Ouvrez la table 9, ajoutez un thé, puis l'icône <b>transférer</b> › table 8 (occupée) › <b>Regrouper</b>.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> la table 8 réunit les trois articles, les tables 2 et 9 redeviennent libres.</p>
   </section>
@@ -222,7 +233,7 @@
     <label><input type="checkbox">Compte serveur et validation responsable</label>
     <ol>
       <li><span class="bouton">Réglages</span> › Équipe : ajoutez un serveur avec un code PIN, puis <span class="bouton">Ajouter à l'équipe</span>. Il faut être connecté à Internet : l'équipe est partagée par toutes les caisses de l'établissement.</li>
-      <li>En haut à droite, <span class="bouton">Quitter</span>, puis connectez-vous avec ce serveur.</li>
+      <li>En haut à droite, l'icône <b>quitter</b> (porte avec une flèche), puis connectez-vous avec ce serveur.</li>
       <li>Vérifiez que l'onglet Réglages n'apparaît plus.</li>
       <li>Sur une table, tentez une remise de 20 % sur une ligne.</li>
     </ol>
@@ -244,7 +255,7 @@
     <ol>
       <li>Onglet <span class="bouton">Tickets</span> : touchez un ticket encaissé, puis <span class="bouton">Facture</span>.</li>
       <li>Saisissez un client fictif (nom, adresse, code postal et ville ; SIREN facultatif) et <b>Émettre la facture</b>.</li>
-      <li><span class="bouton">Imprimer en A4 ou PDF</span> : la feuille d'impression de l'iPad s'ouvre (AirPrint, ou « Enregistrer dans Fichiers » pour un PDF).</li>
+      <li><span class="bouton">Imprimer en A4 ou PDF</span> : la feuille d'impression de l'iPad ou de l'iPhone s'ouvre (AirPrint, ou « Enregistrer dans Fichiers » pour un PDF).</li>
       <li>Annulez ensuite ce ticket : un avoir est émis automatiquement.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> facture numérotée F-…-000001 avec les mentions légales ; une seconde impression porte « Duplicata » ; l'avoir reprend le client et annule la facture. Si la caisse signale une identité incomplète, Lionel complète les mentions de facture dans l'administration.</p>
@@ -274,10 +285,10 @@
   <section class="scenario" data-id="s9">
     <label><input type="checkbox">Service sans Internet</label>
     <ol>
-      <li>En haut à droite, la pastille indique <b>Synchronisé</b> (point vert).</li>
-      <li>Coupez le Wi-Fi de l'iPad (Centre de contrôle), puis encaissez deux ventes au comptoir.</li>
-      <li>Touchez la pastille : elle passe à <b>Hors ligne</b> avec le nombre d'enregistrements en attente.</li>
-      <li>Rallumez le Wi-Fi et attendez une minute (ou touchez la pastille).</li>
+      <li>En haut à droite, la pastille indique <b>Synchronisé</b> (nuage vert ; sur iPhone, seul le nuage s'affiche).</li>
+      <li>Coupez le Wi-Fi et les données cellulaires de l'appareil (Centre de contrôle, ou mode Avion), puis encaissez deux ventes au comptoir.</li>
+      <li>Touchez la pastille : elle passe à <b>Hors ligne</b> (nuage barré) avec le nombre d'enregistrements en attente.</li>
+      <li>Rallumez le réseau et attendez une minute (ou touchez la pastille).</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> les ventes s'encaissent normalement sans réseau, puis la pastille repasse à <b>Synchronisé</b>. Rien n'est perdu ni compté deux fois.</p>
   </section>
@@ -286,7 +297,7 @@
     <label><input type="checkbox">Carte modifiée en direct (avec Lionel)</label>
     <ol>
       <li>Lionel change un prix et rend un article indisponible dans l'administration, puis enregistre la carte.</li>
-      <li>Sur l'iPad, touchez la pastille de synchronisation en haut à droite, puis ouvrez la vente comptoir.</li>
+      <li>Sur l'appareil, touchez la pastille de synchronisation en haut à droite, puis ouvrez la vente comptoir.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> le nouveau prix s'affiche, l'article indisponible est barré et refusé. Les tickets déjà encaissés gardent l'ancien prix.</p>
   </section>
