@@ -48,7 +48,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 - [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
 - [ ] Remplir les mentions légales des factures dans l'administration.
-- [ ] Pousser les tags `noyau-fiscal@0.4.0` et `noyau-fiscal@0.5.0` (le proxy refuse le push de tags depuis la session).
+- [ ] Créer les tags `noyau-fiscal-v0.4.0` (commit 0396872) et `noyau-fiscal-v0.5.0` (commit e81d18c) par une release GitHub : la session ne peut pas pousser de tags, et GitHub refuse « @ » dans un nom de tag créé depuis le navigateur. Le commentaire de `packages/noyau-fiscal/src/version.ts` (`noyau-fiscal@<version>`) sera aligné à la prochaine modification du noyau, pour ne pas incrémenter la version pour un commentaire.
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
 - [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.

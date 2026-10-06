@@ -20,7 +20,7 @@ Caisse tactile iPad multi-établissements du groupe Matalon, conforme à l'artic
 - Aucune modification ni suppression : une erreur se corrige par un ticket d'annulation négatif lié à l'original.
 - Chaque opération est écrite en un seul lot atomique (`StockageFiscal.ajouterLot`).
 - Journée comptable basculant à 5 h, heure de Paris ; dates comptables monotones même si l'horloge recule.
-- Toute modification de `packages/noyau-fiscal` impose d'incrémenter `VERSION_NOYAU_FISCAL`, de tagger `noyau-fiscal@<version>` et de mettre l'attestation à jour.
+- Toute modification de `packages/noyau-fiscal` impose d'incrémenter `VERSION_NOYAU_FISCAL`, de tagger `noyau-fiscal-v<version>` (GitHub refuse « @ » dans un nom de tag créé depuis le navigateur) et de mettre l'attestation à jour.
 
 ## Garde-fous à la charge de l'application caisse
 
