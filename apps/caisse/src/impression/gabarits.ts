@@ -11,7 +11,7 @@ import {
 } from "@matalon/noyau-fiscal";
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
-import { totauxCommande, versSaisie, type Commande } from "../metier/commande";
+import { lignesActives, totauxCommande, versSaisie, type Commande } from "../metier/commande";
 import { MENTIONS_PROFESSIONNELS, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { Recu } from "./recu";
@@ -94,7 +94,7 @@ export function gabaritAddition(commande: Commande, config: Configuration, opera
   r.colonnes(nomTable(config, commande.tableId), dateHeure(new Date().toISOString()));
   if (commande.couverts) r.texte(`${commande.couverts} couvert(s) · servi par ${nomUtilisateur(config, operateurId)}`);
   r.filet();
-  for (const l of commande.lignes) {
+  for (const l of lignesActives(commande)) {
     const s = versSaisie(l);
     r.colonnes(`${l.quantite} x ${s.libelle}`, formaterEuros(l.quantite * l.prixUnitaireTTC));
     if (l.remise) r.colonnes(`   Remise (${l.remise.motif})`, formaterEuros(-l.remise.montantTTC));

@@ -20,6 +20,12 @@ export interface LigneCommande {
   note?: string;
   ajouteePar: string;
   ajouteeLe: string;
+  /**
+   * Ligne retirée de la commande : elle reste affichée barrée à l'écran pour
+   * le service, mais ne compte plus (ni total, ni addition, ni ticket).
+   * Le retrait est aussi tracé au journal des événements.
+   */
+  retiree?: { le: string; par: string };
 }
 
 export interface Commande {
@@ -71,13 +77,54 @@ export interface TotauxCommande {
   ventilation: VentilationTVA[];
 }
 
+/** Lignes qui comptent : celles qui n'ont pas été retirées. */
+export function lignesActives(c: Commande): LigneCommande[] {
+  return c.lignes.filter((l) => !l.retiree);
+}
+
+/**
+ * Une commande se garde tant qu'elle porte quelque chose : un article (même
+ * retiré, pour qu'il reste visible barré), des couverts (table installée avant
+ * de commander) ou une note. « Libérer la table » la ferme explicitement.
+ */
+export function commandeAGarder(c: Commande | null): c is Commande {
+  return !!c && (c.lignes.length > 0 || c.couverts != null || !!c.note);
+}
+
+/**
+ * Modifie une ligne. Un retrait (ligne entière, ou une partie de sa quantité)
+ * laisse une ligne barrée à sa place au lieu de la faire disparaître.
+ */
+export function modifierLigne(
+  c: Commande,
+  ligneUid: string,
+  nouvelle: LigneCommande | null,
+  unitesRetirees: number,
+  par: string,
+): Commande {
+  const retiree = { le: new Date().toISOString(), par };
+  const lignes: LigneCommande[] = [];
+  for (const x of c.lignes) {
+    if (x.uid !== ligneUid) {
+      lignes.push(x);
+    } else if (!nouvelle) {
+      lignes.push({ ...x, retiree });
+    } else {
+      lignes.push(nouvelle);
+      if (unitesRetirees > 0) lignes.push({ ...avecQuantite(x, unitesRetirees), uid: uid(), retiree });
+    }
+  }
+  return { ...c, lignes };
+}
+
 /** Totaux calculés exactement comme le noyau fiscal les calculera. */
 export function totauxCommande(c: Commande): TotauxCommande {
-  const lignes = c.lignes.map((l) => calculerLigne(versSaisie(l)));
+  const actives = lignesActives(c);
+  const lignes = actives.map((l) => calculerLigne(versSaisie(l)));
   return {
     totalTTC: lignes.reduce((s, l) => s + l.montantTTC, 0),
     totalRemises: lignes.reduce((s, l) => s + l.remiseTTC, 0),
-    nbArticles: c.lignes.reduce((s, l) => s + l.quantite, 0),
+    nbArticles: actives.reduce((s, l) => s + l.quantite, 0),
     ventilation: ventiler(lignes),
   };
 }
@@ -100,6 +147,7 @@ export function montantRemise(brutTTC: number, pourcentage: number): number {
 export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajouteeLe">): Commande {
   const identique = c.lignes.find(
     (x) =>
+      !x.retiree &&
       x.articleId === l.articleId &&
       x.prixUnitaireTTC === l.prixUnitaireTTC &&
       !x.remise &&

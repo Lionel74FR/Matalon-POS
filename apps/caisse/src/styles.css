@@ -855,6 +855,23 @@ code {
   color: var(--encre);
 }
 
+/* Ligne retirée : reste visible pour le service, barrée, sans effet sur le total. */
+.ticket-ligne.retiree,
+.ticket-ligne.retiree:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.ticket-ligne.retiree .qte,
+.ticket-ligne.retiree .libelle-texte,
+.ticket-ligne.retiree .montant {
+  text-decoration: line-through;
+}
+
+.ticket-ligne.retiree .mention-retiree {
+  font-style: italic;
+}
+
 .ticket-ligne:active {
   background: var(--papier-ombre);
 }
@@ -1106,6 +1123,57 @@ code {
   width: 56px;
   font-size: 1.5rem;
   padding: 0;
+}
+
+/* Gros rendu monnaie : confirmation avant d'accepter le paiement. */
+.confirmation-rendu {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: var(--rayon-petit);
+  background: #5a4416;
+  color: #fff3c4;
+}
+
+.confirmation-rendu p {
+  margin: 0 0 10px;
+}
+
+/* Couverts : un toucher de 1 à 12. */
+.couverts-grille {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.couverts-choix {
+  min-height: 72px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-3);
+  color: var(--mousse);
+  font-family: var(--police-chiffres);
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.couverts-choix.actif {
+  background: var(--mousse);
+  color: var(--encre);
+}
+
+.couverts-choix:active {
+  filter: brightness(1.15);
+}
+
+.couverts-plus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--espresso-3);
+  color: var(--sable);
 }
 
 .groupe-choix + .groupe-choix {

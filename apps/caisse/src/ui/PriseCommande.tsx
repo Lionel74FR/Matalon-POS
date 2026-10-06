@@ -1,11 +1,11 @@
-import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, Printer, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, DoorOpen, Printer, StickyNote, Users } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
-import { ajouterLigne, montantLigne, totauxCommande, type Commande, type LigneCommande } from "../metier/commande";
+import { ajouterLigne, commandeAGarder, lignesActives, modifierLigne, montantLigne, totauxCommande, type Commande, type LigneCommande } from "../metier/commande";
 import { Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { ModaleArticle } from "./modales/ModaleArticle";
@@ -74,6 +74,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const [ticketOuvert, setTicketOuvert] = useState(false);
   const totaux = totauxCommande(c);
   const estComptoir = c.tableId === ID_COMPTOIR;
+  /** Articles qui comptent (les lignes retirées restent affichées barrées). */
+  const nbActives = lignesActives(c).length;
 
   const ajouter = (l: Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">) =>
     props.onChange(ajouterLigne(c, { ...l, ajouteePar: utilisateur.id }));
@@ -113,8 +115,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             )}
           </div>
           <div className="ticket-outils">
-            <BoutonIcone icone={StickyNote} variante="discret" libelle="Note sur la commande" disabled={c.lignes.length === 0} onClick={() => setNoteOuverte(true)} />
-            <BoutonIcone icone={ArrowRightLeft} variante="discret" libelle="Transférer vers une autre table" disabled={c.lignes.length === 0} onClick={() => setTransfertOuvert(true)} />
+            <BoutonIcone icone={StickyNote} variante="discret" libelle="Note sur la commande" onClick={() => setNoteOuverte(true)} />
+            <BoutonIcone icone={ArrowRightLeft} variante="discret" libelle="Transférer vers une autre table" disabled={!commandeAGarder(c)} onClick={() => setTransfertOuvert(true)} />
           </div>
           <button className="bouton fermer-mobile" onClick={() => setTicketOuvert(false)}>
             <AvecIcone icone={BookOpen}>Carte</AvecIcone>
@@ -129,12 +131,18 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           {c.lignes.length === 0 && <Vide>Touchez un article pour l'ajouter.</Vide>}
           {c.lignes.map((l) => (
             <li key={l.uid}>
-              <button className="ticket-ligne" onClick={() => setLigneOuverte(l)}>
+              <button
+                className={`ticket-ligne${l.retiree ? " retiree" : ""}`}
+                disabled={!!l.retiree}
+                aria-label={l.retiree ? `${l.quantite} ${l.libelle}, retiré de la commande` : undefined}
+                onClick={() => setLigneOuverte(l)}
+              >
                 <span className="qte">{l.quantite}</span>
                 <span className="libelle">
-                  {l.libelle}
+                  <span className="libelle-texte">{l.libelle}</span>
                   {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
                   {l.note && <small className="note-ligne">{l.note}</small>}
+                  {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
                   {l.remise && (
                     <small className="remise">
                       {l.remise.montantTTC === l.quantite * l.prixUnitaireTTC ? "Offert" : `Remise ${euros(l.remise.montantTTC)}`} ·{" "}
@@ -154,13 +162,19 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           </div>
           <div className="ticket-actions">
             {!estComptoir && (
-              <button className="bouton" disabled={c.lignes.length === 0} onClick={() => void imprimerAddition()}>
+              <button className="bouton" disabled={nbActives === 0} onClick={() => void imprimerAddition()}>
                 <AvecIcone icone={Printer}>Addition</AvecIcone>
               </button>
             )}
-            <button className="bouton principal" disabled={c.lignes.length === 0} onClick={() => setEncaissement(true)}>
-              <AvecIcone icone={CreditCard}>Encaisser</AvecIcone>
-            </button>
+            {nbActives === 0 && commandeAGarder(c) ? (
+              <button className="bouton" onClick={props.onTerminee}>
+                <AvecIcone icone={DoorOpen}>{estComptoir ? "Vider" : "Libérer la table"}</AvecIcone>
+              </button>
+            ) : (
+              <button className="bouton principal" disabled={nbActives === 0} onClick={() => setEncaissement(true)}>
+                <AvecIcone icone={CreditCard}>Encaisser</AvecIcone>
+              </button>
+            )}
           </div>
         </footer>
       </aside>
@@ -236,13 +250,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         <ModaleLigne
           ligne={ligneOuverte}
           tableId={c.tableId}
-          onChange={(nouvelle) => {
-            props.onChange({
-              ...c,
-              lignes: nouvelle
-                ? c.lignes.map((x) => (x.uid === nouvelle.uid ? nouvelle : x))
-                : c.lignes.filter((x) => x.uid !== ligneOuverte.uid),
-            });
+          onChange={(nouvelle, unitesRetirees) => {
+            props.onChange(modifierLigne(c, ligneOuverte.uid, nouvelle, unitesRetirees, utilisateur.id));
             setLigneOuverte(null);
           }}
           onFermer={() => setLigneOuverte(null)}

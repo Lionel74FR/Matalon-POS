@@ -17,7 +17,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { ID_COMPTOIR } from "../donnees/configuration";
-import { fusionnerCommandes, nouvelleCommande, totauxCommande, transfererCommande, type Commande } from "../metier/commande";
+import { commandeAGarder, fusionnerCommandes, nouvelleCommande, totauxCommande, transfererCommande, type Commande } from "../metier/commande";
 import { nomTable } from "../impression/gabarits";
 import { MODE_TEST } from "../fiscal/caisse";
 import type { EtatSynchro } from "../serveur/synchro";
@@ -124,11 +124,11 @@ export function Coque() {
     async (c: Commande | null, tableId: string) => {
       setCommandes((m) => {
         const copie = new Map(m);
-        if (c && c.lignes.length > 0) copie.set(tableId, c);
+        if (commandeAGarder(c)) copie.set(tableId, c);
         else copie.delete(tableId);
         return copie;
       });
-      if (c && c.lignes.length > 0) await caisse.db.put("commandes", c);
+      if (commandeAGarder(c)) await caisse.db.put("commandes", c);
       else await caisse.db.delete("commandes", tableId);
     },
     [caisse.db],

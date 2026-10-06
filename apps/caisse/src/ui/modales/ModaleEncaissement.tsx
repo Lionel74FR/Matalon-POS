@@ -1,4 +1,4 @@
-import { Banknote, Check, CreditCard, Printer, Ticket as TicketPapier, Trash2, X, type LucideIcon } from "lucide-react";
+import { Banknote, Check, CreditCard, Printer, Ticket as TicketPapier, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
 import { AvecIcone } from "../icones";
 import { ErreurFiscale, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useState } from "react";
@@ -6,7 +6,7 @@ import { ID_COMPTOIR } from "../../donnees/configuration";
 import { MODE_TEST } from "../../fiscal/caisse";
 import { gabaritNote, LIBELLES_PAIEMENT } from "../../impression/gabarits";
 import { Recu } from "../../impression/recu";
-import { totauxCommande, versSaisie, type Commande } from "../../metier/commande";
+import { lignesActives, totauxCommande, versSaisie, type Commande } from "../../metier/commande";
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
@@ -20,6 +20,8 @@ const ICONES_PAIEMENT: Record<ModePaiement, LucideIcon> = {
   AUTRE: Banknote,
 };
 const BILLETS = [500, 1000, 2000, 5000];
+/** Au-delà de ce rendu (centimes), la caisse demande confirmation : faute de frappe probable. */
+const RENDU_A_CONFIRMER = 2000;
 
 /** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
 export function ModaleEncaissement(props: { commande: Commande; onTermine: () => void; onFermer: () => void }) {
@@ -33,6 +35,8 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
   const montant = saisie ?? reste;
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [enCours, setEnCours] = useState(false);
+  /** Paiement en espèces qui laisserait un gros rendu, en attente de confirmation. */
+  const [renduAConfirmer, setRenduAConfirmer] = useState<{ montant: number; rendu: number } | null>(null);
 
   const especes = paiements.filter((p) => p.mode === "ESPECES").reduce((s, p) => s + p.montant, 0);
   const excedent = paye - total;
@@ -40,9 +44,14 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
 
   const ajouter = (mode: ModePaiement, m = montant) => {
     if (m <= 0) return;
+    if (reste === 0) return notifier("Le total est déjà réglé : retirez un paiement pour en changer.", "erreur");
     if (mode !== "ESPECES" && paye + m > total) {
       return notifier(`${LIBELLES_PAIEMENT[mode]} : le montant dépasse le reste à payer. Seules les espèces donnent lieu à un rendu.`, "erreur");
     }
+    if (mode === "ESPECES" && m - reste > RENDU_A_CONFIRMER && !renduAConfirmer) {
+      return setRenduAConfirmer({ montant: m, rendu: m - reste });
+    }
+    setRenduAConfirmer(null);
     setPaiements((l) => [...l, { mode, montant: m }]);
     setSaisie(null);
   };
@@ -52,7 +61,7 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
     setEnCours(true);
     try {
       const t = await caisse.registre.enregistrerVente({
-        lignes: props.commande.lignes.map(versSaisie),
+        lignes: lignesActives(props.commande).map(versSaisie),
         paiements,
         operateurId: utilisateur.id,
         tableId: props.commande.tableId === ID_COMPTOIR ? null : props.commande.tableId,
@@ -147,14 +156,37 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
       large
       onFermer={props.onFermer}
       pied={
-        <>
-          <button className="bouton" disabled={paiements.length === 0} onClick={() => setPaiements([])}>
-            <AvecIcone icone={Trash2}>Effacer les paiements</AvecIcone>
-          </button>
-          <button className="bouton principal grand" disabled={!valide || enCours || !!blocage} onClick={() => void encaisser()}>
-            <AvecIcone icone={Check}>{blocage ? "Encaissement bloqué" : enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}</AvecIcone>
-          </button>
-        </>
+        renduAConfirmer ? (
+          // Dans le pied, toujours visible même quand le corps défile (iPhone).
+          <div className="confirmation-rendu" role="alertdialog" aria-label="Confirmer le rendu">
+            <p>
+              {euros(renduAConfirmer.montant)} en espèces pour {euros(reste)} à payer : rendre <strong>{euros(renduAConfirmer.rendu)}</strong> ?
+            </p>
+            <div className="options">
+              <button
+                className="bouton"
+                onClick={() => {
+                  setRenduAConfirmer(null);
+                  setSaisie(null);
+                }}
+              >
+                <AvecIcone icone={Undo2}>Corriger</AvecIcone>
+              </button>
+              <button className="bouton principal" onClick={() => ajouter("ESPECES", renduAConfirmer.montant)}>
+                <AvecIcone icone={Check}>Oui, rendre {euros(renduAConfirmer.rendu)}</AvecIcone>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <button className="bouton" disabled={paiements.length === 0} onClick={() => setPaiements([])}>
+              <AvecIcone icone={Trash2}>Effacer les paiements</AvecIcone>
+            </button>
+            <button className="bouton principal grand" disabled={!valide || enCours || !!blocage} onClick={() => void encaisser()}>
+              <AvecIcone icone={Check}>{blocage ? "Encaissement bloqué" : enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}</AvecIcone>
+            </button>
+          </>
+        )
       }
     >
       {blocage && <p className="erreur">{blocage}</p>}

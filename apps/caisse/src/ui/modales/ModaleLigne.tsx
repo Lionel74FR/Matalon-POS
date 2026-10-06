@@ -13,7 +13,8 @@ const NOTES_RAPIDES = ["Sans sucre", "Lait végétal", "Sans glace", "Allergie",
 export function ModaleLigne(props: {
   ligne: LigneCommande;
   tableId: string;
-  onChange: (l: LigneCommande | null) => void;
+  /** `unitesRetirees` : quantité retirée, qui restera affichée barrée. */
+  onChange: (l: LigneCommande | null, unitesRetirees: number) => void;
   onFermer: () => void;
 }) {
   const { caisse, utilisateur, demanderResponsable } = useCaisse();
@@ -46,17 +47,18 @@ export function ModaleLigne(props: {
       if (!id) return;
       accordeePar = id;
     }
-    if (quantite < l.quantite) await tracerRetrait(l.quantite - quantite);
+    const retrait = Math.max(0, l.quantite - quantite);
+    if (retrait > 0) await tracerRetrait(retrait);
     const suite = avecQuantite({ ...l, remise: undefined, note: note.trim() || undefined }, quantite);
     if (pourcentage > 0) {
       suite.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, pourcentage) };
     }
-    props.onChange(suite);
+    props.onChange(suite, retrait);
   };
 
   const supprimer = async () => {
     await tracerRetrait(l.quantite);
-    props.onChange(null);
+    props.onChange(null, l.quantite);
   };
 
   const apercu = avecQuantite(
