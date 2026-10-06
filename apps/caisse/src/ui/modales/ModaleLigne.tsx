@@ -5,6 +5,7 @@ import { euros, useCaisse } from "../contexte";
 
 const MOTIFS = ["Geste commercial", "Client habitué", "Erreur de service", "Repas du personnel", "Offert maison"];
 const POURCENTAGES = [10, 20, 50, 100];
+const NOTES_RAPIDES = ["Sans sucre", "Lait végétal", "Sans glace", "Allergie", "À servir après"];
 
 /** Quantité, remise ou retrait d'une ligne de commande. Tout retrait est tracé au journal. */
 export function ModaleLigne(props: {
@@ -19,6 +20,7 @@ export function ModaleLigne(props: {
   const [pourcentage, setPourcentage] = useState(l.remise?.pourcentage ?? 0);
   const [motif, setMotif] = useState(l.remise?.motif ?? "");
   const [erreur, setErreur] = useState("");
+  const [note, setNote] = useState(l.note ?? "");
 
   const tracerRetrait = (unites: number) =>
     caisse.registre.journaliser(
@@ -43,7 +45,7 @@ export function ModaleLigne(props: {
       accordeePar = id;
     }
     if (quantite < l.quantite) await tracerRetrait(l.quantite - quantite);
-    const suite = avecQuantite({ ...l, remise: undefined }, quantite);
+    const suite = avecQuantite({ ...l, remise: undefined, note: note.trim() || undefined }, quantite);
     if (pourcentage > 0) {
       suite.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, pourcentage) };
     }
@@ -87,6 +89,21 @@ export function ModaleLigne(props: {
             +
           </button>
         </div>
+      </section>
+      <section className="groupe-choix">
+        <h3>Note pour le service</h3>
+        <div className="options">
+          {NOTES_RAPIDES.map((n) => (
+            <button
+              key={n}
+              className={`option${note.includes(n) ? " active" : ""}`}
+              onClick={() => setNote((x) => (x.includes(n) ? x.replace(n, "").replace(/^[\s,]+|[\s,]+$/g, "").replace(/,\s*,/g, ",") : x ? `${x}, ${n}` : n))}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <input className="saisie-note" value={note} maxLength={120} placeholder="Précision libre" onChange={(e) => setNote(e.target.value)} />
       </section>
       <section className="groupe-choix">
         <h3>Remise</h3>

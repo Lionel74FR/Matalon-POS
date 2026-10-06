@@ -4,6 +4,8 @@ import { gabaritNote, LIBELLES_PAIEMENT, nomTable, nomUtilisateur } from "../imp
 import { Modale, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { QrNote, urlNoteTicket } from "./QrNote";
+import { ModaleFacture } from "./modales/ModaleFacture";
+import { emettreAvoir, listerFactures } from "../metier/facture";
 
 const MOTIFS_ANNULATION = ["Erreur de saisie", "Erreur de table", "Client parti sans consommer", "Réclamation client"];
 
@@ -16,11 +18,18 @@ export function Tickets() {
   const [choisi, setChoisi] = useState<Ticket | null>(null);
   const [annulation, setAnnulation] = useState<Ticket | null>(null);
   const [motif, setMotif] = useState("");
+  const [factureDe, setFactureDe] = useState<Ticket | null>(null);
+  const [factures, setFactures] = useState<Map<number, string>>(new Map());
+  /** Ventes facturées (numéro de ticket → numéro de facture), pour proposer l'avoir manquant. */
+  const [ventesFacturees, setVentesFacturees] = useState<Set<number>>(new Set());
 
   const charger = useCallback(async () => {
     const liste = await caisse.stockage.derniers("tickets", 150);
     setTickets(liste);
     setAnnules(new Set(liste.filter((t) => t.ticketOrigine).map((t) => t.ticketOrigine!.numero)));
+    const emises = await listerFactures(caisse.stockage);
+    setFactures(new Map(emises.map((f) => [f.ticket, f.numero])));
+    setVentesFacturees(new Set(emises.filter((f) => f.nature === "FACTURE").map((f) => f.ticket)));
   }, [caisse.stockage]);
 
   useEffect(() => void charger(), [charger]);
@@ -47,17 +56,29 @@ export function Tickets() {
     setQr({ ticket: t, url: urlNoteTicket(t, config, n) });
   };
 
+  const rattraperAvoir = async (a: Ticket) => {
+    try {
+      const avoir = await emettreAvoir(caisse.registre, caisse.stockage, { annulation: a, operateurId: utilisateur.id, caisseId: config.caisseId });
+      if (avoir) notifier(`Avoir n° ${avoir.numero} émis.`);
+      await charger();
+    } catch (e) {
+      notifier(String(e), "erreur");
+    }
+  };
+
   const annuler = async () => {
     if (!annulation || !motif) return;
     const responsable = await demanderResponsable(`Annulation du ticket n° ${annulation.numero} (${euros(annulation.totalTTC)}).`);
     if (!responsable) return;
     try {
       const a = await caisse.registre.enregistrerAnnulation({ numeroTicket: annulation.numero, motif, operateurId: responsable });
+      // Vente déjà facturée : l'avoir suit immédiatement l'annulation (rattrapable depuis le ticket s'il manquait).
+      const avoir = await emettreAvoir(caisse.registre, caisse.stockage, { annulation: a, operateurId: responsable, caisseId: config.caisseId });
       if (imprimanteConfiguree) {
         await imprimer(gabaritNote(a, config), `Annulation n° ${a.numero}`);
         await caisse.registre.journaliser("IMPRESSION_TICKET", { ticket: a.numero, canal: "papier" }, utilisateur.id);
       }
-      notifier(`Ticket n° ${annulation.numero} annulé par le ticket n° ${a.numero}.`);
+      notifier(`Ticket n° ${annulation.numero} annulé par le ticket n° ${a.numero}${avoir ? `, avoir n° ${avoir.numero} émis` : ""}.`);
       setAnnulation(null);
       setChoisi(null);
       setMotif("");
@@ -115,6 +136,19 @@ export function Tickets() {
                   Annuler ce ticket
                 </button>
               )}
+              {(choisi.type === "VENTE" ? !annules.has(choisi.numero) || factures.has(choisi.numero) : factures.has(choisi.numero)) && (
+                <button className="bouton" onClick={() => setFactureDe(choisi)}>
+                  {factures.has(choisi.numero) ? (choisi.type === "VENTE" ? "Facture" : "Avoir") : "Facture"}
+                </button>
+              )}
+              {choisi.type === "ANNULATION" &&
+                choisi.ticketOrigine &&
+                ventesFacturees.has(choisi.ticketOrigine.numero) &&
+                !factures.has(choisi.numero) && (
+                  <button className="bouton principal" onClick={() => void rattraperAvoir(choisi)}>
+                    Émettre l'avoir
+                  </button>
+                )}
               <button className="bouton" onClick={() => void duplicataQr(choisi)}>
                 QR code
               </button>
@@ -126,6 +160,7 @@ export function Tickets() {
         >
           {annules.has(choisi.numero) && <p className="erreur">Ce ticket a été annulé.</p>}
           {choisi.motif && <p className="explication">Motif : {choisi.motif}</p>}
+          {factures.has(choisi.numero) && <p className="explication">Facturé : n° {factures.get(choisi.numero)}</p>}
           <ul className="detail-lignes">
             {choisi.lignes.map((l, i) => (
               <li key={i}>
@@ -142,6 +177,16 @@ export function Tickets() {
             </li>
           </ul>
         </Modale>
+      )}
+
+      {factureDe && (
+        <ModaleFacture
+          ticket={factureDe}
+          onFermer={() => {
+            setFactureDe(null);
+            void charger();
+          }}
+        />
       )}
 
       {qr && (

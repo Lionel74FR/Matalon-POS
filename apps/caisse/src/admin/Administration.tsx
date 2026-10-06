@@ -17,6 +17,7 @@ const CHAMPS_IDENTITE: Array<[keyof IdentiteEtablissement, string, string?]> = [
   ["telephone", "Téléphone"],
   ["siret", "SIRET", "14 chiffres"],
   ["tvaIntracom", "N° de TVA intracommunautaire"],
+  ["mentionsLegales", "Mentions des factures", "Forme juridique, capital, RCS — ex. SAS au capital de 10 000 € · RCS Annecy 123 456 789"],
 ];
 
 /** Petit formulaire avec gestion de l'envoi et de l'erreur. */
@@ -363,7 +364,7 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
 function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: string; nom: string }>; onChange: () => Promise<void> }) {
   const { e } = props;
   const responsable = e.utilisateurs.some((u) => u.role === "responsable" && u.actif);
-  const identiteIncomplete = !e.identite.raisonSociale || !e.identite.siret || !e.identite.tvaIntracom || !e.identite.adresse;
+  const identiteIncomplete = !e.identite.raisonSociale || !e.identite.siret || !e.identite.tvaIntracom || !e.identite.adresse || !e.identite.mentionsLegales;
   return (
     <>
       <header className="admin-fiche-tete">
@@ -374,7 +375,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
       </header>
       {identiteIncomplete && (
         <p className="admin-alerte">
-          Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA doivent figurer sur chaque note client.
+          Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
         </p>
       )}
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
@@ -637,7 +638,7 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
         <div>
           {CHAMPS_IDENTITE.map(([cle, libelle, aide]) => (
             <Champ key={cle} libelle={libelle} aide={aide}>
-              <input value={identite[cle]} onChange={(ev) => setIdentite({ ...identite, [cle]: ev.target.value })} required={cle === "enseigne"} />
+              <input value={identite[cle] ?? ""} onChange={(ev) => setIdentite({ ...identite, [cle]: ev.target.value })} required={cle === "enseigne"} />
             </Champ>
           ))}
         </div>

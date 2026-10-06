@@ -131,6 +131,14 @@ export type CodeEvenement =
   /** Addition (note provisoire) imprimée avant encaissement. */
   | "IMPRESSION_ADDITION"
   | "OUVERTURE_TIROIR"
+  /** Fond de caisse déclaré à l'ouverture de la journée. */
+  | "FOND_DE_CAISSE"
+  /** Comptage des espèces et rapprochement CB / TPE avant la clôture Z, écarts motivés. */
+  | "COMPTAGE_CAISSE"
+  /** Facture émise sur demande à partir d'un ticket ; le journal garantit sa numérotation sans trou. */
+  | "FACTURE"
+  /** Commande ouverte déplacée vers une autre table, ou fusionnée avec elle. */
+  | "TRANSFERT_TABLE"
   | "LECTURE_X"
   | "CLOTURE"
   | "ARCHIVAGE"

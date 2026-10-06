@@ -33,6 +33,7 @@ const config: Configuration = {
     telephone: "04 56 19 02 68",
     siret: "12345678900012",
     tvaIntracom: "FR00123456789",
+    mentionsLegales: "SAS au capital de 10 000 € · RCS Annecy 123 456 789",
   },
   utilisateurs: [{ id: "u-lea", nom: "Léa", role: "serveur", pinHash: "", actif: true }],
   tables: genererTables(12),

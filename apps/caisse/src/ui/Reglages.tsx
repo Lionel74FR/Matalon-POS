@@ -22,6 +22,7 @@ const CHAMPS: Array<[keyof Etablissement, string]> = [
   ["telephone", "Téléphone"],
   ["siret", "SIRET"],
   ["tvaIntracom", "N° de TVA intracommunautaire"],
+  ["mentionsLegales", "Forme, capital, RCS (factures)"],
 ];
 
 /** Message lisible pour une modification refusée ou impossible hors ligne. */
@@ -128,7 +129,7 @@ export function Reglages(props: { onAssistant: () => void }) {
           {CHAMPS.map(([cle, libelle]) => (
             <label key={cle} className="champ">
               <span>{libelle}</span>
-              <input value={etablissement[cle]} onChange={(e) => setEtablissement({ ...etablissement, [cle]: e.target.value })} />
+              <input value={etablissement[cle] ?? ""} onChange={(e) => setEtablissement({ ...etablissement, [cle]: e.target.value })} />
             </label>
           ))}
         </fieldset>

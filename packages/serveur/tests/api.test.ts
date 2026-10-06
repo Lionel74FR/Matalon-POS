@@ -126,8 +126,11 @@ describe("administration", () => {
     expect((await appel("POST", "/api/admin/etablissements", corps, { Cookie: cookie })).statut).toBe(201);
     expect((await appel("POST", "/api/admin/etablissements", corps, { Cookie: cookie })).statut).toBe(409);
     expect((await appel("POST", "/api/admin/etablissements", { ...corps, id: "Bao Canteen" }, { Cookie: cookie })).statut).toBe(400);
-    const maj = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka", siret: "123 456 789 00012" }, tables: [], seuilNote: 3000 }, { Cookie: cookie });
-    expect(maj.corps.etablissement).toMatchObject({ seuilNote: 3000, identite: { siret: "12345678900012" } });
+    const maj = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka", siret: "123 456 789 00012", mentionsLegales: "SAS au capital de 10 000 €" }, tables: [], seuilNote: 3000 }, { Cookie: cookie });
+    expect(maj.corps.etablissement).toMatchObject({ seuilNote: 3000, identite: { siret: "12345678900012", mentionsLegales: "SAS au capital de 10 000 €" } });
+    // Un iPad d'une version antérieure n'envoie pas le champ : la valeur enregistrée reste.
+    const ancien = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, tables: [], seuilNote: 3000 }, { Cookie: cookie });
+    expect(ancien.corps.etablissement.identite.mentionsLegales).toBe("SAS au capital de 10 000 €");
   });
 });
 

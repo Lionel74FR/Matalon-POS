@@ -9,6 +9,7 @@ import { ModaleArticle } from "./modales/ModaleArticle";
 import { ModaleCouverts } from "./modales/ModaleCouverts";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
 import { ModaleLigne } from "./modales/ModaleLigne";
+import { ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
 
 const TEINTES: Record<string, string> = {
   Boissons: "cafe",
@@ -23,6 +24,9 @@ const TEINTES: Record<string, string> = {
 interface ProprietesCommande {
   titre: string;
   commande: Commande;
+  /** Tables déjà ouvertes, pour le transfert. */
+  tablesOuvertes: Set<string>;
+  onTransferer: (versTableId: string) => void;
   onChange: (c: Commande) => void;
   onTerminee: () => void;
   onRetour: () => void;
@@ -61,6 +65,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const [ligneOuverte, setLigneOuverte] = useState<LigneCommande | null>(null);
   const [couvertsOuvert, setCouvertsOuvert] = useState(false);
   const [encaissement, setEncaissement] = useState(false);
+  const [transfertOuvert, setTransfertOuvert] = useState(false);
+  const [noteOuverte, setNoteOuverte] = useState(false);
   /** Sur téléphone, la commande s'ouvre par-dessus la carte. */
   const [ticketOuvert, setTicketOuvert] = useState(false);
   const totaux = totauxCommande(c);
@@ -102,10 +108,23 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
               </button>
             )}
           </div>
+          <div className="ticket-outils">
+            <button className="bouton discret" disabled={c.lignes.length === 0} onClick={() => setNoteOuverte(true)} aria-label="Note sur la commande">
+              Note
+            </button>
+            <button className="bouton discret" disabled={c.lignes.length === 0} onClick={() => setTransfertOuvert(true)}>
+              Transférer
+            </button>
+          </div>
           <button className="bouton fermer-mobile" onClick={() => setTicketOuvert(false)}>
             Carte
           </button>
         </header>
+        {c.note && (
+          <button className="ticket-note" onClick={() => setNoteOuverte(true)}>
+            {c.note}
+          </button>
+        )}
         <ol className="ticket-lignes">
           {c.lignes.length === 0 && <Vide>Touchez un article pour l'ajouter.</Vide>}
           {c.lignes.map((l) => (
@@ -115,6 +134,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                 <span className="libelle">
                   {l.libelle}
                   {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
+                  {l.note && <small className="note-ligne">{l.note}</small>}
                   {l.remise && (
                     <small className="remise">
                       {l.remise.montantTTC === l.quantite * l.prixUnitaireTTC ? "Offert" : `Remise ${euros(l.remise.montantTTC)}`} ·{" "}
@@ -222,6 +242,27 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             setLigneOuverte(null);
           }}
           onFermer={() => setLigneOuverte(null)}
+        />
+      )}
+      {transfertOuvert && (
+        <ModaleTransfert
+          depuis={c.tableId}
+          tablesOuvertes={props.tablesOuvertes}
+          onChoisir={(t) => {
+            setTransfertOuvert(false);
+            props.onTransferer(t);
+          }}
+          onFermer={() => setTransfertOuvert(false)}
+        />
+      )}
+      {noteOuverte && (
+        <ModaleNoteCommande
+          note={c.note ?? ""}
+          onValider={(note) => {
+            props.onChange({ ...c, note: note.trim() || undefined });
+            setNoteOuverte(false);
+          }}
+          onFermer={() => setNoteOuverte(false)}
         />
       )}
       {couvertsOuvert && (

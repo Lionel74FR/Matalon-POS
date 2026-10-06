@@ -91,6 +91,7 @@ interface LigneEtablissement {
   telephone: string;
   siret: string;
   tva_intracom: string;
+  mentions_legales: string;
   carte_id: string;
   tables: Table[];
   seuil_note: number;
@@ -107,6 +108,7 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
       telephone: l.telephone,
       siret: l.siret,
       tvaIntracom: l.tva_intracom,
+      mentionsLegales: l.mentions_legales ?? "",
     },
     carteId: l.carte_id,
     tables: l.tables,
@@ -130,7 +132,11 @@ const versUtilisateur = (l: LigneUtilisateur): UtilisateurApi => ({
   actif: l.actif,
 });
 
-function lireIdentite(v: unknown): IdentiteEtablissement {
+/**
+ * Identité reçue. `mentionsLegales` vaut null quand le champ est absent (iPad
+ * d'une version antérieure) : la valeur enregistrée est alors conservée.
+ */
+function lireIdentite(v: unknown): Omit<IdentiteEtablissement, "mentionsLegales"> & { mentionsLegales: string | null } {
   const o = (v ?? {}) as Record<string, unknown>;
   const identite = {
     enseigne: texte(o.enseigne, "enseigne", 80),
@@ -140,6 +146,7 @@ function lireIdentite(v: unknown): IdentiteEtablissement {
     telephone: texte(o.telephone ?? "", "telephone", 40),
     siret: texte(o.siret ?? "", "siret", 20).replace(/\s/g, ""),
     tvaIntracom: texte(o.tvaIntracom ?? "", "tvaIntracom", 20).replace(/\s/g, ""),
+    mentionsLegales: o.mentionsLegales === undefined ? null : texte(o.mentionsLegales, "mentionsLegales", 200),
   };
   if (!identite.enseigne) throw new ErreurHttp(400, "CHAMP_INVALIDE", "L'enseigne est obligatoire.");
   if (identite.siret && !/^\d{14}$/.test(identite.siret)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le SIRET compte 14 chiffres.");
@@ -426,20 +433,21 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
     JSON.stringify(tables),
     seuil,
     maintenant,
+    identite.mentionsLegales,
   ];
   if (creation) {
     const carteId = texte(corps.carteId, "carteId", 60);
     if (!CARTES[carteId]) throw new ErreurHttp(400, "CARTE_INCONNUE", "Carte inconnue.");
     await env.db.requete(
       `insert into etablissements (id, enseigne, raison_sociale, adresse, code_postal_ville, telephone, siret, tva_intracom,
-         tables, seuil_note, cree_le, maj_le, carte_id)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $11, $12)`,
+         tables, seuil_note, cree_le, maj_le, mentions_legales, carte_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $11, coalesce($12, ''), $13)`,
       [...valeurs, carteId],
     );
   } else {
     const [maj] = await env.db.requete<{ id: string }>(
       `update etablissements set enseigne = $2, raison_sociale = $3, adresse = $4, code_postal_ville = $5, telephone = $6,
-         siret = $7, tva_intracom = $8, tables = $9::jsonb, seuil_note = $10, maj_le = $11
+         siret = $7, tva_intracom = $8, tables = $9::jsonb, seuil_note = $10, maj_le = $11, mentions_legales = coalesce($12, mentions_legales)
        where id = $1 returning id`,
       valeurs,
     );

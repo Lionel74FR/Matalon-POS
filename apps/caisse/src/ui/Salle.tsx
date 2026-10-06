@@ -51,6 +51,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
                           {c.couverts ? `${c.couverts} couv. · ` : ""}
                           {depuis(c.ouverteLe)}
                           {c.additionsImprimees > 0 ? " · addition" : ""}
+                          {c.note ? " · note" : ""}
                         </span>
                       </>
                     ) : (

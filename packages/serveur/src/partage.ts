@@ -14,6 +14,8 @@ export interface IdentiteEtablissement {
   telephone: string;
   siret: string;
   tvaIntracom: string;
+  /** Forme juridique, capital, RCS : mentions exigées sur les factures (ex. « SAS au capital de 10 000 € · RCS Annecy 123 456 789 »). */
+  mentionsLegales: string;
 }
 
 export interface Table {

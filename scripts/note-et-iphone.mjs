@@ -31,6 +31,9 @@ await clic("Configurer plus tard");
 await p.locator(".carte-personne").first().click();
 await pin("1234");
 await p.locator(".salle").waitFor();
+await p.getByRole("dialog", { name: "Fond de caisse" }).waitFor();
+await capture("m02b-fond");
+await clic("Plus tard");
 await capture("m03-salle");
 largeurs.salle = await debordement();
 

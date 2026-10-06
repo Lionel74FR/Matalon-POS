@@ -1,7 +1,9 @@
 import {
+  baseHT,
   formaterEuros,
   VERSION_NOYAU_FISCAL,
   type Cloture,
+  type Evenement,
   type Paiement,
   type Ticket,
   type TotauxPeriode,
@@ -10,6 +12,7 @@ import {
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
 import { totauxCommande, versSaisie, type Commande } from "../metier/commande";
+import { MENTIONS_PROFESSIONNELS, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { Recu } from "./recu";
 
@@ -121,7 +124,7 @@ function corpsTotaux(r: Recu, t: TotauxPeriode): void {
 
 const LIBELLES_PERIODE = { JOUR: "CLÔTURE JOURNALIÈRE Z", MOIS: "CLÔTURE MENSUELLE", EXERCICE: "CLÔTURE D'EXERCICE" } as const;
 
-export function gabaritCloture(c: Cloture, config: Configuration): Recu {
+export function gabaritCloture(c: Cloture, config: Configuration, comptage?: Evenement | null): Recu {
   const r = new Recu();
   entete(r, config);
   r.texte(LIBELLES_PERIODE[c.periode], { align: "centre", gras: true });
@@ -135,8 +138,74 @@ export function gabaritCloture(c: Cloture, config: Configuration): Recu {
   r.colonnes("Grand total perpétuel", formaterEuros(c.grandTotalPerpetuel));
   r.colonnes("Cumul perpétuel absolu", formaterEuros(c.cumulPerpetuelAbsolu));
   r.filet();
+  if (comptage) corpsComptage(r, comptage);
   r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
   r.texte(`Empreinte ${c.hash.slice(0, 32)}`, { align: "centre" });
+  return r;
+}
+
+const euro = (v: unknown) => (typeof v === "number" ? formaterEuros(v) : "-");
+const ecart = (v: unknown) => (typeof v === "number" && v !== 0 ? `${v > 0 ? "+" : ""}${formaterEuros(v)}` : "0,00");
+
+/** Comptage de fin de journée (événement COMPTAGE_CAISSE) repris sur le Z. */
+function corpsComptage(r: Recu, e: Evenement): void {
+  const d = e.details;
+  r.texte("COMPTAGE", { gras: true });
+  r.colonnes("Fond du matin", euro(d.fondInitial));
+  r.colonnes("Espèces attendues", euro(d.especesAttendues));
+  r.colonnes("Espèces comptées", euro(d.especesComptees));
+  r.colonnes("Écart espèces", ecart(d.ecartEspeces), { gras: d.ecartEspeces !== 0 });
+  r.colonnes("CB caisse / TPE", `${euro(d.cbCaisse)} / ${euro(d.cbTpe)}`);
+  r.colonnes("Écart CB", ecart(d.ecartCb), { gras: d.ecartCb !== 0 });
+  r.colonnes("Titres carte caisse / TPE", `${euro(d.trCarteCaisse)} / ${euro(d.trCarteTpe)}`);
+  r.colonnes("Écart titres carte", ecart(d.ecartTrCarte), { gras: d.ecartTrCarte !== 0 });
+  if (d.trPapierCaisse) r.colonnes("Écart titres papier", ecart(d.ecartTrPapier), { gras: d.ecartTrPapier !== 0 });
+  r.colonnes("Fond laissé", euro(d.fondConserve));
+  r.colonnes("Remise en banque", euro(d.remiseEnBanque));
+  if (d.motif) r.texte(`Motif : ${String(d.motif)}`);
+  r.filet();
+}
+
+export const dateLongue = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long" });
+
+/** Facture ou avoir au format ticket (80 mm). */
+export function gabaritFacture(f: Facture, ticket: Ticket, config: Configuration, duplicata = false): Recu {
+  const r = new Recu();
+  entete(r, config);
+  if (config.etablissement.mentionsLegales) r.texte(config.etablissement.mentionsLegales, { align: "centre" }).filet();
+  if (duplicata) r.texte("DUPLICATA", { align: "centre", gras: true });
+  r.texte(`${f.nature === "AVOIR" ? "AVOIR" : "FACTURE"} n° ${f.numero}`, { align: "centre", gras: true, grand: true });
+  if (f.factureOrigine) r.texte(`Annule la facture n° ${f.factureOrigine}`, { align: "centre" });
+  r.colonnes("Date d'émission", dateLongue(f.evenement.horodatage));
+  if (f.nature === "AVOIR") {
+    r.colonnes("Date de l'annulation", dateLongue(ticket.horodatage));
+    if (ticket.ticketOrigine) r.colonnes("Vente d'origine", `ticket n° ${numero(ticket.ticketOrigine.numero)}`);
+  } else r.colonnes("Date de la vente", dateLongue(ticket.horodatage));
+  r.filet();
+  r.texte("Client", { gras: true });
+  for (const l of [f.client.nom, f.client.adresse, f.client.codePostalVille]) if (l) r.texte(l);
+  if (f.client.siren) r.texte(`SIREN/SIRET ${f.client.siren}`);
+  if (f.client.tvaIntracom) r.texte(`TVA ${f.client.tvaIntracom}`);
+  r.filet();
+  for (const l of ticket.lignes) {
+    r.colonnes(`${l.quantite} x ${l.libelle}`, formaterEuros(l.montantTTC));
+    r.texte(
+      `   PU HT ${formaterEuros(prixUnitaireHT(l))} · HT ${formaterEuros(baseHT(l.montantTTC, l.tauxTVA))} · TVA ${tauxLisible(l.tauxTVA)}${l.remiseTTC ? ` · remise ${formaterEuros(l.remiseTTC)}` : ""}`,
+    );
+  }
+  r.filet();
+  tableauTVA(r, ticket.ventilationTVA);
+  r.colonnes("Total HT", formaterEuros(ticket.totalHT));
+  r.colonnes("Total TVA", formaterEuros(ticket.totalTVA));
+  r.colonnes("TOTAL TTC", `${formaterEuros(ticket.totalTTC)} EUR`, { gras: true, grand: true });
+  r.filet();
+  const modes = ticket.paiements.map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ");
+  r.texte(f.nature === "AVOIR" ? `Remboursé le ${dateLongue(ticket.horodatage)} (${modes})` : `Facture acquittée le ${dateLongue(ticket.horodatage)} (${modes})`);
+  r.texte(`${natureOperation(ticket)} · pas d'escompte`);
+  if (f.client.siren) r.texte(MENTIONS_PROFESSIONNELS);
+  r.texte(`Établie d'après le ticket n° ${numero(ticket.numero)}`);
+  r.filet();
+  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
   return r;
 }
 

@@ -57,3 +57,38 @@ export function appliquerToucheMontant(actuel: number, touche: string): number {
 export function Vide(props: { children: ReactNode }) {
   return <div className="vide">{props.children}</div>;
 }
+
+/** Saisie d'un montant en euros au clavier (« 152,30 »), restitué en centimes ; null si vide ou illisible. */
+export function centimesDepuisSaisie(texte: string): number | null {
+  const propre = texte.replace(/\s/g, "").replace("€", "").replace(",", ".");
+  if (!/^\d+(\.\d{0,2})?$/.test(propre)) return null;
+  return Math.round(Number(propre) * 100);
+}
+
+export function saisieDepuisCentimes(c: number | null): string {
+  return c == null ? "" : (c / 100).toFixed(2).replace(".", ",");
+}
+
+export function ChampEuros(props: { valeur: string; onChange: (texte: string) => void; libelle: string; aide?: ReactNode; autoFocus?: boolean }) {
+  const invalide = props.valeur.trim() !== "" && centimesDepuisSaisie(props.valeur) == null;
+  return (
+    <label className="champ champ-euros">
+      <span>
+        {props.libelle}
+        {props.aide && <small>{props.aide}</small>}
+      </span>
+      <span className="champ-euros-saisie">
+        <input
+          value={props.valeur}
+          inputMode="decimal"
+          autoComplete="off"
+          autoFocus={props.autoFocus}
+          aria-invalid={invalide}
+          placeholder="0,00"
+          onChange={(e) => props.onChange(e.target.value)}
+        />
+        <span aria-hidden="true">€</span>
+      </span>
+    </label>
+  );
+}

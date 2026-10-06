@@ -16,6 +16,8 @@ export interface LigneCommande {
   tauxTVA: number;
   /** Remise en pourcentage du montant de la ligne (100 = offert), recalculée si la quantité change. */
   remise?: { pourcentage: number; montantTTC: number; motif: string; accordeePar: string };
+  /** Précision libre pour le service (« sans sucre », « allergie fruits à coque ») : ni prix ni ticket. */
+  note?: string;
   ajouteePar: string;
   ajouteeLe: string;
 }
@@ -27,6 +29,8 @@ export interface Commande {
   ouvertePar: string;
   lignes: LigneCommande[];
   additionsImprimees: number;
+  /** Note libre sur la commande (« anniversaire, servir le dessert avec une bougie »). */
+  note?: string;
 }
 
 export function nouvelleCommande(tableId: string, operateurId: string, couverts: number | null = null): Commande {
@@ -100,6 +104,7 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
       x.prixUnitaireTTC === l.prixUnitaireTTC &&
       !x.remise &&
       !l.remise &&
+      !x.note &&
       x.details.length === 0 &&
       l.details.length === 0,
   );
@@ -110,4 +115,25 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
     };
   }
   return { ...c, lignes: [...c.lignes, { ...l, uid: uid(), ajouteeLe: new Date().toISOString() }] };
+}
+
+/** Commande déplacée sur une autre table (libre). */
+export function transfererCommande(c: Commande, versTableId: string): Commande {
+  return { ...c, tableId: versTableId };
+}
+
+/**
+ * Regroupe la commande d'une table sur celle d'une autre table déjà ouverte :
+ * lignes et couverts additionnés, notes conservées, ouverture la plus ancienne.
+ */
+export function fusionnerCommandes(cible: Commande, source: Commande): Commande {
+  const notes = [cible.note, source.note].filter(Boolean);
+  return {
+    ...cible,
+    couverts: cible.couverts == null && source.couverts == null ? null : (cible.couverts ?? 0) + (source.couverts ?? 0),
+    ouverteLe: cible.ouverteLe < source.ouverteLe ? cible.ouverteLe : source.ouverteLe,
+    lignes: [...cible.lignes, ...source.lignes],
+    additionsImprimees: Math.max(cible.additionsImprimees, source.additionsImprimees),
+    ...(notes.length ? { note: notes.join(" · ") } : {}),
+  };
 }

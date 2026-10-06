@@ -78,6 +78,22 @@ describe("tickets", () => {
     expect((await verifierRegistre(stockage, resoudreCle)).integre).toBe(true);
   });
 
+  it("journalise fond de caisse, comptage, facture et transfert de table (0.4.0)", async () => {
+    const { registre, stockage, resoudreCle } = await nouveauRegistre();
+    await registre.journaliser("FOND_DE_CAISSE", { montant: 15000 }, "lea");
+    await registre.journaliser("TRANSFERT_TABLE", { de: "t4", vers: "t7", fusion: false }, "lea");
+    await registre.journaliser("FACTURE", { sequence: 1, numero: "F-ipad-1-000001", ticket: 1 }, "lea");
+    await registre.journaliser("COMPTAGE_CAISSE", { especesAttendues: 15400, especesComptees: 15300, ecartEspeces: -100 }, "lea");
+    expect((await stockage.lister("evenements")).map((e) => e.code)).toEqual([
+      "FOND_DE_CAISSE",
+      "TRANSFERT_TABLE",
+      "FACTURE",
+      "COMPTAGE_CAISSE",
+    ]);
+    expect((await stockage.dernier("evenements"))?.versionLogiciel).toBe(VERSION_NOYAU_FISCAL);
+    expect((await verifierRegistre(stockage, resoudreCle)).integre).toBe(true);
+  });
+
   it("journalise les remises", async () => {
     const { registre, stockage } = await nouveauRegistre();
     await registre.enregistrerVente({

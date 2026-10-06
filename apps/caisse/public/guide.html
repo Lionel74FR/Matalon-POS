@@ -152,6 +152,9 @@
   <p>Sinon, la caisse affiche « Rattacher cet iPad à un établissement ». Saisissez le code de rattachement reçu de Lionel (par exemple K7PM-3QXA), puis <b>Rattacher l'iPad</b>. L'iPad doit être connecté à Internet pour cette étape.</p>
   <p>La caisse reçoit alors l'établissement (Moka), l'équipe et la carte. Un code ne sert qu'une fois et expire au bout de 48 heures : s'il est refusé, demandez-en un nouveau.</p>
 
+  <h2>3 bis. Ouverture de la journée</h2>
+  <p>À la première connexion de la journée, la caisse demande le <b>fond de caisse</b> : comptez les espèces du tiroir et saisissez le montant. Pour le test, 150 € conviennent. « Plus tard » reporte la question jusqu'à la prochaine clôture.</p>
+
   <h2>4. Connecter l'imprimante (facultatif)</h2>
   <p>Sans imprimante, touchez <b>Configurer plus tard</b> et passez à l'étape 5. L'assistant <b>Connecter l'imprimante</b> s'ouvre après la mise en service. On le retrouve dans <span class="bouton">Réglages</span> › <span class="bouton">Assistant de connexion</span>. Suivez ses six étapes à l'écran.</p>
   <div class="encadre">
@@ -178,7 +181,8 @@
       <li>Ajoutez un Bubble tea : choisissez Taro et le supplément Perles popping.</li>
       <li>Rayon Formules : Brunch Moka, faites les quatre choix demandés.</li>
       <li>Rayon Bar, catégorie Spritz : un Spritz Aperol.</li>
-      <li>Revenez à la salle : la table 4 apparaît occupée, avec son montant.</li>
+      <li>Touchez la ligne Bubble tea, choisissez la note <b>Sans sucre</b>, puis Valider. En haut du ticket, <b>Note</b> › Anniversaire › Enregistrer.</li>
+      <li>Revenez à la salle : la table 4 apparaît occupée, avec son montant et « note ».</li>
       <li>Rouvrez-la et touchez <span class="bouton">Addition</span>.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> l'addition s'imprime (ou s'affiche à l'écran sans imprimante) avec la mention « Note provisoire, ne vaut pas ticket de caisse ». Gardez la table ouverte pour le scénario suivant.</p>
@@ -192,6 +196,15 @@
       <li><span class="bouton">Encaisser</span> › billet de 50 € › <span class="bouton">Valider l'encaissement</span>.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> le spritz apparaît « Offert » à 0 €, la monnaie à rendre s'affiche en grand avec le QR code de la note, le tiroir s'ouvre s'il est branché, et la table redevient libre.</p>
+  </section>
+
+  <section class="scenario" data-id="s3b">
+    <label><input type="checkbox">Transfert et regroupement de tables</label>
+    <ol>
+      <li>Ouvrez la table 2, ajoutez deux cafés, puis <b>Transférer</b> › table 8 (libre) : la commande passe sur la table 8.</li>
+      <li>Ouvrez la table 9, ajoutez un thé, puis <b>Transférer</b> › table 8 (occupée) › <b>Regrouper</b>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la table 8 réunit les trois articles, les tables 2 et 9 redeviennent libres.</p>
   </section>
 
   <section class="scenario" data-id="s4">
@@ -226,6 +239,17 @@
     <p class="attendu"><b>Attendu :</b> le duplicata est numéroté. L'annulation crée un nouveau ticket négatif ; le ticket d'origine apparaît barré, il n'est jamais supprimé.</p>
   </section>
 
+  <section class="scenario" data-id="s6b">
+    <label><input type="checkbox">Facture sur demande</label>
+    <ol>
+      <li>Onglet <span class="bouton">Tickets</span> : touchez un ticket encaissé, puis <span class="bouton">Facture</span>.</li>
+      <li>Saisissez un client fictif (nom, adresse, code postal et ville ; SIREN facultatif) et <b>Émettre la facture</b>.</li>
+      <li><span class="bouton">Imprimer en A4 ou PDF</span> : la feuille d'impression de l'iPad s'ouvre (AirPrint, ou « Enregistrer dans Fichiers » pour un PDF).</li>
+      <li>Annulez ensuite ce ticket : un avoir est émis automatiquement.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> facture numérotée F-…-000001 avec les mentions légales ; une seconde impression porte « Duplicata » ; l'avoir reprend le client et annule la facture. Si la caisse signale une identité incomplète, Lionel complète les mentions de facture dans l'administration.</p>
+  </section>
+
   <section class="scenario" data-id="s7">
     <label><input type="checkbox">Imprimante en défaut (si imprimante connectée)</label>
     <ol>
@@ -239,11 +263,12 @@
     <label><input type="checkbox">Clôture de la journée</label>
     <ol>
       <li>Onglet <span class="bouton">Clôtures</span> › <span class="bouton">Lecture X</span> : vérifiez les totaux par moyen de paiement.</li>
-      <li><span class="bouton">Clôturer la journée (Z)</span>, puis confirmez. Touchez la clôture dans la liste pour voir le ticket Z.</li>
+      <li><span class="bouton">Clôturer la journée (Z)</span> : le comptage s'ouvre. Comptez les espèces (par billets et pièces, ou en total), saisissez les totaux CB et titres-restaurant du ticket de fin de journée du TPE, et le fond laissé pour demain. Un écart demande un motif.</li>
+      <li>Validez, puis touchez la clôture dans la liste pour voir le ticket Z.</li>
       <li><span class="bouton">Vérifier l'intégrité</span>.</li>
       <li><span class="bouton">Export comptable CSV</span> : le fichier se télécharge.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> le ticket Z (imprimé ou à l'écran) montre le total, la TVA à 10 % et 20 % et les encaissements par mode ; le contrôle affiche « Chaînes intactes ». Comparez le total CB du Z avec le relevé du TPE.</p>
+    <p class="attendu"><b>Attendu :</b> le ticket Z (imprimé ou à l'écran) montre le total, la TVA à 10 % et 20 %, les encaissements par mode et le comptage avec ses écarts ; le contrôle affiche « Chaînes intactes ». Le lendemain, le fond proposé à l'ouverture est celui laissé la veille.</p>
   </section>
 
   <section class="scenario" data-id="s9">

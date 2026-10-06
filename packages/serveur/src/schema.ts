@@ -21,6 +21,7 @@ export const MIGRATIONS: string[] = [
     cree_le text not null,
     maj_le text not null
   )`,
+  `alter table etablissements add column if not exists mentions_legales text not null default ''`,
   `create table if not exists utilisateurs (
     id text primary key,
     etablissement_id text not null references etablissements(id),

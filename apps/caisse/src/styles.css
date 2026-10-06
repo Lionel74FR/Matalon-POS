@@ -747,7 +747,7 @@ code {
   background: var(--papier);
   color: var(--encre);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   min-height: 0;
   border-radius: 4px 4px 0 0;
   position: relative;
@@ -1865,4 +1865,349 @@ a.bouton {
   margin: 0 0 10px;
   font-size: 0.85rem;
   color: var(--sable);
+}
+
+.champ-euros-saisie {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.champ-euros-saisie input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.champ-euros-saisie input[aria-invalid="true"] {
+  border-color: var(--rouge);
+}
+
+/* Comptage de fin de journée. */
+.comptage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.comptage h3 {
+  margin-top: 6px;
+}
+
+.comptage .champ {
+  grid-template-columns: 1fr 1fr;
+}
+
+.comptage-lignes {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.comptage-lignes div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comptage-lignes dt {
+  color: var(--sable);
+}
+
+.comptage-lignes dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.comptage-lignes .fort {
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+.coupures {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.coupures label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--sable);
+  text-align: center;
+}
+
+.coupures input {
+  min-height: 44px;
+  width: 100%;
+  text-align: center;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font-variant-numeric: tabular-nums;
+}
+
+.comptage-ecart {
+  margin: 0 0 10px;
+  color: var(--sable);
+  text-align: right;
+}
+
+.ecart {
+  color: #f0a08f;
+  font-weight: 700;
+}
+
+.ecart.nul {
+  color: #a9cf96;
+}
+
+.comptage-resume {
+  margin-right: auto;
+  color: var(--sable);
+}
+
+@media (max-width: 700px) {
+  .comptage {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .comptage .champ {
+    grid-template-columns: 1fr;
+  }
+  .coupures {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .comptage-resume {
+    display: none;
+  }
+}
+
+/* Facture A4 : aperçu dans la caisse et impression système (AirPrint, PDF). */
+.apercu-facture {
+  background: #fff;
+  border-radius: var(--rayon-petit);
+  padding: 20px;
+  overflow-x: auto;
+}
+
+.document-facture {
+  color: #1d1d1d;
+  background: #fff;
+  font-family: var(--police-texte);
+  font-size: 13px;
+  line-height: 1.45;
+  min-width: 560px;
+  user-select: text;
+}
+
+.document-facture header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.document-facture h1 {
+  font-size: 22px;
+  color: #1d1d1d;
+}
+
+.document-facture h2 {
+  font-size: 26px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1d1d1d;
+}
+
+.document-facture h3 {
+  color: #555;
+  margin: 0 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.document-facture p {
+  margin: 6px 0;
+}
+
+.facture-titre {
+  text-align: right;
+}
+
+.facture-numero {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.facture-duplicata,
+.facture-test {
+  font-weight: 700;
+  color: #b3261e;
+  text-transform: uppercase;
+}
+
+.facture-petit {
+  font-size: 11px;
+  color: #555;
+}
+
+.facture-client {
+  margin: 0 0 20px auto;
+  width: 50%;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+.document-facture table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.document-facture th {
+  text-align: left;
+  font-weight: 700;
+  border-bottom: 2px solid #1d1d1d;
+  padding: 6px 4px;
+}
+
+.document-facture td {
+  border-bottom: 1px solid #e2e2e2;
+  padding: 6px 4px;
+}
+
+.document-facture .nombre {
+  text-align: right;
+}
+
+.facture-bas {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 20px 0;
+}
+
+.facture-tva {
+  width: 55% !important;
+}
+
+.facture-totaux {
+  margin: 0;
+  min-width: 220px;
+}
+
+.facture-totaux div {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.facture-totaux dd {
+  margin: 0;
+}
+
+.facture-totaux .fort {
+  border-top: 2px solid #1d1d1d;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.document-facture footer {
+  border-top: 1px solid #ccc;
+  padding-top: 10px;
+}
+
+.impression-a4 {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+  html.impression-a4-active,
+  html.impression-a4-active body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  html.impression-a4-active #racine {
+    display: none !important;
+  }
+  html.impression-a4-active .impression-a4 {
+    display: block;
+  }
+  .document-facture {
+    min-width: 0;
+  }
+}
+
+/* Notes et transfert. */
+.ticket-titre {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-outils {
+  display: flex;
+  gap: 2px;
+}
+
+.ticket-tete .ticket-outils .bouton.discret {
+  font-size: 0.9rem;
+  min-height: 40px;
+  padding: 0 8px;
+  color: var(--encre-douce);
+  font-weight: 700;
+}
+
+.ticket-note {
+  grid-row: 2;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: var(--rayon-petit);
+  background: #f1e2c6;
+  color: var(--encre);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.ticket-lignes {
+  grid-row: 3;
+}
+
+.ticket-pied {
+  grid-row: 4;
+}
+
+.ticket-ligne small.note-ligne {
+  font-style: italic;
+  color: var(--terre-fonce);
+}
+
+.saisie-note {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+  resize: vertical;
+}
+
+.grille-tables.compacte {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.grille-tables.compacte .table {
+  min-height: 76px;
 }

@@ -1,0 +1,26 @@
+# Contrôles obligatoires avant toute fusion sur main (cahier des charges : tests du noyau fiscal).
+name: Contrôles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: TypeScript strict
+        run: pnpm typecheck
+      - name: Tests (noyau fiscal, serveur, caisse)
+        run: pnpm test
+      - name: Construction Vercel (statique + fonction Edge)
+        run: pnpm --filter @matalon/caisse build:vercel

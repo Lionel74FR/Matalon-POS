@@ -37,6 +37,7 @@ await a.locator(".admin-tableau td", { hasText: "Lionel" }).waitFor();
 await champA("Raison sociale").fill("SAS Moka Annecy");
 await champA("SIRET").fill("123 456 789 00012");
 await champA("TVA intracommunautaire").fill("FR12123456789");
+await champA("Mentions des factures").fill("SAS au capital de 10 000 € · RCS Annecy 123 456 789");
 await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistré.").waitFor();
 // Code de rattachement.
@@ -77,6 +78,13 @@ await capture("02-connexion");
 await p.locator(".carte-personne", { hasText: "Lionel" }).click();
 await pin("1234");
 await p.locator(".salle").waitFor();
+const champ = (libelle) => p.locator(".modale label.champ", { hasText: libelle }).locator("input");
+
+// Ouverture de la journée : fond de caisse.
+await p.getByRole("dialog", { name: "Fond de caisse" }).waitFor();
+await champ("Fond de caisse").fill("150");
+await capture("02b-fond-de-caisse");
+await clic("Enregistrer le fond");
 
 // Table 4 : deux cappuccinos, un spritz, une eau 100 cl, un bubble tea taro + perles.
 await p.locator(".grille-tables .table", { hasText: /^4/ }).click();
@@ -100,6 +108,14 @@ for (const choix of ["Plat du jour", "Cheesecake citron", "Flat white"]) await c
 await p.getByRole("button", { name: /^Ajouter/ }).click();
 await p.getByRole("button", { name: "Indiquer les couverts" }).click();
 await clic("2");
+
+// Note sur une ligne et sur la commande.
+await p.locator(".ticket-ligne", { hasText: "Cappuccino" }).click();
+await clic("Sans sucre");
+await p.getByRole("button", { name: /^Valider/ }).click();
+await clic("Note sur la commande");
+await clic("Anniversaire");
+await clic("Enregistrer");
 await capture("04-commande");
 
 // Remise : spritz offert (responsable connecté, pas de code demandé).
@@ -112,6 +128,12 @@ await p.getByRole("button", { name: /^Valider/ }).click();
 await p.locator(".ticket-ligne", { hasText: "Egg muffin" }).click();
 await clic("Retirer de la commande");
 await capture("05-commande-remise");
+
+// Transfert de la table 4 vers la table 6 (libre).
+await clic("Transférer");
+await capture("05b-transfert");
+await p.locator(".modale .grille-tables .table", { hasText: /^6/ }).click();
+await p.getByRole("heading", { name: "Table 6" }).waitFor();
 
 await clic("Encaisser");
 await p.locator(".mode", { hasText: "Espèces" }).click();
@@ -131,6 +153,17 @@ await p.getByRole("tab", { name: "Tickets" }).click();
 await capture("10-tickets");
 // Duplicata en QR code depuis l'historique, puis ouverture de la note comme le ferait le téléphone du client.
 await p.locator(".tableau-tickets tbody tr").first().click();
+// Facture sur demande.
+await clic("Facture");
+await champ("Nom ou raison sociale").fill("SARL Alpes Conseil");
+await champ("Adresse").fill("3 avenue de Genève");
+await champ("Code postal et ville").fill("74000 Annecy");
+await champ("SIREN").fill("123456789");
+await clic("Émettre la facture");
+await p.locator(".apercu-facture .document-facture").waitFor();
+await capture("10a-facture");
+const numeroFacture = (await p.locator(".apercu-facture .facture-numero").textContent()).trim();
+await p.getByRole("button", { name: "Fermer" }).last().click();
 await clic("QR code");
 await p.locator(".qr-note svg").waitFor();
 await capture("10b-duplicata-qr");
@@ -139,11 +172,19 @@ await p.getByRole("button", { name: "Fermer" }).last().click();
 await p.getByRole("tab", { name: "Clôtures" }).click();
 await clic("Lecture X");
 await clic("Clôturer la journée (Z)");
-await p.locator(".modale").getByRole("button", { name: "Clôturer la journée" }).click();
+// Comptage : espèces au centime près, rien sur le TPE.
+const attendu = (await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
+await clic("Saisir le total directement");
+await champ("Espèces comptées").fill(attendu);
+await champ("Total CB du TPE").fill("0");
+await champ("Titres-restaurant carte du TPE").fill("0");
+await capture("10c-comptage");
+await p.getByRole("button", { name: /^Valider.*clôturer/ }).click();
 await p.getByText(/clôturée/).first().waitFor();
 await p.locator(".tableau-clotures tbody tr").first().click();
 await clic("Voir le ticket Z");
 await p.locator(".apercu-recu").waitFor();
+const zAvecComptage = (await p.locator(".apercu-recu", { hasText: "COMPTAGE" }).count()) > 0;
 await capture("11-apercu-z");
 await p.getByRole("button", { name: "Fermer" }).last().click();
 await p.getByRole("button", { name: "Fermer" }).last().click().catch(() => {});
@@ -164,5 +205,5 @@ const serveurIntegre = await a.getByText(/Chaîne intègre/).count();
 await a.screenshot({ path: `${sortie}/14-admin-verification.png`, fullPage: true });
 
 await b.close();
-console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, erreurs }, null, 2));
-if (!integre || !serveurIntegre || erreurs.length) process.exit(1);
+console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, numeroFacture, attendu, zAvecComptage, erreurs }, null, 2));
+if (!integre || !serveurIntegre || !zAvecComptage || erreurs.length) process.exit(1);

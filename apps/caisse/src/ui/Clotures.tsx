@@ -6,13 +6,16 @@ import {
   signataireDepuis,
   verifierRegistre,
   type Cloture,
+  type Evenement,
   type RapportVerification,
   type TotauxPeriode,
 } from "@matalon/noyau-fiscal";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { gabaritCloture, gabaritLectureX, LIBELLES_PAIEMENT } from "../impression/gabarits";
+import { comptageDeLaZ, detailsComptage, type EtatJournee, type SaisieComptage } from "../metier/tresorerie";
 import { Modale, Vide } from "./communs";
+import { ModaleComptage } from "./modales/ModaleComptage";
 import { euros, useCaisse } from "./contexte";
 
 function telecharger(nom: string, contenu: string, type: string) {
@@ -63,6 +66,45 @@ function Totaux({ t }: { t: TotauxPeriode }) {
   );
 }
 
+const montant = (v: unknown) => (typeof v === "number" ? euros(v) : "—");
+
+function ResumeComptage({ e }: { e: Evenement }) {
+  const d = e.details;
+  const ligne = (libelle: string, caisse: unknown, compte: unknown, ecart: unknown) => (
+    <tr>
+      <td>{libelle}</td>
+      <td className="nombre">{montant(caisse)}</td>
+      <td className="nombre">{montant(compte)}</td>
+      <td className={`nombre${ecart ? " erreur" : ""}`}>{montant(ecart)}</td>
+    </tr>
+  );
+  return (
+    <>
+      <h3>Comptage</h3>
+      <table className="tableau">
+        <thead>
+          <tr>
+            <th />
+            <th className="nombre">Caisse</th>
+            <th className="nombre">Compté / TPE</th>
+            <th className="nombre">Écart</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ligne("Espèces (fond inclus)", d.especesAttendues, d.especesComptees, d.ecartEspeces)}
+          {ligne("CB", d.cbCaisse, d.cbTpe, d.ecartCb)}
+          {ligne("Titres-restaurant carte", d.trCarteCaisse, d.trCarteTpe, d.ecartTrCarte)}
+          {d.trPapierCaisse ? ligne("Titres-restaurant papier", d.trPapierCaisse, d.trPapierComptes, d.ecartTrPapier) : null}
+        </tbody>
+      </table>
+      <p className="explication">
+        Fond du matin {montant(d.fondInitial)} · fond laissé {montant(d.fondConserve)} · remise en banque {montant(d.remiseEnBanque)}
+        {d.motif ? ` · motif : ${String(d.motif)}` : ""}
+      </p>
+    </>
+  );
+}
+
 /** Lecture X, clôtures, export comptable, archives et contrôle d'intégrité. */
 export function Clotures(props: { commandesOuvertes: number }) {
   const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree } = useCaisse();
@@ -71,6 +113,16 @@ export function Clotures(props: { commandesOuvertes: number }) {
   const [confirmationZ, setConfirmationZ] = useState(false);
   const [rapport, setRapport] = useState<RapportVerification | null>(null);
   const [choisie, setChoisie] = useState<Cloture | null>(null);
+  const [comptageChoisie, setComptageChoisie] = useState<Evenement | null>(null);
+
+  useEffect(() => {
+    setComptageChoisie(null);
+    let annule = false;
+    if (choisie) void comptageDeLaZ(caisse.stockage, choisie).then((c) => !annule && setComptageChoisie(c));
+    return () => {
+      annule = true;
+    };
+  }, [choisie, caisse.stockage]);
 
   const charger = useCallback(async () => setClotures((await caisse.stockage.derniers("clotures", 120)).reverse()), [caisse.stockage]);
   useEffect(() => void charger(), [charger]);
@@ -95,18 +147,32 @@ export function Clotures(props: { commandesOuvertes: number }) {
       setLecture(x);
     });
 
-  const cloturerJour = () =>
+  const clotureEnCours = useRef(false);
+  const [enCoursZ, setEnCoursZ] = useState(false);
+  const cloturerJour = (saisie: SaisieComptage, etat: EtatJournee) =>
     executer(async () => {
-      const responsable = await demanderResponsable("Clôture Z de la journée.");
-      if (!responsable) return;
-      const z = await caisse.registre.cloturerJournee(responsable);
-      setConfirmationZ(false);
-      setLecture(null);
-      if (imprimanteConfiguree) {
-        for (const c of z) await imprimer(gabaritCloture(c, config), `Clôture Z ${c.identifiantPeriode}`);
+      // Un double appui ne doit pas produire une seconde Z.
+      if (clotureEnCours.current) return;
+      clotureEnCours.current = true;
+      setEnCoursZ(true);
+      try {
+        const responsable = await demanderResponsable("Comptage et clôture Z de la journée.");
+        if (!responsable) return;
+        // Le comptage déclare la journée de la dernière Z produite : celle du dernier ticket, ou aujourd'hui sans ticket.
+        const journee = etat.dateComptable ?? dateComptable(new Date(), HEURE_BASCULE);
+        const comptage = await caisse.registre.journaliser("COMPTAGE_CAISSE", detailsComptage(etat.totaux, saisie, journee), responsable);
+        const z = await caisse.registre.cloturerJournee(responsable);
+        setConfirmationZ(false);
+        setLecture(null);
+        if (imprimanteConfiguree) {
+          for (const [i, c] of z.entries()) await imprimer(gabaritCloture(c, config, i === z.length - 1 ? comptage : null), `Clôture Z ${c.identifiantPeriode}`);
+        }
+        notifier(z.length > 1 ? `${z.length} journées clôturées.` : `Journée du ${z[0]!.identifiantPeriode} clôturée.`);
+        await charger();
+      } finally {
+        clotureEnCours.current = false;
+        setEnCoursZ(false);
       }
-      notifier(z.length > 1 ? `${z.length} journées clôturées.` : `Journée du ${z[0]!.identifiantPeriode} clôturée.`);
-      await charger();
     });
 
   const cloturerMois = (mois: string) =>
@@ -215,26 +281,12 @@ export function Clotures(props: { commandesOuvertes: number }) {
       )}
 
       {confirmationZ && (
-        <Modale
-          titre="Clôturer la journée"
+        <ModaleComptage
+          commandesOuvertes={props.commandesOuvertes}
+          enCours={enCoursZ}
+          onValide={(saisie, etat) => void cloturerJour(saisie, etat)}
           onFermer={() => setConfirmationZ(false)}
-          pied={
-            <button className="bouton principal" onClick={() => void cloturerJour()}>
-              {imprimanteConfiguree ? "Clôturer et imprimer le Z" : "Clôturer la journée"}
-            </button>
-          }
-        >
-          <p className="explication">
-            Tous les tickets encaissés depuis la dernière clôture sont figés. La clôture ne peut pas être annulée.
-          </p>
-          {props.commandesOuvertes > 0 && (
-            <p className="erreur">
-              {props.commandesOuvertes} commande{props.commandesOuvertes > 1 ? "s sont" : " est"} encore ouverte
-              {props.commandesOuvertes > 1 ? "s" : ""}. Elle{props.commandesOuvertes > 1 ? "s seront comptées" : " sera comptée"} sur la
-              journée où elle{props.commandesOuvertes > 1 ? "s seront encaissées" : " sera encaissée"}.
-            </p>
-          )}
-        </Modale>
+        />
       )}
 
       {choisie && (
@@ -246,7 +298,10 @@ export function Clotures(props: { commandesOuvertes: number }) {
               <button className="bouton" onClick={() => void archiver(choisie)}>
                 Télécharger l'archive
               </button>
-              <button className="bouton" onClick={() => void imprimer(gabaritCloture(choisie, config), `Clôture ${choisie.identifiantPeriode}`)}>
+              <button
+                className="bouton"
+                onClick={() => void imprimer(gabaritCloture(choisie, config, comptageChoisie), `Clôture ${choisie.identifiantPeriode}`)}
+              >
                 {imprimanteConfiguree ? "Réimprimer" : "Voir le ticket Z"}
               </button>
             </>
@@ -254,6 +309,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
         >
           <Totaux t={choisie} />
           <p className="explication">Grand total perpétuel : {euros(choisie.grandTotalPerpetuel)}</p>
+          {comptageChoisie && <ResumeComptage e={comptageChoisie} />}
         </Modale>
       )}
 
