@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, DoorOpen, Printer, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, DoorOpen, Printer, Send, StickyNote, Users } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
 import { ajouterLigne, commandeAGarder, lignesActives, modifierLigne, montantLigne, totauxCommande, type Commande, type LigneCommande } from "../metier/commande";
+import { nbLignesAEnvoyer } from "../metier/production";
 import { Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { ModaleArticle } from "./modales/ModaleArticle";
@@ -13,6 +14,7 @@ import { ModaleCouverts } from "./modales/ModaleCouverts";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
 import { ModaleLigne } from "./modales/ModaleLigne";
 import { ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
+import { productionActive, useEnvoiProduction } from "./production";
 
 const TEINTES: Record<string, string> = {
   Boissons: "cafe",
@@ -31,6 +33,8 @@ interface ProprietesCommande {
   tablesOuvertes: Set<string>;
   onTransferer: (versTableId: string) => void;
   onChange: (c: Commande) => void;
+  /** Mise à jour appliquée à la dernière version de la commande (après une impression). */
+  onMaj: (f: (c: Commande) => Commande) => void;
   onTerminee: () => void;
   onRetour: () => void;
 }
@@ -76,6 +80,20 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const estComptoir = c.tableId === ID_COMPTOIR;
   /** Articles qui comptent (les lignes retirées restent affichées barrées). */
   const nbActives = lignesActives(c).length;
+  const production = productionActive(config);
+  const envoyerProduction = useEnvoiProduction();
+  const nbAEnvoyer = production ? nbLignesAEnvoyer(c, CARTE) : 0;
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
+
+  const envoyer = async (commande: Commande, o: { annulationsSeules?: boolean } = {}) => {
+    setEnvoiEnCours(true);
+    try {
+      const maj = await envoyerProduction(commande, CARTE, o);
+      if (maj) props.onMaj(maj);
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  };
 
   const ajouter = (l: Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">) =>
     props.onChange(ajouterLigne(c, { ...l, ajouteePar: utilisateur.id }));
@@ -143,6 +161,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                   {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
                   {l.note && <small className="note-ligne">{l.note}</small>}
                   {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
+                  {production && l.envoyee && !l.retiree && <small className="mention-envoyee">Envoyé</small>}
+                  {production && l.envoyee && l.retiree && !l.annulationEnvoyee && <small className="mention-envoyee">Annulation à envoyer</small>}
                   {l.remise && (
                     <small className="remise">
                       {l.remise.montantTTC === l.quantite * l.prixUnitaireTTC ? "Offert" : `Remise ${euros(l.remise.montantTTC)}`} ·{" "}
@@ -161,6 +181,11 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             <strong>{euros(totaux.totalTTC)}</strong>
           </div>
           <div className="ticket-actions">
+            {production && (
+              <button className="bouton" disabled={nbAEnvoyer === 0 || envoiEnCours} onClick={() => void envoyer(c)}>
+                <AvecIcone icone={Send}>{nbAEnvoyer ? `Envoyer (${nbAEnvoyer})` : "Envoyé"}</AvecIcone>
+              </button>
+            )}
             {!estComptoir && (
               <button className="bouton" disabled={nbActives === 0} onClick={() => void imprimerAddition()}>
                 <AvecIcone icone={Printer}>Addition</AvecIcone>
@@ -251,7 +276,10 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           ligne={ligneOuverte}
           tableId={c.tableId}
           onChange={(nouvelle, unitesRetirees) => {
-            props.onChange(modifierLigne(c, ligneOuverte.uid, nouvelle, unitesRetirees, utilisateur.id));
+            const suite = modifierLigne(c, ligneOuverte.uid, nouvelle, unitesRetirees, utilisateur.id);
+            props.onChange(suite);
+            // Retrait d'un article déjà parti : le poste reçoit aussitôt un bon d'annulation.
+            if (production && ligneOuverte.envoyee && unitesRetirees > 0) void envoyer(suite, { annulationsSeules: true });
             setLigneOuverte(null);
           }}
           onFermer={() => setLigneOuverte(null)}

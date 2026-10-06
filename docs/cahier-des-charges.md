@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 27, copiée le 6 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 28, copiée le 6 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -35,6 +35,7 @@ La V1 couvre le cycle complet d'une vente, de la prise de commande à la clôtur
 | Clôtures | Lecture X à tout moment, clôture Z journalière, clôtures mensuelle et annuelle, fond de caisse, comptage espèces et écart |
 | Utilisateurs | Connexion par code PIN, changement rapide d'utilisateur, rôles vendeur, responsable, administrateur |
 | Comptes clients | Vente portée au compte d'un client (accord d'un responsable), réglée plus tard sur n'importe quel appareil, annulation d'un règlement. La vente compte dans le CA du jour ; la TVA est exigible au règlement (restauration sur place = prestation de services). Ajouté le 6 octobre 2026, noyau fiscal 0.5.0. |
+| Bons de production | Chaque catégorie de la carte désigne un poste (bar, cuisine) ; l'établissement associe une imprimante à chaque poste. « Envoyer » imprime les nouveaux articles par poste, le reste part à l'encaissement, un retrait après envoi imprime un bon d'annulation. Hors périmètre fiscal. Dans l'éditeur de carte, deux catégories au même taux de TVA peuvent être fusionnées. Ajouté le 6 octobre 2026. |
 
 Tickets, notes et factures portent toutes les mentions obligatoires prévues par la réglementation.
 

@@ -24,6 +24,8 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Imprimantes de production : poste par catégorie dans l'éditeur de carte, imprimante par poste (Réglages de la caisse et administration, bon d'essai), bouton « Envoyer (n) », envoi d'office à l'encaissement, bon d'annulation au retrait d'un article envoyé, formules réparties entre postes |
+| d4f1939 | Cartes : fusion de deux catégories au même taux de TVA |
 | e81d18c | Comptes clients (noyau 0.5.0) : vente en compte (mode EN_COMPTE, client scellé, accord responsable), règlement sur n'importe quel appareil (ticket REGLEMENT, TVA exigible au règlement par tranches exactes), annulation d'un règlement, soldes recalculés par le serveur, page Comptes, section admin, Z avec ventes en compte, règlements et TVA exigible, mentions de facture « reste dû » |
 | 6db3a32 | Couverts saisissables avant tout article (table installée gardée, « Libérer la table »), écran des couverts en un toucher, lignes retirées gardées barrées à l'écran, aucun paiement une fois le total réglé, confirmation au-delà de 20 € de rendu |
 | b6912c9 | Icônes dans les menus et les actions (caisse et administration), rattachement d'un iPad ou d'un iPhone (type d'appareil reconnu et affiché), administration défilante au doigt |
@@ -39,6 +41,7 @@ Dernière mise à jour : 6 octobre 2026.
 - Comptes clients : la vente compte dans le CA du jour ; la TVA n'est exigible qu'à l'encaissement (ventes à consommer sur place = prestations de services, BOI-TVA-BASE-20-20 § 130). Le règlement est un ticket `REGLEMENT` sans ligne ni total ; sa TVA est la tranche exacte de la vente (`ventilerTranche`, méthode Sainte-Laguë cumulative : la somme des tranches redonne la ventilation de la vente). Les soldes se calculent sur le serveur (toutes caisses) ; les incohérences entre caisses sont signalées, jamais bloquantes. Format d'archive inchangé (`matalon-archive-fiscale/1`) : il peut désormais contenir des tickets REGLEMENT et des clôtures avec `comptesClients`.
 - La carte vient du serveur (`/api/caisse/carte`) ; `carteDe(config)` tombe sur la carte livrée avec le code seulement avant la première réception.
 - Une divergence de synchronisation est signalée mais ne bloque pas l'encaissement. L'encaissement est bloqué si l'iPad est révoqué ou si son horloge s'écarte de plus de 5 min.
+- Bons de production : hors périmètre fiscal (rien au registre, sauf `apresEnvoi` sur `SUPPRESSION_LIGNE`). Sans aucune imprimante de production réglée, la fonction est invisible. Une ligne envoyée ne se regroupe plus avec un nouvel article identique ; augmenter sa quantité crée une ligne à envoyer. Un bon en échec laisse toute la ligne à envoyer (un doublon en cuisine plutôt qu'un oubli).
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -55,4 +58,4 @@ Dernière mise à jour : 6 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 4 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 6 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

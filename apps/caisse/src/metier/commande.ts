@@ -26,6 +26,12 @@ export interface LigneCommande {
    * Le retrait est aussi tracé au journal des événements.
    */
   retiree?: { le: string; par: string };
+  /** Formule : catégorie de chaque choix, pour envoyer chacun à son poste de production. */
+  composants?: Array<{ libelle: string; categorieId: string }>;
+  /** Bon de production imprimé (Envoyer, ou à l'encaissement). */
+  envoyee?: { le: string; par: string };
+  /** Ligne retirée après envoi : bon d'annulation imprimé. */
+  annulationEnvoyee?: boolean;
 }
 
 export interface Commande {
@@ -93,7 +99,8 @@ export function commandeAGarder(c: Commande | null): c is Commande {
 
 /**
  * Modifie une ligne. Un retrait (ligne entière, ou une partie de sa quantité)
- * laisse une ligne barrée à sa place au lieu de la faire disparaître.
+ * laisse une ligne barrée à sa place au lieu de la faire disparaître ; si la
+ * ligne était partie en production, la partie barrée donnera un bon d'annulation.
  */
 export function modifierLigne(
   c: Commande,
@@ -109,6 +116,11 @@ export function modifierLigne(
       lignes.push(x);
     } else if (!nouvelle) {
       lignes.push({ ...x, retiree });
+    } else if (x.envoyee && nouvelle.quantite > x.quantite) {
+      // Ligne déjà partie en production : le supplément devient une ligne à envoyer.
+      const { envoyee: _, ...reste } = nouvelle;
+      lignes.push(avecQuantite(nouvelle, x.quantite));
+      lignes.push({ ...avecQuantite(reste, nouvelle.quantite - x.quantite), uid: uid(), ajouteeLe: retiree.le, ajouteePar: par });
     } else {
       lignes.push(nouvelle);
       if (unitesRetirees > 0) lignes.push({ ...avecQuantite(x, unitesRetirees), uid: uid(), retiree });
@@ -148,6 +160,7 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
   const identique = c.lignes.find(
     (x) =>
       !x.retiree &&
+      !x.envoyee &&
       x.articleId === l.articleId &&
       x.prixUnitaireTTC === l.prixUnitaireTTC &&
       !x.remise &&

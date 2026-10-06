@@ -2,8 +2,11 @@ import { KeyRound, Printer, RefreshCw, Save, UserCheck, UserPlus, UserX } from "
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { VERSION_NOYAU_FISCAL } from "@matalon/noyau-fiscal";
+import { postesDeLaCarte } from "@matalon/catalogue";
+import type { PostesProduction } from "@matalon/serveur/partage";
 import { useEffect, useState } from "react";
 import {
+  carteDe,
   genererTables,
   hacherPin,
   identifiantAleatoire,
@@ -14,7 +17,10 @@ import {
 } from "../donnees/configuration";
 import { ErreurApi } from "../serveur/client";
 import { VERSION_APPLICATION } from "../fiscal/caisse";
-import { gabaritTest } from "../impression/gabarits";
+import { envoyerEpson } from "../impression/epson";
+import { gabaritBon, gabaritTest } from "../impression/gabarits";
+import { nouvelleCommande } from "../metier/commande";
+import { EditeurPostes } from "./EditeurPostes";
 import { euros, useCaisse } from "./contexte";
 
 const CHAMPS: Array<[keyof Etablissement, string]> = [
@@ -37,7 +43,8 @@ function messageServeur(e: unknown): string {
 }
 
 export function Reglages(props: { onAssistant: () => void }) {
-  const { caisse, config, majConfig, notifier, imprimer, synchro, synchroniser } = useCaisse();
+  const { caisse, config, majConfig, notifier, imprimer, synchro, synchroniser, utilisateur } = useCaisse();
+  const carte = carteDe(config);
   const [envoi, setEnvoi] = useState(false);
   const [etablissement, setEtablissement] = useState(config.etablissement);
   const [imprimante, setImprimante] = useState(config.imprimante);
@@ -117,6 +124,27 @@ export function Reglages(props: { onAssistant: () => void }) {
     await enregistrerMembre({ ...u, pinHash: await hacherPin(u.id, pin) }, `Code PIN de ${u.nom} modifié.`);
   };
 
+  /** Les postes sont communs à l'établissement : enregistrés d'abord sur le serveur. */
+  const enregistrerPostes = async (postes: PostesProduction) => {
+    try {
+      const { etablissement: e } = await caisse.client.enregistrerPostes(postes);
+      await majConfig({ ...config, postesProduction: e.postesProduction ?? {} });
+      notifier("Imprimantes de production enregistrées pour toutes les caisses.");
+    } catch (e) {
+      throw new Error(messageServeur(e));
+    }
+  };
+
+  const testerPoste = async (poste: string, adresse: string, sansAccents: boolean) => {
+    const bon = { poste, annulation: false, articles: [{ quantite: 1, libelle: "Bon d'essai", details: ["Imprimante de production"] }], ligneUids: [] };
+    try {
+      await envoyerEpson(adresse, gabaritBon(bon, nouvelleCommande("comptoir", utilisateur.id), config, utilisateur.id), { sansAccents });
+      notifier(`Bon d'essai envoyé à ${poste}.`);
+    } catch (e) {
+      notifier(`${poste} : ${e instanceof Error ? e.message : String(e)}`, "erreur");
+    }
+  };
+
   return (
     <div className="page reglages">
       <header className="page-tete">
@@ -175,6 +203,20 @@ export function Reglages(props: { onAssistant: () => void }) {
               </span>
               <input type="number" min={0} step={1} value={seuil} onChange={(e) => setSeuil(Number(e.target.value))} />
             </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Imprimantes de production</legend>
+            <p className="aide-champ">
+              Chaque catégorie de la carte peut envoyer ses bons à un poste (bar, cuisine). Associez ici une imprimante à chaque poste :
+              « Envoyer » sur la commande imprime les nouveaux articles, le reste part à l'encaissement. Commun à toutes les caisses.
+            </p>
+            <EditeurPostes
+              postesCarte={carte ? postesDeLaCarte(carte) : []}
+              valeur={config.postesProduction ?? {}}
+              onEnregistrer={enregistrerPostes}
+              onTester={(p, a, s) => void testerPoste(p, a, s)}
+            />
           </fieldset>
 
           <fieldset>

@@ -1,5 +1,5 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -85,6 +85,8 @@ export const api = {
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),
   enregistrerCarte: (id: string, carte: Catalogue, version: number) => appel<ReponseCarte>("PUT", `/cartes/${id}`, { carte, version }),
   creerCarte: (corps: { id: string; nom: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
+  enregistrerPostes: (etablissementId: string, postes: PostesProduction) =>
+    appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/postes`, { postes }),
   comptes: (etablissementId: string) => appel<ReponseComptes>("GET", `/etablissements/${etablissementId}/comptes`),
   enregistrerClient: (etablissementId: string, client: ClientApi) =>
     appel<{ client: ClientApi }>("PUT", `/etablissements/${etablissementId}/clients`, client),

@@ -12,6 +12,7 @@ import {
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
 import { lignesActives, totauxCommande, versSaisie, type Commande } from "../metier/commande";
+import type { Bon } from "../metier/production";
 import { mentionsPaiement, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { Recu } from "./recu";
@@ -139,6 +140,28 @@ export function gabaritAddition(commande: Commande, config: Configuration, opera
   tableauTVA(r, totaux.ventilation);
   r.filet();
   r.texte("Note provisoire, ne vaut pas ticket de caisse", { align: "centre" });
+  return r;
+}
+
+/** Bon de production d'un poste (bar, cuisine) : gros caractères, ni prix ni en-tête légal. */
+export function gabaritBon(bon: Bon, commande: Commande, config: Configuration, operateurId: string): Recu {
+  const r = new Recu();
+  if (bon.annulation) r.texte("*** ANNULATION ***", { align: "centre", gras: true, grand: true });
+  r.texte(bon.poste.toUpperCase(), { align: "centre", gras: true, grand: !bon.annulation });
+  r.colonnes(nomTable(config, commande.tableId), new Date().toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" }), {
+    gras: true,
+    grand: true,
+  });
+  const qui = `Par ${nomUtilisateur(config, operateurId)}`;
+  r.texte(commande.couverts ? `${commande.couverts} couvert(s) · ${qui}` : qui);
+  r.filet();
+  for (const a of bon.articles) {
+    r.texte(`${a.quantite} x ${a.libelle}`, { gras: true, grand: true });
+    for (const d of a.details) r.texte(`    ${d}`, { grand: true });
+    if (a.note) r.texte(`    ! ${a.note}`, { gras: true });
+  }
+  if (commande.note && !bon.annulation) r.filet().texte(`Note : ${commande.note}`, { gras: true });
+  if (MODE_TEST) r.filet().texte("Caisse de test", { align: "centre" });
   return r;
 }
 

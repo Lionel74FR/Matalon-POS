@@ -186,3 +186,8 @@ export function fusionnerCategories(c: Catalogue, sourceId: string, cibleId: str
       })),
   };
 }
+
+/** Postes de production cités par la carte, dans l'ordre d'apparition. */
+export function postesDeLaCarte(c: Catalogue): string[] {
+  return [...new Set(c.categories.map((x) => x.poste).filter((x): x is string => !!x))];
+}

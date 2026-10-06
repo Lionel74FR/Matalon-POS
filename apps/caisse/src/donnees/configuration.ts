@@ -1,6 +1,6 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
 import { CARTES, type Catalogue } from "@matalon/catalogue";
-import type { ClientApi, IdentiteEtablissement, ReponseEtat, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { ClientApi, IdentiteEtablissement, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
 
 export type { Role, Table };
 export type Utilisateur = UtilisateurApi;
@@ -38,6 +38,8 @@ export interface Configuration {
    * pas encore connus du serveur (il les apprend par le ticket en compte).
    */
   clients?: ClientApi[];
+  /** Imprimantes de production de l'établissement : poste de la carte → imprimante. */
+  postesProduction?: PostesProduction;
 }
 
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
@@ -58,6 +60,7 @@ export function fusionnerReferentiel(
     tables: etat.etablissement.tables,
     // La carte (et son identifiant) ne change qu'une fois la nouvelle carte téléchargée.
     seuilNoteAutomatique: etat.etablissement.seuilNote,
+    ...(etat.etablissement.postesProduction ? { postesProduction: etat.etablissement.postesProduction } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
 }

@@ -55,6 +55,8 @@ export interface Categorie {
   nom: string;
   /** Regroupement d'écran : Boissons, Bar, Cuisine, Goûter, À partager, Formules. */
   rayon: string;
+  /** Poste de production (« Bar », « Cuisine ») : imprimante où partent ses bons. Absent : aucun bon. */
+  poste?: string;
   articles: Article[];
 }
 

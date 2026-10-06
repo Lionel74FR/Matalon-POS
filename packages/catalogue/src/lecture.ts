@@ -60,10 +60,12 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
     const co = objet(c, `catégorie ${i + 1}`);
     const nomCat = texte(co.nom, `catégorie ${i + 1} : nom`);
     const ouCat = `catégorie « ${nomCat || i + 1} »`;
+    const poste = optionnel(co.poste, () => texte(co.poste, `${ouCat} : poste de production`, 30));
     return {
       id: ident(co.id, `${ouCat} : identifiant`),
       nom: nomCat,
       rayon: texte(co.rayon, `${ouCat} : rayon`, 40),
+      ...(poste ? { poste } : {}),
       articles: liste(co.articles, `${ouCat} : articles`, LIMITES_CARTE.articlesParCategorie).map((a, j): Article => {
         const ao = objet(a, `${ouCat}, article ${j + 1}`);
         const nom = texte(ao.nom, `${ouCat}, article ${j + 1} : nom`);

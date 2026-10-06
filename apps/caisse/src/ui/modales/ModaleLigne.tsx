@@ -34,6 +34,8 @@ export function ModaleLigne(props: {
         quantite: unites,
         montantTTC: unites * l.prixUnitaireTTC,
         ajouteeLe: l.ajouteeLe,
+        // Déjà parti en production : un bon d'annulation suit.
+        ...(l.envoyee ? { apresEnvoi: true } : {}),
       },
       utilisateur.id,
     );

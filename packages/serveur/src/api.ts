@@ -24,8 +24,10 @@ import {
   calculerComptes,
   CLIENT_ID_VALIDE,
   type ClientApi,
+  posteValide,
   type Derniers,
   type EntreeSynchro,
+  type PostesProduction,
   type ReponseComptes,
   type EtablissementApi,
   type IdentiteEtablissement,
@@ -108,6 +110,7 @@ interface LigneEtablissement {
   carte_version: number | null;
   tables: Table[];
   seuil_note: number;
+  postes_production: PostesProduction | null;
 }
 
 const SELECT_ETABLISSEMENT = `select e.*, c.version as carte_version from etablissements e left join cartes c on c.id = e.carte_id`;
@@ -129,7 +132,34 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     carteVersion: l.carte_version ?? 0,
     tables: l.tables,
     seuilNote: l.seuil_note,
+    postesProduction: l.postes_production ?? {},
   };
+}
+
+function lirePostes(v: unknown): PostesProduction {
+  if (typeof v !== "object" || v === null || Array.isArray(v)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Postes de production invalides.");
+  const entrees = Object.entries(v as Record<string, unknown>);
+  if (entrees.length > 12) throw new ErreurHttp(400, "CHAMP_INVALIDE", "12 postes de production au plus.");
+  const postes: PostesProduction = {};
+  for (const [nom, val] of entrees) {
+    const p = val as { adresse?: unknown; sansAccents?: unknown };
+    const adresse = typeof p?.adresse === "string" ? p.adresse.trim() : "";
+    if (!posteValide(nom) || !/^[a-z0-9.:-]{0,100}$/i.test(adresse)) {
+      throw new ErreurHttp(400, "CHAMP_INVALIDE", `Poste « ${nom} » : nom ou adresse d'imprimante invalide.`);
+    }
+    postes[nom] = { adresse, sansAccents: p?.sansAccents === true };
+  }
+  return postes;
+}
+
+async function majPostes(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
+  const postes = lirePostes(corps.postes);
+  const [maj] = await env.db.requete<{ id: string }>(
+    "update etablissements set postes_production = $2::jsonb, maj_le = $3 where id = $1 returning id",
+    [etablissementId, JSON.stringify(postes), horloge(env).toISOString()],
+  );
+  if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  return etablissement(env.db, etablissementId);
 }
 
 interface LigneUtilisateur {
@@ -1038,6 +1068,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
     if (chemin === "/api/caisse/comptes" && m === "GET") return await comptesCaisse(env, requete);
     if (chemin === "/api/caisse/clients" && m === "PUT") return await majClientCaisse(env, requete);
+    if (chemin === "/api/caisse/postes" && m === "PUT") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { etablissement: await majPostes(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
+    }
 
     if (chemin === "/api/admin/statut" && m === "GET") return await statutAdmin(env, requete);
     if (chemin === "/api/admin/initialiser" && m === "POST") return await initialiserAdmin(env, requete);
@@ -1060,6 +1094,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "POST") return await enregistrerUtilisateurAdmin(env, requete, admin, p[1]!);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/comptes$/.exec(chemin);
       if (p && m === "GET") return json(200, await comptes(env, (await etablissement(env.db, p[1]!)).id));
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/postes$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await majPostes(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
+        await journaliserAdmin(env, admin.id, "postes_production", { etablissement: e.id, postes: e.postesProduction ?? {} });
+        return json(200, { etablissement: e });
+      }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/clients$/.exec(chemin);
       if (p && m === "PUT") {
         const e = await etablissement(env.db, p[1]!);

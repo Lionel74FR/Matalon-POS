@@ -119,6 +119,7 @@ export async function rattacher(
     carteId: r.etablissement.carteId,
     imprimante: { adresse: "", sansAccents: false },
     seuilNoteAutomatique: r.etablissement.seuilNote,
+    ...(r.etablissement.postesProduction ? { postesProduction: r.etablissement.postesProduction } : {}),
   };
   const connexion: ConnexionServeur = {
     jeton: r.jeton,

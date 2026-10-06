@@ -9,10 +9,12 @@ import { euros } from "../contexte";
 type NouvelleLigne = Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">;
 
 /** Options proposées pour un choix de formule : articles des catégories visées, variantes dépliées. */
-function optionsDuChoix(carte: Catalogue, choix: ChoixFormule): string[] {
+function optionsDuChoix(carte: Catalogue, choix: ChoixFormule): Array<{ libelle: string; categorieId: string }> {
   const articles = optionsChoix(carte, choix);
   return articles.flatMap((a) =>
-    a.variantes?.length ? a.variantes.map((v) => v.libelle ?? `${a.nom} ${v.nom}`) : [a.nom],
+    a.variantes?.length
+      ? a.variantes.map((v) => ({ libelle: v.libelle ?? `${a.nom} ${v.nom}`, categorieId: a.categorieId }))
+      : [{ libelle: a.nom, categorieId: a.categorieId }],
   );
 }
 
@@ -51,6 +53,10 @@ export function ModaleArticle(props: {
         articleId: a.id,
         libelle: a.nom,
         details: choixFormule.map((c) => selections[c.choix.id]!),
+        composants: choixFormule.map((c) => ({
+          libelle: selections[c.choix.id]!,
+          categorieId: c.options.find((o) => o.libelle === selections[c.choix.id])?.categorieId ?? "",
+        })),
         quantite,
         prixUnitaireTTC: a.prixTTC!,
         tauxTVA: a.tauxTVA,
@@ -125,7 +131,7 @@ export function ModaleArticle(props: {
         <section key={choix.id} className="groupe-choix">
           <h3>{choix.nom}</h3>
           <div className="options compactes">
-            {options.map((o) => (
+            {options.map(({ libelle: o }) => (
               <button
                 key={o}
                 className={`option${selections[choix.id] === o ? " active" : ""}`}

@@ -357,6 +357,22 @@ describe("comptes clients", () => {
   });
 });
 
+describe("imprimantes de production", () => {
+  it("relie les postes de la carte aux imprimantes de l'établissement, depuis l'administration ou une caisse", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const postes = { Bar: { adresse: "192.168.1.51", sansAccents: false }, Cuisine: { adresse: "192.168.1.52", sansAccents: true } };
+    const r = await appel("PUT", "/api/admin/etablissements/moka/postes", { postes }, { Cookie: cookie });
+    expect(r.statut).toBe(200);
+    const etat = (await appel("GET", "/api/caisse/etat", undefined, a.bearer)).corps as ReponseEtat;
+    expect(etat.etablissement.postesProduction).toEqual(postes);
+    const caisse = await appel("PUT", "/api/caisse/postes", { postes: { Bar: { adresse: "192.168.1.60", sansAccents: false } } }, a.bearer);
+    expect(caisse.corps.etablissement.postesProduction).toEqual({ Bar: { adresse: "192.168.1.60", sansAccents: false } });
+    expect((await appel("PUT", "/api/caisse/postes", { postes: { "Bar\n": { adresse: "x" } } }, a.bearer)).statut).toBe(400);
+    expect((await appel("PUT", "/api/caisse/postes", { postes: { Bar: { adresse: "http://evil" } } }, a.bearer)).statut).toBe(400);
+  });
+});
+
 describe("archives côté serveur", () => {
   it("exporte l'archive d'une Z depuis la copie du serveur, vérifiable seule", async () => {
     const cookie = await adminConnecte();

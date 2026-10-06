@@ -34,6 +34,15 @@ export interface EtablissementApi {
   tables: Table[];
   /** Montant TTC (centimes) à partir duquel la note est imprimée d'office. */
   seuilNote: number;
+  /** Imprimantes de production : poste de la carte → imprimante Epson du réseau de l'établissement. */
+  postesProduction?: PostesProduction;
+}
+
+export type PostesProduction = Record<string, { adresse: string; sansAccents: boolean }>;
+
+/** Nom de poste de production (« Bar », « Cuisine ») : court, lisible, sans caractère de contrôle. */
+export function posteValide(nom: unknown): nom is string {
+  return typeof nom === "string" && nom.trim() === nom && nom.length >= 1 && nom.length <= 30 && !/[\u0000-\u001f\u007f]/.test(nom);
 }
 
 export interface UtilisateurApi {

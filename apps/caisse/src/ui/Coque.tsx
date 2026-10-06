@@ -15,7 +15,7 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { ID_COMPTOIR } from "../donnees/configuration";
 import { commandeAGarder, fusionnerCommandes, nouvelleCommande, totauxCommande, transfererCommande, type Commande } from "../metier/commande";
@@ -134,6 +134,17 @@ export function Coque() {
       else await caisse.db.delete("commandes", tableId);
     },
     [caisse.db],
+  );
+
+  /** Mise à jour d'une commande d'après sa dernière version (après une impression qui a pris du temps). */
+  const commandesRef = useRef(commandes);
+  commandesRef.current = commandes;
+  const majCommande = useCallback(
+    (tableId: string, f: (c: Commande) => Commande) => {
+      const c = commandesRef.current.get(tableId);
+      if (c) void enregistrerCommande(f(c), tableId);
+    },
+    [enregistrerCommande],
   );
 
   const ouvrirTable = (tableId: string) => setVue({ nom: "commande", tableId });
@@ -268,6 +279,7 @@ export function Coque() {
             tablesOuvertes={new Set(commandes.keys())}
             onTransferer={(vers) => void transferer(vue.tableId, vers)}
             onChange={(c) => void enregistrerCommande(c, vue.tableId)}
+            onMaj={(f) => majCommande(vue.tableId, f)}
             onTerminee={() => {
               void enregistrerCommande(null, vue.tableId);
               setVue({ nom: "salle" });

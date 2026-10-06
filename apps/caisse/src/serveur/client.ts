@@ -4,6 +4,7 @@ import type {
   ReponseComptes,
   EtablissementApi,
   IdentiteEtablissement,
+  PostesProduction,
   ReponseEtat,
   ReponseCarte,
   ReponseRattachement,
@@ -90,6 +91,10 @@ export class ClientApi {
 
   enregistrerClient(client: Omit<FicheClient, "actif"> & { actif?: boolean }) {
     return this.appel<{ client: FicheClient; clients: FicheClient[] }>("PUT", "/api/caisse/clients", client);
+  }
+
+  enregistrerPostes(postes: PostesProduction) {
+    return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/postes", { postes });
   }
 
   enregistrerEquipe(utilisateurs: UtilisateurApi[]) {

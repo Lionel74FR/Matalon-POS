@@ -1,4 +1,5 @@
 import {
+  postesDeLaCarte,
   fusionImpossible,
   fusionnerCategories,
   identifiantDepuisNom,
@@ -12,7 +13,7 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, Merge, Pencil, Plus, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ResumeCarte } from "@matalon/serveur/partage";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -410,6 +411,29 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                     list="rayons-carte"
                     onChange={(e) => majCategorie(categorie.id, (c) => ({ ...c, rayon: e.target.value }))}
                   />
+                </label>
+                <label className="champ">
+                  <span>
+                    <Printer className="icone en-ligne" size={18} aria-hidden="true" /> Poste de production
+                  </span>
+                  <input
+                    value={categorie.poste ?? ""}
+                    list="postes-carte"
+                    placeholder="Aucun bon (ex. Bar, Cuisine)"
+                    maxLength={30}
+                    onChange={(e) =>
+                      majCategorie(categorie.id, (c) => {
+                        const poste = e.target.value.replace(/^\s+/, "");
+                        const { poste: _ancien, ...reste } = c;
+                        return poste ? { ...reste, poste } : reste;
+                      })
+                    }
+                  />
+                  <datalist id="postes-carte">
+                    {postesDeLaCarte(carte).map((p) => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
                 </label>
                 <button className="bouton danger" onClick={() => supprimerCategorie(categorie)} title="Supprimer la catégorie">
                   <AvecIcone icone={Trash2}>Supprimer</AvecIcone>

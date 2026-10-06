@@ -273,6 +273,17 @@
     <p class="attendu"><b>Attendu :</b> la lecture X montre la vente dans le chiffre du jour et « Porté en compte » ; le règlement apparaît en encaissement le jour où il est reçu, avec la TVA exigible. Le règlement peut se faire sur un autre appareil que la vente.</p>
   </section>
 
+  <section class="scenario" data-id="s6d">
+    <label><input type="checkbox">Bons bar et cuisine (si imprimantes de production)</label>
+    <ol>
+      <li>Dans l'administration, éditeur de carte : chaque catégorie a un champ <b>Poste de production</b> (« Bar », « Cuisine »). Enregistrez, puis synchronisez l'appareil.</li>
+      <li><span class="bouton">Réglages</span> › Imprimantes de production : l'adresse IP de l'imprimante de chaque poste, puis l'icône imprimante pour un bon d'essai.</li>
+      <li>Ouvrez une table, ajoutez un café et un plat, puis <span class="bouton">Envoyer (2)</span>.</li>
+      <li>Ajoutez un deuxième café, retirez le plat (touchez la ligne › Retirer de la commande), puis encaissez.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> un bon au bar et un en cuisine, les lignes marquées « Envoyé » ; le retrait du plat imprime « ANNULATION » en cuisine ; à l'encaissement, le deuxième café part seul au bar. Un poste sans imprimante est signalé : il se prépare d'après l'écran.</p>
+  </section>
+
   <section class="scenario" data-id="s7">
     <label><input type="checkbox">Imprimante en défaut (si imprimante connectée)</label>
     <ol>

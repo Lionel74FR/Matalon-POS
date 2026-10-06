@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   articlesACompleter,
+  lireCatalogue,
+  postesDeLaCarte,
   fusionImpossible,
   fusionnerCategories,
   CARTE_AUTOMNE_2026,
@@ -163,5 +165,26 @@ describe("fusion de catégories", () => {
   it("refuse des taux de TVA différents", () => {
     expect(fusionImpossible(carte.categories[0] as never, carte.categories[2] as never)).toContain("taux de TVA différents");
     expect(() => fusionnerCategories(carte as never, "vins", "cafes")).toThrow(/Fusion impossible/);
+  });
+});
+
+describe("postes de production", () => {
+  it("lit le poste d'une catégorie et liste les postes de la carte", () => {
+    const carte = {
+      id: "c",
+      nom: "C",
+      categories: [
+        { id: "cafes", nom: "Cafés", rayon: "Boissons", poste: "Bar", articles: [] },
+        { id: "plats", nom: "Plats", rayon: "Cuisine", poste: "Cuisine", articles: [] },
+        { id: "vins", nom: "Vins", rayon: "Bar", poste: "Bar", articles: [] },
+        { id: "goodies", nom: "Goodies", rayon: "Boutique", articles: [] },
+      ],
+    };
+    const lu = lireCatalogue(carte);
+    expect(lu.erreurs).toEqual([]);
+    expect(lu.catalogue!.categories[0]!.poste).toBe("Bar");
+    expect(lu.catalogue!.categories[3]).not.toHaveProperty("poste");
+    expect(postesDeLaCarte(lu.catalogue!)).toEqual(["Bar", "Cuisine"]);
+    expect(lireCatalogue({ ...carte, categories: [{ ...carte.categories[0], poste: "x".repeat(31) }] }).erreurs.length).toBe(1);
   });
 });

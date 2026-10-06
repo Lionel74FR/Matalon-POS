@@ -2,7 +2,7 @@ import { Banknote, Check, CreditCard, NotebookPen, Printer, Ticket as TicketPapi
 import { AvecIcone } from "../icones";
 import { ErreurFiscale, type ClientCompte, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useState } from "react";
-import { ID_COMPTOIR } from "../../donnees/configuration";
+import { carteDe, ID_COMPTOIR } from "../../donnees/configuration";
 import { MODE_TEST } from "../../fiscal/caisse";
 import { gabaritNote, LIBELLES_PAIEMENT } from "../../impression/gabarits";
 import { Recu } from "../../impression/recu";
@@ -10,6 +10,7 @@ import { lignesActives, totauxCommande, versSaisie, type Commande } from "../../
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
+import { useEnvoiProduction } from "../production";
 import { ModaleClient } from "./ModaleClient";
 import type { ClientApi } from "@matalon/serveur/partage";
 
@@ -35,6 +36,7 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
   const [client, setClient] = useState<ClientCompte | null>(null);
   const [choixClient, setChoixClient] = useState<number | null>(null);
   const [noteImprimee, setNoteImprimee] = useState(false);
+  const envoyerProduction = useEnvoiProduction();
   const total = totauxCommande(props.commande).totalTTC;
   const [paiements, setPaiements] = useState<Paiement[]>([]);
   const paye = paiements.reduce((s, p) => s + p.montant, 0);
@@ -101,6 +103,9 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
         ...(client && paiements.some((p) => p.mode === "EN_COMPTE") ? { client } : {}),
       });
       setTicket(t);
+      // Ce qui n'a pas été envoyé en production part maintenant (la commande se ferme : rien à marquer).
+      const carte = carteDe(config);
+      if (carte) void envoyerProduction(props.commande, carte);
       // Sans imprimante, rien ne sort : la note passe par le QR code.
       if (imprimanteConfiguree) {
         const avecEspeces = paiements.some((p) => p.mode === "ESPECES");

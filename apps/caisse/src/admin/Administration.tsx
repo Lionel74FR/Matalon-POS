@@ -2,7 +2,9 @@ import { afficherCode, ID_ETABLISSEMENT_VALIDE, PIN_VALIDE, type IdentiteEtablis
 import QRCode from "qrcode";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { genererTables } from "../donnees/configuration";
-import type { ClientApi, ReponseComptes, ResumeCarte } from "@matalon/serveur/partage";
+import type { ClientApi, PostesProduction, ReponseComptes, ResumeCarte } from "@matalon/serveur/partage";
+import { postesDeLaCarte } from "@matalon/catalogue";
+import { EditeurPostes } from "../ui/EditeurPostes";
 import { nouvelIdClient } from "../donnees/clients";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
@@ -18,6 +20,7 @@ import {
   LogIn,
   LogOut,
   Plus,
+  Printer,
   RotateCw,
   Save,
   ShieldCheck,
@@ -497,6 +500,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
       <Caisses caisses={e.caisses} onChange={props.onChange} />
       <Equipe e={e} onChange={props.onChange} />
+      <ImprimantesProduction e={e} onChange={props.onChange} />
       <ComptesClients etablissementId={e.id} />
       <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
     </>
@@ -794,6 +798,30 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
 }
 
 /** Comptes clients (ardoises) : soldes recalculés par le serveur sur toutes les caisses, fiches clients. */
+/** Postes de production de la carte de l'établissement → imprimantes de son réseau. */
+function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
+  const [postesCarte, setPostesCarte] = useState<string[] | null>(null);
+  const { erreur, envoyer } = useEnvoi();
+  useEffect(() => {
+    void envoyer(async () => setPostesCarte(postesDeLaCarte((await api.carte(props.e.carteId)).carte)));
+  }, [envoyer, props.e.carteId, props.e.carteVersion]);
+  const enregistrer = async (postes: PostesProduction) => {
+    await api.enregistrerPostes(props.e.id, postes);
+    await props.onChange();
+  };
+  return (
+    <section className="admin-section">
+      <Titre icone={Printer}>Imprimantes de production</Titre>
+      <p className="explication">
+        Les catégories de la carte désignent leur poste (bar, cuisine) ; indiquez ici l'adresse IP de l'imprimante de chaque poste sur
+        le réseau de l'établissement. Le bon d'essai s'imprime depuis les Réglages d'une caisse, sur place.
+      </p>
+      {erreur && <p className="erreur">{erreur}</p>}
+      {postesCarte && <EditeurPostes postesCarte={postesCarte} valeur={props.e.postesProduction ?? {}} onEnregistrer={enregistrer} />}
+    </section>
+  );
+}
+
 function ComptesClients(props: { etablissementId: string }) {
   const [donnees, setDonnees] = useState<ReponseComptes | null>(null);
   const [edition, setEdition] = useState<ClientApi | null>(null);

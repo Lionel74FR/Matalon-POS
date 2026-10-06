@@ -930,6 +930,20 @@ code {
   gap: 10px;
 }
 
+/* Envoyer, Addition, Encaisser : les deux premiers côte à côte, Encaisser dessous sur toute la largeur. */
+.ticket-actions:has(> :nth-child(3)) {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ticket-actions:has(> :nth-child(3)) > :last-child {
+  grid-column: 1 / -1;
+}
+
+.ticket-ligne .mention-envoyee {
+  color: var(--vert);
+  font-weight: 600;
+}
+
 .ticket-actions .bouton:only-child {
   grid-column: 1 / -1;
 }
