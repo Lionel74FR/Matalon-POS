@@ -1,0 +1,167 @@
+:root {
+  color-scheme: light;
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  color: #2b1e18;
+  background: #2b1e18;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 24px 14px 40px;
+}
+.papier {
+  max-width: 420px;
+  margin: 0 auto;
+  background: #f7eee3;
+  padding: 26px 22px 30px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  text-align: center;
+}
+.papier::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  height: 10px;
+  background:
+    linear-gradient(-45deg, transparent 50%, #f7eee3 50%) 0 0 / 20px 10px,
+    linear-gradient(45deg, transparent 50%, #f7eee3 50%) 0 0 / 20px 10px;
+}
+h1 {
+  font-size: 1.9rem;
+  margin: 6px 0 4px;
+  letter-spacing: -0.01em;
+}
+.etab {
+  white-space: pre-line;
+  margin: 0;
+  color: #6d5a4c;
+}
+.petit {
+  font-size: 0.82rem;
+}
+.test {
+  background: #f3dc8f;
+  margin: -26px -22px 18px;
+  padding: 8px;
+  font-weight: 700;
+}
+.mention {
+  font-weight: 700;
+  margin: 14px 0 0;
+}
+.meta,
+.articles,
+.paiements {
+  text-align: left;
+  border-top: 2px dashed #e0d1bf;
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.meta .date,
+.meta div {
+  color: #6d5a4c;
+  font-size: 0.92rem;
+}
+.ligne {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 0;
+}
+.ligne span:last-child {
+  white-space: nowrap;
+}
+.meta .ligne {
+  font-weight: 700;
+  color: #2b1e18;
+  font-size: 1rem;
+}
+.remise {
+  color: #9e4220;
+  font-size: 0.9rem;
+  padding-left: 1.2em;
+}
+.total {
+  border-top: 2px solid #2b1e18;
+  margin-top: 12px;
+  padding-top: 10px;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.tva {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  color: #6d5a4c;
+  font-variant-numeric: tabular-nums;
+}
+.tva th,
+.tva td {
+  text-align: right;
+  padding: 2px 0;
+  font-weight: 400;
+}
+.tva th:first-child,
+.tva td:first-child {
+  text-align: left;
+}
+.pied {
+  margin: 18px 0 0;
+  color: #6d5a4c;
+}
+.pied.petit {
+  margin-top: 6px;
+  word-break: break-all;
+}
+.alerte {
+  color: #9e4220;
+  font-weight: 700;
+}
+.actions {
+  max-width: 420px;
+  margin: 28px auto 0;
+  display: flex;
+  gap: 10px;
+}
+.actions button {
+  flex: 1;
+  min-height: 50px;
+  border: none;
+  border-radius: 8px;
+  background: #c0562e;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+}
+.actions button + button {
+  background: #4a382e;
+}
+.aide {
+  max-width: 420px;
+  margin: 14px auto 0;
+  color: #bfa98f;
+  text-align: center;
+  font-size: 0.9rem;
+}
+@media print {
+  :root,
+  body {
+    background: #fff;
+  }
+  .actions,
+  .aide {
+    display: none;
+  }
+  .papier {
+    background: #fff;
+  }
+  .papier::after {
+    display: none;
+  }
+}

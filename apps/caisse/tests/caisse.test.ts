@@ -149,3 +149,26 @@ describe("réponses de l'imprimante", () => {
     expect(lireReponse('<response success="false" code="EPTR_REC_EMPTY" status="0"/>').problemes).toEqual(["plus de papier"]);
   });
 });
+
+describe("note numérique (QR code)", () => {
+  it("fait l'aller-retour, reste assez courte pour un QR code et détecte un lien abîmé", async () => {
+    const { noteDepuisTicket, encoderNote, decoderNote, urlNote } = await import("../src/note/format");
+    const { registre } = await preparer();
+    const lignes = commandeType().lignes.map(versSaisie);
+    const t = await registre.enregistrerVente({
+      lignes: [...lignes, { articleId: "x", libelle: "Déjeuner Moka (Plat du jour, Cheesecake citron, Flat white)", quantite: 2, prixUnitaireTTC: 1900, tauxTVA: 1000, remise: { montantTTC: 1900, motif: "Offert maison" } }],
+      paiements: [{ mode: "ESPECES", montant: 5000 }],
+      operateurId: "u-lea",
+      tableId: "t4",
+      couverts: 2,
+    });
+    const note = noteDepuisTicket(t, { etablissement: config.etablissement, caisseId: config.caisseId, table: "Table 4", serveur: "Léa", test: true });
+    const url = urlNote("https://moka-caisse-test.vercel.app", note);
+    expect(url.length).toBeLessThan(900);
+    const relue = decoderNote(url.split("#")[1]!);
+    expect(relue).toEqual(note);
+    expect(relue.tt).toBe(t.totalTTC);
+    expect(() => decoderNote(encoderNote(note).slice(0, 40))).toThrow(/abîmé|valide/);
+    expect(() => decoderNote("")).toThrow();
+  });
+});

@@ -1,18 +1,21 @@
 import { ErreurFiscale, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useState } from "react";
 import { ID_COMPTOIR } from "../../donnees/configuration";
+import { MODE_TEST } from "../../fiscal/caisse";
 import { gabaritNote, LIBELLES_PAIEMENT } from "../../impression/gabarits";
 import { Recu } from "../../impression/recu";
 import { totauxCommande, versSaisie, type Commande } from "../../metier/commande";
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
+import { QrNote, urlNoteTicket } from "../QrNote";
 
 const MODES: ModePaiement[] = ["CB", "ESPECES", "TITRE_RESTAURANT_CARTE", "TITRE_RESTAURANT_PAPIER"];
 const BILLETS = [500, 1000, 2000, 5000];
 
 /** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
 export function ModaleEncaissement(props: { commande: Commande; onTermine: () => void; onFermer: () => void }) {
-  const { caisse, config, utilisateur, notifier, imprimer } = useCaisse();
+  const { caisse, config, utilisateur, notifier, imprimer, imprimanteConfiguree } = useCaisse();
+  const [noteImprimee, setNoteImprimee] = useState(false);
   const total = totauxCommande(props.commande).totalTTC;
   const [paiements, setPaiements] = useState<Paiement[]>([]);
   const paye = paiements.reduce((s, p) => s + p.montant, 0);
@@ -46,11 +49,15 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
         couverts: props.commande.couverts,
       });
       setTicket(t);
-      const avecEspeces = paiements.some((p) => p.mode === "ESPECES");
-      if (t.totalTTC >= config.seuilNoteAutomatique) {
-        await imprimerNote(t, avecEspeces);
-      } else if (avecEspeces) {
-        await ouvrirTiroir(t);
+      // Sans imprimante, rien ne sort : la note passe par le QR code.
+      if (imprimanteConfiguree) {
+        const avecEspeces = paiements.some((p) => p.mode === "ESPECES");
+        if (t.totalTTC >= config.seuilNoteAutomatique) {
+          await imprimerNote(t, avecEspeces);
+          setNoteImprimee(true);
+        } else if (avecEspeces) {
+          await ouvrirTiroir(t);
+        }
       }
     } catch (e) {
       notifier(e instanceof ErreurFiscale ? e.message : `Encaissement impossible : ${String(e)}`, "erreur");
@@ -60,7 +67,6 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
   };
 
   const ouvrirTiroir = async (t: Ticket) => {
-    if (!config.imprimante.adresse) return;
     await imprimer(new Recu().ouvrirTiroir(), "Tiroir-caisse");
     await caisse.registre.journaliser("OUVERTURE_TIROIR", { ticket: t.numero }, utilisateur.id);
   };
@@ -69,21 +75,29 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
     const recu = gabaritNote(t, config);
     if (tiroir) recu.ouvrirTiroir();
     await imprimer(recu, `Note n° ${t.numero}`);
-    await caisse.registre.journaliser("IMPRESSION_TICKET", { ticket: t.numero }, utilisateur.id);
+    await caisse.registre.journaliser(
+      "IMPRESSION_TICKET",
+      { ticket: t.numero, canal: imprimanteConfiguree ? "papier" : "ecran" },
+      utilisateur.id,
+    );
     if (tiroir) await caisse.registre.journaliser("OUVERTURE_TIROIR", { ticket: t.numero }, utilisateur.id);
   };
 
   if (ticket) {
-    const noteImprimee = ticket.totalTTC >= config.seuilNoteAutomatique;
+    const auDelaSeuil = ticket.totalTTC >= config.seuilNoteAutomatique;
     return (
       <Modale
         titre={`Ticket n° ${ticket.numero} encaissé`}
+        large
         onFermer={props.onTermine}
         pied={
           <>
             {!noteImprimee && (
-              <button className="bouton" onClick={() => void imprimerNote(ticket, false)}>
-                Imprimer la note
+              <button
+                className="bouton"
+                onClick={() => void imprimerNote(ticket, false).then(() => imprimanteConfiguree && setNoteImprimee(true))}
+              >
+                {imprimanteConfiguree ? "Imprimer la note" : "Voir la note"}
               </button>
             )}
             <button className="bouton principal" onClick={props.onTermine}>
@@ -92,20 +106,27 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
           </>
         }
       >
-        {ticket.renduMonnaie > 0 ? (
-          <div className="rendu">
-            <span>Rendu monnaie</span>
-            <strong>{euros(ticket.renduMonnaie)}</strong>
-          </div>
-        ) : (
-          <div className="rendu calme">
-            <span>Encaissé</span>
-            <strong>{euros(ticket.totalTTC)}</strong>
-          </div>
+        <div className="fin-encaissement">
+          {ticket.renduMonnaie > 0 ? (
+            <div className="rendu">
+              <span>Rendu monnaie</span>
+              <strong>{euros(ticket.renduMonnaie)}</strong>
+            </div>
+          ) : (
+            <div className="rendu calme">
+              <span>Encaissé</span>
+              <strong>{euros(ticket.totalTTC)}</strong>
+            </div>
+          )}
+          <QrNote url={urlNoteTicket(ticket, config)} />
+        </div>
+        {noteImprimee && <p className="explication">La note a été imprimée (montant de {euros(config.seuilNoteAutomatique)} ou plus).</p>}
+        {!imprimanteConfiguree && auDelaSeuil && !MODE_TEST && (
+          <p className="erreur">
+            Au-delà de {euros(config.seuilNoteAutomatique)}, la note doit être remise imprimée : connectez l'imprimante dans les
+            réglages.
+          </p>
         )}
-        <p className="explication">
-          {noteImprimee ? "La note a été imprimée (montant au-delà du seuil)." : "La note est imprimée à la demande du client."}
-        </p>
       </Modale>
     );
   }

@@ -70,6 +70,7 @@ export function App() {
         setPhase({ nom: "caisse", caisse: c, utilisateur: u });
       },
       notifier,
+      imprimanteConfiguree: !!caisse.config.imprimante.adresse,
       async imprimer(recu: Recu, titre: string) {
         const { adresse, sansAccents } = caisse.config.imprimante;
         if (!adresse) return setApercu({ recu, titre });

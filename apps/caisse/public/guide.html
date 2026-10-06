@@ -123,7 +123,7 @@
   <div class="colonne">
     <img src="/icone.svg" alt="">
     <h1>Tester la caisse du Moka</h1>
-    <p>Guide pour le service test de la nouvelle caisse sur iPad, avant l'ouverture du jeudi 15 octobre. Comptez 45 minutes pour tout parcourir.</p>
+    <p>Guide pour le service test de la nouvelle caisse, avant l'ouverture du jeudi 15 octobre. Elle fonctionne sur iPad et sur iPhone. Comptez 45 minutes pour tout parcourir.</p>
   </div>
 </header>
 
@@ -134,8 +134,8 @@
 
   <h2>1. Ce qu'il vous faut</h2>
   <ul>
-    <li>L'iPad de la caisse, connecté au Wi-Fi du Moka.</li>
-    <li>L'imprimante Epson TM-m30III allumée, avec du papier, reliée à la box. Le tiroir-caisse branché à l'arrière de l'imprimante.</li>
+    <li>L'iPad de la caisse (ou un iPhone pour un premier essai), connecté au Wi-Fi du Moka.</li>
+    <li>En option, l'imprimante Epson TM-m30III allumée, avec du papier, reliée à la box, et le tiroir-caisse branché à l'arrière. La caisse fonctionne aussi sans : les notes passent alors par QR code.</li>
     <li>Votre code PIN, transmis par Lionel. Si l'iPad n'a pas encore été mis en service, voir l'étape 3.</li>
   </ul>
 
@@ -151,8 +151,8 @@
   <p>Si la caisse affiche « Qui prend le service ? », elle est déjà en service : passez à l'étape 4.</p>
   <p>Sinon, remplissez l'écran « Mise en service de la caisse de test ». Pour un test, des informations fictives conviennent (un SIRET compte 14 chiffres). Choisissez un code PIN à 4 chiffres pour le responsable et notez-le.</p>
 
-  <h2>4. Connecter l'imprimante</h2>
-  <p>L'assistant <b>Connecter l'imprimante</b> s'ouvre après la mise en service. On le retrouve dans <span class="bouton">Réglages</span> › <span class="bouton">Assistant de connexion</span>. Suivez ses six étapes à l'écran.</p>
+  <h2>4. Connecter l'imprimante (facultatif)</h2>
+  <p>Sans imprimante, touchez <b>Configurer plus tard</b> et passez à l'étape 5. L'assistant <b>Connecter l'imprimante</b> s'ouvre après la mise en service. On le retrouve dans <span class="bouton">Réglages</span> › <span class="bouton">Assistant de connexion</span>. Suivez ses six étapes à l'écran.</p>
   <div class="encadre">
     <strong>Étape à surveiller : « Autoriser ».</strong> Safari affiche « Cette connexion n'est pas privée » : touchez Afficher les détails, puis consulter ce site web, puis confirmez. Si le test de connexion échoue ensuite malgré tout, faites une capture d'écran de l'assistant et envoyez-la à Lionel : c'est le point le plus important de ce test.
   </div>
@@ -167,7 +167,7 @@
       <li>Ajoutez un Cappuccino et un Croissant (rayon Cuisine, catégorie Viennoiseries).</li>
       <li><span class="bouton">Encaisser</span> › <span class="bouton">Carte bancaire</span> › <span class="bouton">Valider l'encaissement</span>. Saisissez le même montant sur le TPE.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> « Encaissé 6,00 € ». La note ne sort pas toute seule sous 25 € : <span class="bouton">Imprimer la note</span> l'imprime.</p>
+    <p class="attendu"><b>Attendu :</b> « Encaissé 6,00 € » et un QR code. Scannez-le avec l'appareil photo d'un téléphone : la note s'ouvre, lisible et enregistrable en PDF. Avec une imprimante, <span class="bouton">Imprimer la note</span> l'imprime.</p>
   </section>
 
   <section class="scenario" data-id="s2">
@@ -180,7 +180,7 @@
       <li>Revenez à la salle : la table 4 apparaît occupée, avec son montant.</li>
       <li>Rouvrez-la et touchez <span class="bouton">Addition</span>.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> l'addition s'imprime avec la mention « Note provisoire, ne vaut pas ticket de caisse ». Gardez la table ouverte pour le scénario suivant.</p>
+    <p class="attendu"><b>Attendu :</b> l'addition s'imprime (ou s'affiche à l'écran sans imprimante) avec la mention « Note provisoire, ne vaut pas ticket de caisse ». Gardez la table ouverte pour le scénario suivant.</p>
   </section>
 
   <section class="scenario" data-id="s3">
@@ -190,7 +190,7 @@
       <li>Touchez la ligne Bubble tea Taro › <span class="bouton">Retirer de la commande</span>, puis la même chose pour la ligne Suppl. Perles popping.</li>
       <li><span class="bouton">Encaisser</span> › billet de 50 € › <span class="bouton">Valider l'encaissement</span>.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> le spritz apparaît « Offert » à 0 €, la monnaie à rendre s'affiche en grand, le tiroir s'ouvre et la table redevient libre.</p>
+    <p class="attendu"><b>Attendu :</b> le spritz apparaît « Offert » à 0 €, la monnaie à rendre s'affiche en grand avec le QR code de la note, le tiroir s'ouvre s'il est branché, et la table redevient libre.</p>
   </section>
 
   <section class="scenario" data-id="s4">
@@ -201,7 +201,7 @@
       <li>Le reste s'affiche : <span class="bouton">Carte bancaire</span> pour solder, puis validez.</li>
       <li>Essayez aussi de payer en carte plus que le reste : la caisse doit refuser.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> deux paiements sur le même ticket, note imprimée d'office (plus de 25 €).</p>
+    <p class="attendu"><b>Attendu :</b> deux paiements sur le même ticket. Avec une imprimante, la note sort d'office (plus de 25 €) ; sans, le QR code s'affiche.</p>
   </section>
 
   <section class="scenario" data-id="s5">
@@ -219,14 +219,14 @@
     <label><input type="checkbox">Annulation et duplicata</label>
     <ol>
       <li>Onglet <span class="bouton">Tickets</span> : touchez le ticket du scénario 1.</li>
-      <li><span class="bouton">Imprimer un duplicata</span>.</li>
+      <li><span class="bouton">QR code</span> : scannez-le, la note s'ouvre marquée « Duplicata n° 1 ».</li>
       <li>Puis <span class="bouton">Annuler ce ticket</span>, choisissez un motif et validez.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> le duplicata porte « DUPLICATA n° 1 ». L'annulation crée un nouveau ticket négatif ; le ticket d'origine apparaît barré, il n'est jamais supprimé.</p>
+    <p class="attendu"><b>Attendu :</b> le duplicata est numéroté. L'annulation crée un nouveau ticket négatif ; le ticket d'origine apparaît barré, il n'est jamais supprimé.</p>
   </section>
 
   <section class="scenario" data-id="s7">
-    <label><input type="checkbox">Imprimante en défaut</label>
+    <label><input type="checkbox">Imprimante en défaut (si imprimante connectée)</label>
     <ol>
       <li>Ouvrez le capot de l'imprimante, puis lancez <span class="bouton">Addition</span> sur une table.</li>
       <li>Refermez le capot et recommencez.</li>
@@ -238,11 +238,11 @@
     <label><input type="checkbox">Clôture de la journée</label>
     <ol>
       <li>Onglet <span class="bouton">Clôtures</span> › <span class="bouton">Lecture X</span> : vérifiez les totaux par moyen de paiement.</li>
-      <li><span class="bouton">Clôturer la journée (Z)</span> › <span class="bouton">Clôturer et imprimer le Z</span>.</li>
+      <li><span class="bouton">Clôturer la journée (Z)</span>, puis confirmez. Touchez la clôture dans la liste pour voir le ticket Z.</li>
       <li><span class="bouton">Vérifier l'intégrité</span>.</li>
       <li><span class="bouton">Export comptable CSV</span> : le fichier se télécharge.</li>
     </ol>
-    <p class="attendu"><b>Attendu :</b> le ticket Z sort avec le total, la TVA à 10 % et 20 % et les encaissements par mode ; le contrôle affiche « Chaînes intactes ». Comparez le total CB du Z avec le relevé du TPE.</p>
+    <p class="attendu"><b>Attendu :</b> le ticket Z (imprimé ou à l'écran) montre le total, la TVA à 10 % et 20 % et les encaissements par mode ; le contrôle affiche « Chaînes intactes ». Comparez le total CB du Z avec le relevé du TPE.</p>
   </section>
 
   <h2>6. Signaler un problème</h2>

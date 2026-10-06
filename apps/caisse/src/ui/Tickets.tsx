@@ -3,12 +3,14 @@ import { useCallback, useEffect, useState } from "react";
 import { gabaritNote, LIBELLES_PAIEMENT, nomTable, nomUtilisateur } from "../impression/gabarits";
 import { Modale, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
+import { QrNote, urlNoteTicket } from "./QrNote";
 
 const MOTIFS_ANNULATION = ["Erreur de saisie", "Erreur de table", "Client parti sans consommer", "Réclamation client"];
 
 /** Derniers tickets : détail, duplicata, annulation. */
 export function Tickets() {
-  const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable } = useCaisse();
+  const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree } = useCaisse();
+  const [qr, setQr] = useState<{ ticket: Ticket; url: string } | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [annules, setAnnules] = useState<Set<number>>(new Set());
   const [choisi, setChoisi] = useState<Ticket | null>(null);
@@ -23,11 +25,26 @@ export function Tickets() {
 
   useEffect(() => void charger(), [charger]);
 
-  const duplicata = async (t: Ticket) => {
+  /** Numéro du prochain duplicata d'un ticket, papier ou QR code confondus. */
+  const prochainDuplicata = async (t: Ticket) => {
     const evts = await caisse.stockage.lister("evenements");
-    const deja = evts.filter((e) => e.code === "REIMPRESSION_TICKET" && e.details.ticket === t.numero).length;
-    await imprimer(gabaritNote(t, config, deja + 1), `Duplicata n° ${deja + 1}`);
-    await caisse.registre.journaliser("REIMPRESSION_TICKET", { ticket: t.numero, duplicata: deja + 1 }, utilisateur.id);
+    return evts.filter((e) => e.code === "REIMPRESSION_TICKET" && e.details.ticket === t.numero).length + 1;
+  };
+
+  const duplicata = async (t: Ticket) => {
+    const n = await prochainDuplicata(t);
+    await imprimer(gabaritNote(t, config, n), `Duplicata n° ${n}`);
+    await caisse.registre.journaliser(
+      "REIMPRESSION_TICKET",
+      { ticket: t.numero, duplicata: n, canal: imprimanteConfiguree ? "papier" : "ecran" },
+      utilisateur.id,
+    );
+  };
+
+  const duplicataQr = async (t: Ticket) => {
+    const n = await prochainDuplicata(t);
+    await caisse.registre.journaliser("REIMPRESSION_TICKET", { ticket: t.numero, duplicata: n, canal: "qr" }, utilisateur.id);
+    setQr({ ticket: t, url: urlNoteTicket(t, config, n) });
   };
 
   const annuler = async () => {
@@ -36,8 +53,10 @@ export function Tickets() {
     if (!responsable) return;
     try {
       const a = await caisse.registre.enregistrerAnnulation({ numeroTicket: annulation.numero, motif, operateurId: responsable });
-      await imprimer(gabaritNote(a, config), `Annulation n° ${a.numero}`);
-      await caisse.registre.journaliser("IMPRESSION_TICKET", { ticket: a.numero }, utilisateur.id);
+      if (imprimanteConfiguree) {
+        await imprimer(gabaritNote(a, config), `Annulation n° ${a.numero}`);
+        await caisse.registre.journaliser("IMPRESSION_TICKET", { ticket: a.numero, canal: "papier" }, utilisateur.id);
+      }
       notifier(`Ticket n° ${annulation.numero} annulé par le ticket n° ${a.numero}.`);
       setAnnulation(null);
       setChoisi(null);
@@ -57,7 +76,7 @@ export function Tickets() {
       {tickets.length === 0 ? (
         <Vide>Aucun ticket pour l'instant. Ils apparaîtront ici après le premier encaissement.</Vide>
       ) : (
-        <table className="tableau">
+        <table className="tableau tableau-tickets">
           <thead>
             <tr>
               <th>N°</th>
@@ -96,8 +115,11 @@ export function Tickets() {
                   Annuler ce ticket
                 </button>
               )}
+              <button className="bouton" onClick={() => void duplicataQr(choisi)}>
+                QR code
+              </button>
               <button className="bouton" onClick={() => void duplicata(choisi)}>
-                Imprimer un duplicata
+                {imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}
               </button>
             </>
           }
@@ -119,6 +141,12 @@ export function Tickets() {
               <span>{euros(choisi.totalTTC)}</span>
             </li>
           </ul>
+        </Modale>
+      )}
+
+      {qr && (
+        <Modale titre={`Note n° ${qr.ticket.numero} · duplicata`} onFermer={() => setQr(null)}>
+          <QrNote url={qr.url} legende="Le client scanne pour récupérer un duplicata de sa note" />
         </Modale>
       )}
 

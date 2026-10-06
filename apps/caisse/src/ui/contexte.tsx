@@ -9,6 +9,8 @@ export interface ContexteCaisse {
   utilisateur: Utilisateur;
   majConfig(config: Configuration): Promise<void>;
   notifier(message: string, ton?: "info" | "erreur"): void;
+  /** Une adresse d'imprimante est enregistrée. Sans elle, rien ne s'imprime d'office. */
+  imprimanteConfiguree: boolean;
   /** Imprime ; sans imprimante ou en cas d'échec, affiche l'aperçu à l'écran. */
   imprimer(recu: Recu, titre: string): Promise<void>;
   /**

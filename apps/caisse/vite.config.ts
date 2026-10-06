@@ -13,6 +13,12 @@ function versionBuild(): string {
 }
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      // Deux pages : la caisse, et la note numérique ouverte par le client (QR code).
+      input: { caisse: "index.html", note: "n.html" },
+    },
+  },
   define: {
     __BUILD__: JSON.stringify(`${versionBuild()}-${new Date().toISOString().slice(0, 10)}`),
   },
@@ -27,7 +33,7 @@ export default defineConfig({
         description: "Caisse du Moka — Matalon POS",
         lang: "fr",
         display: "standalone",
-        orientation: "landscape",
+        orientation: "any",
         background_color: "#2B1E18",
         theme_color: "#2B1E18",
         icons: [
@@ -39,7 +45,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/guide/],
+        navigateFallbackDenylist: [/^\/guide/, /^\/n(\.html)?$/],
       },
     }),
   ],

@@ -65,7 +65,7 @@ function Totaux({ t }: { t: TotauxPeriode }) {
 
 /** Lecture X, clôtures, export comptable, archives et contrôle d'intégrité. */
 export function Clotures(props: { commandesOuvertes: number }) {
-  const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable } = useCaisse();
+  const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree } = useCaisse();
   const [clotures, setClotures] = useState<Cloture[]>([]);
   const [lecture, setLecture] = useState<(TotauxPeriode & { dateComptable: string }) | null>(null);
   const [confirmationZ, setConfirmationZ] = useState(false);
@@ -102,7 +102,9 @@ export function Clotures(props: { commandesOuvertes: number }) {
       const z = await caisse.registre.cloturerJournee(responsable);
       setConfirmationZ(false);
       setLecture(null);
-      for (const c of z) await imprimer(gabaritCloture(c, config), `Clôture Z ${c.identifiantPeriode}`);
+      if (imprimanteConfiguree) {
+        for (const c of z) await imprimer(gabaritCloture(c, config), `Clôture Z ${c.identifiantPeriode}`);
+      }
       notifier(z.length > 1 ? `${z.length} journées clôturées.` : `Journée du ${z[0]!.identifiantPeriode} clôturée.`);
       await charger();
     });
@@ -112,7 +114,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
       const responsable = await demanderResponsable(`Clôture mensuelle de ${mois}.`);
       if (!responsable) return;
       const c = await caisse.registre.cloturerMois(mois, responsable);
-      await imprimer(gabaritCloture(c, config), `Clôture ${mois}`);
+      if (imprimanteConfiguree) await imprimer(gabaritCloture(c, config), `Clôture ${mois}`);
       notifier(`Mois ${mois} clôturé.`);
       await charger();
     });
@@ -175,9 +177,11 @@ export function Clotures(props: { commandesOuvertes: number }) {
         <section className="carte-lecture">
           <header>
             <h2>Lecture X · journée du {lecture.dateComptable}</h2>
-            <button className="bouton discret" onClick={() => void imprimer(gabaritLectureX(lecture, config, utilisateur.id), "Lecture X")}>
-              Imprimer
-            </button>
+            {imprimanteConfiguree && (
+              <button className="bouton discret" onClick={() => void imprimer(gabaritLectureX(lecture, config, utilisateur.id), "Lecture X")}>
+                Imprimer
+              </button>
+            )}
           </header>
           <Totaux t={lecture} />
         </section>
@@ -186,7 +190,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
       {clotures.length === 0 ? (
         <Vide>Aucune clôture. La première apparaîtra ici après la clôture Z du premier soir.</Vide>
       ) : (
-        <table className="tableau">
+        <table className="tableau tableau-clotures">
           <thead>
             <tr>
               <th>N°</th>
@@ -216,7 +220,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
           onFermer={() => setConfirmationZ(false)}
           pied={
             <button className="bouton principal" onClick={() => void cloturerJour()}>
-              Clôturer et imprimer le Z
+              {imprimanteConfiguree ? "Clôturer et imprimer le Z" : "Clôturer la journée"}
             </button>
           }
         >
@@ -243,7 +247,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
                 Télécharger l'archive
               </button>
               <button className="bouton" onClick={() => void imprimer(gabaritCloture(choisie, config), `Clôture ${choisie.identifiantPeriode}`)}>
-                Réimprimer
+                {imprimanteConfiguree ? "Réimprimer" : "Voir le ticket Z"}
               </button>
             </>
           }

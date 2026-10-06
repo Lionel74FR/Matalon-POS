@@ -35,7 +35,9 @@ Caisse tactile iPad du groupe Matalon, conforme à l'article 286 I 3° bis du CG
 3. Imprimante Epson TM-m30III : relever son adresse IP (page d'état), ouvrir `https://<adresse>` dans Safari et accepter le certificat, puis saisir l'adresse dans Réglages et imprimer un test.
 4. Créer les comptes de l'équipe dans Réglages.
 
-Sans imprimante configurée, chaque reçu s'affiche à l'écran.
+L'imprimante est facultative. Sans elle, rien ne s'imprime d'office : après chaque encaissement, la note s'affiche en QR code. Le client le scanne et ouvre sa note sur `/n`, la note entière étant contenue dans le lien (aucun stockage, aucune donnée personnelle). Les Z et les additions restent consultables à l'écran. Rappel : au-delà de 25 € TTC, la note de restaurant doit être remise imprimée.
+
+La caisse s'adapte à l'iPhone en portrait : carte en plein écran, commande ouverte depuis le bandeau du bas.
 
 ## Commandes
 

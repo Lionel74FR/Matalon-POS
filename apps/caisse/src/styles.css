@@ -1411,8 +1411,21 @@ a.bouton {
 @media (max-width: 900px) {
   .assistant {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100%;
   }
+  /* En-tête compact : titre et « Configurer plus tard » restent accessibles. */
   .assistant-etapes {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+  }
+  .assistant-etapes h1 {
+    font-size: 1.15rem;
+  }
+  .assistant-etapes > p,
+  .assistant-etapes ol {
     display: none;
   }
 }
@@ -1423,4 +1436,306 @@ a.bouton {
   color: #fff3c4;
   font-weight: 700;
   text-align: center;
+}
+
+/* ───────── Note numérique (QR code) ───────── */
+
+.fin-encaissement {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: center;
+}
+
+.qr-note {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.qr-note .qr {
+  width: 240px;
+  height: 240px;
+  background: #fff;
+  border-radius: var(--rayon-petit);
+  padding: 6px;
+}
+
+.qr-note .qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qr-note figcaption {
+  color: var(--sable);
+  font-size: 0.9rem;
+  text-align: center;
+  max-width: 240px;
+}
+
+/* ───────── Téléphone (iPhone en portrait) ───────── */
+
+.resume-mobile,
+.fermer-mobile {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  :root {
+    font-size: 16px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+  }
+
+  /* Barre du haut sur deux lignes : marque et sortie, puis les onglets. */
+  .barre {
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    padding: 6px 8px 4px;
+  }
+  .barre-marque {
+    flex: 1;
+  }
+  .barre-onglets {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  /* Le comptoir reste accessible depuis la salle. */
+  .onglet.comptoir {
+    display: none;
+  }
+  .bandeau-texte {
+    display: none;
+  }
+  .barre-etat time {
+    display: none;
+  }
+  .barre-onglets {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .onglet {
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+  .onglet.comptoir {
+    margin-left: 0;
+  }
+  .barre-etat .bouton {
+    padding: 0 8px;
+  }
+  .bandeau-info {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    font-size: 0.9rem;
+  }
+
+  /* Écrans de page. */
+  .salle,
+  .page {
+    padding: 14px 12px 32px;
+  }
+  .salle-tete,
+  .page-tete {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .grille-tables {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+  }
+  .table {
+    min-height: 92px;
+    padding: 10px 11px;
+  }
+
+  /* Prise de commande : la carte en plein écran, la commande en résumé en bas. */
+  .prise-commande {
+    display: flex;
+    flex-direction: column;
+  }
+  .carte {
+    flex: 1;
+    min-height: 0;
+    padding: 8px 8px 0;
+  }
+  .grille-articles {
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    grid-auto-rows: 84px;
+    gap: 6px;
+  }
+  .tuile {
+    padding: 8px 9px;
+    font-size: 0.9rem;
+  }
+  .rayon {
+    min-height: 46px;
+    padding: 0 14px;
+  }
+  .resume-mobile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    padding: 0 16px calc(env(safe-area-inset-bottom));
+    background: var(--papier);
+    color: var(--encre);
+    font-weight: 700;
+    box-shadow: 0 -1px 0 var(--papier-ombre);
+  }
+  .resume-mobile strong {
+    font-family: var(--police-chiffres);
+    font-size: 1.4rem;
+  }
+  .ticket-papier {
+    display: none;
+  }
+  .ticket-papier.ouvert {
+    display: grid;
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    z-index: 15;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .ticket-papier.ouvert::after {
+    display: none;
+  }
+  .ticket-titre {
+    flex: 1;
+  }
+  .fermer-mobile {
+    display: inline-flex;
+    align-items: center;
+    background: var(--papier-ombre);
+    color: var(--encre);
+  }
+
+  /* Modales en plein écran. */
+  .voile {
+    padding: 0;
+    place-items: stretch;
+  }
+  .modale,
+  .modale.large {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    padding-top: env(safe-area-inset-top);
+  }
+  .modale-pied {
+    flex-wrap: wrap;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  .modale-pied .bouton {
+    flex: 1 1 auto;
+  }
+  .encaissement {
+    gap: 14px;
+  }
+  /* Le moyen de paiement d'abord : le cas courant est « tout en carte ». */
+  .encaissement-modes {
+    order: 2;
+  }
+  .encaissement-saisie {
+    order: 3;
+  }
+  .encaissement-saisie {
+    justify-self: center;
+  }
+  .encaissement-saisie .afficheur {
+    font-size: 2rem;
+  }
+  .touche {
+    height: 60px;
+  }
+  .mode {
+    min-height: 54px;
+  }
+  .fin-encaissement {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 8px;
+  }
+  .rendu {
+    padding: 8px 0;
+  }
+  .rendu strong {
+    font-size: 3rem;
+  }
+  .qr-note .qr {
+    width: min(260px, 70vw);
+    height: min(260px, 70vw);
+  }
+
+  /* Formulaires sur une colonne. */
+  .champ {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .ajout-utilisateur {
+    grid-template-columns: 1fr 1fr;
+  }
+  .ajout-utilisateur .bouton {
+    grid-column: 1 / -1;
+  }
+  .ecran-installation {
+    padding: 20px 14px 32px;
+  }
+  .ecran-installation footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .assistant-contenu {
+    padding: 24px 16px;
+  }
+  .assistant-actions .bouton {
+    flex: 1 1 auto;
+  }
+
+  /* Connexion. */
+  .connexion-panneau {
+    padding: 24px 12px;
+  }
+  .grille-personnes {
+    grid-template-columns: repeat(2, 140px);
+  }
+
+  /* Tableaux : colonnes secondaires masquées. */
+  .tableau-tickets th:nth-child(3),
+  .tableau-tickets td:nth-child(3),
+  .tableau-tickets th:nth-child(4),
+  .tableau-tickets td:nth-child(4),
+  .tableau-tickets th:nth-child(5),
+  .tableau-tickets td:nth-child(5),
+  .tableau-clotures th:nth-child(4),
+  .tableau-clotures td:nth-child(4) {
+    display: none;
+  }
+  .actions-clotures .bouton {
+    flex: 1 1 100%;
+  }
+  .actions-clotures .espace {
+    display: none;
+  }
+  .toasts {
+    left: 12px;
+    right: 12px;
+  }
+  .bandeau-maj {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    flex-direction: column;
+  }
 }

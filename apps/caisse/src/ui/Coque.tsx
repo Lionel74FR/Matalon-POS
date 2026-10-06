@@ -92,7 +92,7 @@ export function Coque() {
         <div className="barre-etat">
           <time>{maintenant.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>
           <button className="bouton discret" onClick={deconnecter} title="Changer d'utilisateur">
-            {utilisateur.nom} · Quitter
+            <span className="nom-utilisateur">{utilisateur.nom} · </span>Quitter
           </button>
         </div>
       </nav>
@@ -107,7 +107,9 @@ export function Coque() {
       )}
       {!config.imprimante.adresse && utilisateur.role === "responsable" && (
         <div className="bandeau-info">
-          Aucune imprimante connectée : les notes et les Z s'affichent à l'écran.
+          <span className="bandeau-texte">
+            Caisse sans imprimante : les notes passent par QR code, les Z restent consultables dans Clôtures.
+          </span>
           <button className="bouton" onClick={() => setAssistant(true)}>
             Connecter l'imprimante
           </button>

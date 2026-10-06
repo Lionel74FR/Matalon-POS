@@ -2,7 +2,6 @@ import {
   formaterEuros,
   VERSION_NOYAU_FISCAL,
   type Cloture,
-  type ModePaiement,
   type Paiement,
   type Ticket,
   type TotauxPeriode,
@@ -11,15 +10,10 @@ import {
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
 import { totauxCommande, versSaisie, type Commande } from "../metier/commande";
+import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { Recu } from "./recu";
 
-export const LIBELLES_PAIEMENT: Record<ModePaiement, string> = {
-  CB: "Carte bancaire",
-  ESPECES: "Espèces",
-  TITRE_RESTAURANT_PAPIER: "Titre-restaurant papier",
-  TITRE_RESTAURANT_CARTE: "Titre-restaurant carte",
-  AUTRE: "Autre",
-};
+export { LIBELLES_PAIEMENT };
 
 const tauxLisible = (t: number) => `${(t / 100).toLocaleString("fr-FR")} %`;
 const dateHeure = (iso: string) =>
@@ -44,7 +38,7 @@ function entete(r: Recu, config: Configuration): void {
 
 function tableauTVA(r: Recu, ventilation: VentilationTVA[]): void {
   r.colonnes("Taux        HT        TVA", "TTC");
-  for (const v of ventilation) {
+  for (const v of ventilation.filter((x) => x.montantTTC !== 0)) {
     const gauche = `${tauxLisible(v.tauxTVA).padEnd(8)}${formaterEuros(v.baseHT).padStart(8)}${formaterEuros(v.montantTVA).padStart(11)}`;
     r.colonnes(gauche, formaterEuros(v.montantTTC));
   }

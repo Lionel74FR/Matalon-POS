@@ -29,7 +29,7 @@ export function PriseCommande(props: {
   onTerminee: () => void;
   onRetour: () => void;
 }) {
-  const { caisse, config, utilisateur, notifier, imprimer } = useCaisse();
+  const { caisse, config, utilisateur, notifier, imprimer, imprimanteConfiguree } = useCaisse();
   const c = props.commande;
   const [rayon, setRayon] = useState(RAYONS[0]!);
   const categories = useMemo(() => CARTE.categories.filter((x) => x.rayon === rayon), [rayon]);
@@ -39,6 +39,8 @@ export function PriseCommande(props: {
   const [ligneOuverte, setLigneOuverte] = useState<LigneCommande | null>(null);
   const [couvertsOuvert, setCouvertsOuvert] = useState(false);
   const [encaissement, setEncaissement] = useState(false);
+  /** Sur téléphone, la commande s'ouvre par-dessus la carte. */
+  const [ticketOuvert, setTicketOuvert] = useState(false);
   const totaux = totauxCommande(c);
   const estComptoir = c.tableId === ID_COMPTOIR;
 
@@ -57,7 +59,7 @@ export function PriseCommande(props: {
     await imprimer(gabaritAddition(c, config, utilisateur.id), "Addition");
     await caisse.registre.journaliser(
       "IMPRESSION_ADDITION",
-      { table: c.tableId, totalTTC: totaux.totalTTC, nbArticles: totaux.nbArticles },
+      { table: c.tableId, totalTTC: totaux.totalTTC, nbArticles: totaux.nbArticles, canal: imprimanteConfiguree ? "papier" : "ecran" },
       utilisateur.id,
     );
     props.onChange({ ...c, additionsImprimees: c.additionsImprimees + 1 });
@@ -65,12 +67,12 @@ export function PriseCommande(props: {
 
   return (
     <div className="prise-commande">
-      <aside className="ticket-papier" aria-label="Commande en cours">
+      <aside className={`ticket-papier${ticketOuvert ? " ouvert" : ""}`} aria-label="Commande en cours">
         <header className="ticket-tete">
           <button className="bouton discret" onClick={props.onRetour} aria-label="Retour à la salle">
             ←
           </button>
-          <div>
+          <div className="ticket-titre">
             <h1>{props.titre}</h1>
             {!estComptoir && (
               <button className="lien" onClick={() => setCouvertsOuvert(true)}>
@@ -78,6 +80,9 @@ export function PriseCommande(props: {
               </button>
             )}
           </div>
+          <button className="bouton fermer-mobile" onClick={() => setTicketOuvert(false)}>
+            Carte
+          </button>
         </header>
         <ol className="ticket-lignes">
           {c.lignes.length === 0 && <Vide>Touchez un article pour l'ajouter.</Vide>}
@@ -160,6 +165,13 @@ export function PriseCommande(props: {
           ))}
         </div>
       </section>
+
+      <button className="resume-mobile" onClick={() => setTicketOuvert(true)}>
+        <span>
+          {props.titre} · {totaux.nbArticles} article{totaux.nbArticles > 1 ? "s" : ""}
+        </span>
+        <strong>{euros(totaux.totalTTC)}</strong>
+      </button>
 
       {articleOuvert && (
         <ModaleArticle
