@@ -1592,12 +1592,17 @@ a.bouton {
   }
 }
 
-.bandeau-test {
-  padding: 8px 16px;
-  background: repeating-linear-gradient(135deg, #6a5a1c 0 18px, #5c4e17 18px 36px);
-  color: #fff3c4;
+/* Caisse de test : badge discret dans la barre, à côté de l'utilisateur. */
+.badge-test {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #d9a441;
+  color: #2a1f12;
+  font-size: 0.75rem;
   font-weight: 700;
-  text-align: center;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
 }
 
 /* ───────── Note numérique (QR code) ───────── */

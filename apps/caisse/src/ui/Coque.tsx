@@ -198,12 +198,19 @@ export function Coque() {
           <PuceSynchro etat={synchro} onToucher={() => void synchroniser()} />
           <time>{maintenant.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>
           <span className="nom-utilisateur">{utilisateur.nom}</span>
+          {MODE_TEST && (
+            <span
+              className="badge-test"
+              role="note"
+              title="Caisse de test : les tickets n'ont aucune valeur et restent séparés de la vraie caisse."
+              aria-label="Caisse de test : les tickets n'ont aucune valeur et restent séparés de la vraie caisse."
+            >
+              TEST
+            </span>
+          )}
           <BoutonIcone icone={LogOut} variante="discret" libelle={`Quitter (${utilisateur.nom}) : changer d'utilisateur`} onClick={deconnecter} />
         </div>
       </nav>
-      {MODE_TEST && (
-        <div className="bandeau-test">Caisse de test : les tickets n'ont aucune valeur et restent séparés de la vraie caisse.</div>
-      )}
       {blocage && (
         <div className="bandeau-alerte" role="alert">
           <span>
