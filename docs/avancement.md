@@ -24,7 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (comptes clients) | Comptes clients (noyau 0.5.0) : vente en compte (mode EN_COMPTE, client scellé, accord responsable), règlement sur n'importe quel appareil (ticket REGLEMENT, TVA exigible au règlement par tranches exactes), annulation d'un règlement, soldes recalculés par le serveur, page Comptes, section admin, Z avec ventes en compte, règlements et TVA exigible, mentions de facture « reste dû » |
+| e81d18c | Comptes clients (noyau 0.5.0) : vente en compte (mode EN_COMPTE, client scellé, accord responsable), règlement sur n'importe quel appareil (ticket REGLEMENT, TVA exigible au règlement par tranches exactes), annulation d'un règlement, soldes recalculés par le serveur, page Comptes, section admin, Z avec ventes en compte, règlements et TVA exigible, mentions de facture « reste dû » |
 | 6db3a32 | Couverts saisissables avant tout article (table installée gardée, « Libérer la table »), écran des couverts en un toucher, lignes retirées gardées barrées à l'écran, aucun paiement une fois le total réglé, confirmation au-delà de 20 € de rendu |
 | b6912c9 | Icônes dans les menus et les actions (caisse et administration), rattachement d'un iPad ou d'un iPhone (type d'appareil reconnu et affiché), administration défilante au doigt |
 | 172907c | Lot 2 : éditeur de cartes dans l'administration, cartes envoyées aux iPad (versionnées, gardées hors ligne), archives par Z côté serveur vérifiables seules, journal d'administration en ajout seul |
