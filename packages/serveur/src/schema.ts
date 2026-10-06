@@ -86,6 +86,16 @@ export const MIGRATIONS: string[] = [
     maj_le text not null,
     maj_par text
   )`,
+  // Clients des comptes (ardoises). Créés par une caisse (même hors ligne : le ticket en compte porte le client) ou par l'administration.
+  `create table if not exists clients (
+    id text primary key,
+    etablissement_id text not null references etablissements(id),
+    nom text not null,
+    telephone text not null default '',
+    actif boolean not null default true,
+    cree_le text not null,
+    maj_le text not null
+  )`,
   `create table if not exists admins (
     id text primary key,
     identifiant text not null unique,

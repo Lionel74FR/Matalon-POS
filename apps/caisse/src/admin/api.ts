@@ -1,5 +1,5 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { Derniers, EtablissementApi, IdentiteEtablissement, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -85,6 +85,9 @@ export const api = {
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),
   enregistrerCarte: (id: string, carte: Catalogue, version: number) => appel<ReponseCarte>("PUT", `/cartes/${id}`, { carte, version }),
   creerCarte: (corps: { id: string; nom: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
+  comptes: (etablissementId: string) => appel<ReponseComptes>("GET", `/etablissements/${etablissementId}/comptes`),
+  enregistrerClient: (etablissementId: string, client: ClientApi) =>
+    appel<{ client: ClientApi }>("PUT", `/etablissements/${etablissementId}/clients`, client),
   clotures: (caisseId: string) => appel<{ clotures: ResumeCloture[] }>("GET", `/caisses/${caisseId}/clotures`),
   urlArchive: (caisseId: string, numero: number) => `/api/admin/caisses/${caisseId}/clotures/${numero}/archive.json`,
   urlCsv: (caisseId: string) => `/api/admin/caisses/${caisseId}/clotures.csv`,

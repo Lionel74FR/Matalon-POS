@@ -1263,21 +1263,38 @@ code {
   color: #a9cf96;
 }
 
+/* Modes de paiement en tuiles (2 ou 3 colonnes selon la place) : l'icône d'abord. */
 .encaissement-modes {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
   gap: 8px;
+  align-content: start;
+}
+
+.encaissement-modes > .billets,
+.encaissement-modes > p {
+  grid-column: 1 / -1;
 }
 
 .mode {
-  min-height: 64px;
+  min-height: 104px;
   border-radius: var(--rayon-petit);
   background: var(--espresso-3);
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  padding: 0 16px;
+  gap: 6px;
+  padding: 10px 8px;
   font-weight: 700;
-  text-align: left;
+  font-size: 0.92rem;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.mode .icone {
+  width: 34px;
+  height: 34px;
 }
 
 .mode small {
@@ -1895,7 +1912,7 @@ a.bouton {
     height: 60px;
   }
   .mode {
-    min-height: 54px;
+    min-height: 92px;
   }
   .fin-encaissement {
     grid-template-columns: 1fr;
@@ -2334,4 +2351,85 @@ a.bouton {
 .tuile.indisponible {
   opacity: 0.4;
   text-decoration: line-through;
+}
+
+/* ───────── Comptes clients ───────── */
+
+.mode-en_compte {
+  box-shadow: inset 0 0 0 2px var(--terre);
+}
+
+.recherche-client {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+  border: 2px solid var(--espresso-3);
+  margin-bottom: 10px;
+}
+
+.recherche-client input {
+  flex: 1;
+  min-height: 48px;
+  border: none;
+  background: transparent;
+  color: var(--mousse);
+  font: inherit;
+  outline: none;
+}
+
+.liste-clients,
+.liste-comptes {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.liste-comptes {
+  max-height: none;
+}
+
+.client-choix,
+.compte {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-3);
+  color: var(--mousse);
+  text-align: left;
+}
+
+.client-choix small,
+.compte small {
+  display: block;
+  color: var(--sable);
+}
+
+.compte .montant {
+  font-family: var(--police-chiffres);
+  font-size: 1.3rem;
+}
+
+.compte:disabled {
+  opacity: 0.6;
+}
+
+.formulaire-client {
+  display: grid;
+  gap: 12px;
+}
+
+.comptes .case {
+  margin: 8px 0 14px;
 }

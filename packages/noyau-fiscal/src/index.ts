@@ -20,9 +20,13 @@ export {
   totauxTickets,
   totauxClotures,
   champsTotaux,
+  montantEnCompte,
+  ventilationExigible,
   TOTAUX_VIDES,
   type OptionsRegistre,
   type SaisieVente,
+  type SaisieReglement,
+  type SaisieImputation,
   type SaisieAnnulation,
 } from "./registre.js";
 export {
@@ -32,6 +36,7 @@ export {
   verifierLiensClotures,
   verifierClotures,
   verifierScellement,
+  verifierImputationsLocales,
   type Anomalie,
   type RapportVerification,
 } from "./verification.js";

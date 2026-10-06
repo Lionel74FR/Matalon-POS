@@ -12,7 +12,7 @@ import {
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
 import { lignesActives, totauxCommande, versSaisie, type Commande } from "../metier/commande";
-import { MENTIONS_PROFESSIONNELS, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
+import { mentionsPaiement, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { Recu } from "./recu";
 
@@ -54,6 +54,7 @@ function paiements(r: Recu, liste: Paiement[], rendu: number): void {
 
 /** Note client (ticket de caisse) d'une vente ou d'une annulation, éventuellement en duplicata. */
 export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: number): Recu {
+  if (ticket.reglement) return gabaritReglement(ticket, config, duplicata);
   const r = new Recu();
   entete(r, config);
   if (duplicata) r.texte(`DUPLICATA n° ${duplicata}`, { align: "centre", gras: true }).filet();
@@ -77,11 +78,44 @@ export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: n
   tableauTVA(r, ticket.ventilationTVA);
   r.filet();
   paiements(r, ticket.paiements, ticket.renduMonnaie);
+  if (ticket.client) r.texte(`Au compte de : ${ticket.client.nom}`, { gras: true });
   r.filet();
   r.texte("Prix nets, service compris", { align: "centre" });
   r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
   r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   if (!duplicata && ticket.type === "VENTE") r.saut().texte("Merci et à bientôt !", { align: "centre" });
+  return r;
+}
+
+/**
+ * Reçu d'un règlement de compte client : sommes reçues et ventes soldées.
+ * Ce n'est pas une vente : aucune ligne, la TVA est celle des ventes réglées.
+ */
+export function gabaritReglement(ticket: Ticket, config: Configuration, duplicata?: number): Recu {
+  const r = new Recu();
+  const reglement = ticket.reglement!;
+  entete(r, config);
+  if (duplicata) r.texte(`DUPLICATA n° ${duplicata}`, { align: "centre", gras: true }).filet();
+  if (ticket.type === "ANNULATION") {
+    r.texte(`ANNULATION du règlement n° ${numero(ticket.ticketOrigine!.numero)}`, { align: "centre", gras: true });
+    if (ticket.motif) r.texte(`Motif : ${ticket.motif}`, { align: "centre" });
+  } else r.texte("REÇU DE RÈGLEMENT", { align: "centre", gras: true });
+  r.colonnes(`Pièce n° ${numero(ticket.numero)}`, dateHeure(ticket.horodatage), { gras: true });
+  r.texte(`Client : ${ticket.client?.nom ?? ""}`);
+  r.texte(`Reçu par ${nomUtilisateur(config, ticket.operateurId)}`);
+  r.filet();
+  for (const i of reglement.imputations) {
+    r.colonnes(`Note ${i.caisseId === config.caisseId ? "" : `${i.caisseId} `}n° ${numero(i.numero)}`, formaterEuros(i.montantTTC));
+  }
+  r.filet();
+  r.colonnes("TOTAL RÉGLÉ", `${formaterEuros(reglement.montantTTC)} EUR`, { gras: true, grand: true });
+  r.saut();
+  tableauTVA(r, reglement.ventilationTVA);
+  r.filet();
+  paiements(r, ticket.paiements, ticket.renduMonnaie);
+  r.filet();
+  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   return r;
 }
 
@@ -119,7 +153,19 @@ function corpsTotaux(r: Recu, t: TotauxPeriode): void {
   r.colonnes("TOTAL TTC", formaterEuros(t.totalTTC), { gras: true, grand: true });
   r.filet();
   r.texte("Encaissements", { gras: true });
-  paiements(r, t.paiements, 0);
+  paiements(r, t.paiements.filter((p) => p.mode !== "EN_COMPTE"), 0);
+  if (t.comptesClients) {
+    // Ardoises : vendu sans encaisser, réglé plus tard ; la TVA due est celle des sommes encaissées.
+    const c = t.comptesClients;
+    r.filet();
+    r.texte("Comptes clients", { gras: true });
+    r.colonnes("Ventes portées en compte", formaterEuros(c.ventesEnCompteTTC));
+    r.colonnes(`Règlements reçus (${c.nbReglements})`, formaterEuros(c.reglementsTTC));
+    r.filet();
+    r.texte("TVA exigible (sommes encaissées)", { gras: true });
+    tableauTVA(r, c.ventilationTVAExigible);
+    r.colonnes("Total TVA exigible", formaterEuros(c.ventilationTVAExigible.reduce((s, v) => s + v.montantTVA, 0)));
+  }
 }
 
 const LIBELLES_PERIODE = { JOUR: "CLÔTURE JOURNALIÈRE Z", MOIS: "CLÔTURE MENSUELLE", EXERCICE: "CLÔTURE D'EXERCICE" } as const;
@@ -199,10 +245,10 @@ export function gabaritFacture(f: Facture, ticket: Ticket, config: Configuration
   r.colonnes("Total TVA", formaterEuros(ticket.totalTVA));
   r.colonnes("TOTAL TTC", `${formaterEuros(ticket.totalTTC)} EUR`, { gras: true, grand: true });
   r.filet();
-  const modes = ticket.paiements.map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ");
-  r.texte(f.nature === "AVOIR" ? `Remboursé le ${dateLongue(ticket.horodatage)} (${modes})` : `Facture acquittée le ${dateLongue(ticket.horodatage)} (${modes})`);
+  const mentions = mentionsPaiement(f.nature, ticket, dateLongue);
+  r.texte(mentions.paiement);
   r.texte(`${natureOperation(ticket)} · pas d'escompte`);
-  if (f.client.siren) r.texte(MENTIONS_PROFESSIONNELS);
+  if (f.client.siren) r.texte(mentions.professionnels);
   r.texte(`Établie d'après le ticket n° ${numero(ticket.numero)}`);
   r.filet();
   r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });

@@ -69,14 +69,15 @@ async function adminConnecte(): Promise<string> {
   return conf.cookie!.split(";")[0]!;
 }
 
-async function caisseRattachee(cookie: string) {
-  const sansEquipe = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
-  expect(sansEquipe.corps.code).toBe("RESPONSABLE_REQUIS");
-  const u = await appel("POST", "/api/admin/etablissements/moka/utilisateurs", { nom: "Léa", role: "responsable", pin: "1234" }, { Cookie: cookie });
-  expect(u.statut).toBe(200);
+async function caisseRattachee(cookie: string, caisseId = "ipad-0a1b2c3d") {
+  if (caisseId === "ipad-0a1b2c3d") {
+    const sansEquipe = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
+    expect(sansEquipe.corps.code).toBe("RESPONSABLE_REQUIS");
+    const u = await appel("POST", "/api/admin/etablissements/moka/utilisateurs", { nom: "Léa", role: "responsable", pin: "1234" }, { Cookie: cookie });
+    expect(u.statut).toBe(200);
+  }
   const code = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
   expect(code.statut).toBe(201);
-  const caisseId = "ipad-0a1b2c3d";
   const paire = await genererPaireCles(`${caisseId}-k1`);
   const r = await appel("POST", "/api/caisse/rattacher", {
     code: code.corps.code.toLowerCase().replace(/(.{4})/, "$1-"),
@@ -295,6 +296,64 @@ describe("cartes", () => {
     const maj = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, tables: [], seuilNote: 2500, carteId: "carte-hiver-2026" }, { Cookie: cookie });
     expect(maj.corps.etablissement).toMatchObject({ carteId: "carte-hiver-2026", carteVersion: 1 });
     expect((await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, carteId: "inexistante" }, { Cookie: cookie })).statut).toBe(400);
+  });
+});
+
+describe("comptes clients", () => {
+  it("vend en compte sur une caisse, règle sur une autre, et recalcule les soldes côté serveur", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    const martin = { id: "cli-0000abcd", nom: "M. Martin" };
+    // Client créé hors ligne : il n'existe que dans le ticket.
+    const vente = await a.registre.enregistrerVente({
+      lignes: [CAFE, SPRITZ],
+      paiements: [
+        { mode: "CB", montant: 500 },
+        { mode: "EN_COMPTE", montant: 1000 },
+      ],
+      operateurId: "u-1",
+      client: martin,
+    });
+    expect((await a.synchro()).statut).toBe(200);
+    const etat = (await appel("GET", "/api/caisse/etat", undefined, b.bearer)).corps as ReponseEtat;
+    expect(etat.clients).toEqual([{ ...martin, telephone: "", actif: true }]);
+
+    let comptes = (await appel("GET", "/api/caisse/comptes", undefined, b.bearer)).corps;
+    expect(comptes.comptes[0]).toMatchObject({ client: { id: martin.id }, soldeTTC: 1000 });
+    const v = comptes.comptes[0].ventes[0];
+    expect(v).toMatchObject({ caisseId: a.caisseId, numero: vente.numero, resteTTC: 1000 });
+
+    await b.registre.enregistrerReglement({
+      client: martin,
+      paiements: [{ mode: "ESPECES", montant: 600 }],
+      imputations: [{ caisseId: v.caisseId, numero: v.numero, hash: v.hash, montantTTC: 600, venteTotalTTC: v.totalTTC, venteEnCompteTTC: v.enCompteTTC, dejaRegleTTC: v.regleTTC, venteVentilationTVA: v.ventilationTVA }],
+      operateurId: "u-1",
+    });
+    expect((await b.synchro()).statut).toBe(200);
+    comptes = (await appel("GET", "/api/caisse/comptes", undefined, a.bearer)).corps;
+    expect(comptes.comptes[0]).toMatchObject({ soldeTTC: 400 });
+    expect(comptes.anomalies).toEqual([]);
+    expect(comptes.dernierTicketCaisse).toBe(1);
+
+    // Fiche client complétée par la caisse, puis vue de l'administration.
+    const maj = await appel("PUT", "/api/caisse/clients", { id: martin.id, nom: "Martin Paul", telephone: "06 00 00 00 00" }, a.bearer);
+    expect(maj.corps.clients[0]).toMatchObject({ nom: "Martin Paul", telephone: "06 00 00 00 00" });
+    const admin = await appel("GET", "/api/admin/etablissements/moka/comptes", undefined, { Cookie: cookie });
+    expect(admin.corps.comptes[0]).toMatchObject({ client: { nom: "Martin Paul" }, soldeTTC: 400 });
+    expect((await appel("PUT", "/api/caisse/clients", { id: "pas-un-id", nom: "X" }, a.bearer)).statut).toBe(400);
+
+    // Un sur-règlement (deux caisses qui règlent la même dette) est signalé, jamais bloqué.
+    await a.registre.enregistrerReglement({
+      client: martin,
+      paiements: [{ mode: "CB", montant: 1000 }],
+      imputations: [{ caisseId: v.caisseId, numero: v.numero, hash: v.hash, montantTTC: 1000, venteTotalTTC: v.totalTTC, venteEnCompteTTC: v.enCompteTTC, dejaRegleTTC: 0, venteVentilationTVA: v.ventilationTVA }],
+      operateurId: "u-1",
+    }).catch(() => null);
+    // La caisse A connaît le règlement de B seulement par le serveur : son contrôle local ne voit que ses tickets.
+    expect((await a.synchro({ tickets: 1, evenements: 0, clotures: 0 } as never)).statut).toBe(200);
+    comptes = (await appel("GET", "/api/caisse/comptes", undefined, a.bearer)).corps;
+    expect(comptes.anomalies.join(" ")).toContain("de trop");
   });
 });
 

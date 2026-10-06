@@ -19,6 +19,13 @@ export type ModePaiement =
   | "ESPECES"
   | "TITRE_RESTAURANT_PAPIER"
   | "TITRE_RESTAURANT_CARTE"
+  /**
+   * Vente portée au compte d'un client (ardoise) : rien n'est encaissé. La
+   * vente compte dans le chiffre du jour ; la TVA n'est exigible qu'au
+   * règlement (ventes à consommer sur place = prestations de services,
+   * BOI-TVA-BASE-20-20 § 130). Depuis 0.5.0.
+   */
+  | "EN_COMPTE"
   | "AUTRE";
 
 export const MODES_PAIEMENT: readonly ModePaiement[] = [
@@ -26,8 +33,29 @@ export const MODES_PAIEMENT: readonly ModePaiement[] = [
   "ESPECES",
   "TITRE_RESTAURANT_PAPIER",
   "TITRE_RESTAURANT_CARTE",
+  "EN_COMPTE",
   "AUTRE",
 ];
+
+/** Client débiteur, désigné par un identifiant stable et son nom (aucune autre donnée personnelle). */
+export interface ClientCompte {
+  id: string;
+  nom: string;
+}
+
+/** Part d'une vente en compte soldée par un règlement. */
+export interface ImputationReglement {
+  /** Caisse qui a enregistré la vente (le règlement peut être reçu sur une autre caisse). */
+  caisseId: string;
+  numero: number;
+  hash: string;
+  montantTTC: Centimes;
+  /** Total de la vente, et ce qui en était déjà encaissé (part payée à la vente et règlements antérieurs). */
+  venteTotalTTC: Centimes;
+  encaisseAvantTTC: Centimes;
+  /** TVA devenue exigible : tranche de la ventilation de la vente (`ventilerTranche`). */
+  ventilationTVA: VentilationTVA[];
+}
 
 /** Identifie le poste d'encaissement qui produit les enregistrements. */
 export interface ContexteCaisse {
@@ -97,7 +125,12 @@ export interface EnTeteEnregistrement extends ContexteCaisse {
 }
 
 export interface Ticket extends EnTeteEnregistrement, Scellement {
-  type: "VENTE" | "ANNULATION";
+  /**
+   * REGLEMENT (depuis 0.5.0) : encaissement d'une dette client, sans vente
+   * (aucune ligne, totaux à zéro) ; le montant et la TVA exigible sont dans
+   * `reglement`. Une ANNULATION d'un règlement en est le miroir négatif.
+   */
+  type: "VENTE" | "ANNULATION" | "REGLEMENT";
   dateComptable: string;
   operateurId: string;
   tableId: string | null;
@@ -112,6 +145,10 @@ export interface Ticket extends EnTeteEnregistrement, Scellement {
   /** Ticket annulé (ANNULATION uniquement). */
   ticketOrigine: { numero: number; hash: string } | null;
   motif: string | null;
+  /** Client débiteur : vente en compte, son annulation, ou règlement. Absent sinon. */
+  client?: ClientCompte;
+  /** REGLEMENT, ou son annulation (montants négatifs). */
+  reglement?: { montantTTC: Centimes; imputations: ImputationReglement[]; ventilationTVA: VentilationTVA[] };
   /** Somme signée de tous les totaux TTC de la caisse depuis l'origine, ce ticket inclus. */
   grandTotalPerpetuel: Centimes;
   /** Somme des valeurs absolues de tous les totaux TTC depuis l'origine, ce ticket inclus. */
@@ -139,6 +176,8 @@ export type CodeEvenement =
   | "FACTURE"
   /** Commande ouverte déplacée vers une autre table, ou fusionnée avec elle. */
   | "TRANSFERT_TABLE"
+  /** Règlement reçu d'un client débiteur (le ticket REGLEMENT porte le détail). Depuis 0.5.0. */
+  | "REGLEMENT_COMPTE"
   | "LECTURE_X"
   | "CLOTURE"
   | "ARCHIVAGE"
@@ -163,9 +202,23 @@ export interface TotauxPeriode {
   totalTVA: Centimes;
   totalTTC: Centimes;
   ventilationTVA: VentilationTVA[];
-  /** Encaissements nets par mode (espèces nettes du rendu monnaie). */
+  /**
+   * Encaissements nets par mode (espèces nettes du rendu monnaie), règlements
+   * de comptes clients compris ; EN_COMPTE = ventes portées en compte.
+   */
   paiements: Paiement[];
   totalRemisesTTC: Centimes;
+  /**
+   * Comptes clients (depuis 0.5.0), présent seulement si la période en compte :
+   * ventes portées en compte, règlements reçus, et TVA exigible de la période
+   * (TVA des sommes réellement encaissées, ventes et règlements).
+   */
+  comptesClients?: {
+    ventesEnCompteTTC: Centimes;
+    nbReglements: number;
+    reglementsTTC: Centimes;
+    ventilationTVAExigible: VentilationTVA[];
+  };
 }
 
 export interface Cloture extends EnTeteEnregistrement, Scellement, TotauxPeriode {

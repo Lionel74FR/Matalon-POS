@@ -1,5 +1,6 @@
-import { baseHT, type Evenement, type Registre, type StockageFiscal, type Ticket } from "@matalon/noyau-fiscal";
+import { baseHT, formaterEuros, type Evenement, type Registre, type StockageFiscal, type Ticket } from "@matalon/noyau-fiscal";
 import type { Etablissement } from "../donnees/configuration";
+import { LIBELLES_PAIEMENT } from "./libelles";
 
 /**
  * Factures sur demande, établies à partir d'un ticket.
@@ -94,6 +95,38 @@ export function natureOperation(t: Ticket): string {
 /** Mentions exigées entre professionnels (art. L441-9 et L441-10 du Code de commerce). */
 export const MENTIONS_PROFESSIONNELS =
   "Échéance : paiement comptant, à la date d'émission. Pénalités de retard : taux de la BCE majoré de 10 points. Indemnité forfaitaire pour frais de recouvrement : 40 €.";
+
+/** Délai de paiement d'une vente en compte : 30 jours (art. L441-10 du code de commerce, délai par défaut). */
+export const DELAI_COMPTE_JOURS = 30;
+
+/**
+ * Mentions de paiement d'une facture ou d'un avoir. Une vente portée en
+ * compte n'est pas acquittée : la facture indique ce qui reste dû et son
+ * échéance (et, entre professionnels, les pénalités de retard).
+ */
+export function mentionsPaiement(
+  nature: "FACTURE" | "AVOIR",
+  t: Ticket,
+  dateLongue: (iso: string) => string,
+): { paiement: string; professionnels: string } {
+  const libelle = (m: string) => LIBELLES_PAIEMENT[m as keyof typeof LIBELLES_PAIEMENT] ?? m;
+  const enCompte = t.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((s, p) => s + p.montant, 0);
+  const reels = t.paiements.filter((p) => p.mode !== "EN_COMPTE");
+  const modes = reels.map((p) => libelle(p.mode)).join(", ");
+  const euros = (c: number) => `${formaterEuros(c)} €`;
+  if (nature === "AVOIR") {
+    const rembourse = reels.length ? `Remboursé le ${dateLongue(t.horodatage)} (${modes})` : "";
+    const impute = enCompte ? `${euros(-enCompte)} déduits du compte client` : "";
+    return { paiement: [rembourse, impute].filter(Boolean).join(" · ") + ".", professionnels: MENTIONS_PROFESSIONNELS };
+  }
+  if (enCompte === 0) return { paiement: `Facture acquittée le ${dateLongue(t.horodatage)} (${modes}).`, professionnels: MENTIONS_PROFESSIONNELS };
+  const echeance = dateLongue(new Date(Date.parse(t.horodatage) + DELAI_COMPTE_JOURS * 86_400_000).toISOString());
+  const paye = t.totalTTC - enCompte;
+  return {
+    paiement: `${paye > 0 ? `Payé le ${dateLongue(t.horodatage)} : ${euros(paye)} (${modes}). ` : ""}Reste dû : ${euros(enCompte)}, à régler au plus tard le ${echeance}.`,
+    professionnels: `Échéance : ${echeance}. Pénalités de retard : taux de la BCE majoré de 10 points. Indemnité forfaitaire pour frais de recouvrement : 40 €.`,
+  };
+}
 
 /** Mentions légales du vendeur manquantes pour émettre une facture. */
 export function mentionsVendeurManquantes(e: Etablissement): string[] {

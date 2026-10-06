@@ -7,6 +7,7 @@ const LIBELLES_MODES: Record<ModePaiement, string> = {
   ESPECES: "Especes",
   TITRE_RESTAURANT_PAPIER: "Titres-restaurant papier",
   TITRE_RESTAURANT_CARTE: "Titres-restaurant carte",
+  EN_COMPTE: "Ventes en compte",
   AUTRE: "Autre",
 };
 
@@ -39,6 +40,8 @@ export function exporterCloturesCSV(clotures: Cloture[]): string {
     "Total TTC",
     ...MODES_PAIEMENT.map((m) => LIBELLES_MODES[m]),
     "Remises TTC",
+    "Reglements comptes clients TTC",
+    "TVA exigible",
     "Grand total perpetuel",
     "Empreinte",
   ];
@@ -65,6 +68,8 @@ export function exporterCloturesCSV(clotures: Cloture[]): string {
       formaterEuros(c.totalTTC),
       ...MODES_PAIEMENT.map((m) => formaterEuros(p.get(m) ?? 0)),
       formaterEuros(c.totalRemisesTTC),
+      formaterEuros(c.comptesClients?.reglementsTTC ?? 0),
+      formaterEuros((c.comptesClients?.ventilationTVAExigible ?? c.ventilationTVA).reduce((s, x) => s + x.montantTVA, 0)),
       formaterEuros(c.grandTotalPerpetuel),
       c.hash,
     ]

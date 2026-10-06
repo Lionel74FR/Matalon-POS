@@ -1,5 +1,7 @@
 import type {
+  ClientApi as FicheClient,
   EntreeSynchro,
+  ReponseComptes,
   EtablissementApi,
   IdentiteEtablissement,
   ReponseEtat,
@@ -80,6 +82,14 @@ export class ClientApi {
 
   carte() {
     return this.appel<ReponseCarte>("GET", "/api/caisse/carte");
+  }
+
+  comptes() {
+    return this.appel<ReponseComptes>("GET", "/api/caisse/comptes");
+  }
+
+  enregistrerClient(client: Omit<FicheClient, "actif"> & { actif?: boolean }) {
+    return this.appel<{ client: FicheClient; clients: FicheClient[] }>("PUT", "/api/caisse/clients", client);
   }
 
   enregistrerEquipe(utilisateurs: UtilisateurApi[]) {

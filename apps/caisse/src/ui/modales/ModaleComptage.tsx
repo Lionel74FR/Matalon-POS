@@ -111,7 +111,7 @@ export function ModaleComptage(props: {
       {props.commandesOuvertes > 0 && (
         <p className="erreur">
           {props.commandesOuvertes} commande{props.commandesOuvertes > 1 ? "s ouvertes seront comptées" : " ouverte sera comptée"} sur la
-          journée de leur encaissement.
+          journée de leur encaissement. Une table qui part sans payer peut être portée au compte d'un client : Encaisser › En compte.
         </p>
       )}
 

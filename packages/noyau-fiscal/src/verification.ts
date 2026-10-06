@@ -1,8 +1,8 @@
 import { canonique, contenuScelle } from "./canonique.js";
 import { HASH_GENESE, sha256Hex, verifierSignature, type ResolveurCle } from "./crypto.js";
 import { listeMois } from "./dates.js";
-import { ventiler } from "./montants.js";
-import { champsTotaux, TOTAUX_VIDES, totauxClotures, totauxTickets } from "./registre.js";
+import { cumulerVentilations, TAUX_TVA_AUTORISES, ventiler, ventilerTranche } from "./montants.js";
+import { champsTotaux, montantEnCompte, TOTAUX_VIDES, totauxClotures, totauxTickets } from "./registre.js";
 import type { StockageFiscal } from "./stockage.js";
 import type { Chaine, Cloture, Enregistrement, Ticket } from "./types.js";
 
@@ -81,6 +81,78 @@ export async function verifierChaine(
   return anomalies;
 }
 
+/**
+ * Comptes clients (0.5.0) : une vente en compte désigne son client, une vente
+ * payée n'en a pas ; un règlement (ou son annulation, en négatif) n'a ni ligne
+ * ni total, et son montant et sa TVA sont exactement ceux de ses imputations,
+ * chacune étant la tranche de TVA attendue de la vente réglée.
+ */
+function comptesCoherents(t: Ticket): boolean {
+  const enCompte = montantEnCompte(t);
+  if (!t.reglement) {
+    if (t.type === "REGLEMENT") return false;
+    return enCompte === 0 ? !t.client : !!t.client;
+  }
+  const r = t.reglement;
+  const signe = t.type === "REGLEMENT" ? 1 : t.type === "ANNULATION" && t.ticketOrigine ? -1 : 0;
+  if (!signe || !t.client || t.lignes.length > 0 || t.totalTTC !== 0 || enCompte !== 0 || r.imputations.length === 0) return false;
+  // Cohérence interne de chaque imputation ; la tranche exacte est contrôlée par rapport à la vente
+  // quand on la détient (verifierImputationsLocales ici, calculerComptes sur le serveur pour toutes les caisses).
+  const imputationsOk = r.imputations.every((i) => {
+    const part = signe * i.montantTTC;
+    const debut = signe > 0 ? i.encaisseAvantTTC : i.encaisseAvantTTC - part;
+    return (
+      part > 0 &&
+      i.venteTotalTTC > 0 &&
+      debut >= 0 &&
+      debut + part <= i.venteTotalTTC &&
+      i.ventilationTVA.length > 0 &&
+      i.ventilationTVA.every(
+        (v) =>
+          TAUX_TVA_AUTORISES.includes(v.tauxTVA) &&
+          v.montantTTC === v.baseHT + v.montantTVA &&
+          signe * v.montantTTC >= 0 &&
+          signe * v.baseHT >= 0 &&
+          signe * v.montantTVA >= 0,
+      ) &&
+      i.ventilationTVA.reduce((s, v) => s + v.montantTTC, 0) === i.montantTTC
+    );
+  });
+  return (
+    imputationsOk &&
+    r.montantTTC === r.imputations.reduce((s, i) => s + i.montantTTC, 0) &&
+    canonique(r.ventilationTVA) === canonique(cumulerVentilations(r.imputations.map((i) => i.ventilationTVA)))
+  );
+}
+
+/** Contrôle complet d'un règlement d'une vente de cette caisse : la tranche de TVA est celle de la vente. */
+export function verifierImputationsLocales(tickets: Ticket[]): Anomalie[] {
+  const anomalies: Anomalie[] = [];
+  const ventes = new Map(tickets.filter((t) => t.type === "VENTE").map((t) => [t.numero, t]));
+  for (const t of tickets) {
+    for (const i of t.reglement?.imputations ?? []) {
+      if (i.caisseId !== t.caisseId) continue;
+      const v = ventes.get(i.numero);
+      const signe = i.montantTTC < 0 ? -1 : 1;
+      const debut = signe > 0 ? i.encaisseAvantTTC : i.encaisseAvantTTC + i.montantTTC;
+      let ok = !!v && v.hash === i.hash && v.client?.id === t.client?.id && i.venteTotalTTC === v.totalTTC;
+      if (ok) {
+        try {
+          const attendue = ventilerTranche(v!.ventilationTVA, debut, signe * i.montantTTC, v!.totalTTC);
+          const obtenue = signe > 0 ? i.ventilationTVA : i.ventilationTVA.map((x) => ({ ...x, montantTTC: -x.montantTTC, baseHT: -x.baseHT, montantTVA: -x.montantTVA }));
+          ok = canonique(attendue) === canonique(obtenue);
+        } catch {
+          ok = false;
+        }
+      }
+      if (!ok) {
+        anomalies.push({ chaine: "tickets", numero: t.numero, code: "TOTAUX_INCOHERENTS", detail: `règlement incohérent avec la vente n°${i.numero}` });
+      }
+    }
+  }
+  return anomalies;
+}
+
 /** Contrôles arithmétiques propres aux tickets : totaux, TVA, paiements, grand total perpétuel. */
 export function verifierTotauxTickets(tickets: Ticket[], grandTotalInitial = 0, cumulInitial = 0): Anomalie[] {
   const anomalies: Anomalie[] = [];
@@ -92,8 +164,9 @@ export function verifierTotauxTickets(tickets: Ticket[], grandTotalInitial = 0, 
     const ventilation = ventiler(t.lignes);
     const ventilationOk = canonique(ventilation) === canonique(t.ventilationTVA);
     const htOk = t.totalHT === ventilation.reduce((s, v) => s + v.baseHT, 0) && t.totalTVA === t.totalTTC - t.totalHT;
-    const paiementsOk = t.paiements.reduce((s, p) => s + p.montant, 0) - t.renduMonnaie === t.totalTTC;
-    if (!lignesOk || somme !== t.totalTTC || !ventilationOk || !htOk || !paiementsOk) {
+    const encaisse = t.paiements.reduce((s, p) => s + p.montant, 0) - t.renduMonnaie;
+    const paiementsOk = encaisse === (t.reglement ? t.reglement.montantTTC : t.type === "REGLEMENT" ? NaN : t.totalTTC);
+    if (!lignesOk || somme !== t.totalTTC || !ventilationOk || !htOk || !paiementsOk || !comptesCoherents(t)) {
       anomalies.push({
         chaine: "tickets",
         numero: t.numero,
@@ -216,6 +289,7 @@ export async function verifierRegistre(
     ...(await verifierChaine("evenements", evenements, resoudreCle)),
     ...(await verifierChaine("clotures", clotures, resoudreCle)),
     ...verifierTotauxTickets(tickets),
+    ...verifierImputationsLocales(tickets),
     ...verifierLiensClotures(clotures, new Map(tickets.map((t) => [t.numero, t]))),
     ...verifierClotures(clotures, tickets),
   ];

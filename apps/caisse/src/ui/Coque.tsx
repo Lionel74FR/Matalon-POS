@@ -7,6 +7,7 @@ import {
   Coffee,
   LayoutGrid,
   LogOut,
+  NotebookPen,
   Printer,
   Receipt,
   RefreshCw,
@@ -25,13 +26,14 @@ import { etatJournee } from "../metier/tresorerie";
 import { ModaleFondDeCaisse } from "./modales/ModaleFondDeCaisse";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Clotures } from "./Clotures";
+import { Comptes } from "./Comptes";
 import { useCaisse } from "./contexte";
 import { PriseCommande } from "./PriseCommande";
 import { Reglages } from "./Reglages";
 import { Salle } from "./Salle";
 import { Tickets } from "./Tickets";
 
-type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "clotures" } | { nom: "reglages" };
+type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "comptes" } | { nom: "clotures" } | { nom: "reglages" };
 
 const LIBELLES_SYNCHRO: Record<EtatSynchro["statut"], string> = {
   synchronise: "Synchronisé",
@@ -165,6 +167,7 @@ export function Coque() {
   const onglets: Array<{ vue: Vue["nom"]; libelle: string; icone: LucideIcon; responsable?: boolean }> = [
     { vue: "salle", libelle: "Salle", icone: LayoutGrid },
     { vue: "tickets", libelle: "Tickets", icone: Receipt },
+    { vue: "comptes", libelle: "Comptes", icone: NotebookPen },
     { vue: "clotures", libelle: "Clôtures", icone: Archive },
     { vue: "reglages", libelle: "Réglages", icone: Settings, responsable: true },
   ];
@@ -273,6 +276,7 @@ export function Coque() {
           />
         )}
         {vue.nom === "tickets" && <Tickets />}
+        {vue.nom === "comptes" && <Comptes />}
         {vue.nom === "clotures" && <Clotures commandesOuvertes={commandes.size} />}
         {vue.nom === "reglages" && <Reglages onAssistant={() => setAssistant(true)} />}
       </main>

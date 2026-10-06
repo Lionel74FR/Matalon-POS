@@ -5,5 +5,6 @@ export const LIBELLES_PAIEMENT: Record<ModePaiement, string> = {
   ESPECES: "Espèces",
   TITRE_RESTAURANT_PAPIER: "Titre-restaurant papier",
   TITRE_RESTAURANT_CARTE: "Titre-restaurant carte",
+  EN_COMPTE: "En compte",
   AUTRE: "Autre",
 };

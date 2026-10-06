@@ -92,6 +92,80 @@ export function ventiler(lignes: Array<{ tauxTVA: TauxTVA; montantTTC: Centimes 
     });
 }
 
+/**
+ * Part cumulée `x` (centimes, du signe de `total`) d'une vente de total
+ * `total`, répartie entre ses taux de TVA. Méthode du diviseur (Sainte-Laguë) :
+ * centime par centime, chaque centime va au taux le plus en retard sur sa
+ * part. La répartition ne recule jamais quand `x` augmente, et à `x = total`
+ * elle redonne exactement la ventilation de la vente (TTC et HT).
+ */
+function prorataCumule(ventilation: VentilationTVA[], x: Centimes, total: Centimes): VentilationTVA[] {
+  const signe = total < 0 ? -1 : 1;
+  const ttc = ventilation.map((v) => Math.abs(v.montantTTC));
+  const ht = ventilation.map((v) => Math.abs(v.baseHT));
+  const cible = Math.abs(x);
+  if (Math.sign(x) === -signe && x !== 0) throw new ErreurFiscale("MONTANT_INVALIDE", "part de signe contraire à la vente");
+  if (cible > ttc.reduce((s, t) => s + t, 0)) throw new ErreurFiscale("MONTANT_INVALIDE", "part supérieure à la vente");
+  const parts = ttc.map(() => 0);
+  for (let c = 0; c < cible; c++) {
+    let choisi = -1;
+    let meilleur = -1;
+    ttc.forEach((t, i) => {
+      if (parts[i]! >= t) return;
+      const priorite = t / (parts[i]! + 0.5);
+      if (priorite > meilleur) {
+        meilleur = priorite;
+        choisi = i;
+      }
+    });
+    parts[choisi]! += 1;
+  }
+  return ventilation.map((v, i) => {
+    const montantTTC = parts[i]!;
+    const baseHT = ttc[i] === 0 ? 0 : Math.round((ht[i]! * montantTTC) / ttc[i]!);
+    return { tauxTVA: v.tauxTVA, baseHT: signe * baseHT, montantTVA: signe * (montantTTC - baseHT), montantTTC: signe * montantTTC };
+  });
+}
+
+/**
+ * TVA d'une tranche encaissée d'une vente : de `avant` (déjà encaissé) à
+ * `avant + part`. Les tranches successives (part payée à la vente, puis
+ * chaque règlement) s'additionnent exactement à la ventilation de la vente :
+ * aucun centime ne dérive d'un taux à l'autre, quel que soit le découpage.
+ */
+export function ventilerTranche(ventilation: VentilationTVA[], avant: Centimes, part: Centimes, total: Centimes): VentilationTVA[] {
+  if (part === 0 || ventilation.length === 0) return [];
+  if (total === 0) throw new ErreurFiscale("MONTANT_INVALIDE", "prorata d'une vente à zéro");
+  const debut = prorataCumule(ventilation, avant, total);
+  const fin = prorataCumule(ventilation, avant + part, total);
+  return fin
+    .map((v, i) => ({
+      tauxTVA: v.tauxTVA,
+      baseHT: v.baseHT - debut[i]!.baseHT,
+      montantTVA: v.montantTVA - debut[i]!.montantTVA,
+      montantTTC: v.montantTTC - debut[i]!.montantTTC,
+    }))
+    .filter((v) => v.montantTTC !== 0 || v.baseHT !== 0 || v.montantTVA !== 0);
+}
+
+/** Première tranche d'une vente (part encaissée au moment de la vente). */
+export function ventilerProrata(ventilation: VentilationTVA[], part: Centimes, total: Centimes): VentilationTVA[] {
+  return ventilerTranche(ventilation, 0, part, total);
+}
+
+/** Ventilation d'une vente bien formée : taux autorisés, HT recalculé par taux, somme égale au total. */
+export function ventilationValide(ventilation: VentilationTVA[], totalTTC: Centimes): boolean {
+  if (!Array.isArray(ventilation) || ventilation.length === 0) return false;
+  const taux = new Set<number>();
+  for (const v of ventilation) {
+    if (!estCentimes(v?.montantTTC) || !estCentimes(v.baseHT) || !estCentimes(v.montantTVA)) return false;
+    if (!TAUX_TVA_AUTORISES.includes(v.tauxTVA) || taux.has(v.tauxTVA)) return false;
+    taux.add(v.tauxTVA);
+    if (v.baseHT !== baseHT(v.montantTTC, v.tauxTVA) || v.montantTVA !== v.montantTTC - v.baseHT) return false;
+  }
+  return ventilation.reduce((s, v) => s + v.montantTTC, 0) === totalTTC;
+}
+
 /** Additionne des ventilations déjà calculées (clôtures) sans recalculer la TVA. */
 export function cumulerVentilations(ventilations: VentilationTVA[][]): VentilationTVA[] {
   const parTaux = new Map<TauxTVA, VentilationTVA>();

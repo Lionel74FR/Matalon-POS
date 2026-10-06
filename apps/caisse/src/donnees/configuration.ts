@@ -1,6 +1,6 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
 import { CARTES, type Catalogue } from "@matalon/catalogue";
-import type { IdentiteEtablissement, ReponseEtat, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { ClientApi, IdentiteEtablissement, ReponseEtat, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
 
 export type { Role, Table };
 export type Utilisateur = UtilisateurApi;
@@ -33,12 +33,25 @@ export interface Configuration {
   };
   /** Montant TTC à partir duquel la note est imprimée d'office (centimes). */
   seuilNoteAutomatique: number;
+  /**
+   * Clients des comptes (ardoises) : ceux du serveur, plus ceux créés ici et
+   * pas encore connus du serveur (il les apprend par le ticket en compte).
+   */
+  clients?: ClientApi[];
 }
 
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
-export function fusionnerReferentiel(config: Configuration, etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs">): Configuration | null {
+export function fusionnerReferentiel(
+  config: Configuration,
+  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients">,
+): Configuration | null {
+  const serveur = etat.clients;
+  const clients = serveur
+    ? [...serveur, ...(config.clients ?? []).filter((c) => !serveur.some((s) => s.id === c.id))]
+    : config.clients;
   const suivante: Configuration = {
     ...config,
+    ...(clients ? { clients } : {}),
     caisseNom: etat.caisse.nom,
     etablissement: etat.etablissement.identite,
     utilisateurs: etat.utilisateurs,

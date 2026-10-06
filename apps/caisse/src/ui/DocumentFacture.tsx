@@ -2,8 +2,8 @@ import { baseHT, formaterEuros, VERSION_NOYAU_FISCAL, type Ticket } from "@matal
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import type { Configuration } from "../donnees/configuration";
-import { dateLongue, LIBELLES_PAIEMENT } from "../impression/gabarits";
-import { MENTIONS_PROFESSIONNELS, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
+import { dateLongue } from "../impression/gabarits";
+import { mentionsPaiement, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { MODE_TEST } from "../fiscal/caisse";
 
 const taux = (t: number) => `${(t / 100).toLocaleString("fr-FR")} %`;
@@ -12,7 +12,7 @@ const taux = (t: number) => `${(t / 100).toLocaleString("fr-FR")} %`;
 export function DocumentFacture(props: { facture: Facture; ticket: Ticket; config: Configuration; duplicata?: boolean }) {
   const { facture: f, ticket: t, config } = props;
   const e = config.etablissement;
-  const modes = t.paiements.map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ");
+  const mentions = mentionsPaiement(f.nature, t, dateLongue);
   return (
     <article className="document-facture">
       {MODE_TEST && <p className="facture-test">Caisse de test — document sans valeur</p>}
@@ -154,10 +154,10 @@ export function DocumentFacture(props: { facture: Facture; ticket: Ticket; confi
 
       <footer>
         <p>
-          {f.nature === "AVOIR" ? "Remboursé" : "Facture acquittée"} le {dateLongue(t.horodatage)} par {modes || "—"}. {natureOperation(t)}, pas d'escompte.
+          {mentions.paiement} {natureOperation(t)}, pas d'escompte.
           Établie d'après le ticket de caisse n° {t.numero}.
         </p>
-        {f.client.siren && <p>{MENTIONS_PROFESSIONNELS}</p>}
+        {f.client.siren && <p>{mentions.professionnels}</p>}
         <p className="facture-petit">
           {config.caisseId} · Matalon POS {VERSION_NOYAU_FISCAL} · empreinte du ticket {t.hash.slice(0, 16)}
         </p>

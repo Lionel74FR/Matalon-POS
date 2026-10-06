@@ -1,6 +1,6 @@
-import { Banknote, Check, CreditCard, Printer, Ticket as TicketPapier, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
+import { Banknote, Check, CreditCard, NotebookPen, Printer, Ticket as TicketPapier, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
 import { AvecIcone } from "../icones";
-import { ErreurFiscale, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
+import { ErreurFiscale, type ClientCompte, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useState } from "react";
 import { ID_COMPTOIR } from "../../donnees/configuration";
 import { MODE_TEST } from "../../fiscal/caisse";
@@ -10,22 +10,30 @@ import { lignesActives, totauxCommande, versSaisie, type Commande } from "../../
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
+import { ModaleClient } from "./ModaleClient";
+import type { ClientApi } from "@matalon/serveur/partage";
 
-const MODES: ModePaiement[] = ["CB", "ESPECES", "TITRE_RESTAURANT_CARTE", "TITRE_RESTAURANT_PAPIER"];
+const MODES: ModePaiement[] = ["CB", "ESPECES", "TITRE_RESTAURANT_CARTE", "TITRE_RESTAURANT_PAPIER", "EN_COMPTE"];
 const ICONES_PAIEMENT: Record<ModePaiement, LucideIcon> = {
   CB: CreditCard,
   ESPECES: Banknote,
   TITRE_RESTAURANT_CARTE: CreditCard,
   TITRE_RESTAURANT_PAPIER: TicketPapier,
+  EN_COMPTE: NotebookPen,
   AUTRE: Banknote,
 };
 const BILLETS = [500, 1000, 2000, 5000];
+/** Somme réellement encaissée sur une vente (hors part portée en compte). */
+const encaisseVente = (t: Ticket) => t.totalTTC - t.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((s, p) => s + p.montant, 0);
 /** Au-delà de ce rendu (centimes), la caisse demande confirmation : faute de frappe probable. */
 const RENDU_A_CONFIRMER = 2000;
 
 /** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
 export function ModaleEncaissement(props: { commande: Commande; onTermine: () => void; onFermer: () => void }) {
-  const { caisse, config, utilisateur, notifier, imprimer, imprimanteConfiguree, blocage } = useCaisse();
+  const { caisse, config, majConfig, utilisateur, notifier, imprimer, imprimanteConfiguree, blocage, demanderResponsable } = useCaisse();
+  /** Client au compte duquel une partie est portée (une vente, un seul client). */
+  const [client, setClient] = useState<ClientCompte | null>(null);
+  const [choixClient, setChoixClient] = useState<number | null>(null);
   const [noteImprimee, setNoteImprimee] = useState(false);
   const total = totauxCommande(props.commande).totalTTC;
   const [paiements, setPaiements] = useState<Paiement[]>([]);
@@ -51,10 +59,34 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
     if (mode === "ESPECES" && m - reste > RENDU_A_CONFIRMER && !renduAConfirmer) {
       return setRenduAConfirmer({ montant: m, rendu: m - reste });
     }
+    // Chaque somme portée en compte est un crédit accordé : toujours l'accord d'un responsable.
+    if (mode === "EN_COMPTE") return client ? void mettreEnCompte(client, m) : setChoixClient(m);
     setRenduAConfirmer(null);
     setPaiements((l) => [...l, { mode, montant: m }]);
     setSaisie(null);
   };
+
+  /** Mise en compte : le client choisi, puis l'accord d'un responsable (c'est un crédit accordé). */
+  const mettreEnCompte = async (c: ClientCompte | ClientApi, m: number, nouveau = false) => {
+    setChoixClient(null);
+    const responsable = await demanderResponsable(`${euros(m)} au compte de ${c.nom}.`);
+    if (!responsable) return;
+    if (nouveau && "telephone" in c) {
+      // Fiche enregistrée seulement une fois la mise en compte accordée ; le serveur la reçoit en ligne, ou par le ticket.
+      await majConfig({ ...config, clients: [...(config.clients ?? []), c] });
+      void caisse.client.enregistrerClient(c).catch(() => undefined);
+    }
+    setClient({ id: c.id, nom: c.nom });
+    setPaiements((l) => [...l, { mode: "EN_COMPTE", montant: m }]);
+    setSaisie(null);
+  };
+
+  const retirerPaiement = (i: number) =>
+    setPaiements((l) => {
+      const suite = l.filter((_, j) => j !== i);
+      if (!suite.some((p) => p.mode === "EN_COMPTE")) setClient(null);
+      return suite;
+    });
 
   const encaisser = async () => {
     if (blocage) return notifier(blocage, "erreur");
@@ -66,6 +98,7 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
         operateurId: utilisateur.id,
         tableId: props.commande.tableId === ID_COMPTOIR ? null : props.commande.tableId,
         couverts: props.commande.couverts,
+        ...(client && paiements.some((p) => p.mode === "EN_COMPTE") ? { client } : {}),
       });
       setTicket(t);
       // Sans imprimante, rien ne sort : la note passe par le QR code.
@@ -126,16 +159,24 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
         }
       >
         <div className="fin-encaissement">
+          {ticket.client && (
+            <div className="rendu calme">
+              <span>Au compte de {ticket.client.nom}</span>
+              <strong>{euros(ticket.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((s, p) => s + p.montant, 0))}</strong>
+            </div>
+          )}
           {ticket.renduMonnaie > 0 ? (
             <div className="rendu">
               <span>Rendu monnaie</span>
               <strong>{euros(ticket.renduMonnaie)}</strong>
             </div>
           ) : (
-            <div className="rendu calme">
-              <span>Encaissé</span>
-              <strong>{euros(ticket.totalTTC)}</strong>
-            </div>
+            encaisseVente(ticket) > 0 && (
+              <div className="rendu calme">
+                <span>Encaissé</span>
+                <strong>{euros(encaisseVente(ticket))}</strong>
+              </div>
+            )
           )}
           <QrNote url={urlNoteTicket(ticket, config)} />
         </div>
@@ -179,7 +220,14 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
           </div>
         ) : (
           <>
-            <button className="bouton" disabled={paiements.length === 0} onClick={() => setPaiements([])}>
+            <button
+              className="bouton"
+              disabled={paiements.length === 0}
+              onClick={() => {
+                setPaiements([]);
+                setClient(null);
+              }}
+            >
               <AvecIcone icone={Trash2}>Effacer les paiements</AvecIcone>
             </button>
             <button className="bouton principal grand" disabled={!valide || enCours || !!blocage} onClick={() => void encaisser()}>
@@ -198,14 +246,17 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
           </div>
           {paiements.map((p, i) => (
             <div key={i} className="ligne-montant paiement">
-              <span>{LIBELLES_PAIEMENT[p.mode]}</span>
+              <span>
+                {LIBELLES_PAIEMENT[p.mode]}
+                {p.mode === "EN_COMPTE" && client ? ` · ${client.nom}` : ""}
+              </span>
               <span>
                 {euros(p.montant)}
                 <button
                   className="bouton discret"
                   aria-label={`Retirer le paiement ${LIBELLES_PAIEMENT[p.mode]}`}
                   title={`Retirer le paiement ${LIBELLES_PAIEMENT[p.mode]}`}
-                  onClick={() => setPaiements((l) => l.filter((_, j) => j !== i))}
+                  onClick={() => retirerPaiement(i)}
                 >
                   <X className="icone" size={20} aria-hidden="true" />
                 </button>
@@ -226,7 +277,9 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
         <div className="encaissement-modes">
           {MODES.map((m) => (
             <button key={m} className={`mode mode-${m.toLowerCase()}`} disabled={montant <= 0} onClick={() => ajouter(m)}>
-              <AvecIcone icone={ICONES_PAIEMENT[m]} taille={26}>{LIBELLES_PAIEMENT[m]}</AvecIcone>
+              <AvecIcone icone={ICONES_PAIEMENT[m]} taille={26}>
+                {m === "EN_COMPTE" && client ? `Compte ${client.nom}` : LIBELLES_PAIEMENT[m]}
+              </AvecIcone>
               <small>{euros(montant)}</small>
             </button>
           ))}
@@ -239,6 +292,13 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
           </div>
         </div>
       </div>
+      {choixClient != null && (
+        <ModaleClient
+          titre={`${euros(choixClient)} en compte : quel client ?`}
+          onChoisir={(c, nouveau) => void mettreEnCompte(c, choixClient, nouveau)}
+          onFermer={() => setChoixClient(null)}
+        />
+      )}
     </Modale>
   );
 }

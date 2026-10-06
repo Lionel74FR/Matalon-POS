@@ -39,6 +39,8 @@ Les cartes se modifient dans l'administration (Cartes et prix) : catégories et 
 
 Archives : l'iPad produit l'archive signée de chaque clôture (Clôtures › Télécharger l'archive). L'administration produit aussi, sans l'iPad, l'archive d'une clôture depuis la copie du serveur : même contenu, chaque enregistrement signé par l'iPad, empreinte de la clé de l'iPad à comparer avec celle affichée dans l'administration ; `verifierArchiveServeur` (packages/serveur) la contrôle seule.
 
+Comptes clients (ardoises) : Encaisser › En compte porte tout ou partie d'une vente au compte d'un client (accord d'un responsable). La vente compte dans le chiffre du jour ; la TVA n'est exigible qu'au règlement (restauration sur place = prestation de services). Le règlement se fait depuis l'onglet Comptes, sur n'importe quel appareil connecté : ticket `REGLEMENT` sans vente, TVA répartie par tranches exactes de la vente. Les soldes sont recalculés par le serveur sur toutes les caisses.
+
 L'équipe et l'identité de l'établissement sont communes à toutes ses caisses : elles se modifient dans l'administration ou dans les Réglages d'un iPad (connexion requise) et arrivent sur les autres iPad à la synchronisation suivante.
 
 L'imprimante est facultative. Sans elle, rien ne s'imprime d'office : après chaque encaissement, la note s'affiche en QR code. Le client le scanne et ouvre sa note sur `/n`, la note entière étant contenue dans le lien (aucun stockage, aucune donnée personnelle). Les Z et les additions restent consultables à l'écran. Rappel : au-delà de 25 € TTC, la note de restaurant doit être remise imprimée.
@@ -58,6 +60,7 @@ URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts
 URL=… node scripts/carte.mjs captures              # carte éditée dans l'administration, reçue par l'iPad
 URL=… node scripts/journee-hors-ligne.mjs captures # journée entière hors ligne, copie serveur identique à l'iPad
 URL=… node scripts/note-et-iphone.mjs captures     # note client et écrans iPhone
+URL=… node scripts/comptes.mjs captures            # vente en compte hors ligne, règlement sur iPhone, annulation du règlement
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

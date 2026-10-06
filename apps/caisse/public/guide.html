@@ -261,6 +261,18 @@
     <p class="attendu"><b>Attendu :</b> facture numérotée F-…-000001 avec les mentions légales ; une seconde impression porte « Duplicata » ; l'avoir reprend le client et annule la facture. Si la caisse signale une identité incomplète, Lionel complète les mentions de facture dans l'administration.</p>
   </section>
 
+  <section class="scenario" data-id="s6c">
+    <label><input type="checkbox">Compte client (ardoise)</label>
+    <ol>
+      <li>Ouvrez une table, ajoutez deux articles, puis <span class="bouton">Encaisser</span> › <span class="bouton">En compte</span>.</li>
+      <li><b>Nouveau client</b> : un nom fictif et un téléphone, puis <b>Créer et choisir</b>. Un responsable valide.</li>
+      <li><span class="bouton">Valider l'encaissement</span> : l'écran affiche « Au compte de … ».</li>
+      <li>Onglet <span class="bouton">Comptes</span> (connexion nécessaire) : le client apparaît avec son solde. Touchez-le, encaissez le règlement en espèces ou par carte.</li>
+      <li>Onglet <span class="bouton">Tickets</span> : touchez le règlement, puis <span class="bouton">Annuler ce règlement</span> › Erreur de client. Le solde réapparaît dans Comptes.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la lecture X montre la vente dans le chiffre du jour et « Porté en compte » ; le règlement apparaît en encaissement le jour où il est reçu, avec la TVA exigible. Le règlement peut se faire sur un autre appareil que la vente.</p>
+  </section>
+
   <section class="scenario" data-id="s7">
     <label><input type="checkbox">Imprimante en défaut (si imprimante connectée)</label>
     <ol>

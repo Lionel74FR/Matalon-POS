@@ -60,10 +60,22 @@ function Totaux({ t }: { t: TotauxPeriode }) {
       ))}
       {t.paiements.map((p) => (
         <div key={p.mode}>
-          <dt>{LIBELLES_PAIEMENT[p.mode]}</dt>
+          <dt>{p.mode === "EN_COMPTE" ? "Porté en compte" : LIBELLES_PAIEMENT[p.mode]}</dt>
           <dd>{euros(p.montant)}</dd>
         </div>
       ))}
+      {t.comptesClients && (
+        <>
+          <div>
+            <dt>Règlements de comptes reçus ({t.comptesClients.nbReglements})</dt>
+            <dd>{euros(t.comptesClients.reglementsTTC)}</dd>
+          </div>
+          <div>
+            <dt>TVA exigible (sommes encaissées)</dt>
+            <dd>{euros(t.comptesClients.ventilationTVAExigible.reduce((s, v) => s + v.montantTVA, 0))}</dd>
+          </div>
+        </>
+      )}
     </dl>
   );
 }

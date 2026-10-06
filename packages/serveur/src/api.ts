@@ -21,8 +21,12 @@ import {
   ID_ETABLISSEMENT_VALIDE,
   normaliserCode,
   PIN_VALIDE,
+  calculerComptes,
+  CLIENT_ID_VALIDE,
+  type ClientApi,
   type Derniers,
   type EntreeSynchro,
+  type ReponseComptes,
   type EtablissementApi,
   type IdentiteEtablissement,
   type ReponseEtat,
@@ -196,6 +200,24 @@ async function utilisateurs(db: Db, etablissementId: string): Promise<Utilisateu
   return lignes.map(versUtilisateur);
 }
 
+async function clients(db: Db, etablissementId: string): Promise<ClientApi[]> {
+  return db.requete<ClientApi>(
+    "select id, nom, telephone, actif from clients where etablissement_id = $1 order by nom",
+    [etablissementId],
+  );
+}
+
+/** Comptes clients d'un établissement, recalculés à partir des tickets répliqués de toutes ses caisses. */
+async function comptes(env: Environnement, etablissementId: string): Promise<ReponseComptes> {
+  const lignes = await env.db.requete<{ contenu: Ticket }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.chaine = 'tickets' and e.contenu ? 'client'
+     order by e.horodatage, e.caisse_id, e.numero`,
+    [etablissementId],
+  );
+  return { ...calculerComptes(lignes.map((l) => l.contenu), await clients(env.db, etablissementId)), calculeLe: horloge(env).toISOString() };
+}
+
 async function derniers(db: Db, caisseId: string): Promise<Derniers> {
   const lignes = await db.requete<{ chaine: Chaine; numero: number; hash: string }>(
     `select e.chaine, e.numero, e.hash from enregistrements e
@@ -306,10 +328,43 @@ async function etatCaisse(env: Environnement, requete: Request): Promise<Respons
     caisse: { id: c.id, nom: c.nom },
     etablissement: await etablissement(env.db, c.etablissement_id),
     utilisateurs: await utilisateurs(env.db, c.etablissement_id),
+    clients: await clients(env.db, c.etablissement_id),
     derniers: await derniers(env.db, c.id),
     heure: horloge(env).toISOString(),
   };
   return json(200, reponse);
+}
+
+async function comptesCaisse(env: Environnement, requete: Request): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  // Dernier ticket reçu de cette caisse : elle vérifie que ses propres règlements sont bien comptés.
+  const reponse: ReponseComptes = { ...(await comptes(env, c.etablissement_id)), dernierTicketCaisse: (await derniers(env.db, c.id)).tickets?.numero ?? 0 };
+  return json(200, reponse);
+}
+
+/** Fiche client (nom, téléphone, actif), créée ou modifiée par une caisse ou par l'administration. */
+async function enregistrerClient(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<ClientApi> {
+  const id = texte(corps.id, "id", 12);
+  if (!CLIENT_ID_VALIDE.test(id)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Identifiant de client invalide.");
+  const nom = texte(corps.nom, "nom", 80).trim();
+  if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le nom du client est obligatoire.");
+  const telephone = texte(corps.telephone ?? "", "telephone", 30).trim();
+  const [existant] = await env.db.requete<{ etablissement_id: string }>("select etablissement_id from clients where id = $1", [id]);
+  if (existant && existant.etablissement_id !== etablissementId) throw new ErreurHttp(403, "INTERDIT", "Client d'un autre établissement.");
+  const maintenant = horloge(env).toISOString();
+  await env.db.requete(
+    `insert into clients (id, etablissement_id, nom, telephone, actif, cree_le, maj_le) values ($1, $2, $3, $4, $5, $6, $6)
+     on conflict (id) do update set nom = excluded.nom, telephone = excluded.telephone, actif = excluded.actif, maj_le = excluded.maj_le
+     where clients.etablissement_id = excluded.etablissement_id`,
+    [id, etablissementId, nom, telephone, corps.actif !== false, maintenant],
+  );
+  return { id, nom, telephone, actif: corps.actif !== false };
+}
+
+async function majClientCaisse(env: Environnement, requete: Request): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const client = await enregistrerClient(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete));
+  return json(200, { client, clients: await clients(env.db, c.etablissement_id) });
 }
 
 /**
@@ -373,9 +428,26 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
     if (anomalies.length) await divergence(`tickets : ${anomalies.map((a) => `${a.code} n°${a.numero}`).join(", ")}`);
   }
 
+  // Un client créé hors ligne n'existe que dans ses tickets : on le crée à leur réception (sans écraser une fiche existante).
+  const nouveauxClients = new Map<string, string>();
+  for (const t of ticketsNouveaux) if (t.client && CLIENT_ID_VALIDE.test(t.client.id)) nouveauxClients.set(t.client.id, t.client.nom);
+  if (nouveauxClients.size) {
+    const autres = await env.db.requete<{ id: string }>(
+      "select id from clients where id = any($1) and etablissement_id <> $2",
+      [[...nouveauxClients.keys()], c.etablissement_id],
+    );
+    for (const [id, nom] of nouveauxClients) {
+      if (autres.some((x) => x.id === id)) continue;
+      aInserer.push({
+        texte: `insert into clients (id, etablissement_id, nom, cree_le, maj_le) values ($1, $2, $3, $4, $4) on conflict (id) do nothing`,
+        params: [id, c.etablissement_id, nom.slice(0, 80), maintenant],
+      });
+    }
+  }
+
   aInserer.push({ texte: "update caisses set derniere_synchro = $2 where id = $1", params: [c.id, maintenant] });
   await env.db.lot(aInserer);
-  const reponse: ReponseSynchro = { acceptes: aInserer.length - 1, derniers: queues };
+  const reponse: ReponseSynchro = { acceptes: aInserer.filter((x) => x.texte.includes("insert into enregistrements")).length, derniers: queues };
   return json(200, reponse);
 }
 
@@ -964,6 +1036,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/utilisateurs" && m === "PUT") return await majUtilisateursCaisse(env, requete);
     if (chemin === "/api/caisse/etablissement" && m === "PUT") return await majEtablissementCaisse(env, requete);
     if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
+    if (chemin === "/api/caisse/comptes" && m === "GET") return await comptesCaisse(env, requete);
+    if (chemin === "/api/caisse/clients" && m === "PUT") return await majClientCaisse(env, requete);
 
     if (chemin === "/api/admin/statut" && m === "GET") return await statutAdmin(env, requete);
     if (chemin === "/api/admin/initialiser" && m === "POST") return await initialiserAdmin(env, requete);
@@ -984,6 +1058,15 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "PUT") return await creerOuModifierEtablissement(env, requete, admin, p[1]);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/utilisateurs$/.exec(chemin);
       if (p && m === "POST") return await enregistrerUtilisateurAdmin(env, requete, admin, p[1]!);
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/comptes$/.exec(chemin);
+      if (p && m === "GET") return json(200, await comptes(env, (await etablissement(env.db, p[1]!)).id));
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/clients$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await etablissement(env.db, p[1]!);
+        const client = await enregistrerClient(env, e.id, await lireJson<Record<string, unknown>>(requete));
+        await journaliserAdmin(env, admin.id, "client_enregistre", { etablissement: e.id, client: client.id, nom: client.nom, actif: client.actif });
+        return json(200, { client });
+      }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/codes$/.exec(chemin);
       if (p && m === "POST") return await genererCode(env, requete, admin, p[1]!);
       p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/revoquer$/.exec(chemin);

@@ -3,7 +3,7 @@
  * Ce module ne dépend d'aucune bibliothèque serveur : la caisse l'importe.
  */
 import type { Catalogue } from "@matalon/catalogue";
-import type { Chaine, Enregistrement } from "@matalon/noyau-fiscal";
+import { canonique, montantEnCompte, ventilerTranche, type Chaine, type Enregistrement, type Ticket } from "@matalon/noyau-fiscal";
 
 export type Role = "serveur" | "responsable";
 
@@ -62,6 +62,8 @@ export interface ReponseEtat {
   caisse: { id: string; nom: string };
   etablissement: EtablissementApi;
   utilisateurs: UtilisateurApi[];
+  /** Clients des comptes (ardoises) de l'établissement, pour vendre en compte hors ligne. Depuis 0.5.0. */
+  clients?: ClientApi[];
   derniers: Derniers;
   /** Heure du serveur (ISO), pour contrôler l'horloge de l'iPad. */
   heure: string;
@@ -124,3 +126,120 @@ export function hacherPin(utilisateurId: string, pin: string): Promise<string> {
 
 export const PIN_VALIDE = /^\d{4}$/;
 export const ID_ETABLISSEMENT_VALIDE = /^[a-z0-9][a-z0-9-]{1,40}$/;
+
+// ───────── Comptes clients ─────────
+
+export interface ClientApi {
+  /** « cli-xxxxxxxx », créé par une caisse (même hors ligne) ou par l'administration. */
+  id: string;
+  nom: string;
+  telephone: string;
+  actif: boolean;
+}
+
+export const CLIENT_ID_VALIDE = /^cli-[0-9a-f]{8}$/;
+
+/** Vente portée en compte, encore due en tout ou partie. */
+export interface VenteOuverte {
+  caisseId: string;
+  numero: number;
+  hash: string;
+  dateComptable: string;
+  horodatage: string;
+  totalTTC: number;
+  enCompteTTC: number;
+  regleTTC: number;
+  resteTTC: number;
+  ventilationTVA: Ticket["ventilationTVA"];
+}
+
+export interface CompteClient {
+  client: ClientApi;
+  soldeTTC: number;
+  ventes: VenteOuverte[];
+}
+
+export interface ReponseComptes {
+  comptes: CompteClient[];
+  /** Incohérences relevées entre caisses (sur-règlement, vente inconnue…) : signalées, jamais bloquantes. */
+  anomalies: string[];
+  /** Heure du calcul (serveur). */
+  calculeLe: string;
+  /** Réponse à une caisse : dernier ticket d'elle que le serveur a reçu. */
+  dernierTicketCaisse?: number;
+}
+
+/**
+ * Comptes clients d'un établissement, recalculés à partir des tickets de
+ * toutes ses caisses : ventes en compte, annulations et règlements (le
+ * règlement peut être reçu sur une autre caisse que la vente).
+ */
+export function calculerComptes(tickets: Ticket[], clients: ClientApi[]): Omit<ReponseComptes, "calculeLe"> {
+  const cle = (caisseId: string, numero: number) => `${caisseId}#${numero}`;
+  const ventes = new Map<string, { t: Ticket; enCompte: number; regle: number }>();
+  const anomalies: string[] = [];
+  for (const t of tickets) {
+    if (t.type === "VENTE" && montantEnCompte(t) !== 0) ventes.set(cle(t.caisseId, t.numero), { t, enCompte: montantEnCompte(t), regle: 0 });
+  }
+  for (const t of tickets) {
+    if (t.type !== "ANNULATION" || !t.ticketOrigine) continue;
+    const v = ventes.get(cle(t.caisseId, t.ticketOrigine.numero));
+    if (v) v.enCompte += montantEnCompte(t);
+  }
+  // Règlements et annulations de règlements (montants négatifs), dans l'ordre où ils ont été reçus.
+  for (const t of tickets) {
+    if (!t.reglement) continue;
+    for (const i of t.reglement.imputations) {
+      const ref = `${t.type === "REGLEMENT" ? "règlement" : "annulation de règlement"} ${t.caisseId} n°${t.numero}`;
+      const v = ventes.get(cle(i.caisseId, i.numero));
+      if (!v || v.t.hash !== i.hash) {
+        anomalies.push(`${ref} : vente ${i.caisseId} n°${i.numero} introuvable ou différente`);
+        continue;
+      }
+      if (v.t.client?.id !== t.client?.id) anomalies.push(`${ref} : client différent de celui de la vente n°${i.numero}`);
+      const part = Math.abs(i.montantTTC);
+      const debut = i.montantTTC > 0 ? i.encaisseAvantTTC : i.encaisseAvantTTC - part;
+      let attendue: Ticket["ventilationTVA"] | null = null;
+      try {
+        attendue = ventilerTranche(v.t.ventilationTVA, debut, part, v.t.totalTTC);
+      } catch {
+        /* tranche hors de la vente : signalée ci-dessous */
+      }
+      const obtenue = i.montantTTC > 0 ? i.ventilationTVA : i.ventilationTVA.map((x) => ({ ...x, baseHT: -x.baseHT, montantTVA: -x.montantTVA, montantTTC: -x.montantTTC }));
+      if (!attendue || i.venteTotalTTC !== v.t.totalTTC || canonique(attendue) !== canonique(obtenue)) {
+        anomalies.push(`${ref} : TVA de la vente n°${i.numero} mal répartie`);
+      }
+      v.regle += i.montantTTC;
+    }
+  }
+  const parClient = new Map<string, CompteClient>();
+  const connus = new Map(clients.map((c) => [c.id, c]));
+  for (const { t, enCompte, regle } of ventes.values()) {
+    const reste = enCompte - regle;
+    if (reste < 0) anomalies.push(`vente ${t.caisseId} n°${t.numero} : réglée ${-reste} centimes de trop`);
+    if (reste <= 0) continue;
+    const id = t.client!.id;
+    const client = connus.get(id) ?? { id, nom: t.client!.nom, telephone: "", actif: true };
+    const compte = parClient.get(id) ?? { client, soldeTTC: 0, ventes: [] };
+    compte.soldeTTC += reste;
+    compte.ventes.push({
+      caisseId: t.caisseId,
+      numero: t.numero,
+      hash: t.hash,
+      dateComptable: t.dateComptable,
+      horodatage: t.horodatage,
+      totalTTC: t.totalTTC,
+      enCompteTTC: enCompte,
+      regleTTC: regle,
+      resteTTC: reste,
+      ventilationTVA: t.ventilationTVA,
+    });
+    parClient.set(id, compte);
+  }
+  const comptes = [...parClient.values()];
+  for (const c of comptes) c.ventes.sort((a, b) => a.horodatage.localeCompare(b.horodatage));
+  // Les clients sans dette restent listés (solde nul) pour être choisis à la prochaine vente.
+  for (const c of clients) if (!parClient.has(c.id)) comptes.push({ client: c, soldeTTC: 0, ventes: [] });
+  comptes.sort((a, b) => b.soldeTTC - a.soldeTTC || a.client.nom.localeCompare(b.client.nom, "fr"));
+  return { comptes, anomalies };
+}

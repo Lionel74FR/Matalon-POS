@@ -9,15 +9,20 @@ import {
   ligneInverse,
   paiementsNets,
   ventiler,
+  ventilationValide,
+  ventilerProrata,
+  ventilerTranche,
 } from "./montants.js";
 import type { EntreeLot, StockageFiscal, TypesChaines } from "./stockage.js";
 import {
   ErreurFiscale,
   type Chaine,
+  type ClientCompte,
   type Cloture,
   type CodeEvenement,
   type ContexteCaisse,
   type Evenement,
+  type ImputationReglement,
   type Paiement,
   type SaisieLigne,
   type Ticket,
@@ -41,6 +46,29 @@ export interface SaisieVente {
   operateurId: string;
   tableId?: string | null;
   couverts?: number | null;
+  /** Obligatoire si une partie est portée en compte (mode EN_COMPTE). */
+  client?: ClientCompte;
+}
+
+/** Vente en compte à solder (en tout ou partie) par un règlement. */
+export interface SaisieImputation {
+  caisseId: string;
+  numero: number;
+  hash: string;
+  montantTTC: number;
+  /** Vente : total, part portée en compte, déjà réglé (toutes caisses), ventilation — pour la TVA exigible. */
+  venteTotalTTC: number;
+  venteEnCompteTTC: number;
+  dejaRegleTTC: number;
+  venteVentilationTVA: Ticket["ventilationTVA"];
+}
+
+export interface SaisieReglement {
+  client: ClientCompte;
+  /** Moyens de paiement réels (jamais EN_COMPTE) ; les espèces peuvent donner lieu à un rendu. */
+  paiements: Paiement[];
+  imputations: SaisieImputation[];
+  operateurId: string;
 }
 
 export interface SaisieAnnulation {
@@ -84,12 +112,63 @@ export function champsTotaux(x: TotauxPeriode): TotauxPeriode {
     ventilationTVA: x.ventilationTVA,
     paiements: x.paiements,
     totalRemisesTTC: x.totalRemisesTTC,
+    ...(x.comptesClients ? { comptesClients: x.comptesClients } : {}),
+  };
+}
+
+/** Identifiant de client : « cli- » et 8 chiffres hexadécimaux (le même format côté serveur). */
+export const CLIENT_ID_VALIDE = /^cli-[0-9a-f]{8}$/;
+
+/** Client d'une vente en compte ou d'un règlement : identifiant stable et nom lisible. */
+function clientValide(c: ClientCompte | undefined): ClientCompte {
+  const nom = c?.nom?.trim() ?? "";
+  if (!c || !CLIENT_ID_VALIDE.test(c.id ?? "") || !nom || nom.length > 80 || /[\u0000-\u001f\u007f]/.test(nom)) {
+    throw new ErreurFiscale("CLIENT_INVALIDE", "client du compte invalide (identifiant et nom obligatoires)");
+  }
+  return { id: c.id, nom };
+}
+
+/** Montant d'une vente porté en compte (signé : négatif sur une annulation). */
+export function montantEnCompte(t: Ticket): number {
+  return t.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((s, p) => s + p.montant, 0);
+}
+
+/** Règlements reçus (positifs) ou annulés (négatifs) de chaque vente, sur un ensemble de tickets. */
+function regleParVente(tickets: Ticket[]): Map<string, number> {
+  const regle = new Map<string, number>();
+  for (const t of tickets) {
+    for (const i of t.reglement?.imputations ?? []) {
+      const cle = `${i.caisseId}#${i.numero}`;
+      regle.set(cle, (regle.get(cle) ?? 0) + i.montantTTC);
+    }
+  }
+  return regle;
+}
+
+/** TVA devenue exigible avec ce ticket : part encaissée d'une vente, ou règlement d'un compte (ou son annulation). */
+export function ventilationExigible(t: Ticket): Ticket["ventilationTVA"] {
+  if (t.reglement) return t.reglement.ventilationTVA;
+  const enCompte = montantEnCompte(t);
+  return enCompte === 0 ? t.ventilationTVA : ventilerProrata(t.ventilationTVA, t.totalTTC - enCompte, t.totalTTC);
+}
+
+/** Comptes clients d'un ensemble de tickets, ou rien s'ils n'en ont pas. */
+function comptesTickets(tickets: Ticket[]): TotauxPeriode["comptesClients"] {
+  const concernes = tickets.some((t) => t.reglement || montantEnCompte(t) !== 0);
+  if (!concernes) return undefined;
+  return {
+    ventesEnCompteTTC: tickets.reduce((s, t) => s + montantEnCompte(t), 0),
+    nbReglements: tickets.filter((t) => t.type === "REGLEMENT").length,
+    // Net des règlements annulés.
+    reglementsTTC: tickets.reduce((s, t) => s + (t.reglement?.montantTTC ?? 0), 0),
+    ventilationTVAExigible: cumulerVentilations(tickets.map(ventilationExigible)),
   };
 }
 
 /** Totaux d'un ensemble de tickets (lecture X, clôture Z). */
 export function totauxTickets(tickets: Ticket[]): TotauxPeriode {
   if (tickets.length === 0) return { ...TOTAUX_VIDES };
+  const comptesClients = comptesTickets(tickets);
   return {
     nbVentes: tickets.filter((t) => t.type === "VENTE").length,
     nbAnnulations: tickets.filter((t) => t.type === "ANNULATION").length,
@@ -99,12 +178,22 @@ export function totauxTickets(tickets: Ticket[]): TotauxPeriode {
     ventilationTVA: cumulerVentilations(tickets.map((t) => t.ventilationTVA)),
     paiements: cumulerPaiements(tickets.map((t) => paiementsNets(t.paiements, t.renduMonnaie))),
     totalRemisesTTC: tickets.reduce((s, t) => s + t.lignes.reduce((r, l) => r + l.remiseTTC, 0), 0),
+    ...(comptesClients ? { comptesClients } : {}),
   };
 }
 
 /** Totaux d'un ensemble de clôtures (clôtures mensuelle et annuelle). */
 export function totauxClotures(clotures: Cloture[]): TotauxPeriode {
   if (clotures.length === 0) return { ...TOTAUX_VIDES };
+  // Une clôture sans comptes clients a une TVA exigible égale à sa TVA collectée.
+  const comptesClients = clotures.some((c) => c.comptesClients)
+    ? {
+        ventesEnCompteTTC: clotures.reduce((s, c) => s + (c.comptesClients?.ventesEnCompteTTC ?? 0), 0),
+        nbReglements: clotures.reduce((s, c) => s + (c.comptesClients?.nbReglements ?? 0), 0),
+        reglementsTTC: clotures.reduce((s, c) => s + (c.comptesClients?.reglementsTTC ?? 0), 0),
+        ventilationTVAExigible: cumulerVentilations(clotures.map((c) => c.comptesClients?.ventilationTVAExigible ?? c.ventilationTVA)),
+      }
+    : undefined;
   return {
     nbVentes: clotures.reduce((s, c) => s + c.nbVentes, 0),
     nbAnnulations: clotures.reduce((s, c) => s + c.nbAnnulations, 0),
@@ -114,6 +203,7 @@ export function totauxClotures(clotures: Cloture[]): TotauxPeriode {
     ventilationTVA: cumulerVentilations(clotures.map((c) => c.ventilationTVA)),
     paiements: cumulerPaiements(clotures.map((c) => c.paiements)),
     totalRemisesTTC: clotures.reduce((s, c) => s + c.totalRemisesTTC, 0),
+    ...(comptesClients ? { comptesClients } : {}),
   };
 }
 
@@ -288,6 +378,9 @@ export class Registre {
       const { renduMonnaie } = controlerPaiements(totalTTC, s.paiements);
       const ventilationTVA = ventiler(lignes);
       const totalHT = ventilationTVA.reduce((t, v) => t + v.baseHT, 0);
+      const enCompte = s.paiements.some((p) => p.mode === "EN_COMPTE");
+      if (!enCompte && s.client) throw new ErreurFiscale("CLIENT_INVALIDE", "client indiqué sans paiement en compte");
+      const client = enCompte ? clientValide(s.client) : undefined;
 
       const dateComptable = await this.dateComptableSure(lot, maintenant);
       const precedent = await lot.dernier("tickets");
@@ -309,6 +402,7 @@ export class Registre {
           renduMonnaie,
           ticketOrigine: null,
           motif: null,
+          ...(client ? { client } : {}),
           grandTotalPerpetuel: (precedent?.grandTotalPerpetuel ?? 0) + totalTTC,
           cumulPerpetuelAbsolu: (precedent?.cumulPerpetuelAbsolu ?? 0) + Math.abs(totalTTC),
         },
@@ -343,17 +437,21 @@ export class Registre {
       if (!s.motif?.trim()) throw new ErreurFiscale("MOTIF_OBLIGATOIRE", "une annulation exige un motif");
       const origine = await this.stockage.trouver("tickets", s.numeroTicket);
       if (!origine) throw new ErreurFiscale("TICKET_INCONNU", `ticket ${s.numeroTicket} introuvable`);
-      if (origine.type !== "VENTE") {
-        throw new ErreurFiscale("ANNULATION_INTERDITE", "seule une vente peut être annulée");
+      if (origine.type === "ANNULATION") {
+        throw new ErreurFiscale("ANNULATION_INTERDITE", "seule une vente ou un règlement peut être annulé");
       }
       const suivants = await this.stockage.lister("tickets", origine.numero + 1);
       if (suivants.some((t) => t.type === "ANNULATION" && t.ticketOrigine?.numero === origine.numero)) {
         throw new ErreurFiscale("DEJA_ANNULE", `le ticket ${origine.numero} est déjà annulé`);
       }
+      // Une vente en compte réglée (même en partie) ne s'annule qu'après annulation de ses règlements.
+      if ((regleParVente(suivants).get(`${this.contexte.caisseId}#${origine.numero}`) ?? 0) > 0) {
+        throw new ErreurFiscale("VENTE_REGLEE", `le ticket ${origine.numero} a déjà reçu un règlement de compte : annulez d'abord le règlement`);
+      }
 
       const lignes = origine.lignes.map(ligneInverse);
       const ventilationTVA = ventiler(lignes);
-      const totalTTC = -origine.totalTTC;
+      const totalTTC = 0 - origine.totalTTC;
       const totalHT = ventilationTVA.reduce((t, v) => t + v.baseHT, 0);
       const remboursements = paiementsNets(origine.paiements, origine.renduMonnaie).map((p) => ({
         mode: p.mode,
@@ -380,6 +478,32 @@ export class Registre {
           renduMonnaie: 0,
           ticketOrigine: { numero: origine.numero, hash: origine.hash },
           motif: s.motif.trim(),
+          ...(origine.client ? { client: origine.client } : {}),
+          // Annulation d'un règlement : miroir négatif, la dette renaît et la TVA exigible est reprise.
+          ...(origine.reglement
+            ? {
+                reglement: {
+                  montantTTC: -origine.reglement.montantTTC,
+                  imputations: origine.reglement.imputations.map((i) => ({
+                    ...i,
+                    montantTTC: -i.montantTTC,
+                    encaisseAvantTTC: i.encaisseAvantTTC + i.montantTTC,
+                    ventilationTVA: i.ventilationTVA.map((v) => ({
+                      tauxTVA: v.tauxTVA,
+                      baseHT: -v.baseHT,
+                      montantTVA: -v.montantTVA,
+                      montantTTC: -v.montantTTC,
+                    })),
+                  })),
+                  ventilationTVA: origine.reglement.ventilationTVA.map((v) => ({
+                    tauxTVA: v.tauxTVA,
+                    baseHT: -v.baseHT,
+                    montantTVA: -v.montantTVA,
+                    montantTTC: -v.montantTTC,
+                  })),
+                },
+              }
+            : {}),
           grandTotalPerpetuel: (precedent?.grandTotalPerpetuel ?? 0) + totalTTC,
           cumulPerpetuelAbsolu: (precedent?.cumulPerpetuelAbsolu ?? 0) + Math.abs(totalTTC),
         },
@@ -394,6 +518,107 @@ export class Registre {
         maintenant,
       );
       return annulation;
+    });
+  }
+
+  /**
+   * Règlement d'un compte client : encaisse tout ou partie de ventes portées en
+   * compte, sans nouvelle vente. La TVA de ces ventes devient exigible au
+   * prorata des sommes réglées. Les ventes de cette caisse sont contrôlées ici
+   * (client, empreinte, montant restant dû) ; celles d'une autre caisse le sont
+   * par le serveur, qui détient toutes les chaînes.
+   */
+  enregistrerReglement(s: SaisieReglement): Promise<Ticket> {
+    return this.operation(async (lot, maintenant) => {
+      if (!s.operateurId) throw new ErreurFiscale("OPERATEUR_OBLIGATOIRE", "opérateur obligatoire");
+      const client = clientValide(s.client);
+      if (!s.imputations?.length) throw new ErreurFiscale("REGLEMENT_VIDE", "aucune vente à régler");
+      if (s.paiements.some((p) => p.mode === "EN_COMPTE")) {
+        throw new ErreurFiscale("MODE_PAIEMENT_INVALIDE", "un règlement ne peut pas être porté en compte");
+      }
+      const vues = new Set<string>();
+      const locales = await this.stockage.lister("tickets");
+      const regleLocal = regleParVente(locales);
+      const invalide = (cle: string, raison: string) => new ErreurFiscale("IMPUTATION_INVALIDE", `vente ${cle} : ${raison}`);
+      const imputations: ImputationReglement[] = s.imputations.map((i) => {
+        const cle = `${i.caisseId}#${i.numero}`;
+        if (!i.caisseId || !Number.isSafeInteger(i.numero) || i.numero < 1 || !/^[0-9a-f]{64}$/.test(i.hash ?? "") || vues.has(cle)) {
+          throw invalide(cle, "référence invalide ou en double");
+        }
+        vues.add(cle);
+        const entiers = [i.montantTTC, i.venteTotalTTC, i.venteEnCompteTTC, i.dejaRegleTTC];
+        if (!entiers.every((x) => Number.isSafeInteger(x)) || i.montantTTC <= 0 || i.dejaRegleTTC < 0 || i.venteEnCompteTTC <= 0) {
+          throw invalide(cle, "montants invalides");
+        }
+        if (i.venteEnCompteTTC > i.venteTotalTTC || i.dejaRegleTTC + i.montantTTC > i.venteEnCompteTTC) {
+          throw invalide(cle, "le règlement dépasse ce qui reste dû");
+        }
+        // Données d'une vente d'une autre caisse : elles doivent former une ventilation que la vérification acceptera.
+        if (!ventilationValide(i.venteVentilationTVA, i.venteTotalTTC)) throw invalide(cle, "ventilation de TVA incohérente");
+        if (i.caisseId === this.contexte.caisseId) {
+          const vente = locales.find((t) => t.numero === i.numero);
+          if (!vente || vente.type !== "VENTE" || vente.hash !== i.hash || vente.client?.id !== client.id) {
+            throw invalide(cle, "pas une vente en compte de ce client");
+          }
+          if (locales.some((t) => t.type === "ANNULATION" && t.ticketOrigine?.numero === vente.numero)) throw invalide(cle, "vente annulée");
+          if (
+            i.venteTotalTTC !== vente.totalTTC ||
+            i.venteEnCompteTTC !== montantEnCompte(vente) ||
+            canonique(i.venteVentilationTVA) !== canonique(vente.ventilationTVA) ||
+            i.dejaRegleTTC < (regleLocal.get(cle) ?? 0)
+          ) {
+            throw invalide(cle, "déjà réglée en tout ou partie, ou totaux incohérents");
+          }
+        }
+        const encaisseAvantTTC = i.venteTotalTTC - i.venteEnCompteTTC + i.dejaRegleTTC;
+        return {
+          caisseId: i.caisseId,
+          numero: i.numero,
+          hash: i.hash,
+          montantTTC: i.montantTTC,
+          venteTotalTTC: i.venteTotalTTC,
+          encaisseAvantTTC,
+          ventilationTVA: ventilerTranche(i.venteVentilationTVA, encaisseAvantTTC, i.montantTTC, i.venteTotalTTC),
+        };
+      });
+      const montantTTC = imputations.reduce((somme, i) => somme + i.montantTTC, 0);
+      const { renduMonnaie } = controlerPaiements(montantTTC, s.paiements);
+
+      const dateComptable = await this.dateComptableSure(lot, maintenant);
+      const precedent = await lot.dernier("tickets");
+      const ticket = await this.sceller(
+        lot,
+        "tickets",
+        {
+          type: "REGLEMENT",
+          dateComptable,
+          operateurId: s.operateurId,
+          tableId: null,
+          couverts: null,
+          lignes: [],
+          ventilationTVA: [],
+          totalHT: 0,
+          totalTVA: 0,
+          totalTTC: 0,
+          paiements: s.paiements.map((p) => ({ mode: p.mode, montant: p.montant })),
+          renduMonnaie,
+          ticketOrigine: null,
+          motif: null,
+          client,
+          reglement: { montantTTC, imputations, ventilationTVA: cumulerVentilations(imputations.map((i) => i.ventilationTVA)) },
+          grandTotalPerpetuel: precedent?.grandTotalPerpetuel ?? 0,
+          cumulPerpetuelAbsolu: precedent?.cumulPerpetuelAbsolu ?? 0,
+        },
+        maintenant,
+      );
+      await this.evenement(
+        lot,
+        "REGLEMENT_COMPTE",
+        { ticket: ticket.numero, client: client.id, montantTTC, ventes: imputations.length },
+        s.operateurId,
+        maintenant,
+      );
+      return ticket;
     });
   }
 

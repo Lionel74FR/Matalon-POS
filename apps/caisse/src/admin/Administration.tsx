@@ -2,7 +2,8 @@ import { afficherCode, ID_ETABLISSEMENT_VALIDE, PIN_VALIDE, type IdentiteEtablis
 import QRCode from "qrcode";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { genererTables } from "../donnees/configuration";
-import type { ResumeCarte } from "@matalon/serveur/partage";
+import type { ClientApi, ReponseComptes, ResumeCarte } from "@matalon/serveur/partage";
+import { nouvelIdClient } from "../donnees/clients";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import {
@@ -12,6 +13,8 @@ import {
   FileJson,
   FileSpreadsheet,
   KeyRound,
+  NotebookPen,
+  Pencil,
   LogIn,
   LogOut,
   Plus,
@@ -494,6 +497,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
       <Caisses caisses={e.caisses} onChange={props.onChange} />
       <Equipe e={e} onChange={props.onChange} />
+      <ComptesClients etablissementId={e.id} />
       <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
     </>
   );
@@ -784,6 +788,91 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
         </button>
       </form>
       {props.e.utilisateurs.length === 0 && <p className="explication">Commencez par un responsable.</p>}
+      {erreur && <p className="erreur">{erreur}</p>}
+    </section>
+  );
+}
+
+/** Comptes clients (ardoises) : soldes recalculés par le serveur sur toutes les caisses, fiches clients. */
+function ComptesClients(props: { etablissementId: string }) {
+  const [donnees, setDonnees] = useState<ReponseComptes | null>(null);
+  const [edition, setEdition] = useState<ClientApi | null>(null);
+  const { enCours, erreur, envoyer } = useEnvoi();
+  const charger = useCallback(() => envoyer(async () => setDonnees(await api.comptes(props.etablissementId))), [envoyer, props.etablissementId]);
+  useEffect(() => void charger(), [charger]);
+  const enregistrer = (ev: FormEvent) => {
+    ev.preventDefault();
+    if (!edition) return;
+    void envoyer(async () => {
+      await api.enregistrerClient(props.etablissementId, { ...edition, nom: edition.nom.trim(), telephone: edition.telephone.trim() });
+      setEdition(null);
+      setDonnees(await api.comptes(props.etablissementId));
+    });
+  };
+  const du = donnees?.comptes.reduce((s, c) => s + c.soldeTTC, 0) ?? 0;
+  return (
+    <section className="admin-section">
+      <Titre icone={NotebookPen}>Comptes clients</Titre>
+      <p className="explication">
+        Ventes portées en compte et réglées plus tard, sur n'importe quel appareil. La vente compte dans le chiffre du jour ; la TVA
+        devient exigible au règlement. {donnees && <strong>Total dû : {euros(du)}.</strong>}
+      </p>
+      {donnees && donnees.anomalies.length > 0 && (
+        <div className="admin-alerte">
+          <strong>À vérifier :</strong>
+          <ul>
+            {donnees.anomalies.map((a) => (
+              <li key={a}>{a}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {donnees && donnees.comptes.length > 0 && (
+        <table className="tableau admin-tableau">
+          <tbody>
+            {donnees.comptes.map((c) => (
+              <tr key={c.client.id} className={c.client.actif ? "" : "annule"}>
+                <td>
+                  {c.client.nom}
+                  <br />
+                  <small>{[c.client.telephone, c.client.id].filter(Boolean).join(" · ")}</small>
+                </td>
+                <td>{c.ventes.length ? pluriel(c.ventes.length, "note due") : "—"}</td>
+                <td className="nombre">{euros(c.soldeTTC)}</td>
+                <td className="admin-boutons">
+                  <BoutonIcone icone={Pencil} variante="discret" libelle={`Modifier la fiche de ${c.client.nom}`} onClick={() => setEdition({ ...c.client })} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {donnees && donnees.comptes.length === 0 && <p className="explication">Aucun client pour l'instant : ils se créent en caisse (Encaisser › En compte) ou ici.</p>}
+      {edition ? (
+        <form className="admin-ligne" onSubmit={enregistrer}>
+          <input value={edition.nom} onChange={(ev) => setEdition({ ...edition, nom: ev.target.value })} placeholder="Nom du client" required maxLength={80} />
+          <input value={edition.telephone} onChange={(ev) => setEdition({ ...edition, telephone: ev.target.value })} placeholder="Téléphone" maxLength={30} />
+          <label className="case">
+            <input type="checkbox" checked={edition.actif} onChange={(ev) => setEdition({ ...edition, actif: ev.target.checked })} />
+            Actif
+          </label>
+          <button className="bouton principal" disabled={enCours}>
+            <AvecIcone icone={Save}>Enregistrer</AvecIcone>
+          </button>
+          <button type="button" className="bouton" onClick={() => setEdition(null)}>
+            Annuler
+          </button>
+        </form>
+      ) : (
+        <div className="admin-ligne">
+          <button className="bouton" onClick={() => setEdition({ id: nouvelIdClient(), nom: "", telephone: "", actif: true })}>
+            <AvecIcone icone={UserPlus}>Nouveau client</AvecIcone>
+          </button>
+          <button className="bouton" disabled={enCours} onClick={() => void charger()}>
+            <AvecIcone icone={RotateCw}>Actualiser</AvecIcone>
+          </button>
+        </div>
+      )}
       {erreur && <p className="erreur">{erreur}</p>}
     </section>
   );

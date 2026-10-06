@@ -1,3 +1,4 @@
+import { CLIENT_ID_VALIDE } from "@matalon/serveur/partage";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { AvecIcone } from "./icones";
 import { Link, RefreshCw, RotateCw } from "lucide-react";
@@ -96,6 +97,13 @@ export function App() {
                 carteRecue = await actuelle.client.carte();
               } catch {
                 /* nouvel essai à la prochaine synchronisation ; on garde la carte en place */
+              }
+            }
+            // Clients créés ici hors ligne : leur fiche complète (téléphone) part dès que le serveur répond.
+            const connus = etat.clients;
+            if (connus) {
+              for (const c of (caisseCourante.current ?? actuelle).config.clients ?? []) {
+                if (CLIENT_ID_VALIDE.test(c.id) && !connus.some((x) => x.id === c.id)) await actuelle.client.enregistrerClient(c).catch(() => undefined);
               }
             }
             // Relue après l'attente réseau : une modification locale faite entre-temps (imprimante…) est conservée.
