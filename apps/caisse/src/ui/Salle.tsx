@@ -1,3 +1,5 @@
+import { Clock, Coffee, Printer, StickyNote, Users } from "lucide-react";
+import { AvecIcone } from "./icones";
 import { ID_COMPTOIR } from "../donnees/configuration";
 import { totauxCommande, type Commande } from "../metier/commande";
 import { euros, useCaisse } from "./contexte";
@@ -26,7 +28,9 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
         </p>
       </header>
       <button className={`table comptoir${comptoir ? " occupee" : ""}`} onClick={() => props.onOuvrir(ID_COMPTOIR)}>
-        <span className="table-nom">Comptoir</span>
+        <span className="table-nom">
+          <AvecIcone icone={Coffee} taille={22}>Comptoir</AvecIcone>
+        </span>
         {comptoir ? (
           <span className="table-total">{euros(totauxCommande(comptoir).totalTTC)}</span>
         ) : (
@@ -48,10 +52,26 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
                       <>
                         <span className="table-total">{euros(totauxCommande(c).totalTTC)}</span>
                         <span className="table-meta">
-                          {c.couverts ? `${c.couverts} couv. · ` : ""}
-                          {depuis(c.ouverteLe)}
-                          {c.additionsImprimees > 0 ? " · addition" : ""}
-                          {c.note ? " · note" : ""}
+                          {c.couverts ? (
+                            <span title={`${c.couverts} couverts`}>
+                              <AvecIcone icone={Users} taille={14}>{c.couverts}</AvecIcone>
+                            </span>
+                          ) : null}
+                          <span title="Ouverte depuis">
+                            <AvecIcone icone={Clock} taille={14}>{depuis(c.ouverteLe)}</AvecIcone>
+                          </span>
+                          {c.additionsImprimees > 0 && (
+                            <span title="Addition imprimée">
+                              <AvecIcone icone={Printer} taille={14} />
+                              <span className="lecteur-ecran">addition</span>
+                            </span>
+                          )}
+                          {c.note && (
+                            <span title="Note sur la commande">
+                              <AvecIcone icone={StickyNote} taille={14} />
+                              <span className="lecteur-ecran">note</span>
+                            </span>
+                          )}
                         </span>
                       </>
                     ) : (

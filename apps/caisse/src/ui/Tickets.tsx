@@ -1,3 +1,5 @@
+import { Eye, FileText, Printer, QrCode, Undo2 } from "lucide-react";
+import { AvecIcone } from "./icones";
 import { ErreurFiscale, type Ticket } from "@matalon/noyau-fiscal";
 import { useCallback, useEffect, useState } from "react";
 import { gabaritNote, LIBELLES_PAIEMENT, nomTable, nomUtilisateur } from "../impression/gabarits";
@@ -133,12 +135,12 @@ export function Tickets() {
             <>
               {choisi.type === "VENTE" && !annules.has(choisi.numero) && (
                 <button className="bouton danger" onClick={() => setAnnulation(choisi)}>
-                  Annuler ce ticket
+                  <AvecIcone icone={Undo2}>Annuler ce ticket</AvecIcone>
                 </button>
               )}
               {(choisi.type === "VENTE" ? !annules.has(choisi.numero) || factures.has(choisi.numero) : factures.has(choisi.numero)) && (
                 <button className="bouton" onClick={() => setFactureDe(choisi)}>
-                  {factures.has(choisi.numero) ? (choisi.type === "VENTE" ? "Facture" : "Avoir") : "Facture"}
+                  <AvecIcone icone={FileText}>{factures.has(choisi.numero) ? (choisi.type === "VENTE" ? "Facture" : "Avoir") : "Facture"}</AvecIcone>
                 </button>
               )}
               {choisi.type === "ANNULATION" &&
@@ -146,14 +148,14 @@ export function Tickets() {
                 ventesFacturees.has(choisi.ticketOrigine.numero) &&
                 !factures.has(choisi.numero) && (
                   <button className="bouton principal" onClick={() => void rattraperAvoir(choisi)}>
-                    Émettre l'avoir
+                    <AvecIcone icone={FileText}>Émettre l'avoir</AvecIcone>
                   </button>
                 )}
               <button className="bouton" onClick={() => void duplicataQr(choisi)}>
-                QR code
+                <AvecIcone icone={QrCode}>QR code</AvecIcone>
               </button>
               <button className="bouton" onClick={() => void duplicata(choisi)}>
-                {imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}
+                <AvecIcone icone={imprimanteConfiguree ? Printer : Eye}>{imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}</AvecIcone>
               </button>
             </>
           }
@@ -201,7 +203,7 @@ export function Tickets() {
           onFermer={() => setAnnulation(null)}
           pied={
             <button className="bouton danger" disabled={!motif} onClick={() => void annuler()}>
-              Annuler {euros(annulation.totalTTC)}
+              <AvecIcone icone={Undo2}>Annuler {euros(annulation.totalTTC)}</AvecIcone>
             </button>
           }
         >

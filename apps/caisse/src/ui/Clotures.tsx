@@ -1,3 +1,5 @@
+import { CalendarCheck, Download, Eye, FileSpreadsheet, Lock, Printer, ShieldCheck } from "lucide-react";
+import { AvecIcone } from "./icones";
 import {
   construireArchive,
   dateComptable,
@@ -220,22 +222,22 @@ export function Clotures(props: { commandesOuvertes: number }) {
 
       <section className="actions-clotures">
         <button className="bouton" onClick={() => void lectureX()}>
-          Lecture X
+          <AvecIcone icone={Eye}>Lecture X</AvecIcone>
         </button>
         <button className="bouton principal" onClick={() => setConfirmationZ(true)}>
-          Clôturer la journée (Z)
+          <AvecIcone icone={Lock}>Clôturer la journée (Z)</AvecIcone>
         </button>
         {moisAClore.map((m) => (
           <button key={m} className="bouton" onClick={() => void cloturerMois(m)}>
-            Clôturer le mois {m}
+            <AvecIcone icone={CalendarCheck}>Clôturer le mois {m}</AvecIcone>
           </button>
         ))}
         <span className="espace" />
         <button className="bouton discret" onClick={() => void exporterCSV()}>
-          Export comptable CSV
+          <AvecIcone icone={FileSpreadsheet}>Export comptable CSV</AvecIcone>
         </button>
         <button className="bouton discret" onClick={() => void verifier()}>
-          Vérifier l'intégrité
+          <AvecIcone icone={ShieldCheck}>Vérifier l'intégrité</AvecIcone>
         </button>
       </section>
 
@@ -245,7 +247,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
             <h2>Lecture X · journée du {lecture.dateComptable}</h2>
             {imprimanteConfiguree && (
               <button className="bouton discret" onClick={() => void imprimer(gabaritLectureX(lecture, config, utilisateur.id), "Lecture X")}>
-                Imprimer
+                <AvecIcone icone={Printer}>Imprimer</AvecIcone>
               </button>
             )}
           </header>
@@ -296,13 +298,13 @@ export function Clotures(props: { commandesOuvertes: number }) {
           pied={
             <>
               <button className="bouton" onClick={() => void archiver(choisie)}>
-                Télécharger l'archive
+                <AvecIcone icone={Download}>Télécharger l'archive</AvecIcone>
               </button>
               <button
                 className="bouton"
                 onClick={() => void imprimer(gabaritCloture(choisie, config, comptageChoisie), `Clôture ${choisie.identifiantPeriode}`)}
               >
-                {imprimanteConfiguree ? "Réimprimer" : "Voir le ticket Z"}
+                <AvecIcone icone={imprimanteConfiguree ? Printer : Eye}>{imprimanteConfiguree ? "Réimprimer" : "Voir le ticket Z"}</AvecIcone>
               </button>
             </>
           }

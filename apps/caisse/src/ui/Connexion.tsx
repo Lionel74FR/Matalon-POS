@@ -1,3 +1,5 @@
+import { Users } from "lucide-react";
+import { AvecIcone } from "./icones";
 import { useState } from "react";
 import type { Utilisateur } from "../donnees/configuration";
 import type { Caisse } from "../fiscal/caisse";
@@ -38,7 +40,7 @@ export function Connexion(props: { caisse: Caisse; onConnecte: (u: Utilisateur) 
           <>
             <SaisiePin key={choisi.id} utilisateur={choisi} onValide={props.onConnecte} />
             <button className="bouton discret" onClick={() => setChoisi(null)}>
-              Changer de personne
+              <AvecIcone icone={Users}>Changer de personne</AvecIcone>
             </button>
           </>
         )}

@@ -1,3 +1,5 @@
+import { FileText, Printer, Receipt } from "lucide-react";
+import { AvecIcone } from "../icones";
 import type { Ticket } from "@matalon/noyau-fiscal";
 import { useEffect, useState } from "react";
 import { gabaritFacture } from "../../impression/gabarits";
@@ -96,7 +98,7 @@ export function ModaleFacture(props: { ticket: Ticket; onFermer: () => void }) {
                   })()
                 }
               >
-                {imprimanteConfiguree ? "Imprimer sur l'imprimante ticket" : "Format ticket"}
+                <AvecIcone icone={Receipt}>{imprimanteConfiguree ? "Imprimer sur l'imprimante ticket" : "Format ticket"}</AvecIcone>
               </button>
               <button
                 className="bouton principal"
@@ -105,7 +107,7 @@ export function ModaleFacture(props: { ticket: Ticket; onFermer: () => void }) {
                   void tracer("a4");
                 }}
               >
-                Imprimer en A4 ou PDF
+                <AvecIcone icone={Printer}>Imprimer en A4 ou PDF</AvecIcone>
               </button>
             </>
           }
@@ -128,7 +130,7 @@ export function ModaleFacture(props: { ticket: Ticket; onFermer: () => void }) {
       onFermer={props.onFermer}
       pied={
         <button className="bouton principal" disabled={enCours || manquantes.length > 0} onClick={() => void emettre()}>
-          Émettre la facture
+          <AvecIcone icone={FileText}>Émettre la facture</AvecIcone>
         </button>
       }
     >

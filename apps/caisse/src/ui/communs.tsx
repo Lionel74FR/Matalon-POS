@@ -1,3 +1,5 @@
+import { Delete, X } from "lucide-react";
+import { BoutonIcone } from "./icones";
 import { useEffect, type ReactNode } from "react";
 
 export function Modale(props: {
@@ -17,9 +19,7 @@ export function Modale(props: {
       <div className={`modale${props.large ? " large" : ""}`} role="dialog" aria-modal="true" aria-label={props.titre}>
         <header className="modale-tete">
           <h2>{props.titre}</h2>
-          <button className="bouton discret" onClick={props.onFermer} aria-label="Fermer">
-            ✕
-          </button>
+          <BoutonIcone icone={X} variante="discret" libelle="Fermer" onClick={props.onFermer} />
         </header>
         <div className="modale-corps">{props.children}</div>
         {props.pied && <footer className="modale-pied">{props.pied}</footer>}
@@ -38,7 +38,7 @@ export function Pave(props: { onTouche: (t: string) => void; virgule?: boolean; 
           <span key={i} />
         ) : (
           <button key={i} className="touche" onClick={() => props.onTouche(t)} aria-label={t === "effacer" ? "Effacer" : t}>
-            {t === "effacer" ? "⌫" : t}
+            {t === "effacer" ? <Delete className="icone" size={28} aria-hidden="true" /> : t}
           </button>
         ),
       )}

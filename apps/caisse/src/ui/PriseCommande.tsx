@@ -1,3 +1,6 @@
+import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, Printer, StickyNote, Users } from "lucide-react";
+import { AvecIcone, BoutonIcone } from "./icones";
+import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
@@ -40,11 +43,11 @@ export function PriseCommande(props: ProprietesCommande) {
     return (
       <div className="page">
         <Vide>
-          La carte de l'établissement n'a pas encore été reçue. Connectez l'iPad à Internet, puis touchez la pastille de
+          La carte de l'établissement n'a pas encore été reçue. Connectez l'{NOM_APPAREIL} à Internet, puis touchez la pastille de
           synchronisation en haut à droite.
         </Vide>
         <button className="bouton" onClick={props.onRetour}>
-          Retour à la salle
+          <AvecIcone icone={ArrowLeft}>Retour à la salle</AvecIcone>
         </button>
       </div>
     );
@@ -98,27 +101,23 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
     <div className="prise-commande">
       <aside className={`ticket-papier${ticketOuvert ? " ouvert" : ""}`} aria-label="Commande en cours">
         <header className="ticket-tete">
-          <button className="bouton discret" onClick={props.onRetour} aria-label="Retour à la salle">
-            ←
-          </button>
+          <BoutonIcone icone={ArrowLeft} variante="discret" libelle="Retour à la salle" onClick={props.onRetour} />
           <div className="ticket-titre">
             <h1>{props.titre}</h1>
             {!estComptoir && (
               <button className="lien" onClick={() => setCouvertsOuvert(true)}>
-                {c.couverts ? `${c.couverts} couvert${c.couverts > 1 ? "s" : ""}` : "Indiquer les couverts"}
+                <AvecIcone icone={Users} taille={18}>
+                  {c.couverts ? `${c.couverts} couvert${c.couverts > 1 ? "s" : ""}` : "Indiquer les couverts"}
+                </AvecIcone>
               </button>
             )}
           </div>
           <div className="ticket-outils">
-            <button className="bouton discret" disabled={c.lignes.length === 0} onClick={() => setNoteOuverte(true)} aria-label="Note sur la commande">
-              Note
-            </button>
-            <button className="bouton discret" disabled={c.lignes.length === 0} onClick={() => setTransfertOuvert(true)}>
-              Transférer
-            </button>
+            <BoutonIcone icone={StickyNote} variante="discret" libelle="Note sur la commande" disabled={c.lignes.length === 0} onClick={() => setNoteOuverte(true)} />
+            <BoutonIcone icone={ArrowRightLeft} variante="discret" libelle="Transférer vers une autre table" disabled={c.lignes.length === 0} onClick={() => setTransfertOuvert(true)} />
           </div>
           <button className="bouton fermer-mobile" onClick={() => setTicketOuvert(false)}>
-            Carte
+            <AvecIcone icone={BookOpen}>Carte</AvecIcone>
           </button>
         </header>
         {c.note && (
@@ -156,11 +155,11 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           <div className="ticket-actions">
             {!estComptoir && (
               <button className="bouton" disabled={c.lignes.length === 0} onClick={() => void imprimerAddition()}>
-                Addition
+                <AvecIcone icone={Printer}>Addition</AvecIcone>
               </button>
             )}
             <button className="bouton principal" disabled={c.lignes.length === 0} onClick={() => setEncaissement(true)}>
-              Encaisser
+              <AvecIcone icone={CreditCard}>Encaisser</AvecIcone>
             </button>
           </div>
         </footer>

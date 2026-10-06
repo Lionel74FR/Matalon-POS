@@ -24,6 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Icônes dans les menus et les actions (caisse et administration), rattachement d'un iPad ou d'un iPhone (type d'appareil reconnu et affiché), administration défilante au doigt |
 | 172907c | Lot 2 : éditeur de cartes dans l'administration, cartes envoyées aux iPad (versionnées, gardées hors ligne), archives par Z côté serveur vérifiables seules, journal d'administration en ajout seul |
 | 0396872 | Lot 1 : fond de caisse et comptage au Z, facture sur demande et avoir, notes et transfert de table, CI GitHub |
 | 867b516 et avant | Noyau fiscal, caisse PWA, serveur (rattachement, réplication vérifiée), administration 2FA, note en QR code, version iPhone, guide de test |
@@ -32,6 +33,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 - Montants en centimes entiers ; TVA en points de base.
 - Le noyau fiscal tient une chaîne par caisse, signée par une clé ECDSA propre à l'iPad. Le serveur vérifie et réplique, mais ne signe jamais.
+- Interface : une icône seule quand le sens est évident (fermer, retour, imprimer, se déconnecter), toujours avec son libellé pour l'accessibilité ; icône et mot court quand l'action engage. Icônes Lucide intégrées au code (hors ligne).
 - La carte vient du serveur (`/api/caisse/carte`) ; `carteDe(config)` tombe sur la carte livrée avec le code seulement avant la première réception.
 - Une divergence de synchronisation est signalée mais ne bloque pas l'encaissement. L'encaissement est bloqué si l'iPad est révoqué ou si son horloge s'écarte de plus de 5 min.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.

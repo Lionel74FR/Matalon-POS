@@ -1,3 +1,5 @@
+import { Check, Minus, Plus, Trash2 } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { useState } from "react";
 import { avecQuantite, montantLigne, montantRemise, type LigneCommande } from "../../metier/commande";
 import { Modale } from "../communs";
@@ -69,10 +71,10 @@ export function ModaleLigne(props: {
       pied={
         <>
           <button className="bouton danger" onClick={() => void supprimer()}>
-            Retirer de la commande
+            <AvecIcone icone={Trash2}>Retirer de la commande</AvecIcone>
           </button>
           <button className="bouton principal" onClick={() => void valider()}>
-            Valider · {euros(montantLigne(apercu))}
+            <AvecIcone icone={Check}>Valider · {euros(montantLigne(apercu))}</AvecIcone>
           </button>
         </>
       }
@@ -82,11 +84,11 @@ export function ModaleLigne(props: {
         <h3>Quantité</h3>
         <div className="quantite">
           <button className="bouton" onClick={() => setQuantite((q) => Math.max(1, q - 1))} aria-label="Un de moins">
-            −
+            <Minus className="icone" size={22} aria-hidden="true" />
           </button>
           <span>{quantite}</span>
           <button className="bouton" onClick={() => setQuantite((q) => q + 1)} aria-label="Un de plus">
-            +
+            <Plus className="icone" size={22} aria-hidden="true" />
           </button>
         </div>
       </section>

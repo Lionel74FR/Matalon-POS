@@ -1,3 +1,5 @@
+import { Check } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { useState } from "react";
 import { Modale, Pave } from "../communs";
 
@@ -9,7 +11,7 @@ export function ModaleCouverts(props: { valeur: number | null; onValider: (n: nu
       onFermer={props.onFermer}
       pied={
         <button className="bouton principal" onClick={() => props.onValider(n > 0 ? n : null)}>
-          Valider {n > 0 ? `${n} couvert${n > 1 ? "s" : ""}` : "sans couverts"}
+          <AvecIcone icone={Check}>Valider {n > 0 ? `${n} couvert${n > 1 ? "s" : ""}` : "sans couverts"}</AvecIcone>
         </button>
       }
     >

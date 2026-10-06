@@ -1,3 +1,5 @@
+import { Calculator, Coins, Lock } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { useEffect, useMemo, useState } from "react";
 import { COUPURES, etatJournee, rapprocher, totalCoupures, type EtatJournee, type SaisieComptage } from "../../metier/tresorerie";
 import { centimesDepuisSaisie, ChampEuros, Modale, saisieDepuisCentimes } from "../communs";
@@ -92,7 +94,7 @@ export function ModaleComptage(props: {
             disabled={!saisie || motifManquant || fondTropGrand || props.enCours}
             onClick={() => saisie && props.onValide(saisie, etat)}
           >
-            {imprimanteConfiguree ? "Valider, clôturer et imprimer le Z" : "Valider et clôturer la journée"}
+            <AvecIcone icone={Lock}>{imprimanteConfiguree ? "Valider, clôturer et imprimer le Z" : "Valider et clôturer la journée"}</AvecIcone>
           </button>
         </>
       }
@@ -151,14 +153,14 @@ export function ModaleComptage(props: {
                 ))}
               </div>
               <button className="bouton discret" onClick={() => setTotalDirect(saisieDepuisCentimes(totalCoupures(detail) || null))}>
-                Saisir le total directement
+                <AvecIcone icone={Calculator}>Saisir le total directement</AvecIcone>
               </button>
             </>
           ) : (
             <>
               <ChampEuros libelle="Espèces comptées" valeur={totalDirect} onChange={setTotalDirect} />
               <button className="bouton discret" onClick={() => setTotalDirect(null)}>
-                Compter par billets et pièces
+                <AvecIcone icone={Coins}>Compter par billets et pièces</AvecIcone>
               </button>
             </>
           )}

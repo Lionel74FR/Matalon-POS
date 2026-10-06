@@ -1,3 +1,4 @@
+import { descriptionAppareil } from "../donnees/appareil";
 import {
   genererPaireCles,
   Registre,
@@ -104,7 +105,7 @@ export async function rattacher(
     caisseId,
     cleId: paire.cleId,
     clePubliqueJwk: paire.clePubliqueJwk,
-    appareil: typeof navigator === "undefined" ? "" : navigator.userAgent.slice(0, 200),
+    appareil: typeof navigator === "undefined" ? "" : descriptionAppareil(),
   });
   const maintenant = new Date().toISOString();
   const config: Configuration = {

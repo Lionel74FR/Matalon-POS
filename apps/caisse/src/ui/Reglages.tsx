@@ -1,3 +1,6 @@
+import { KeyRound, Printer, RefreshCw, Save, UserCheck, UserPlus, UserX } from "lucide-react";
+import { AvecIcone, BoutonIcone } from "./icones";
+import { NOM_APPAREIL } from "../donnees/appareil";
 import { VERSION_NOYAU_FISCAL } from "@matalon/noyau-fiscal";
 import { useEffect, useState } from "react";
 import {
@@ -67,7 +70,7 @@ export function Reglages(props: { onAssistant: () => void }) {
         setEtablissement(e.identite);
       }
       await majConfig(suivante);
-      notifier(partageModifie ? "Réglages enregistrés et partagés avec les autres caisses." : "Réglages de cet iPad enregistrés.");
+      notifier(partageModifie ? "Réglages enregistrés et partagés avec les autres caisses." : `Réglages de cet ${NOM_APPAREIL} enregistrés.`);
     } catch (e) {
       notifier(messageServeur(e), "erreur");
     } finally {
@@ -119,7 +122,7 @@ export function Reglages(props: { onAssistant: () => void }) {
       <header className="page-tete">
         <h1>Réglages</h1>
         <button className="bouton principal" disabled={envoi} onClick={() => void enregistrer()}>
-          {envoi ? "Enregistrement…" : "Enregistrer les réglages"}
+          <AvecIcone icone={Save}>{envoi ? "Enregistrement…" : "Enregistrer les réglages"}</AvecIcone>
         </button>
       </header>
 
@@ -139,7 +142,7 @@ export function Reglages(props: { onAssistant: () => void }) {
           <fieldset>
             <legend>Imprimante Epson</legend>
             <button className="bouton principal" onClick={props.onAssistant}>
-              Assistant de connexion
+              <AvecIcone icone={Printer}>Assistant de connexion</AvecIcone>
             </button>
             <label className="champ">
               <span>
@@ -163,7 +166,7 @@ export function Reglages(props: { onAssistant: () => void }) {
                 void imprimer(gabaritTest({ ...config, etablissement, imprimante: { ...imprimante, adresse: imprimante.adresse.trim() } }), "Test")
               }
             >
-              Imprimer un test
+              <AvecIcone icone={Printer}>Imprimer un test</AvecIcone>
             </button>
             <label className="champ">
               <span>
@@ -197,12 +200,13 @@ export function Reglages(props: { onAssistant: () => void }) {
                 <td>{u.nom}</td>
                 <td>{u.role === "responsable" ? "Responsable" : "Serveur"}</td>
                 <td className="nombre">
-                  <button className="bouton discret" onClick={() => void changerPin(u)}>
-                    Changer le code
-                  </button>
-                  <button className="bouton discret" onClick={() => void basculerActif(u)}>
-                    {u.actif ? "Désactiver" : "Réactiver"}
-                  </button>
+                  <BoutonIcone icone={KeyRound} variante="discret" libelle={`Changer le code PIN de ${u.nom}`} onClick={() => void changerPin(u)} />
+                  <BoutonIcone
+                    icone={u.actif ? UserX : UserCheck}
+                    variante="discret"
+                    libelle={`${u.actif ? "Désactiver" : "Réactiver"} ${u.nom}`}
+                    onClick={() => void basculerActif(u)}
+                  />
                 </td>
               </tr>
             ))}
@@ -223,7 +227,7 @@ export function Reglages(props: { onAssistant: () => void }) {
             onChange={(e) => setNouveau({ ...nouveau, pin: e.target.value.replace(/\D/g, "") })}
           />
           <button className="bouton" onClick={() => void ajouterUtilisateur()}>
-            Ajouter à l'équipe
+            <AvecIcone icone={UserPlus}>Ajouter à l'équipe</AvecIcone>
           </button>
         </div>
       </fieldset>
@@ -256,7 +260,7 @@ export function Reglages(props: { onAssistant: () => void }) {
               {synchro.enAttente > 0 && ` · ${synchro.enAttente} à envoyer`}
               {synchro.derniereSynchro && ` · dernière le ${new Date(synchro.derniereSynchro).toLocaleString("fr-FR")}`}{" "}
               <button className="bouton discret" onClick={() => void synchroniser()}>
-                Synchroniser
+                <AvecIcone icone={RefreshCw}>Synchroniser</AvecIcone>
               </button>
             </dd>
           </div>
@@ -282,7 +286,7 @@ export function Reglages(props: { onAssistant: () => void }) {
               {persistant == null
                 ? "Inconnu"
                 : persistant
-                  ? "Oui, l'iPad ne purgera pas les données"
+                  ? `Oui, l'${NOM_APPAREIL} ne purgera pas les données`
                   : "Non : installez la caisse sur l'écran d'accueil (Partager › Sur l'écran d'accueil)"}
             </dd>
           </div>

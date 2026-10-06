@@ -1,3 +1,6 @@
+import { ArrowLeft, ArrowRight, Ban, Banknote, Check, Clock, ExternalLink, Printer, RotateCw, X } from "lucide-react";
+import { AvecIcone } from "./icones";
+import { NOM_APPAREIL } from "../donnees/appareil";
 import { useEffect, useState } from "react";
 import type { Configuration } from "../donnees/configuration";
 import { ADRESSE_IPV4, envoyerEpson, ErreurImpression, testerEpson, type EtatImprimante } from "../impression/epson";
@@ -87,7 +90,7 @@ export function AssistantImprimante(props: {
           ))}
         </ol>
         <button className="bouton discret" onClick={props.onPlusTard}>
-          Configurer plus tard
+          <AvecIcone icone={Clock}>Configurer plus tard</AvecIcone>
         </button>
       </aside>
 
@@ -99,16 +102,16 @@ export function AssistantImprimante(props: {
               <li>Branchez l'alimentation, placez le rouleau de papier de 80 mm et fermez le capot. Le voyant vert doit être allumé.</li>
               <li>
                 Reliez l'imprimante à la box de l'établissement avec un câble réseau, sur le port <strong>LAN</strong> à l'arrière. En Wi-Fi,
-                connectez-la d'abord avec l'app gratuite Epson TM Utility sur l'iPad.
+                connectez-la d'abord avec l'app gratuite Epson TM Utility sur l'{NOM_APPAREIL}.
               </li>
               <li>
                 Branchez le câble du tiroir-caisse sur la prise <strong>DK</strong> à l'arrière de l'imprimante.
               </li>
-              <li>Vérifiez que l'iPad est connecté au Wi-Fi de l'établissement, le même réseau que l'imprimante.</li>
+              <li>Vérifiez que l'{NOM_APPAREIL} est connecté au Wi-Fi de l'établissement, le même réseau que l'imprimante.</li>
             </ol>
             <div className="assistant-actions">
               <button className="bouton principal grand" onClick={() => setEtape(1)}>
-                C'est branché
+                <AvecIcone icone={Check}>C'est branché</AvecIcone>
               </button>
             </div>
           </>
@@ -143,10 +146,10 @@ export function AssistantImprimante(props: {
             </p>
             <div className="assistant-actions">
               <button className="bouton" onClick={() => setEtape(0)}>
-                Retour
+                <AvecIcone icone={ArrowLeft}>Retour</AvecIcone>
               </button>
               <button className="bouton principal grand" disabled={!adresseValide} onClick={() => setEtape(2)}>
-                Continuer
+                <AvecIcone icone={ArrowRight}>Continuer</AvecIcone>
               </button>
             </div>
           </>
@@ -156,7 +159,7 @@ export function AssistantImprimante(props: {
           <>
             <h2>Autoriser la connexion sécurisée</h2>
             <p className="explication">
-              La caisse parle à l'imprimante en connexion chiffrée. L'iPad doit accepter une fois le certificat de l'imprimante.
+              La caisse parle à l'imprimante en connexion chiffrée. L'{NOM_APPAREIL} doit accepter une fois le certificat de l'imprimante.
             </p>
             <ol className="consignes">
               <li>Touchez « Ouvrir l'imprimante » : Safari affiche « Cette connexion n'est pas privée ». C'est normal.</li>
@@ -165,13 +168,13 @@ export function AssistantImprimante(props: {
             </ol>
             <div className="assistant-actions">
               <button className="bouton" onClick={() => setEtape(1)}>
-                Retour
+                <AvecIcone icone={ArrowLeft}>Retour</AvecIcone>
               </button>
               <a className="bouton" href={`https://${ip}/`} target="_blank" rel="noreferrer">
-                Ouvrir l'imprimante
+                <AvecIcone icone={ExternalLink}>Ouvrir l'imprimante</AvecIcone>
               </a>
               <button className="bouton principal grand" onClick={() => setEtape(3)}>
-                C'est fait, tester
+                <AvecIcone icone={Check}>C'est fait, tester</AvecIcone>
               </button>
             </div>
           </>
@@ -205,19 +208,19 @@ export function AssistantImprimante(props: {
                 <ul className="consignes">
                   <li>Le voyant vert de l'imprimante est-il allumé ?</li>
                   <li>L'adresse saisie ({ip}) est-elle celle de la feuille d'état ?</li>
-                  <li>L'iPad est-il sur le Wi-Fi de l'établissement, et non en 4G ou sur un Wi-Fi invité ?</li>
+                  <li>L'{NOM_APPAREIL} est-il sur le Wi-Fi de l'établissement, et non en 4G ou sur un Wi-Fi invité ?</li>
                 </ul>
               </>
             )}
             <div className="assistant-actions">
               <button className="bouton" onClick={() => setEtape(test?.etat === "echec" && test.erreur.cause_ === "injoignable" ? 1 : 2)}>
-                Retour
+                <AvecIcone icone={ArrowLeft}>Retour</AvecIcone>
               </button>
               <button className="bouton" disabled={test?.etat === "en cours"} onClick={() => void lancerTest()}>
-                Relancer le test
+                <AvecIcone icone={RotateCw}>Relancer le test</AvecIcone>
               </button>
               <button className="bouton principal grand" disabled={test?.etat !== "ok"} onClick={() => setEtape(4)}>
-                Continuer
+                <AvecIcone icone={ArrowRight}>Continuer</AvecIcone>
               </button>
             </div>
           </>
@@ -234,18 +237,18 @@ export function AssistantImprimante(props: {
             <div className="assistant-actions">
               {impression !== "envoyee" ? (
                 <button className="bouton principal grand" onClick={() => void imprimerTest(true)}>
-                  Imprimer un ticket de test
+                  <AvecIcone icone={Printer}>Imprimer un ticket de test</AvecIcone>
                 </button>
               ) : (
                 <>
                   <button className="bouton" onClick={() => { setImpression("attente"); setEtape(3); }}>
-                    Rien n'est sorti
+                    <AvecIcone icone={X}>Rien n'est sorti</AvecIcone>
                   </button>
                   <button className="bouton" onClick={() => void imprimerTest(false)}>
-                    Accents déformés : réimprimer sans accents
+                    <AvecIcone icone={RotateCw}>Accents déformés : réimprimer sans accents</AvecIcone>
                   </button>
                   <button className="bouton principal grand" onClick={() => setEtape(5)}>
-                    Le ticket est correct
+                    <AvecIcone icone={Check}>Le ticket est correct</AvecIcone>
                   </button>
                 </>
               )}
@@ -267,19 +270,19 @@ export function AssistantImprimante(props: {
               {tiroir === "attente" || tiroir === "bloque" ? (
                 <>
                   <button className="bouton" onClick={terminer}>
-                    Pas de tiroir
+                    <AvecIcone icone={Ban}>Pas de tiroir</AvecIcone>
                   </button>
                   <button className="bouton principal grand" onClick={() => void ouvrirTiroir()}>
-                    Ouvrir le tiroir
+                    <AvecIcone icone={Banknote}>Ouvrir le tiroir</AvecIcone>
                   </button>
                 </>
               ) : (
                 <>
                   <button className="bouton" onClick={() => setTiroir("bloque")}>
-                    Il ne s'est pas ouvert
+                    <AvecIcone icone={X}>Il ne s'est pas ouvert</AvecIcone>
                   </button>
                   <button className="bouton principal grand" onClick={terminer}>
-                    Il s'est ouvert, terminer
+                    <AvecIcone icone={Check}>Il s'est ouvert, terminer</AvecIcone>
                   </button>
                 </>
               )}

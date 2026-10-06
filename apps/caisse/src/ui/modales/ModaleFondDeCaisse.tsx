@@ -1,3 +1,5 @@
+import { Clock, Save } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { useState } from "react";
 import { centimesDepuisSaisie, ChampEuros, Modale, saisieDepuisCentimes } from "../communs";
 import { euros, useCaisse } from "../contexte";
@@ -29,10 +31,10 @@ export function ModaleFondDeCaisse(props: { propose: number | null; onDeclare: (
       pied={
         <>
           <button className="bouton" onClick={props.onPlusTard}>
-            Plus tard
+            <AvecIcone icone={Clock}>Plus tard</AvecIcone>
           </button>
           <button className="bouton principal" disabled={montant == null || enCours} onClick={() => void declarer()}>
-            Enregistrer le fond
+            <AvecIcone icone={Save}>Enregistrer le fond</AvecIcone>
           </button>
         </>
       }

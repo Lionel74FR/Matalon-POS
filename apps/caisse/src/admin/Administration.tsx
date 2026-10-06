@@ -5,6 +5,47 @@ import { genererTables } from "../donnees/configuration";
 import type { ResumeCarte } from "@matalon/serveur/partage";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
+import {
+  Archive,
+  Ban,
+  BookOpen,
+  FileJson,
+  FileSpreadsheet,
+  KeyRound,
+  LogIn,
+  LogOut,
+  Plus,
+  RotateCw,
+  Save,
+  ShieldCheck,
+  Smartphone,
+  Store,
+  Tablet,
+  TabletSmartphone,
+  TriangleAlert,
+  UserCheck,
+  UserPlus,
+  Users,
+  UserX,
+  type LucideIcon,
+} from "lucide-react";
+import { typeDepuisDescription, type TypeAppareil } from "../donnees/appareil";
+import { AvecIcone, BoutonIcone } from "../ui/icones";
+
+const ICONE_APPAREIL: Record<TypeAppareil, LucideIcon> = { iPad: Tablet, iPhone: Smartphone, Autre: Tablet };
+/** L'iPad est dessiné à l'horizontale, comme posé sur le comptoir, pour ne pas le confondre avec l'iPhone. */
+const CLASSE_APPAREIL: Record<TypeAppareil, string | undefined> = { iPad: "paysage", iPhone: undefined, Autre: "paysage" };
+
+/** Titre de section précédé de son icône. */
+function Titre(props: { icone: LucideIcon; children: ReactNode }) {
+  return (
+    <h2 className="titre-icone">
+      <AvecIcone icone={props.icone} taille={22}>
+        {props.children}
+      </AvecIcone>
+    </h2>
+  );
+}
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const dateHeure = (iso: string | null) => (iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "—");
@@ -72,7 +113,7 @@ export function Administration() {
         <h1>Administration indisponible</h1>
         <p className="erreur">{erreur}</p>
         <button className="bouton" onClick={() => location.reload()}>
-          Réessayer
+          <AvecIcone icone={RotateCw}>Réessayer</AvecIcone>
         </button>
       </div>
     );
@@ -129,7 +170,7 @@ function Initialisation(props: { onTermine: () => void }) {
       {!secret ? (
         <form className="admin-carte" onSubmit={creer}>
           <p>
-            Ce compte gère les établissements, les équipes et les iPad du groupe. Il est protégé par un mot de passe et un
+            Ce compte gère les établissements, les équipes et les caisses (iPad et iPhone) du groupe. Il est protégé par un mot de passe et un
             code à usage unique (application d'authentification).
           </p>
           <Champ libelle="Identifiant">
@@ -145,7 +186,7 @@ function Initialisation(props: { onTermine: () => void }) {
             {erreur}
           </p>
           <button className="bouton principal" disabled={enCours}>
-            Continuer
+            <AvecIcone icone={ShieldCheck}>Continuer</AvecIcone>
           </button>
         </form>
       ) : (
@@ -174,7 +215,7 @@ function Initialisation(props: { onTermine: () => void }) {
             {erreur}
           </p>
           <button className="bouton principal" disabled={enCours || code.length !== 6}>
-            Activer et se connecter
+            <AvecIcone icone={LogIn}>Activer et se connecter</AvecIcone>
           </button>
         </form>
       )}
@@ -217,7 +258,7 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
           {erreur}
         </p>
         <button className="bouton principal" disabled={enCours || code.length !== 6}>
-          Se connecter
+          <AvecIcone icone={LogIn}>Se connecter</AvecIcone>
         </button>
       </form>
     </div>
@@ -268,34 +309,63 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           <small>Administration</small>
         </div>
         <div className="admin-barre-droite">
-          <span>{props.identifiant}</span>
-          <button className="bouton discret" onClick={() => void api.deconnexion().finally(props.onDeconnecte)}>
-            Se déconnecter
-          </button>
+          <span className="admin-identifiant">{props.identifiant}</span>
+          <BoutonIcone
+            icone={LogOut}
+            libelle={`Se déconnecter (${props.identifiant})`}
+            variante="discret"
+            onClick={() => void api.deconnexion().finally(props.onDeconnecte)}
+          />
         </div>
       </header>
       <div className="admin-corps">
         <nav className="admin-liste" aria-label="Établissements">
           <h2>Établissements</h2>
-          {donnees?.etablissements.map((e) => (
-            <button key={e.id} className={`admin-lien${e.id === choisi ? " actif" : ""}`} onClick={() => aller(e.id)}>
-              <strong>{e.identite.enseigne}</strong>
-              <small>
-                {e.caisses.filter((c) => !c.revoqueeLe).length} iPad · {pluriel(e.utilisateurs.filter((u) => u.actif).length, "personne")}
-                {e.caisses.some((c) => c.divergence && !c.revoqueeLe) ? " · divergence" : ""}
-              </small>
-            </button>
-          ))}
+          {donnees?.etablissements.map((e) => {
+            const actives = e.caisses.filter((c) => !c.revoqueeLe).length;
+            const personnes = e.utilisateurs.filter((u) => u.actif).length;
+            const divergence = e.caisses.some((c) => c.divergence && !c.revoqueeLe);
+            return (
+              <button
+                key={e.id}
+                className={`admin-lien${e.id === choisi ? " actif" : ""}`}
+                onClick={() => aller(e.id)}
+                aria-label={`${e.identite.enseigne} : ${pluriel(actives, "caisse")}, ${pluriel(personnes, "personne")}${divergence ? ", divergence" : ""}`}
+              >
+                <strong>
+                  <AvecIcone icone={Store}>{e.identite.enseigne}</AvecIcone>
+                </strong>
+                <small className="admin-compteurs" aria-hidden="true">
+                  <span title="Caisses en service">
+                    <AvecIcone icone={Tablet} taille={16} classe="paysage">{actives}</AvecIcone>
+                  </span>
+                  <span title="Personnes actives">
+                    <AvecIcone icone={Users} taille={16}>{personnes}</AvecIcone>
+                  </span>
+                  {divergence && (
+                    <span className="erreur" title="Divergence de synchronisation">
+                      <AvecIcone icone={TriangleAlert} taille={16} />
+                    </span>
+                  )}
+                </small>
+              </button>
+            );
+          })}
           <button className={`admin-lien${choisi === "nouveau" ? " actif" : ""}`} onClick={() => aller("nouveau")}>
-            + Nouvel établissement
+            <strong>
+              <AvecIcone icone={Plus}>Établissement</AvecIcone>
+            </strong>
           </button>
           <h2 className="admin-liste-titre">Cartes</h2>
           <button
             className={`admin-lien${choisi === "cartes" ? " actif" : ""}`}
             onClick={() => aller("cartes")}
+            aria-label={`Cartes et prix : ${pluriel(cartes.length, "carte")}`}
           >
-            <strong>Cartes et prix</strong>
-            <small>{pluriel(cartes.length, "carte")}</small>
+            <strong>
+              <AvecIcone icone={BookOpen}>Cartes et prix</AvecIcone>
+            </strong>
+            <small aria-hidden="true">{pluriel(cartes.length, "carte")}</small>
           </button>
         </nav>
         <main className="admin-contenu">
@@ -363,7 +433,9 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
 
   return (
     <form className="admin-section" onSubmit={creer}>
-      <h1>Nouvel établissement</h1>
+      <h1 className="titre-icone">
+        <AvecIcone icone={Store} taille={26}>Nouvel établissement</AvecIcone>
+      </h1>
       <p className="explication">
         L'identifiant figure dans chaque ticket de ses caisses : il ne pourra plus changer. Le reste (identité légale, salle,
         équipe) se complète ensuite.
@@ -394,7 +466,7 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
         {erreur}
       </p>
       <button className="bouton principal" disabled={enCours}>
-        Créer l'établissement
+        <AvecIcone icone={Plus}>Créer l'établissement</AvecIcone>
       </button>
     </form>
   );
@@ -416,7 +488,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
       </header>
       {identiteIncomplete && (
         <p className="admin-alerte">
-          Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
+          <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
         </p>
       )}
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
@@ -428,32 +500,53 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
 }
 
 function Rattacher(props: { e: EtablissementAdmin; responsable: boolean; onChange: () => Promise<void> }) {
+  const [type, setType] = useState<"iPad" | "iPhone">("iPad");
   const [nom, setNom] = useState("");
   const [nouveau, setNouveau] = useState<{ code: string; expireLe: string; nomCaisse: string } | null>(null);
   const { enCours, erreur, envoyer } = useEnvoi();
   const generer = (ev: FormEvent) => {
     ev.preventDefault();
     void envoyer(async () => {
-      setNouveau(await api.genererCode(props.e.id, nom.trim() || "iPad"));
+      setNouveau(await api.genererCode(props.e.id, nom.trim() || type));
       setNom("");
       await props.onChange();
     });
   };
   return (
     <section className="admin-section">
-      <h2>Rattacher un iPad</h2>
+      <Titre icone={Plus}>Rattacher un iPad ou un iPhone</Titre>
       {!props.responsable ? (
         <p className="explication">Ajoutez d'abord un responsable à l'équipe : sans lui, personne ne pourrait ouvrir la caisse.</p>
       ) : (
         <>
+          <div className="options" role="radiogroup" aria-label="Appareil à rattacher">
+            {(["iPad", "iPhone"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="radio"
+                aria-checked={type === t}
+                className={`option${type === t ? " active" : ""}`}
+                onClick={() => setType(t)}
+              >
+                <AvecIcone icone={ICONE_APPAREIL[t]} classe={CLASSE_APPAREIL[t]}>{t}</AvecIcone>
+              </button>
+            ))}
+          </div>
           <p className="explication">
-            Sur l'iPad, ouvrez {location.host} depuis Safari, ajoutez-le à l'écran d'accueil (Partager › Sur l'écran d'accueil),
-            ouvrez-le, puis saisissez le code. Un code sert une seule fois et expire au bout de 48 heures.
+            Sur l'{type}, ouvrez {location.host} dans Safari, ajoutez-le à l'écran d'accueil (Partager › Sur l'écran d'accueil),
+            ouvrez-le depuis cette icône, puis saisissez le code. Un code sert une seule fois et expire au bout de 48 heures.
           </p>
           <form className="admin-ligne" onSubmit={generer}>
-            <input value={nom} onChange={(ev) => setNom(ev.target.value)} placeholder="Nom de l'iPad (Comptoir, Terrasse…)" maxLength={40} />
+            <input
+              value={nom}
+              onChange={(ev) => setNom(ev.target.value)}
+              placeholder={type === "iPad" ? "Nom de l'iPad (Comptoir, Terrasse…)" : "Nom de l'iPhone (Salle, Lionel…)"}
+              aria-label={`Nom de l'${type}`}
+              maxLength={40}
+            />
             <button className="bouton principal" disabled={enCours}>
-              Générer un code
+              <AvecIcone icone={KeyRound}>Générer un code</AvecIcone>
             </button>
           </form>
           {erreur && <p className="erreur">{erreur}</p>}
@@ -502,7 +595,7 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
     }
   };
   const revoquer = async (c: CaisseAdmin) => {
-    if (!window.confirm(`Révoquer « ${c.nom} » ? Cet iPad ne pourra plus encaisser ni se synchroniser. C'est définitif.`)) return;
+    if (!window.confirm(`Révoquer « ${c.nom} » ? Cet appareil ne pourra plus encaisser ni se synchroniser. C'est définitif.`)) return;
     try {
       await api.revoquer(c.id);
       await props.onChange();
@@ -512,18 +605,21 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
   };
   return (
     <section className="admin-section">
-      <h2>iPad rattachés</h2>
+      <Titre icone={TabletSmartphone}>Appareils rattachés</Titre>
       {props.caisses.length === 0 ? (
-        <p className="explication">Aucun iPad pour l'instant.</p>
+        <p className="explication">Aucun iPad ni iPhone pour l'instant.</p>
       ) : (
         <div className="admin-caisses">
           {props.caisses.map((c) => {
             const rapport = rapports[c.id];
+            const type = typeDepuisDescription(c.appareil);
             return (
               <article key={c.id} className={`admin-caisse${c.revoqueeLe ? " revoquee" : ""}`}>
                 <header>
-                  <strong>{c.nom}</strong>
-                  <small>{c.id}</small>
+                  <strong>
+                    <AvecIcone icone={ICONE_APPAREIL[type]} classe={CLASSE_APPAREIL[type]}>{c.nom}</AvecIcone>
+                  </strong>
+                  <small>{type === "Autre" ? c.id : `${type} · ${c.id}`}</small>
                   <span className={c.divergence && !c.revoqueeLe ? "erreur" : "etat"}>
                     {c.revoqueeLe ? `Révoqué le ${dateHeure(c.revoqueeLe)}` : c.divergence ? "Divergence" : "En service"}
                   </span>
@@ -549,8 +645,13 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
                               </td>
                               <td className="nombre">{euros(z.totalTTC)}</td>
                               <td>
-                                <a className="bouton discret" href={api.urlArchive(c.id, z.numero)}>
-                                  Archive (JSON)
+                                <a
+                                  className="bouton bouton-icone discret"
+                                  href={api.urlArchive(c.id, z.numero)}
+                                  aria-label={`Télécharger l'archive de la clôture n° ${z.numero} (JSON)`}
+                                  title="Télécharger l'archive (JSON)"
+                                >
+                                  <AvecIcone icone={Archive} />
                                 </a>
                               </td>
                             </tr>
@@ -573,21 +674,21 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
                   </p>
                 )}
                 <div className="admin-actions">
-                  <button className="bouton" onClick={() => void verifier(c.id)}>
-                    Vérifier la chaîne
+                  <button className="bouton" onClick={() => void verifier(c.id)} title="Vérifier la chaîne fiscale">
+                    <AvecIcone icone={ShieldCheck}>Vérifier</AvecIcone>
                   </button>
-                  <a className="bouton" href={api.urlCsv(c.id)}>
-                    Clôtures (CSV)
-                  </a>
-                  <a className="bouton" href={api.urlJournal(c.id)}>
-                    Journal complet (JSON)
-                  </a>
-                  <button className="bouton" onClick={() => void basculerClotures(c.id)}>
-                    {clotures[c.id] ? "Masquer les clôtures" : "Clôtures et archives"}
+                  <button className="bouton" aria-expanded={!!clotures[c.id]} onClick={() => void basculerClotures(c.id)} title="Clôtures et archives">
+                    <AvecIcone icone={Archive}>Clôtures</AvecIcone>
                   </button>
+                  <a className="bouton" href={api.urlCsv(c.id)} title="Télécharger les clôtures (CSV)">
+                    <AvecIcone icone={FileSpreadsheet}>CSV</AvecIcone>
+                  </a>
+                  <a className="bouton" href={api.urlJournal(c.id)} title="Télécharger le journal complet (JSON)">
+                    <AvecIcone icone={FileJson}>Journal</AvecIcone>
+                  </a>
                   {!c.revoqueeLe && (
-                    <button className="bouton danger" onClick={() => void revoquer(c)}>
-                      Révoquer
+                    <button className="bouton danger" onClick={() => void revoquer(c)} title="Révoquer cet appareil">
+                      <AvecIcone icone={Ban}>Révoquer</AvecIcone>
                     </button>
                   )}
                 </div>
@@ -631,10 +732,10 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
 
   return (
     <section className="admin-section">
-      <h2>Équipe</h2>
+      <Titre icone={Users}>Équipe</Titre>
       <p className="explication">
         Chaque personne se connecte en caisse avec son code PIN. Les responsables valident annulations et clôtures. Les
-        changements arrivent sur les iPad à la synchronisation suivante (une minute au plus en ligne).
+        changements arrivent sur les iPad et iPhone à la synchronisation suivante (une minute au plus en ligne).
       </p>
       {props.e.utilisateurs.length > 0 && (
         <table className="tableau admin-tableau">
@@ -648,13 +749,15 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
                     <option value="responsable">Responsable</option>
                   </select>
                 </td>
-                <td>
-                  <button className="bouton discret" disabled={enCours} onClick={() => changerPin(u)}>
-                    Changer le code
-                  </button>
-                  <button className="bouton discret" disabled={enCours} onClick={() => void modifier(u, { actif: !u.actif })}>
-                    {u.actif ? "Désactiver" : "Réactiver"}
-                  </button>
+                <td className="admin-boutons">
+                  <BoutonIcone icone={KeyRound} libelle={`Changer le code PIN de ${u.nom}`} variante="discret" disabled={enCours} onClick={() => changerPin(u)} />
+                  <BoutonIcone
+                    icone={u.actif ? UserX : UserCheck}
+                    libelle={`${u.actif ? "Désactiver" : "Réactiver"} ${u.nom}`}
+                    variante="discret"
+                    disabled={enCours}
+                    onClick={() => void modifier(u, { actif: !u.actif })}
+                  />
                 </td>
               </tr>
             ))}
@@ -677,7 +780,7 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
           onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ""))}
         />
         <button className="bouton" disabled={enCours}>
-          Ajouter
+          <AvecIcone icone={UserPlus}>Ajouter</AvecIcone>
         </button>
       </form>
       {props.e.utilisateurs.length === 0 && <p className="explication">Commencez par un responsable.</p>}
@@ -714,7 +817,7 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
 
   return (
     <form className="admin-section" onSubmit={enregistrer}>
-      <h2>Identité, carte et salle</h2>
+      <Titre icone={Store}>Identité, carte et salle</Titre>
       <div className="formulaire-colonnes">
         <div>
           {CHAMPS_IDENTITE.map(([cle, libelle, aide]) => (
@@ -746,9 +849,9 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
       </div>
       <div className="admin-ligne">
         <button className="bouton principal" disabled={enCours}>
-          Enregistrer
+          <AvecIcone icone={Save}>Enregistrer</AvecIcone>
         </button>
-        {enregistre && <span className="admin-ok">Enregistré. Les iPad le recevront à la prochaine synchronisation.</span>}
+        {enregistre && <span className="admin-ok">Enregistré. Les iPad et iPhone le recevront à la prochaine synchronisation.</span>}
         {erreur && <span className="erreur">{erreur}</span>}
       </div>
     </form>

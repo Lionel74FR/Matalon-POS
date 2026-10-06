@@ -10,6 +10,8 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
+import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, Pencil, Plus, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ResumeCarte } from "@matalon/serveur/partage";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { centimesDepuisSaisie, saisieDepuisCentimes } from "../ui/communs";
@@ -61,7 +63,9 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
   return (
     <>
       <section className="admin-section">
-        <h1>Cartes</h1>
+        <h1 className="titre-icone">
+          <AvecIcone icone={BookOpen} taille={26}>Cartes</AvecIcone>
+        </h1>
         <p className="explication">
           Une carte peut servir à plusieurs établissements ; chacun choisit la sienne dans sa fiche. Une modification enregistrée
           arrive sur les iPad à la synchronisation suivante, en moins d'une minute quand ils sont en ligne.
@@ -94,7 +98,7 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
                 </td>
                 <td>
                   <button className="bouton" onClick={() => props.onOuvrir(c.id)}>
-                    Modifier
+                    <AvecIcone icone={Pencil}>Modifier</AvecIcone>
                   </button>
                 </td>
               </tr>
@@ -103,7 +107,9 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
         </table>
       </section>
       <form className="admin-section" onSubmit={(e) => void creer(e)}>
-        <h2>Nouvelle carte</h2>
+        <h2 className="titre-icone">
+          <AvecIcone icone={Plus} taille={22}>Nouvelle carte</AvecIcone>
+        </h2>
         <div className="admin-ligne">
           <input placeholder="Nom (ex. Carte hiver 2026)" value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={80} />
           <select value={depuis} onChange={(e) => setDepuis(e.target.value)} aria-label="Point de départ">
@@ -114,7 +120,9 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
               </option>
             ))}
           </select>
-          <button className="bouton principal">Créer</button>
+          <button className="bouton principal">
+            <AvecIcone icone={Plus}>Créer</AvecIcone>
+          </button>
         </div>
         {erreur && <p className="erreur">{erreur}</p>}
       </form>
@@ -283,7 +291,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
       <header className="admin-fiche-tete editeur-tete">
         <div>
           <button className="bouton discret" onClick={props.onRetour}>
-            ← Cartes
+            <AvecIcone icone={ArrowLeft}>Cartes</AvecIcone>
           </button>
           <p className="surtitre">
             {carte.id} · version {origine.version}
@@ -291,15 +299,15 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
           <input className="editeur-nom" value={carte.nom} onChange={(e) => setCarte({ ...carte, nom: e.target.value })} aria-label="Nom de la carte" />
         </div>
         <div className="editeur-actions">
-          {etat === "enregistre" && <span className="admin-ok">Enregistrée : les iPad la reçoivent à la prochaine synchronisation.</span>}
+          {etat === "enregistre" && <span className="admin-ok">Enregistrée : les iPad et iPhone la reçoivent à la prochaine synchronisation.</span>}
           {modifiee && etat !== "envoi" && <span className="editeur-modifiee">Modifications non enregistrées</span>}
           {modifiee && (
             <button className="bouton" onClick={() => window.confirm("Annuler toutes les modifications ?") && setCarte(structuredClone(origine.carte))}>
-              Annuler
+              <AvecIcone icone={Undo2}>Annuler</AvecIcone>
             </button>
           )}
           <button className="bouton principal" disabled={!modifiee || etat === "envoi"} onClick={() => void enregistrer()}>
-            {etat === "envoi" ? "Enregistrement…" : "Enregistrer la carte"}
+            <AvecIcone icone={Save}>{etat === "envoi" ? "Enregistrement…" : "Enregistrer"}</AvecIcone>
           </button>
         </div>
       </header>
@@ -309,7 +317,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
           Quelqu'un a enregistré cette carte pendant que vous la modifiiez. Rechargez-la (vos modifications seront perdues) puis
           refaites-les, ou remplacez la carte enregistrée par la vôtre (leurs modifications seront alors perdues).{" "}
           <button className="bouton" onClick={() => void charger()}>
-            Recharger
+            <AvecIcone icone={RotateCw}>Recharger</AvecIcone>
           </button>{" "}
           <button
             className="bouton danger"
@@ -321,7 +329,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
               })()
             }
           >
-            Remplacer par ma version
+            <AvecIcone icone={Save}>Remplacer par ma version</AvecIcone>
           </button>
         </p>
       )}
@@ -350,12 +358,8 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                     <button className="editeur-cat-nom" onClick={() => setCatId(c.id)}>
                       {c.nom} <small>{c.articles.length}</small>
                     </button>
-                    <button className="bouton discret" aria-label={`Monter ${c.nom}`} onClick={() => majCategories((cats) => deplacerDansRayon(cats, i, -1))}>
-                      ↑
-                    </button>
-                    <button className="bouton discret" aria-label={`Descendre ${c.nom}`} onClick={() => majCategories((cats) => deplacerDansRayon(cats, i, 1))}>
-                      ↓
-                    </button>
+                    <BoutonIcone icone={ArrowUp} taille={18} variante="discret" libelle={`Monter ${c.nom}`} onClick={() => majCategories((cats) => deplacerDansRayon(cats, i, -1))} />
+                    <BoutonIcone icone={ArrowDown} taille={18} variante="discret" libelle={`Descendre ${c.nom}`} onClick={() => majCategories((cats) => deplacerDansRayon(cats, i, 1))} />
                   </div>
                 ))}
             </div>
@@ -368,7 +372,9 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                 <option key={r} value={r} />
               ))}
             </datalist>
-            <button className="bouton">Ajouter la catégorie</button>
+            <button className="bouton">
+              <AvecIcone icone={Plus}>Catégorie</AvecIcone>
+            </button>
           </form>
         </aside>
 
@@ -390,8 +396,8 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                     onChange={(e) => majCategorie(categorie.id, (c) => ({ ...c, rayon: e.target.value }))}
                   />
                 </label>
-                <button className="bouton danger" onClick={() => supprimerCategorie(categorie)}>
-                  Supprimer la catégorie
+                <button className="bouton danger" onClick={() => supprimerCategorie(categorie)} title="Supprimer la catégorie">
+                  <AvecIcone icone={Trash2}>Supprimer</AvecIcone>
                 </button>
               </div>
               <table className="tableau admin-tableau editeur-table">
@@ -444,12 +450,8 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                         </label>
                       </td>
                       <td className="editeur-ordre">
-                        <button className="bouton discret" aria-label={`Monter ${a.nom}`} onClick={() => majCategorie(categorie.id, (c) => ({ ...c, articles: deplacer(c.articles, i, -1) }))}>
-                          ↑
-                        </button>
-                        <button className="bouton discret" aria-label={`Descendre ${a.nom}`} onClick={() => majCategorie(categorie.id, (c) => ({ ...c, articles: deplacer(c.articles, i, 1) }))}>
-                          ↓
-                        </button>
+                        <BoutonIcone icone={ArrowUp} taille={18} variante="discret" libelle={`Monter ${a.nom}`} onClick={() => majCategorie(categorie.id, (c) => ({ ...c, articles: deplacer(c.articles, i, -1) }))} />
+                        <BoutonIcone icone={ArrowDown} taille={18} variante="discret" libelle={`Descendre ${a.nom}`} onClick={() => majCategorie(categorie.id, (c) => ({ ...c, articles: deplacer(c.articles, i, 1) }))} />
                       </td>
                     </tr>
                   ))}
@@ -465,7 +467,9 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                     </option>
                   ))}
                 </select>
-                <button className="bouton">Ajouter</button>
+                <button className="bouton">
+                  <AvecIcone icone={Plus}>Ajouter</AvecIcone>
+                </button>
               </form>
               {erreurAjout && <p className="erreur">{erreurAjout}</p>}
             </>
@@ -555,9 +559,7 @@ function FicheArticle(props: {
       <div className="modale large fiche-article" role="dialog" aria-modal="true" aria-label={a.nom}>
         <header className="modale-tete">
           <h2>{a.nom || "Article"}</h2>
-          <button className="bouton discret" onClick={props.onFermer} aria-label="Fermer">
-            ✕
-          </button>
+          <BoutonIcone icone={X} variante="discret" libelle="Fermer" onClick={props.onFermer} />
         </header>
         <div className="modale-corps">
           <div className="formulaire-colonnes">
@@ -630,13 +632,11 @@ function FicheArticle(props: {
                 onChange={(e) => setA({ ...a, variantes: a.variantes!.map((x, j) => (j === i ? { ...x, nom: e.target.value } : x)) })}
               />
               <input placeholder="Prix (vide : prix de l'article)" {...champPrix(`v:${v.id}`)} />
-              <button className="bouton discret" onClick={() => setA({ ...a, variantes: a.variantes!.filter((_, j) => j !== i) })}>
-                Retirer
-              </button>
+              <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer la variante ${v.nom}`} onClick={() => setA({ ...a, variantes: a.variantes!.filter((_, j) => j !== i) })} />
             </div>
           ))}
           <button className="bouton discret" onClick={() => setA({ ...a, variantes: [...(a.variantes ?? []), { id: sousId(`variante-${(a.variantes?.length ?? 0) + 1}`, a.variantes), nom: "" }] })}>
-            + Variante
+            <AvecIcone icone={Plus}>Variante</AvecIcone>
           </button>
 
           <h3>Suppléments (facturés en plus)</h3>
@@ -644,16 +644,14 @@ function FicheArticle(props: {
             <div key={s.id} className="admin-ligne sous-ligne">
               <input value={s.nom} placeholder="Nom" onChange={(e) => setA({ ...a, supplements: a.supplements!.map((x, j) => (j === i ? { ...x, nom: e.target.value } : x)) })} />
               <input placeholder="Prix (ex. 0,50)" {...champPrix(`s:${s.id}`)} />
-              <button className="bouton discret" onClick={() => setA({ ...a, supplements: a.supplements!.filter((_, j) => j !== i) })}>
-                Retirer
-              </button>
+              <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer le supplément ${s.nom}`} onClick={() => setA({ ...a, supplements: a.supplements!.filter((_, j) => j !== i) })} />
             </div>
           ))}
           <button
             className="bouton discret"
             onClick={() => setA({ ...a, supplements: [...(a.supplements ?? []), { id: sousId(`supplement-${(a.supplements?.length ?? 0) + 1}`, a.supplements), nom: "", prixTTC: 0 }] })}
           >
-            + Supplément
+            <AvecIcone icone={Plus}>Supplément</AvecIcone>
           </button>
 
           <h3>Formule (choix inclus dans le prix)</h3>
@@ -668,16 +666,16 @@ function FicheArticle(props: {
             />
           ))}
           <button className="bouton discret" onClick={() => setA({ ...a, formule: [...(a.formule ?? []), { id: sousId(`choix-${(a.formule?.length ?? 0) + 1}`, a.formule), nom: "", categories: [] }] })}>
-            + Choix de formule
+            <AvecIcone icone={Plus}>Choix de formule</AvecIcone>
           </button>
           {erreur && <p className="erreur">{erreur}</p>}
         </div>
         <footer className="modale-pied">
-          <button className="bouton danger" onClick={props.onSupprimer}>
-            Supprimer l'article
+          <button className="bouton danger" onClick={props.onSupprimer} title="Supprimer l'article">
+            <AvecIcone icone={Trash2}>Supprimer</AvecIcone>
           </button>
           <button className="bouton principal" onClick={valider}>
-            Valider
+            <AvecIcone icone={Check}>Valider</AvecIcone>
           </button>
         </footer>
       </div>
@@ -701,9 +699,7 @@ function ChoixFormuleEditeur(props: {
     <div className="choix-formule">
       <div className="admin-ligne sous-ligne">
         <input value={c.nom} placeholder="Nom du choix (ex. Boisson chaude)" onChange={(e) => props.onChange({ ...c, nom: e.target.value })} />
-        <button className="bouton discret" onClick={props.onRetirer}>
-          Retirer
-        </button>
+        <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer le choix ${c.nom}`} onClick={props.onRetirer} />
       </div>
       {(() => {
         const cats = new Set(props.carte.categories.map((x) => x.id));

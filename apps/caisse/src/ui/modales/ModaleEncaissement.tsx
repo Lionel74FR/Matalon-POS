@@ -1,3 +1,5 @@
+import { Banknote, Check, CreditCard, Printer, Ticket as TicketPapier, Trash2, X, type LucideIcon } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { ErreurFiscale, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useState } from "react";
 import { ID_COMPTOIR } from "../../donnees/configuration";
@@ -10,6 +12,13 @@ import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
 
 const MODES: ModePaiement[] = ["CB", "ESPECES", "TITRE_RESTAURANT_CARTE", "TITRE_RESTAURANT_PAPIER"];
+const ICONES_PAIEMENT: Record<ModePaiement, LucideIcon> = {
+  CB: CreditCard,
+  ESPECES: Banknote,
+  TITRE_RESTAURANT_CARTE: CreditCard,
+  TITRE_RESTAURANT_PAPIER: TicketPapier,
+  AUTRE: Banknote,
+};
 const BILLETS = [500, 1000, 2000, 5000];
 
 /** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
@@ -98,11 +107,11 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
                 className="bouton"
                 onClick={() => void imprimerNote(ticket, false).then(() => imprimanteConfiguree && setNoteImprimee(true))}
               >
-                {imprimanteConfiguree ? "Imprimer la note" : "Voir la note"}
+                <AvecIcone icone={Printer}>{imprimanteConfiguree ? "Imprimer la note" : "Voir la note"}</AvecIcone>
               </button>
             )}
             <button className="bouton principal" onClick={props.onTermine}>
-              Terminé
+              <AvecIcone icone={Check}>Terminé</AvecIcone>
             </button>
           </>
         }
@@ -140,10 +149,10 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
       pied={
         <>
           <button className="bouton" disabled={paiements.length === 0} onClick={() => setPaiements([])}>
-            Effacer les paiements
+            <AvecIcone icone={Trash2}>Effacer les paiements</AvecIcone>
           </button>
           <button className="bouton principal grand" disabled={!valide || enCours || !!blocage} onClick={() => void encaisser()}>
-            {blocage ? "Encaissement bloqué" : enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}
+            <AvecIcone icone={Check}>{blocage ? "Encaissement bloqué" : enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}</AvecIcone>
           </button>
         </>
       }
@@ -163,9 +172,10 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
                 <button
                   className="bouton discret"
                   aria-label={`Retirer le paiement ${LIBELLES_PAIEMENT[p.mode]}`}
+                  title={`Retirer le paiement ${LIBELLES_PAIEMENT[p.mode]}`}
                   onClick={() => setPaiements((l) => l.filter((_, j) => j !== i))}
                 >
-                  ✕
+                  <X className="icone" size={20} aria-hidden="true" />
                 </button>
               </span>
             </div>
@@ -184,7 +194,7 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
         <div className="encaissement-modes">
           {MODES.map((m) => (
             <button key={m} className={`mode mode-${m.toLowerCase()}`} disabled={montant <= 0} onClick={() => ajouter(m)}>
-              {LIBELLES_PAIEMENT[m]}
+              <AvecIcone icone={ICONES_PAIEMENT[m]} taille={26}>{LIBELLES_PAIEMENT[m]}</AvecIcone>
               <small>{euros(montant)}</small>
             </button>
           ))}

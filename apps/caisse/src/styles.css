@@ -112,7 +112,22 @@ button:disabled {
   background: var(--espresso-3);
   color: var(--mousse);
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
 }
+
+/* Icônes (Lucide) : alignées sur le texte, jamais déformées. */
+.icone {
+  flex: none;
+}
+
+.icone.paysage {
+  transform: rotate(90deg);
+}
+
 
 .bouton:active:not(:disabled) {
   transform: translateY(1px);
@@ -142,6 +157,15 @@ button:disabled {
   padding: 0 12px;
   color: var(--sable);
   font-weight: 400;
+}
+
+.bouton.bouton-icone {
+  padding: 0;
+  min-width: 52px;
+}
+
+.bouton.bouton-icone.discret {
+  min-width: 44px;
 }
 
 .lien {
@@ -417,38 +441,40 @@ button:disabled {
   white-space: nowrap;
 }
 
-.puce-synchro::before {
-  content: "";
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--sable);
+.puce-synchro .icone {
+  color: var(--sable);
 }
-
-.puce-synchro.synchronise::before {
-  background: var(--vert);
+.puce-synchro.synchronise .icone {
+  color: var(--vert);
 }
-
-.puce-synchro.en_attente::before,
-.puce-synchro.hors_ligne::before {
-  background: #d9a441;
+.puce-synchro.en_attente .icone,
+.puce-synchro.hors_ligne .icone {
+  color: #d9a441;
 }
-
 .puce-synchro.divergence,
 .puce-synchro.revoquee,
 .puce-synchro.erreur {
   color: #fff;
   background: var(--rouge);
 }
-
-.puce-synchro.divergence::before,
-.puce-synchro.revoquee::before,
-.puce-synchro.erreur::before {
-  background: #fff;
+.puce-synchro.divergence .icone,
+.puce-synchro.revoquee .icone,
+.puce-synchro.erreur .icone {
+  color: #fff;
+}
+.puce-synchro.en-cours .icone {
+  animation: pulsation 1s ease-in-out infinite;
 }
 
-.puce-synchro.en-cours::before {
-  animation: pulsation 1s ease-in-out infinite;
+/* Icône posée dans une phrase (bandeaux, alertes). */
+.icone.en-ligne {
+  vertical-align: -4px;
+}
+
+.onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @keyframes pulsation {
@@ -729,6 +755,26 @@ code {
 .table-meta {
   color: var(--encre-douce);
   font-size: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.table-meta > span,
+.table-nom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Texte réservé aux lecteurs d'écran. */
+.lecteur-ecran {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ───────── Prise de commande ───────── */

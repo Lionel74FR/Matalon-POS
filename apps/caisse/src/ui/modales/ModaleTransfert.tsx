@@ -1,3 +1,5 @@
+import { ArrowLeft, Merge, Save } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { useState } from "react";
 import { ID_COMPTOIR } from "../../donnees/configuration";
 import { Modale } from "../communs";
@@ -18,10 +20,10 @@ export function ModaleTransfert(props: { depuis: string; tablesOuvertes: Set<str
         pied={
           <>
             <button className="bouton" onClick={() => setFusion(null)}>
-              Choisir une autre table
+              <AvecIcone icone={ArrowLeft}>Choisir une autre table</AvecIcone>
             </button>
             <button className="bouton principal" onClick={() => props.onChoisir(fusion)}>
-              Regrouper sur {nom(fusion)}
+              <AvecIcone icone={Merge}>Regrouper sur {nom(fusion)}</AvecIcone>
             </button>
           </>
         }
@@ -69,7 +71,7 @@ export function ModaleNoteCommande(props: { note: string; onValider: (note: stri
       onFermer={props.onFermer}
       pied={
         <button className="bouton principal" onClick={() => props.onValider(note)}>
-          Enregistrer
+          <AvecIcone icone={Save}>Enregistrer</AvecIcone>
         </button>
       }
     >

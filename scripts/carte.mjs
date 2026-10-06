@@ -30,7 +30,7 @@ await a.locator(".editeur-ajout-article input[name=prix]").fill("2,50");
 await a.getByRole("button", { name: "Ajouter", exact: true }).click();
 await a.locator("tr", { hasText: "Cortado" }).locator("input[type=checkbox]").uncheck();
 await a.screenshot({ path: `${sortie}/c01-editeur.png`, fullPage: true });
-await a.getByRole("button", { name: "Enregistrer la carte" }).click();
+await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistrée").waitFor();
 // Contrôle : un prix illisible est refusé avant l'envoi.
 await a.getByRole("button", { name: "Ristretto", exact: true }).click();
@@ -39,14 +39,14 @@ await a.getByRole("button", { name: "Valider" }).click();
 const refusPrix = await a.getByText("Prix illisible").count();
 // Variante au prix tapé au clavier (« 3,50 » doit rester 3,50).
 await a.locator(".fiche-article label.champ", { hasText: "Prix TTC" }).locator("input").fill("2,50");
-await a.getByRole("button", { name: "+ Variante" }).click();
+await a.getByRole("button", { name: "Variante", exact: true }).click();
 await a.locator(".fiche-article .sous-ligne input").first().fill("Double");
 await a.locator(".fiche-article .sous-ligne input").nth(1).pressSequentially("3,50");
 await a.getByRole("button", { name: "Valider" }).click();
 // Suppression d'une catégorie citée par des formules : les références sont retirées, la carte s'enregistre.
 await a.locator(".editeur-cat-nom", { hasText: "Thés" }).click();
-await a.getByRole("button", { name: "Supprimer la catégorie" }).click();
-await a.getByRole("button", { name: "Enregistrer la carte" }).click();
+await a.getByRole("button", { name: "Supprimer", exact: true }).click();
+await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistrée").waitFor();
 const enregistree = (await appel("GET", "/cartes/carte-automne-2026")).carte;
 const articlesEnregistres = enregistree.categories.flatMap((c) => c.articles);
@@ -78,7 +78,7 @@ await p.screenshot({ path: `${sortie}/c02-ipad-carte.png` });
 await a.getByRole("button", { name: "Espresso", exact: true }).click();
 await a.locator(".fiche-article label.champ", { hasText: "Prix TTC" }).locator("input").fill("2,80");
 await a.getByRole("button", { name: "Valider" }).click();
-await a.getByRole("button", { name: "Enregistrer la carte" }).click();
+await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistrée").waitFor();
 await p.locator(".puce-synchro").click();
 await p.locator(".tuile", { hasText: "2,80" }).first().waitFor({ timeout: 15000 });

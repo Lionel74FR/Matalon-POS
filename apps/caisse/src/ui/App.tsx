@@ -1,3 +1,6 @@
+import { NOM_APPAREIL } from "../donnees/appareil";
+import { AvecIcone } from "./icones";
+import { Link, RefreshCw, RotateCw } from "lucide-react";
 import type { Catalogue } from "@matalon/catalogue";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
@@ -192,7 +195,7 @@ export function App() {
       contenu = (
         <div className="ecran-centre">
           <h1>La caisse est déjà ouverte</h1>
-          <p>Elle tourne dans un autre onglet ou une autre fenêtre de cet iPad. Fermez cet onglet et utilisez l'autre.</p>
+          <p>Elle tourne dans un autre onglet ou une autre fenêtre de cet {NOM_APPAREIL}. Fermez cet onglet et utilisez l'autre.</p>
         </div>
       );
       break;
@@ -202,7 +205,7 @@ export function App() {
           <h1>La caisse ne peut pas démarrer</h1>
           <p>{phase.message}</p>
           <button className="bouton principal" onClick={() => location.reload()}>
-            Réessayer
+            <AvecIcone icone={RotateCw}>Réessayer</AvecIcone>
           </button>
         </div>
       );
@@ -223,7 +226,7 @@ export function App() {
         <div className="ecran-centre">
           <h1>Caisse d'une version précédente</h1>
           <p>
-            Cet iPad a été mis en service avant le rattachement aux établissements du groupe. Ses tickets ne peuvent pas
+            Cet {NOM_APPAREIL} a été mis en service avant le rattachement aux établissements du groupe. Ses tickets ne peuvent pas
             rejoindre le serveur.
           </p>
           {MODE_TEST ? (
@@ -231,11 +234,11 @@ export function App() {
               <button
                 className="bouton principal"
                 onClick={() => {
-                  if (!window.confirm("Effacer les tickets de test de cet iPad (sans valeur) et le rattacher à un établissement ?")) return;
+                  if (!window.confirm(`Effacer les tickets de test de cet ${NOM_APPAREIL} (sans valeur) et le rattacher à un établissement ?`)) return;
                   void effacerCaisseDeTest(phase.db).then(() => setPhase({ nom: "rattachement", db: phase.db }));
                 }}
               >
-                Effacer les données de test et rattacher l'iPad
+                <AvecIcone icone={Link}>Effacer les données de test et rattacher l'{NOM_APPAREIL}</AvecIcone>
               </button>
             </div>
           ) : (
@@ -285,7 +288,7 @@ export function App() {
         <div className="bandeau-maj">
           Une nouvelle version de la caisse est prête.
           <button className="bouton" onClick={() => void updateServiceWorker(true)}>
-            Mettre à jour
+            <AvecIcone icone={RefreshCw}>Mettre à jour</AvecIcone>
           </button>
         </div>
       )}

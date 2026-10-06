@@ -1,4 +1,21 @@
+import {
+  Archive,
+  Ban,
+  CloudCheck,
+  CloudOff,
+  CloudUpload,
+  Coffee,
+  LayoutGrid,
+  LogOut,
+  Printer,
+  Receipt,
+  RefreshCw,
+  Settings,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { AvecIcone, BoutonIcone } from "./icones";
 import { ID_COMPTOIR } from "../donnees/configuration";
 import { fusionnerCommandes, nouvelleCommande, totauxCommande, transfererCommande, type Commande } from "../metier/commande";
 import { nomTable } from "../impression/gabarits";
@@ -25,6 +42,15 @@ const LIBELLES_SYNCHRO: Record<EtatSynchro["statut"], string> = {
   erreur: "Erreur serveur",
 };
 
+const ICONES_SYNCHRO: Record<EtatSynchro["statut"], LucideIcon> = {
+  synchronise: CloudCheck,
+  en_attente: CloudUpload,
+  hors_ligne: CloudOff,
+  divergence: TriangleAlert,
+  revoquee: Ban,
+  erreur: TriangleAlert,
+};
+
 function PuceSynchro(props: { etat: EtatSynchro; onToucher: () => void }) {
   const { etat } = props;
   const detail = [
@@ -41,6 +67,7 @@ function PuceSynchro(props: { etat: EtatSynchro; onToucher: () => void }) {
       aria-label={`${LIBELLES_SYNCHRO[etat.statut]} : ${detail}`}
       onClick={props.onToucher}
     >
+      <AvecIcone icone={ICONES_SYNCHRO[etat.statut]} taille={18} />
       <span className="libelle-synchro">
         {LIBELLES_SYNCHRO[etat.statut]}
         {etat.enAttente > 0 && etat.statut !== "synchronise" ? ` (${etat.enAttente})` : ""}
@@ -135,11 +162,11 @@ export function Coque() {
     setVue({ nom: "commande", tableId: vers });
   };
 
-  const onglets: Array<{ vue: Vue["nom"]; libelle: string; responsable?: boolean }> = [
-    { vue: "salle", libelle: "Salle" },
-    { vue: "tickets", libelle: "Tickets" },
-    { vue: "clotures", libelle: "Clôtures" },
-    { vue: "reglages", libelle: "Réglages", responsable: true },
+  const onglets: Array<{ vue: Vue["nom"]; libelle: string; icone: LucideIcon; responsable?: boolean }> = [
+    { vue: "salle", libelle: "Salle", icone: LayoutGrid },
+    { vue: "tickets", libelle: "Tickets", icone: Receipt },
+    { vue: "clotures", libelle: "Clôtures", icone: Archive },
+    { vue: "reglages", libelle: "Réglages", icone: Settings, responsable: true },
   ];
 
   return (
@@ -160,19 +187,18 @@ export function Coque() {
                 className="onglet"
                 onClick={() => setVue({ nom: o.vue } as Vue)}
               >
-                {o.libelle}
+                <AvecIcone icone={o.icone}>{o.libelle}</AvecIcone>
               </button>
             ))}
           <button className="onglet comptoir" onClick={() => ouvrirTable(ID_COMPTOIR)}>
-            Vente comptoir
+            <AvecIcone icone={Coffee}>Vente comptoir</AvecIcone>
           </button>
         </div>
         <div className="barre-etat">
           <PuceSynchro etat={synchro} onToucher={() => void synchroniser()} />
           <time>{maintenant.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>
-          <button className="bouton discret" onClick={deconnecter} title="Changer d'utilisateur">
-            <span className="nom-utilisateur">{utilisateur.nom} · </span>Quitter
-          </button>
+          <span className="nom-utilisateur">{utilisateur.nom}</span>
+          <BoutonIcone icone={LogOut} variante="discret" libelle={`Quitter (${utilisateur.nom}) : changer d'utilisateur`} onClick={deconnecter} />
         </div>
       </nav>
       {MODE_TEST && (
@@ -180,10 +206,12 @@ export function Coque() {
       )}
       {blocage && (
         <div className="bandeau-alerte" role="alert">
-          <span>{blocage}</span>
+          <span>
+            <TriangleAlert className="icone en-ligne" size={20} aria-hidden="true" /> {blocage}
+          </span>
           {synchro.statut !== "revoquee" && (
             <button className="bouton" onClick={() => void synchroniser()}>
-              Vérifier
+              <AvecIcone icone={RefreshCw}>Vérifier</AvecIcone>
             </button>
           )}
         </div>
@@ -191,7 +219,7 @@ export function Coque() {
       {synchro.statut === "divergence" && utilisateur.role === "responsable" && (
         <div className="bandeau-alerte" role="alert">
           <span>
-            Divergence avec le serveur : {synchro.message}. La caisse continue d'encaisser ; prévenez l'administrateur, qui
+            <TriangleAlert className="icone en-ligne" size={20} aria-hidden="true" /> Divergence avec le serveur : {synchro.message}. La caisse continue d'encaisser ; prévenez l'administrateur, qui
             vérifiera les deux copies.
           </span>
         </div>
@@ -206,8 +234,8 @@ export function Coque() {
       )}
       {horlogeSuspecte && (
         <div className="bandeau-alerte">
-          L'heure de l'iPad est antérieure au dernier ticket. Réglez la date et l'heure dans les réglages de l'iPad avant
-          d'encaisser.
+          <TriangleAlert className="icone en-ligne" size={20} aria-hidden="true" /> L'heure de l'appareil est antérieure au dernier
+          ticket. Réglez la date et l'heure dans les réglages de l'iPad ou de l'iPhone avant d'encaisser.
         </div>
       )}
       {!config.imprimante.adresse && utilisateur.role === "responsable" && (
@@ -216,7 +244,7 @@ export function Coque() {
             Caisse sans imprimante : les notes passent par QR code, les Z restent consultables dans Clôtures.
           </span>
           <button className="bouton" onClick={() => setAssistant(true)}>
-            Connecter l'imprimante
+            <AvecIcone icone={Printer}>Connecter l'imprimante</AvecIcone>
           </button>
         </div>
       )}

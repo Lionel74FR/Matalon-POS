@@ -1,3 +1,5 @@
+import { Minus, Plus } from "lucide-react";
+import { AvecIcone } from "../icones";
 import { ligneDepuisArticle, ligneSupplement, tousLesArticles, type Article, type Catalogue, type ChoixFormule, optionsChoix } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
 import type { LigneCommande } from "../../metier/commande";
@@ -71,15 +73,15 @@ export function ModaleArticle(props: {
         <>
           <div className="quantite">
             <button className="bouton" onClick={() => setQuantite((q) => Math.max(1, q - 1))} aria-label="Un de moins">
-              −
+              <Minus className="icone" size={22} aria-hidden="true" />
             </button>
             <span>{quantite}</span>
             <button className="bouton" onClick={() => setQuantite((q) => q + 1)} aria-label="Un de plus">
-              +
+              <Plus className="icone" size={22} aria-hidden="true" />
             </button>
           </div>
           <button className="bouton principal" disabled={!pret} onClick={ajouter}>
-            {pret ? `Ajouter · ${euros(prixUnitaire * quantite)}` : varianteManquante ? "Choisissez une variante" : `Choisissez : ${choixManquant!.choix.nom}`}
+            <AvecIcone icone={Plus}>{pret ? `Ajouter · ${euros(prixUnitaire * quantite)}` : varianteManquante ? "Choisissez une variante" : `Choisissez : ${choixManquant!.choix.nom}`}</AvecIcone>
           </button>
         </>
       }

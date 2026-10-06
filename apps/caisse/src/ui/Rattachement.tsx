@@ -1,3 +1,6 @@
+import { Link } from "lucide-react";
+import { AvecIcone } from "./icones";
+import { NOM_APPAREIL } from "../donnees/appareil";
 import { normaliserCode } from "@matalon/serveur/partage";
 import { useState } from "react";
 import type { BaseCaisse, ConnexionServeur } from "../donnees/base";
@@ -32,18 +35,18 @@ export function Rattachement(props: { db: BaseCaisse; onRattachee: (c: Caisse, c
       <section className="connexion-marque">
         <img src="/icone.svg" alt="" width={96} height={96} />
         <h1>Matalon POS</h1>
-        <p>{MODE_TEST ? "Caisse de test" : "Mise en service de l'iPad"}</p>
+        <p>{MODE_TEST ? "Caisse de test" : `Mise en service de l'${NOM_APPAREIL}`}</p>
       </section>
       <section className="rattachement-panneau">
-        <h2>Rattacher cet iPad à un établissement</h2>
+        <h2>Rattacher cet {NOM_APPAREIL} à un établissement</h2>
         <ol className="etapes-rattachement">
           <li>
             Sur un ordinateur, ouvrez <strong>{location.host}/admin</strong> et connectez-vous.
           </li>
           <li>
-            Choisissez l'établissement, puis <strong>Rattacher un iPad</strong>. Un code valable 48 heures s'affiche.
+            Choisissez l'établissement, puis <strong>Rattacher un iPad ou un iPhone</strong>. Un code valable 48 heures s'affiche.
           </li>
-          <li>Saisissez ce code ci-dessous. L'iPad reçoit l'établissement, l'équipe et la carte.</li>
+          <li>Saisissez ce code ci-dessous. L'{NOM_APPAREIL} reçoit l'établissement, l'équipe et la carte.</li>
         </ol>
         <form
           onSubmit={(e) => {
@@ -69,11 +72,11 @@ export function Rattachement(props: { db: BaseCaisse; onRattachee: (c: Caisse, c
             {erreur}
           </p>
           <button className="bouton principal grand" disabled={enCours || code.length !== 8}>
-            {enCours ? "Rattachement…" : "Rattacher l'iPad"}
+            <AvecIcone icone={Link}>{enCours ? "Rattachement…" : `Rattacher l'${NOM_APPAREIL}`}</AvecIcone>
           </button>
         </form>
         <p className="note-rattachement">
-          L'iPad crée sa propre clé de signature, qui ne le quitte jamais. Une connexion Internet est nécessaire pour la mise en
+          L'{NOM_APPAREIL} crée sa propre clé de signature, qui ne le quitte jamais. Une connexion Internet est nécessaire pour la mise en
           service ; ensuite la caisse encaisse aussi hors ligne.
         </p>
       </section>

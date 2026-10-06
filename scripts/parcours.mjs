@@ -130,7 +130,7 @@ await clic("Retirer de la commande");
 await capture("05-commande-remise");
 
 // Transfert de la table 4 vers la table 6 (libre).
-await clic("Transférer");
+await clic("Transférer vers une autre table");
 await capture("05b-transfert");
 await p.locator(".modale .grille-tables .table", { hasText: /^6/ }).click();
 await p.getByRole("heading", { name: "Table 6" }).waitFor();
@@ -199,7 +199,7 @@ await p.locator(".puce-synchro").click();
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 await capture("13-synchronise");
 await a.reload();
-await a.getByRole("button", { name: "Vérifier la chaîne" }).click();
+await a.getByRole("button", { name: "Vérifier", exact: true }).click();
 await a.getByText(/Chaîne intègre|anomalie/).waitFor();
 const serveurIntegre = await a.getByText(/Chaîne intègre/).count();
 await a.screenshot({ path: `${sortie}/14-admin-verification.png`, fullPage: true });
