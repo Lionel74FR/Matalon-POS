@@ -3,6 +3,7 @@ import { ID_COMPTOIR } from "../donnees/configuration";
 import { nouvelleCommande, type Commande } from "../metier/commande";
 import { nomTable } from "../impression/gabarits";
 import { MODE_TEST } from "../fiscal/caisse";
+import type { EtatSynchro } from "../serveur/synchro";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Clotures } from "./Clotures";
 import { useCaisse } from "./contexte";
@@ -12,6 +13,39 @@ import { Salle } from "./Salle";
 import { Tickets } from "./Tickets";
 
 type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "clotures" } | { nom: "reglages" };
+
+const LIBELLES_SYNCHRO: Record<EtatSynchro["statut"], string> = {
+  synchronise: "Synchronisé",
+  en_attente: "En attente",
+  hors_ligne: "Hors ligne",
+  divergence: "Divergence",
+  revoquee: "Révoquée",
+  erreur: "Erreur serveur",
+};
+
+function PuceSynchro(props: { etat: EtatSynchro; onToucher: () => void }) {
+  const { etat } = props;
+  const detail = [
+    etat.enAttente > 0 ? `${etat.enAttente} enregistrement${etat.enAttente > 1 ? "s" : ""} à envoyer` : null,
+    etat.derniereSynchro ? `dernière synchronisation ${new Date(etat.derniereSynchro).toLocaleString("fr-FR")}` : "jamais synchronisée",
+    etat.message,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <button
+      className={`puce-synchro ${etat.statut}${etat.enCours ? " en-cours" : ""}`}
+      title={detail}
+      aria-label={`${LIBELLES_SYNCHRO[etat.statut]} : ${detail}`}
+      onClick={props.onToucher}
+    >
+      <span className="libelle-synchro">
+        {LIBELLES_SYNCHRO[etat.statut]}
+        {etat.enAttente > 0 && etat.statut !== "synchronise" ? ` (${etat.enAttente})` : ""}
+      </span>
+    </button>
+  );
+}
 
 function useHorloge() {
   const [maintenant, setMaintenant] = useState(() => new Date());
@@ -23,7 +57,7 @@ function useHorloge() {
 }
 
 export function Coque() {
-  const { caisse, config, utilisateur, deconnecter, majConfig, notifier } = useCaisse();
+  const { caisse, config, utilisateur, deconnecter, majConfig, notifier, synchro, synchroniser, blocage } = useCaisse();
   const [assistant, setAssistant] = useState(false);
   const [vue, setVue] = useState<Vue>({ nom: "salle" });
   const [commandes, setCommandes] = useState<Map<string, Commande>>(new Map());
@@ -90,6 +124,7 @@ export function Coque() {
           </button>
         </div>
         <div className="barre-etat">
+          <PuceSynchro etat={synchro} onToucher={() => void synchroniser()} />
           <time>{maintenant.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>
           <button className="bouton discret" onClick={deconnecter} title="Changer d'utilisateur">
             <span className="nom-utilisateur">{utilisateur.nom} · </span>Quitter
@@ -98,6 +133,24 @@ export function Coque() {
       </nav>
       {MODE_TEST && (
         <div className="bandeau-test">Caisse de test : les tickets n'ont aucune valeur et restent séparés de la vraie caisse.</div>
+      )}
+      {blocage && (
+        <div className="bandeau-alerte" role="alert">
+          <span>{blocage}</span>
+          {synchro.statut !== "revoquee" && (
+            <button className="bouton" onClick={() => void synchroniser()}>
+              Vérifier
+            </button>
+          )}
+        </div>
+      )}
+      {synchro.statut === "divergence" && utilisateur.role === "responsable" && (
+        <div className="bandeau-alerte" role="alert">
+          <span>
+            Divergence avec le serveur : {synchro.message}. La caisse continue d'encaisser ; prévenez l'administrateur, qui
+            vérifiera les deux copies.
+          </span>
+        </div>
       )}
       {horlogeSuspecte && (
         <div className="bandeau-alerte">

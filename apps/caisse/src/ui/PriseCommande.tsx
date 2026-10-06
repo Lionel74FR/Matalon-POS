@@ -1,4 +1,4 @@
-import { CARTE_AUTOMNE_2026, type Article, type Categorie } from "@matalon/catalogue";
+import { CARTES, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
 import { ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
@@ -10,8 +10,6 @@ import { ModaleCouverts } from "./modales/ModaleCouverts";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
 import { ModaleLigne } from "./modales/ModaleLigne";
 
-const CARTE = CARTE_AUTOMNE_2026;
-const RAYONS = [...new Set(CARTE.categories.map((c) => c.rayon))];
 const TEINTES: Record<string, string> = {
   Boissons: "cafe",
   Bar: "prune",
@@ -22,17 +20,41 @@ const TEINTES: Record<string, string> = {
   Ateliers: "ardoise",
 };
 
-export function PriseCommande(props: {
+interface ProprietesCommande {
   titre: string;
   commande: Commande;
   onChange: (c: Commande) => void;
   onTerminee: () => void;
   onRetour: () => void;
-}) {
+}
+
+/** La carte vient de l'établissement (référentiel serveur). */
+export function PriseCommande(props: ProprietesCommande) {
+  const { config } = useCaisse();
+  const carte = CARTES[config.carteId];
+  if (!carte) {
+    return (
+      <div className="page">
+        <Vide>
+          La carte « {config.carteId} » n'existe pas dans cette version de la caisse. Mettez la caisse à jour (bandeau en bas de
+          l'écran) ou choisissez une autre carte dans l'administration.
+        </Vide>
+        <button className="bouton" onClick={props.onRetour}>
+          Retour à la salle
+        </button>
+      </div>
+    );
+  }
+  return <PriseCommandeCarte {...props} carte={carte} />;
+}
+
+function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const { caisse, config, utilisateur, notifier, imprimer, imprimanteConfiguree } = useCaisse();
   const c = props.commande;
+  const CARTE = props.carte;
+  const RAYONS = useMemo(() => [...new Set(CARTE.categories.map((x) => x.rayon))], [CARTE]);
   const [rayon, setRayon] = useState(RAYONS[0]!);
-  const categories = useMemo(() => CARTE.categories.filter((x) => x.rayon === rayon), [rayon]);
+  const categories = useMemo(() => CARTE.categories.filter((x) => x.rayon === rayon), [CARTE, rayon]);
   const [categorieId, setCategorieId] = useState<string | null>(null);
   const categorie: Categorie = categories.find((x) => x.id === categorieId) ?? categories[0]!;
   const [articleOuvert, setArticleOuvert] = useState<Article | null>(null);

@@ -4,10 +4,12 @@ import {
   genererTables,
   hacherPin,
   identifiantAleatoire,
+  type Configuration,
   type Etablissement,
   type Role,
   type Utilisateur,
 } from "../donnees/configuration";
+import { ErreurApi } from "../serveur/client";
 import { VERSION_APPLICATION } from "../fiscal/caisse";
 import { gabaritTest } from "../impression/gabarits";
 import { euros, useCaisse } from "./contexte";
@@ -22,8 +24,17 @@ const CHAMPS: Array<[keyof Etablissement, string]> = [
   ["tvaIntracom", "N° de TVA intracommunautaire"],
 ];
 
+/** Message lisible pour une modification refusée ou impossible hors ligne. */
+function messageServeur(e: unknown): string {
+  if (e instanceof ErreurApi && e.code === "HORS_LIGNE") {
+    return "Connexion Internet nécessaire : l'établissement et l'équipe sont partagés par toutes les caisses du groupe.";
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function Reglages(props: { onAssistant: () => void }) {
-  const { caisse, config, majConfig, notifier, imprimer } = useCaisse();
+  const { caisse, config, majConfig, notifier, imprimer, synchro, synchroniser } = useCaisse();
+  const [envoi, setEnvoi] = useState(false);
   const [etablissement, setEtablissement] = useState(config.etablissement);
   const [imprimante, setImprimante] = useState(config.imprimante);
   const [seuil, setSeuil] = useState(config.seuilNoteAutomatique / 100);
@@ -37,14 +48,42 @@ export function Reglages(props: { onAssistant: () => void }) {
   }, []);
 
   const enregistrer = async () => {
-    await majConfig({
-      ...config,
-      etablissement,
-      imprimante: { ...imprimante, adresse: imprimante.adresse.trim() },
-      seuilNoteAutomatique: Math.round(seuil * 100),
-      tables: genererTables(salle, terrasse),
-    });
-    notifier("Réglages enregistrés.");
+    const tables = [...genererTables(salle, terrasse), ...config.tables.filter((t) => t.zone !== "Salle" && t.zone !== "Terrasse")];
+    const seuilNote = Math.round(seuil * 100);
+    let suivante: Configuration = { ...config, imprimante: { ...imprimante, adresse: imprimante.adresse.trim() } };
+    const partageModifie =
+      JSON.stringify([etablissement, tables, seuilNote]) !== JSON.stringify([config.etablissement, config.tables, config.seuilNoteAutomatique]);
+    setEnvoi(true);
+    try {
+      if (partageModifie) {
+        const { etablissement: e } = await caisse.client.enregistrerEtablissement({
+          identite: { ...etablissement, siret: etablissement.siret.replace(/\s/g, "") },
+          tables,
+          seuilNote,
+        });
+        suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote, carteId: e.carteId };
+        setEtablissement(e.identite);
+      }
+      await majConfig(suivante);
+      notifier(partageModifie ? "Réglages enregistrés et partagés avec les autres caisses." : "Réglages de cet iPad enregistrés.");
+    } catch (e) {
+      notifier(messageServeur(e), "erreur");
+    } finally {
+      setEnvoi(false);
+    }
+  };
+
+  /** L'équipe est commune à l'établissement : la modification passe d'abord par le serveur. */
+  const enregistrerMembre = async (u: Utilisateur, message: string) => {
+    try {
+      const { utilisateurs } = await caisse.client.enregistrerEquipe([u]);
+      await majConfig({ ...config, utilisateurs });
+      notifier(message);
+      return true;
+    } catch (e) {
+      notifier(messageServeur(e), "erreur");
+      return false;
+    }
   };
 
   const ajouterUtilisateur = async () => {
@@ -53,9 +92,9 @@ export function Reglages(props: { onAssistant: () => void }) {
     }
     const id = identifiantAleatoire("u");
     const u: Utilisateur = { id, nom: nouveau.nom.trim(), role: nouveau.role, pinHash: await hacherPin(id, nouveau.pin), actif: true };
-    await majConfig({ ...config, utilisateurs: [...config.utilisateurs, u] });
-    setNouveau({ nom: "", role: "serveur", pin: "" });
-    notifier(`${u.nom} peut maintenant se connecter.`);
+    if (await enregistrerMembre(u, `${u.nom} peut maintenant se connecter sur toutes les caisses.`)) {
+      setNouveau({ nom: "", role: "serveur", pin: "" });
+    }
   };
 
   const basculerActif = async (u: Utilisateur) => {
@@ -63,30 +102,29 @@ export function Reglages(props: { onAssistant: () => void }) {
     if (u.actif && u.role === "responsable" && responsablesActifs.length === 1) {
       return notifier("Il faut au moins un responsable actif.", "erreur");
     }
-    await majConfig({ ...config, utilisateurs: config.utilisateurs.map((x) => (x.id === u.id ? { ...x, actif: !x.actif } : x)) });
+    await enregistrerMembre({ ...u, actif: !u.actif }, u.actif ? `${u.nom} est désactivé.` : `${u.nom} est réactivé.`);
   };
 
   const changerPin = async (u: Utilisateur) => {
     const pin = window.prompt(`Nouveau code PIN à 4 chiffres pour ${u.nom}`);
     if (pin == null) return;
     if (!/^\d{4}$/.test(pin)) return notifier("Le code PIN compte 4 chiffres.", "erreur");
-    const pinHash = await hacherPin(u.id, pin);
-    await majConfig({ ...config, utilisateurs: config.utilisateurs.map((x) => (x.id === u.id ? { ...x, pinHash } : x)) });
-    notifier(`Code PIN de ${u.nom} modifié.`);
+    await enregistrerMembre({ ...u, pinHash: await hacherPin(u.id, pin) }, `Code PIN de ${u.nom} modifié.`);
   };
 
   return (
     <div className="page reglages">
       <header className="page-tete">
         <h1>Réglages</h1>
-        <button className="bouton principal" onClick={() => void enregistrer()}>
-          Enregistrer les réglages
+        <button className="bouton principal" disabled={envoi} onClick={() => void enregistrer()}>
+          {envoi ? "Enregistrement…" : "Enregistrer les réglages"}
         </button>
       </header>
 
       <div className="formulaire-colonnes">
         <fieldset>
           <legend>Établissement (en-tête des notes)</legend>
+          <p className="aide-champ">Commun à toutes les caisses de l'établissement. La modification demande une connexion Internet.</p>
           {CHAMPS.map(([cle, libelle]) => (
             <label key={cle} className="champ">
               <span>{libelle}</span>
@@ -192,8 +230,33 @@ export function Reglages(props: { onAssistant: () => void }) {
         <legend>Cette caisse</legend>
         <dl className="totaux">
           <div>
-            <dt>Identifiant</dt>
-            <dd>{config.caisseId}</dd>
+            <dt>Caisse</dt>
+            <dd>
+              {config.caisseNom} · {config.caisseId}
+            </dd>
+          </div>
+          <div>
+            <dt>Établissement</dt>
+            <dd>
+              {config.etablissementId} · carte {config.carteId}
+            </dd>
+          </div>
+          <div>
+            <dt>Synchronisation</dt>
+            <dd className={["divergence", "revoquee", "erreur"].includes(synchro.statut) ? "erreur" : ""}>
+              {synchro.statut === "synchronise"
+                ? "À jour"
+                : synchro.statut === "hors_ligne"
+                  ? "Hors ligne"
+                  : synchro.statut === "en_attente"
+                    ? "En attente"
+                    : synchro.message}
+              {synchro.enAttente > 0 && ` · ${synchro.enAttente} à envoyer`}
+              {synchro.derniereSynchro && ` · dernière le ${new Date(synchro.derniereSynchro).toLocaleString("fr-FR")}`}{" "}
+              <button className="bouton discret" onClick={() => void synchroniser()}>
+                Synchroniser
+              </button>
+            </dd>
           </div>
           <div>
             <dt>Mise en service</dt>

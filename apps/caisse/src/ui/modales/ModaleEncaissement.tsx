@@ -14,7 +14,7 @@ const BILLETS = [500, 1000, 2000, 5000];
 
 /** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
 export function ModaleEncaissement(props: { commande: Commande; onTermine: () => void; onFermer: () => void }) {
-  const { caisse, config, utilisateur, notifier, imprimer, imprimanteConfiguree } = useCaisse();
+  const { caisse, config, utilisateur, notifier, imprimer, imprimanteConfiguree, blocage } = useCaisse();
   const [noteImprimee, setNoteImprimee] = useState(false);
   const total = totauxCommande(props.commande).totalTTC;
   const [paiements, setPaiements] = useState<Paiement[]>([]);
@@ -39,6 +39,7 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
   };
 
   const encaisser = async () => {
+    if (blocage) return notifier(blocage, "erreur");
     setEnCours(true);
     try {
       const t = await caisse.registre.enregistrerVente({
@@ -141,12 +142,13 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
           <button className="bouton" disabled={paiements.length === 0} onClick={() => setPaiements([])}>
             Effacer les paiements
           </button>
-          <button className="bouton principal grand" disabled={!valide || enCours} onClick={() => void encaisser()}>
-            {enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}
+          <button className="bouton principal grand" disabled={!valide || enCours || !!blocage} onClick={() => void encaisser()}>
+            {blocage ? "Encaissement bloqué" : enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}
           </button>
         </>
       }
     >
+      {blocage && <p className="erreur">{blocage}</p>}
       <div className="encaissement">
         <div className="encaissement-etat">
           <div className="ligne-montant">

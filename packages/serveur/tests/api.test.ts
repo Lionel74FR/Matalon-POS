@@ -62,6 +62,8 @@ async function adminConnecte(): Promise<string> {
 }
 
 async function caisseRattachee(cookie: string) {
+  const sansEquipe = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
+  expect(sansEquipe.corps.code).toBe("RESPONSABLE_REQUIS");
   const u = await appel("POST", "/api/admin/etablissements/moka/utilisateurs", { nom: "Léa", role: "responsable", pin: "1234" }, { Cookie: cookie });
   expect(u.statut).toBe(200);
   const code = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
@@ -211,6 +213,9 @@ describe("rattachement et synchronisation", () => {
     expect(maj.corps.utilisateurs.map((u: any) => u.nom)).toEqual(["Léa", "Tom"]);
     const sansResponsable = await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...lea, actif: false }] }, bearer);
     expect(sansResponsable.statut).toBe(400);
+    // Le refus n'a rien écrit : Léa reste responsable active.
+    const etat = await appel("GET", "/api/caisse/etat", undefined, bearer);
+    expect(etat.corps.utilisateurs.find((u: any) => u.id === lea.id).actif).toBe(true);
 
     const etab = await appel("PUT", "/api/caisse/etablissement", {
       identite: { ...rattachement.etablissement.identite, raisonSociale: "SAS Moka" },

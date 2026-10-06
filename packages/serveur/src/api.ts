@@ -389,14 +389,17 @@ async function enregistrerUtilisateurs(env: Environnement, etablissementId: stri
       params: [id, etablissementId, texte(u.nom, "nom", 60), u.role, u.pinHash, !!u.actif, maintenant],
     };
   });
-  if (requetes.length) await env.db.lot(requetes);
-  const responsables = await env.db.requete<{ n: number }>(
-    "select count(*)::int as n from utilisateurs where etablissement_id = $1 and role = 'responsable' and actif",
+  // Contrôle avant écriture : il doit rester au moins un responsable actif.
+  const actuels = await env.db.requete<{ id: string }>(
+    "select id from utilisateurs where etablissement_id = $1 and role = 'responsable' and actif",
     [etablissementId],
   );
-  if (liste.length && !responsables[0]?.n) {
+  const modifies = new Set(liste.map((u) => String(u.id)));
+  const restants = actuels.filter((u) => !modifies.has(u.id)).length + liste.filter((u) => u.role === "responsable" && u.actif).length;
+  if (liste.length && !restants) {
     throw new ErreurHttp(400, "RESPONSABLE_REQUIS", "Il faut au moins un responsable actif.");
   }
+  if (requetes.length) await env.db.lot(requetes);
 }
 
 async function majEtablissementCaisse(env: Environnement, requete: Request): Promise<Response> {
@@ -660,6 +663,12 @@ async function enregistrerUtilisateurAdmin(env: Environnement, requete: Request,
 
 async function genererCode(env: Environnement, requete: Request, admin: { id: string }, etablissementId: string): Promise<Response> {
   await etablissement(env.db, etablissementId);
+  const [responsables] = await env.db.requete<{ n: number }>(
+    "select count(*)::int as n from utilisateurs where etablissement_id = $1 and role = 'responsable' and actif",
+    [etablissementId],
+  );
+  // Sans responsable, l'iPad rattaché n'aurait personne pour ouvrir la caisse.
+  if (!responsables?.n) throw new ErreurHttp(400, "RESPONSABLE_REQUIS", "Ajoutez d'abord un responsable à l'équipe de cet établissement.");
   const corps = await lireJson<Record<string, unknown>>(requete);
   const nomCaisse = texte(corps.nomCaisse || "iPad", "nomCaisse", 40) || "iPad";
   const octets = aleatoire(8);

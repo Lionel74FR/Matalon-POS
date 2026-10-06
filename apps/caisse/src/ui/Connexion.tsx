@@ -15,11 +15,17 @@ export function Connexion(props: { caisse: Caisse; onConnecte: (u: Utilisateur) 
       <section className="connexion-marque">
         <img src="/icone.svg" alt="" width={96} height={96} />
         <h1>{props.caisse.config.etablissement.enseigne}</h1>
+        <p className="connexion-caisse">Matalon POS · {props.caisse.config.caisseNom}</p>
         <p>{heure}</p>
       </section>
       <section className="connexion-panneau">
         <h2>{choisi ? `Bonjour ${choisi.nom}` : "Qui prend le service ?"}</h2>
-        {!choisi ? (
+        {actifs.length === 0 ? (
+          <p className="explication">
+            Aucun membre d'équipe pour cet établissement. Ajoutez un responsable dans l'administration : il apparaîtra ici dès
+            la prochaine synchronisation.
+          </p>
+        ) : !choisi ? (
           <div className="grille-personnes">
             {actifs.map((u) => (
               <button key={u.id} className="carte-personne" onClick={() => setChoisi(u)}>

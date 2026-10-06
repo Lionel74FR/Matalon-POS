@@ -1,15 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
-import type { BaseCaisse } from "../donnees/base";
-import type { Configuration, Utilisateur } from "../donnees/configuration";
-import { demarrer, enregistrerConfiguration, prendreVerrouCaisse, type Caisse } from "../fiscal/caisse";
+import type { BaseCaisse, ConnexionServeur } from "../donnees/base";
+import { fusionnerReferentiel, type Configuration, type Utilisateur } from "../donnees/configuration";
+import {
+  demarrer,
+  effacerCaisseDeTest,
+  enregistrerConfiguration,
+  MODE_TEST,
+  prendreVerrouCaisse,
+  type Caisse,
+} from "../fiscal/caisse";
 import { envoyerEpson } from "../impression/epson";
 import type { Recu } from "../impression/recu";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Connexion } from "./Connexion";
 import { Contexte, type ContexteCaisse } from "./contexte";
 import { Coque } from "./Coque";
-import { Installation } from "./Installation";
+import { blocageEncaissement, Synchroniseur, type EtatSynchro } from "../serveur/synchro";
+import { Rattachement } from "./Rattachement";
 import { ModaleApercu } from "./modales/ModaleApercu";
 import { ModalePin } from "./modales/ModalePin";
 
@@ -17,10 +25,20 @@ type Phase =
   | { nom: "chargement" }
   | { nom: "autreOnglet" }
   | { nom: "erreur"; message: string }
-  | { nom: "installation"; db: BaseCaisse }
+  | { nom: "rattachement"; db: BaseCaisse }
+  | { nom: "ancienne"; db: BaseCaisse }
   | { nom: "assistantImprimante"; caisse: Caisse }
   | { nom: "connexion"; caisse: Caisse }
   | { nom: "caisse"; caisse: Caisse; utilisateur: Utilisateur };
+
+const ETAT_INITIAL: EtatSynchro = {
+  statut: "en_attente",
+  enAttente: 0,
+  derniereSynchro: null,
+  decalageHorloge: 0,
+  message: null,
+  enCours: false,
+};
 
 interface Toast {
   id: number;
@@ -33,21 +51,81 @@ export function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [apercu, setApercu] = useState<{ recu: Recu; titre: string; erreur?: string } | null>(null);
   const [demandePin, setDemandePin] = useState<{ raison: string; resoudre: (id: string | null) => void } | null>(null);
+  const [synchro, setSynchro] = useState<EtatSynchro | null>(null);
+  const synchroniseur = useRef<Synchroniseur | null>(null);
+  const caisseCourante = useRef<Caisse | null>(null);
   const {
     needRefresh: [majDisponible],
     updateServiceWorker,
   } = useRegisterSW();
+
+  if ("caisse" in phase) caisseCourante.current = phase.caisse;
+
+  /** Remplace la caisse (nouvelle configuration) dans la phase en cours. */
+  const remplacerCaisse = useCallback((caisse: Caisse) => {
+    caisseCourante.current = caisse;
+    setPhase((p) => {
+      if (p.nom !== "caisse") return "caisse" in p ? { ...p, caisse } : p;
+      const u = caisse.config.utilisateurs.find((x) => x.id === p.utilisateur.id);
+      // Membre désactivé depuis l'administration : retour à l'écran de connexion.
+      if (!u?.actif) return { nom: "connexion", caisse };
+      return { ...p, caisse, utilisateur: u };
+    });
+  }, []);
+
+  /** Démarre la réplication vers le serveur, une fois par caisse ouverte. */
+  const brancherSynchro = useCallback(
+    (caisse: Caisse, connexion: ConnexionServeur) => {
+      if (synchroniseur.current) return;
+      const s = new Synchroniseur(
+        {
+          db: caisse.db,
+          stockage: caisse.stockage,
+          client: caisse.client,
+          async surReferentiel(etat) {
+            const actuelle = caisseCourante.current;
+            if (!actuelle) return;
+            const config = fusionnerReferentiel(actuelle.config, etat);
+            if (config) remplacerCaisse(await enregistrerConfiguration(actuelle, config));
+          },
+        },
+        connexion,
+      );
+      synchroniseur.current = s;
+      s.abonner(setSynchro);
+      caisse.stockage.surEcriture(() => s.signalerEcriture());
+      void s.synchroniser();
+    },
+    [remplacerCaisse],
+  );
 
   useEffect(() => {
     void (async () => {
       try {
         if (!(await prendreVerrouCaisse())) return setPhase({ nom: "autreOnglet" });
         const d = await demarrer();
-        setPhase(d.etat === "installation" ? { nom: "installation", db: d.db } : { nom: "connexion", caisse: d.caisse });
+        if (d.etat === "rattachement") return setPhase({ nom: "rattachement", db: d.db });
+        if (d.etat === "ancienne") return setPhase({ nom: "ancienne", db: d.db });
+        brancherSynchro(d.caisse, d.connexion);
+        setPhase({ nom: "connexion", caisse: d.caisse });
       } catch (e) {
         setPhase({ nom: "erreur", message: e instanceof Error ? e.message : String(e) });
       }
     })();
+  }, [brancherSynchro]);
+
+  // Rattrapage : toutes les minutes, au retour du réseau et au retour sur l'app.
+  useEffect(() => {
+    const relancer = () => void synchroniseur.current?.synchroniser();
+    const visible = () => document.visibilityState === "visible" && relancer();
+    const minuterie = setInterval(relancer, 60_000);
+    window.addEventListener("online", relancer);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      clearInterval(minuterie);
+      window.removeEventListener("online", relancer);
+      document.removeEventListener("visibilitychange", visible);
+    };
   }, []);
 
   const compteur = useRef(0);
@@ -65,9 +143,7 @@ export function App() {
       config: caisse.config,
       utilisateur,
       async majConfig(config: Configuration) {
-        const c = await enregistrerConfiguration(caisse, config);
-        const u = config.utilisateurs.find((x) => x.id === utilisateur.id) ?? utilisateur;
-        setPhase({ nom: "caisse", caisse: c, utilisateur: u });
+        remplacerCaisse(await enregistrerConfiguration(caisse, config));
       },
       notifier,
       imprimanteConfiguree: !!caisse.config.imprimante.adresse,
@@ -88,8 +164,11 @@ export function App() {
         void caisse.registre.journaliser("DECONNEXION", {}, utilisateur.id);
         setPhase({ nom: "connexion", caisse });
       },
+      synchro: synchro ?? ETAT_INITIAL,
+      synchroniser: () => synchroniseur.current?.synchroniser() ?? Promise.resolve(),
+      blocage: synchro ? blocageEncaissement(synchro) : null,
     };
-  }, [phase, notifier]);
+  }, [phase, notifier, synchro, remplacerCaisse]);
 
   let contenu: React.ReactNode;
   switch (phase.nom) {
@@ -115,17 +194,52 @@ export function App() {
         </div>
       );
       break;
-    case "installation":
-      contenu = <Installation db={phase.db} onInstallee={(caisse) => setPhase({ nom: "assistantImprimante", caisse })} />;
+    case "rattachement":
+      contenu = (
+        <Rattachement
+          db={phase.db}
+          onRattachee={(caisse, connexion) => {
+            brancherSynchro(caisse, connexion);
+            setPhase({ nom: "assistantImprimante", caisse });
+          }}
+        />
+      );
+      break;
+    case "ancienne":
+      contenu = (
+        <div className="ecran-centre">
+          <h1>Caisse d'une version précédente</h1>
+          <p>
+            Cet iPad a été mis en service avant le rattachement aux établissements du groupe. Ses tickets ne peuvent pas
+            rejoindre le serveur.
+          </p>
+          {MODE_TEST ? (
+            <div className="actions-ecran">
+              <button
+                className="bouton principal"
+                onClick={() => {
+                  if (!window.confirm("Effacer les tickets de test de cet iPad (sans valeur) et le rattacher à un établissement ?")) return;
+                  void effacerCaisseDeTest(phase.db).then(() => setPhase({ nom: "rattachement", db: phase.db }));
+                }}
+              >
+                Effacer les données de test et rattacher l'iPad
+              </button>
+            </div>
+          ) : (
+            <p>Contactez l'administrateur : ces données doivent être exportées avant toute nouvelle mise en service.</p>
+          )}
+        </div>
+      );
       break;
     case "assistantImprimante":
       contenu = (
         <AssistantImprimante
           config={phase.caisse.config}
           onTerminer={(imprimante) =>
-            void enregistrerConfiguration(phase.caisse, { ...phase.caisse.config, imprimante }).then((caisse) =>
-              setPhase({ nom: "connexion", caisse }),
-            )
+            void enregistrerConfiguration(caisseCourante.current ?? phase.caisse, {
+              ...(caisseCourante.current ?? phase.caisse).config,
+              imprimante,
+            }).then((caisse) => setPhase({ nom: "connexion", caisse }))
           }
           onPlusTard={() => setPhase({ nom: "connexion", caisse: phase.caisse })}
         />

@@ -15,7 +15,15 @@ const CHAINES: Chaine[] = ["tickets", "evenements", "clotures"];
  * soit tout est écrit, soit rien (coupure, fermeture de l'app, erreur).
  */
 export class StockageIndexedDB implements StockageFiscal {
+  private readonly abonnes = new Set<() => void>();
+
   constructor(private readonly db: BaseCaisse) {}
+
+  /** Prévient après chaque lot écrit (déclenche la synchronisation). Renvoie la fonction de désabonnement. */
+  surEcriture(rappel: () => void): () => void {
+    this.abonnes.add(rappel);
+    return () => this.abonnes.delete(rappel);
+  }
 
   async ajouterLot(lot: EntreeLot[]): Promise<void> {
     const tx = this.db.transaction(CHAINES, "readwrite");
@@ -40,6 +48,7 @@ export class StockageIndexedDB implements StockageFiscal {
       }
       throw e;
     }
+    for (const rappel of this.abonnes) rappel();
   }
 
   async dernier<C extends Chaine>(chaine: C): Promise<TypesChaines[C] | null> {

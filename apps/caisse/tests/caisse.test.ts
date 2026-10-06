@@ -22,6 +22,8 @@ async function preparer() {
 const config: Configuration = {
   etablissementId: "moka",
   caisseId: "ipad-test",
+  caisseNom: "Comptoir",
+  carteId: "carte-automne-2026",
   installeeLe: "2026-10-15T08:00:00Z",
   etablissement: {
     enseigne: "Moka",

@@ -2,6 +2,7 @@ import { createContext, useContext } from "react";
 import type { Configuration, Utilisateur } from "../donnees/configuration";
 import type { Caisse } from "../fiscal/caisse";
 import type { Recu } from "../impression/recu";
+import type { EtatSynchro } from "../serveur/synchro";
 
 export interface ContexteCaisse {
   caisse: Caisse;
@@ -19,6 +20,12 @@ export interface ContexteCaisse {
    */
   demanderResponsable(raison: string): Promise<string | null>;
   deconnecter(): void;
+  /** État de la réplication vers le serveur du groupe. */
+  synchro: EtatSynchro;
+  /** Synchronise tout de suite (et revérifie l'horloge). */
+  synchroniser(): Promise<void>;
+  /** Raison qui interdit d'encaisser (caisse révoquée, horloge fausse), ou `null`. */
+  blocage: string | null;
 }
 
 export const Contexte = createContext<ContexteCaisse | null>(null);

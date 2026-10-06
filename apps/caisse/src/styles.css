@@ -336,22 +336,133 @@ button:disabled {
 
 /* ───────── Installation et réglages ───────── */
 
-.ecran-installation {
+.ecran-rattachement {
   height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+}
+
+.rattachement-panneau {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+  padding: 32px 48px;
+  max-width: 620px;
   overflow-y: auto;
-  padding: 32px 40px 40px;
 }
 
-.ecran-installation header p {
+.rattachement-panneau h2 {
+  margin: 0;
+}
+
+.etapes-rattachement {
+  margin: 0;
+  padding-left: 1.3em;
   color: var(--sable);
-  max-width: 68ch;
+  line-height: 1.5;
 }
 
-.ecran-installation footer {
+.etapes-rattachement strong {
+  color: var(--mousse);
+}
+
+.rattachement-panneau form {
+  display: grid;
+  gap: 12px;
+}
+
+.champ-code {
+  display: grid;
+  gap: 6px;
+}
+
+.champ-code input {
+  font-family: var(--police-chiffres);
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 14px;
+}
+
+.note-rattachement {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--sable);
+}
+
+.ecran-centre .actions-ecran {
   display: flex;
-  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Pastille d'état de la synchronisation dans la barre. */
+.puce-synchro {
+  display: inline-flex;
   align-items: center;
-  gap: 20px;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sable);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.puce-synchro::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sable);
+}
+
+.puce-synchro.synchronise::before {
+  background: var(--vert);
+}
+
+.puce-synchro.en_attente::before,
+.puce-synchro.hors_ligne::before {
+  background: #d9a441;
+}
+
+.puce-synchro.divergence,
+.puce-synchro.revoquee,
+.puce-synchro.erreur {
+  color: #fff;
+  background: var(--rouge);
+}
+
+.puce-synchro.divergence::before,
+.puce-synchro.revoquee::before,
+.puce-synchro.erreur::before {
+  background: #fff;
+}
+
+.puce-synchro.en-cours::before {
+  animation: pulsation 1s ease-in-out infinite;
+}
+
+@keyframes pulsation {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.bandeau-alerte {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bandeau-alerte .bouton {
+  flex: none;
+  min-height: 40px;
 }
 
 .formulaire-colonnes {
@@ -1269,7 +1380,8 @@ code {
   }
   .encaissement,
   .formulaire-colonnes,
-  .ecran-connexion {
+  .ecran-connexion,
+  .ecran-rattachement {
     grid-template-columns: 1fr;
   }
   .connexion-marque {
@@ -1689,12 +1801,16 @@ a.bouton {
   .ajout-utilisateur .bouton {
     grid-column: 1 / -1;
   }
-  .ecran-installation {
-    padding: 20px 14px 32px;
+  .rattachement-panneau {
+    padding: 24px 16px;
   }
-  .ecran-installation footer {
+  .puce-synchro .libelle-synchro {
+    display: none;
+  }
+  .bandeau-alerte {
     flex-direction: column;
     align-items: stretch;
+    gap: 6px;
   }
   .assistant-contenu {
     padding: 24px 16px;
@@ -1738,4 +1854,11 @@ a.bouton {
     transform: none;
     flex-direction: column;
   }
+}
+
+.aide-champ {
+  clear: both;
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--sable);
 }

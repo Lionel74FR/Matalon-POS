@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./vercel": "./src/vercel.ts"
+    "./vercel": "./src/vercel.ts",
+    "./partage": "./src/partage.ts"
   },
   "scripts": {
     "test": "vitest run",
