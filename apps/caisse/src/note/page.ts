@@ -28,7 +28,6 @@ function rendre(n: NoteNumerique): HTMLElement {
     "article",
     { class: "papier" },
     n.x ? el("p", { class: "test" }, "Caisse de test — note sans valeur") : null,
-    el("img", { src: "/icone.svg", alt: "", width: "56", height: "56" }),
     el("h1", {}, enseigne),
     el("p", { class: "etab" }, [raison, adresse, cpVille, tel && `Tél. ${tel}`].filter(Boolean).join("\n")),
     el("p", { class: "etab petit" }, [siret && `SIRET ${siret}`, tva && `TVA ${tva}`].filter(Boolean).join(" · ")),

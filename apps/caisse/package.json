@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:vercel": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@fontsource/atkinson-hyperlegible": "^5.1.0",
@@ -33,6 +34,7 @@
     "vite": "^5.4.10",
     "vite-plugin-pwa": "^0.20.5",
     "vitest": "^2.1.4",
-    "@electric-sql/pglite": "^0.3.0"
+    "@electric-sql/pglite": "^0.3.0",
+    "esbuild": "^0.21.5"
   }
 }

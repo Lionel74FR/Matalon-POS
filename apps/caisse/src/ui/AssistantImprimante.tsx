@@ -98,13 +98,13 @@ export function AssistantImprimante(props: {
             <ol className="consignes">
               <li>Branchez l'alimentation, placez le rouleau de papier de 80 mm et fermez le capot. Le voyant vert doit être allumé.</li>
               <li>
-                Reliez l'imprimante à la box du Moka avec un câble réseau, sur le port <strong>LAN</strong> à l'arrière. En Wi-Fi,
+                Reliez l'imprimante à la box de l'établissement avec un câble réseau, sur le port <strong>LAN</strong> à l'arrière. En Wi-Fi,
                 connectez-la d'abord avec l'app gratuite Epson TM Utility sur l'iPad.
               </li>
               <li>
                 Branchez le câble du tiroir-caisse sur la prise <strong>DK</strong> à l'arrière de l'imprimante.
               </li>
-              <li>Vérifiez que l'iPad est connecté au Wi-Fi du Moka, le même réseau que l'imprimante.</li>
+              <li>Vérifiez que l'iPad est connecté au Wi-Fi de l'établissement, le même réseau que l'imprimante.</li>
             </ol>
             <div className="assistant-actions">
               <button className="bouton principal grand" onClick={() => setEtape(1)}>
@@ -205,7 +205,7 @@ export function AssistantImprimante(props: {
                 <ul className="consignes">
                   <li>Le voyant vert de l'imprimante est-il allumé ?</li>
                   <li>L'adresse saisie ({ip}) est-elle celle de la feuille d'état ?</li>
-                  <li>L'iPad est-il sur le Wi-Fi du Moka, et non en 4G ou sur un Wi-Fi invité ?</li>
+                  <li>L'iPad est-il sur le Wi-Fi de l'établissement, et non en 4G ou sur un Wi-Fi invité ?</li>
                 </ul>
               </>
             )}

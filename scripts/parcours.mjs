@@ -1,34 +1,66 @@
-// Parcours de bout en bout de la caisse dans Chromium au format iPad paysage :
-// installation, connexion, commande en salle, remise, encaissement, Z.
-// Usage : pnpm --filter @matalon/caisse preview (port 4173), puis
-//         PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs [dossier-captures]
+// Parcours de bout en bout dans Chromium : administration (compte 2FA, équipe,
+// code de rattachement), puis caisse au format iPad paysage : rattachement,
+// connexion, commande en salle, remise, encaissement, Z, synchronisation.
+// Usage (dans apps/caisse) : pnpm build && node scripts/serveur-local.mjs 4180, puis à la racine :
+//         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs [dossier-captures]
 import { chromium } from "playwright";
+import { totp } from "./preparer-caisse.mjs";
 
-const URL = process.env.URL ?? "http://localhost:4173";
+const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
 const b = await chromium.launch();
+const erreurs = [];
+
+// ── Administration, sur ordinateur ──
+const bureau = await b.newContext({ viewport: { width: 1280, height: 900 } });
+const a = await bureau.newPage();
+a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
+const champA = (libelle) => a.locator("label.champ", { hasText: libelle }).locator("input");
+await a.goto(`${URL}/admin`);
+await a.getByText("Créer le compte administrateur").waitFor();
+await champA("Identifiant").fill("lionel");
+await champA(/^Mot de passe/).fill("un-mot-de-passe-solide");
+await champA("Confirmer le mot de passe").fill("un-mot-de-passe-solide");
+await a.getByRole("button", { name: "Continuer" }).click();
+const secret = await a.locator(".admin-totp code").textContent();
+await a.screenshot({ path: `${sortie}/00a-admin-2fa.png` });
+await champA("Code à 6 chiffres").fill(totp(secret));
+await a.getByRole("button", { name: "Activer et se connecter" }).click();
+await a.getByRole("heading", { name: "Moka" }).waitFor();
+// Équipe : un responsable d'abord.
+await a.getByPlaceholder("Prénom").fill("Lionel");
+await a.locator(".admin-section", { hasText: "Équipe" }).locator("select").last().selectOption("responsable");
+await a.getByPlaceholder("Code PIN").fill("1234");
+await a.getByRole("button", { name: "Ajouter", exact: true }).click();
+await a.locator(".admin-tableau td", { hasText: "Lionel" }).waitFor();
+// Identité légale.
+await champA("Raison sociale").fill("SAS Moka Annecy");
+await champA("SIRET").fill("123 456 789 00012");
+await champA("TVA intracommunautaire").fill("FR12123456789");
+await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
+await a.getByText("Enregistré.").waitFor();
+// Code de rattachement.
+await a.getByPlaceholder("Nom de l'iPad").fill("Comptoir");
+await a.getByRole("button", { name: "Générer un code" }).click();
+const code = (await a.locator(".admin-code span").textContent()).trim();
+await a.screenshot({ path: `${sortie}/00b-admin-code.png`, fullPage: true });
+
+// ── Caisse, sur iPad ──
 const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 1, hasTouch: true });
 const p = await ctx.newPage();
-const erreurs = [];
 p.on("pageerror", (e) => erreurs.push(e.message));
 p.on("console", (m) => m.type() === "error" && erreurs.push(m.text()));
 const capture = (nom) => p.screenshot({ path: `${sortie}/${nom}.png` });
 const clic = (texte) => p.getByRole("button", { name: texte, exact: true }).first().click();
-const pin = async (code) => {
-  for (const c of code) await p.locator(".pave .touche", { hasText: new RegExp(`^${c}$`) }).last().click();
+const pin = async (c) => {
+  for (const x of c) await p.locator(".pave .touche", { hasText: new RegExp(`^${x}$`) }).last().click();
 };
 
 await p.goto(URL);
-await p.getByText("Mise en service de la caisse").waitFor();
-const champ = (libelle) => p.locator("label.champ", { hasText: libelle }).locator("input");
-await champ("Raison sociale").fill("SAS Moka Annecy");
-await champ("SIRET").fill("123 456 789 00012");
-await champ("TVA intracommunautaire").fill("FR12123456789");
-await champ("Prénom").fill("Lionel");
-await champ("Code PIN (4 chiffres)").fill("1234");
-await champ("Confirmer le code").fill("1234");
-await capture("01-installation");
-await clic("Mettre la caisse en service");
+await p.getByText("Rattacher cet iPad à un établissement").waitFor();
+await p.locator(".champ-code input").fill(code);
+await capture("01-rattachement");
+await clic("Rattacher l'iPad");
 
 // Assistant imprimante : on parcourt les premières étapes puis on remet à plus tard.
 await p.getByText("Connecter l'imprimante").first().waitFor();
@@ -119,7 +151,18 @@ await clic("Vérifier l'intégrité");
 await p.getByText(/Chaînes intactes|anomalie/).waitFor();
 await capture("12-integrite");
 const integre = await p.getByText(/Chaînes intactes/).count();
+await p.getByRole("button", { name: "Fermer" }).last().click().catch(() => {});
+
+// Synchronisation : la pastille repasse au vert, et le serveur vérifie la copie reçue.
+await p.locator(".puce-synchro").click();
+await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
+await capture("13-synchronise");
+await a.reload();
+await a.getByRole("button", { name: "Vérifier la chaîne" }).click();
+await a.getByText(/Chaîne intègre|anomalie/).waitFor();
+const serveurIntegre = await a.getByText(/Chaîne intègre/).count();
+await a.screenshot({ path: `${sortie}/14-admin-verification.png`, fullPage: true });
 
 await b.close();
-console.log(JSON.stringify({ integre: integre > 0, erreurs }, null, 2));
-if (!integre || erreurs.length) process.exit(1);
+console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, erreurs }, null, 2));
+if (!integre || !serveurIntegre || erreurs.length) process.exit(1);

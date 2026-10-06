@@ -4,6 +4,7 @@ import {
   Registre,
   signataireDepuis,
   StockageMemoire,
+  verifierRegistre,
   type Chaine,
   type SaisieLigne,
 } from "@matalon/noyau-fiscal";
@@ -170,6 +171,12 @@ describe("rattachement et synchronisation", () => {
     expect(verif.corps.compteurs.tickets).toBe(181);
     const csv = await appel("GET", `/api/admin/caisses/${caisseId}/clotures.csv`, undefined, { Cookie: cookie });
     expect(csv.corps).toContain("JOUR;2026-10-15");
+    // Journal complet en JSON : il se vérifie seul avec la clé publique qu'il porte.
+    const journal = await appel("GET", `/api/admin/caisses/${caisseId}/journal.json`, undefined, { Cookie: cookie });
+    expect(journal.corps.tickets).toHaveLength(181);
+    const copie = new StockageMemoire();
+    await copie.ajouterLot((["tickets", "evenements", "clotures"] as Chaine[]).flatMap((chaine) => journal.corps[chaine].map((enregistrement: any) => ({ chaine, enregistrement }))));
+    expect((await verifierRegistre(copie, (id) => (id === journal.corps.cleId ? journal.corps.clePublique : null))).integre).toBe(true);
 
     // Renvoi après coupure réseau : rien n'est dupliqué.
     const renvoi = (await synchro()).corps as ReponseSynchro;

@@ -10,7 +10,7 @@
   --papier-ombre: #e8dccc;
   --encre: #2b1e18;
   --encre-douce: #6d5a4c;
-  /* Terracotta Moka : action principale. */
+  /* Terracotta : action principale. */
   --terre: #c0562e;
   --terre-fonce: #9e4220;
   --vert: #5f8a4e;
@@ -377,6 +377,10 @@ button:disabled {
 }
 
 .champ-code input {
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso-2);
+  color: var(--mousse);
   font-family: var(--police-chiffres);
   font-size: 2.2rem;
   font-weight: 700;

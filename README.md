@@ -1,6 +1,6 @@
 # Matalon POS
 
-Caisse tactile iPad du groupe Matalon, conforme à l'article 286 I 3° bis du CGI (conditions ISCA : inaltérabilité, sécurisation, conservation, archivage). Premier établissement : le Moka, ouverture le 15 octobre 2026.
+Caisse tactile iPad multi-établissements du groupe Matalon, conforme à l'article 286 I 3° bis du CGI (conditions ISCA : inaltérabilité, sécurisation, conservation, archivage). Premier établissement : le Moka, ouverture le 15 octobre 2026.
 
 Éditeur : proIA Conseil.
 
@@ -10,8 +10,8 @@ Caisse tactile iPad du groupe Matalon, conforme à l'article 286 I 3° bis du CG
 | --- | --- | --- |
 | `packages/noyau-fiscal` | Tickets chaînés et signés, journal des événements, clôtures Z / mois / exercice, vérification, archives, export CSV | **Oui**, couvert par l'attestation |
 | `packages/catalogue` | Cartes des établissements, prix, TVA, variantes, formules | Non |
-| `apps/caisse` | PWA iPad : salle, prise de commande, encaissement, tickets, clôtures, réglages, impression Epson | Non, consomme le noyau |
-| `apps/backoffice` | Back-office web et API Vercel (à venir) | Non |
+| `packages/serveur` | API (fonction Edge Vercel, Postgres Neon) : établissements, équipes, rattachement des iPad, réplication vérifiée des chaînes, administration 2FA | Non, vérifie avec le noyau |
+| `apps/caisse` | PWA iPad (`/`), note client (`/n`), administration (`/admin`), guide de test (`/guide`) | Non, consomme le noyau |
 
 ## Règles du noyau fiscal
 
@@ -24,16 +24,18 @@ Caisse tactile iPad du groupe Matalon, conforme à l'article 286 I 3° bis du CG
 
 ## Garde-fous à la charge de l'application caisse
 
-- **Horloge** : une horloge qui avance (ex. iPad réglé en 2027) fige la date comptable dans le futur, puisque les dates ne reculent jamais. La PWA compare l'heure de l'iPad à celle du serveur au démarrage et avant chaque encaissement en ligne, et bloque l'encaissement au-delà de 5 minutes d'écart.
-- **Persistance** : `navigator.storage.persist()`, écritures sérialisées entre onglets (Web Locks), synchronisation de chaque lot vers le serveur, qui refuse toute divergence de numéro ou d'empreinte ; au démarrage, comparaison du dernier numéro/empreinte local et serveur, caisse bloquée en cas d'écart.
+- **Horloge** : une horloge qui avance (ex. iPad réglé en 2027) fige la date comptable dans le futur, puisque les dates ne reculent jamais. À chaque synchronisation, la caisse mesure l'écart avec l'heure du serveur et bloque l'encaissement au-delà de 5 minutes (dernier écart connu conservé hors ligne).
+- **Persistance** : `navigator.storage.persist()`, écritures sérialisées entre onglets (Web Locks), réplication de chaque lot vers le serveur (après écriture, toutes les minutes, au retour du réseau). Le serveur revérifie continuité, empreinte, signature et totaux, et refuse toute divergence ; la caisse compare aussi la copie du serveur à la sienne. Une divergence est signalée à l'écran et dans l'administration sans bloquer l'encaissement : l'iPad détient l'original.
+- **Révocation** : un iPad révoqué ne peut plus encaisser ni se synchroniser (les clôtures restent possibles).
 - **Traçabilité** : journaliser connexions, suppressions de lignes sur une commande ouverte, impressions d'addition, ouvertures de tiroir, réimpressions, archivages et exports.
 
 ## Mise en route sur l'iPad
 
-1. Ouvrir l'adresse de la caisse dans Safari, puis Partager › Sur l'écran d'accueil. Lancer la caisse depuis cette icône (sinon iPadOS peut purger les données).
-2. Remplir la mise en service : établissement, responsable et son code PIN, nombre de tables. La clé de signature de la caisse est créée à ce moment, une fois pour toutes.
-3. Imprimante Epson TM-m30III : relever son adresse IP (page d'état), ouvrir `https://<adresse>` dans Safari et accepter le certificat, puis saisir l'adresse dans Réglages et imprimer un test.
-4. Créer les comptes de l'équipe dans Réglages.
+1. Dans l'administration (`/admin`, sur ordinateur) : créer le compte administrateur (mot de passe + application d'authentification), compléter l'identité légale de l'établissement, ajouter au moins un responsable, puis **Rattacher un iPad** pour obtenir un code à usage unique (48 h).
+2. Sur l'iPad : ouvrir l'adresse dans Safari, Partager › Sur l'écran d'accueil, lancer la caisse depuis cette icône (sinon iPadOS peut purger les données), saisir le code. L'iPad crée sa clé de signature non exportable et reçoit établissement, équipe, tables et carte.
+3. Imprimante Epson TM-m30III (facultative) : relever son adresse IP (page d'état), ouvrir `https://<adresse>` dans Safari et accepter le certificat, puis suivre l'assistant de connexion.
+
+L'équipe et l'identité de l'établissement sont communes à toutes ses caisses : elles se modifient dans l'administration ou dans les Réglages d'un iPad (connexion requise) et arrivent sur les autres iPad à la synchronisation suivante.
 
 L'imprimante est facultative. Sans elle, rien ne s'imprime d'office : après chaque encaissement, la note s'affiche en QR code. Le client le scanne et ouvre sa note sur `/n`, la note entière étant contenue dans le lien (aucun stockage, aucune donnée personnelle). Les Z et les additions restent consultables à l'écran. Rappel : au-delà de 25 € TTC, la note de restaurant doit être remise imprimée.
 
@@ -45,7 +47,12 @@ La caisse s'adapte à l'iPhone en portrait : carte en plein écran, commande ouv
 pnpm install
 pnpm test        # tous les tests
 pnpm typecheck   # TypeScript strict
-pnpm --filter @matalon/caisse dev       # caisse en local
-pnpm --filter @matalon/caisse build && pnpm --filter @matalon/caisse preview
-PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs captures   # parcours complet + captures iPad
+pnpm --filter @matalon/caisse build
+(cd apps/caisse && node scripts/serveur-local.mjs 4180)   # caisse + API sur Postgres embarqué (PGlite)
+URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs captures   # administration, rattachement, service, Z, synchro
+pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
+
+## Déploiement Vercel
+
+Projet à la racine `apps/caisse`, commande de build `pnpm build:vercel`, préréglage « Other ». La base Neon (région Francfort) est reliée au projet par l'intégration Vercel, qui fournit `DATABASE_URL`. Le schéma se crée seul au premier appel de l'API. `VITE_MODE_TEST=1` sur le projet de test : bandeau et mention « sans valeur » sur chaque note.

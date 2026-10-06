@@ -1,9 +1,11 @@
 // Vérifie la page de note (/n) et les écrans principaux au format iPhone.
-// Usage : PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/note-et-iphone.mjs [dossier-captures]
+// Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
+//         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/note-et-iphone.mjs [dossier-captures]
 import { chromium } from "playwright";
+import { codeDeRattachement } from "./preparer-caisse.mjs";
 import { createRequire } from "node:module";
 
-const URL = process.env.URL ?? "http://localhost:4173";
+const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
@@ -18,16 +20,11 @@ const pin = async (code) => {
 const debordement = () => p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
 await p.goto(URL);
-await p.getByText("Mise en service de la caisse").waitFor();
-await capture("m01-installation");
-const champ = (libelle) => p.locator("label.champ", { hasText: libelle }).locator("input");
-await champ("Raison sociale").fill("SAS Moka Annecy");
-await champ("SIRET").fill("12345678900012");
-await champ("TVA intracommunautaire").fill("FR12123456789");
-await champ("Prénom").fill("Lionel");
-await champ("Code PIN (4 chiffres)").fill("1234");
-await champ("Confirmer le code").fill("1234");
-await clic("Mettre la caisse en service");
+await p.getByText("Rattacher cet iPad à un établissement").waitFor();
+await p.locator(".champ-code input").fill(await codeDeRattachement(URL));
+await capture("m01-rattachement");
+const largeurs = { rattachement: await debordement() };
+await clic("Rattacher l'iPad");
 await p.getByText("Connecter l'imprimante").first().waitFor();
 await capture("m02-assistant");
 await clic("Configurer plus tard");
@@ -35,7 +32,7 @@ await p.locator(".carte-personne").first().click();
 await pin("1234");
 await p.locator(".salle").waitFor();
 await capture("m03-salle");
-const largeurs = { salle: await debordement() };
+largeurs.salle = await debordement();
 
 await p.locator(".grille-tables .table", { hasText: /^2/ }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).click();

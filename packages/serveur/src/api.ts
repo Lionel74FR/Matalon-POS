@@ -720,6 +720,35 @@ async function exporterCaisse(env: Environnement, admin: { id: string }, caisseI
   });
 }
 
+/**
+ * Copie intégrale de la chaîne d'une caisse, en JSON (format ouvert). Chaque
+ * enregistrement y garde son empreinte et sa signature : le fichier se vérifie
+ * seul avec la clé publique qu'il contient.
+ */
+async function exporterJournal(env: Environnement, admin: { id: string }, caisseId: string): Promise<Response> {
+  const c = await cleDeCaisse(env, caisseId);
+  const stockage = new StockageServeur(env.db, caisseId);
+  const corps = {
+    format: "matalon-pos/journal-caisse",
+    version: 1,
+    exporteLe: horloge(env).toISOString(),
+    caisseId,
+    cleId: c.cle_id,
+    clePublique: c.cle_publique,
+    tickets: await stockage.lister("tickets"),
+    evenements: await stockage.lister("evenements"),
+    clotures: await stockage.lister("clotures"),
+  };
+  await journaliserAdmin(env, admin.id, "export_journal", { caisse: caisseId, tickets: corps.tickets.length });
+  return new Response(JSON.stringify(corps, null, 1), {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Disposition": `attachment; filename="journal-${caisseId}.json"`,
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 // ───────── Routage ─────────
 
 export async function traiter(requete: Request, env: Environnement): Promise<Response> {
@@ -756,6 +785,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "POST") return await revoquerCaisse(env, admin, p[1]!);
       p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/verification$/.exec(chemin);
       if (p && m === "GET") return await verifierCaisse(env, admin, p[1]!);
+      p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/journal\.json$/.exec(chemin);
+      if (p && m === "GET") return await exporterJournal(env, admin, p[1]!);
       p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/clotures\.csv$/.exec(chemin);
       if (p && m === "GET") return await exporterCaisse(env, admin, p[1]!);
     }

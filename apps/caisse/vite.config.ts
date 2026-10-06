@@ -15,8 +15,8 @@ function versionBuild(): string {
 export default defineConfig({
   build: {
     rollupOptions: {
-      // Deux pages : la caisse, et la note numérique ouverte par le client (QR code).
-      input: { caisse: "index.html", note: "n.html" },
+      // Trois pages : la caisse, la note numérique ouverte par le client (QR code) et l'administration.
+      input: { caisse: "index.html", note: "n.html", admin: "admin.html" },
     },
   },
   define: {
@@ -28,9 +28,9 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icone.svg", "icone-180.png"],
       manifest: {
-        name: "Moka Caisse",
-        short_name: "Caisse",
-        description: "Caisse du Moka — Matalon POS",
+        name: "Matalon POS",
+        short_name: "Matalon POS",
+        description: "Caisse des établissements du groupe Matalon",
         lang: "fr",
         display: "standalone",
         orientation: "any",
@@ -44,6 +44,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"],
+        // L'administration se consulte en ligne, sur ordinateur : rien à garder sur l'iPad.
+        globIgnores: ["admin.html", "assets/admin-*"],
         navigateFallback: "index.html",
         navigateFallbackDenylist: [/^\/guide/, /^\/n(\.html)?$/, /^\/api\//, /^\/admin/],
       },
