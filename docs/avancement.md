@@ -24,7 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
+| c2985fa | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
 | 3857124 | Imprimantes de production : poste par catégorie dans l'éditeur de carte, imprimante par poste (Réglages de la caisse et administration, bon d'essai), bouton « Envoyer (n) », envoi d'office à l'encaissement, bon d'annulation au retrait d'un article envoyé, formules réparties entre postes |
 | d4f1939 | Cartes : fusion de deux catégories au même taux de TVA |
 | e81d18c | Comptes clients (noyau 0.5.0) : vente en compte (mode EN_COMPTE, client scellé, accord responsable), règlement sur n'importe quel appareil (ticket REGLEMENT, TVA exigible au règlement par tranches exactes), annulation d'un règlement, soldes recalculés par le serveur, page Comptes, section admin, Z avec ventes en compte, règlements et TVA exigible, mentions de facture « reste dû » |
