@@ -500,7 +500,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
         </p>
       )}
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
-      <Caisses caisses={e.caisses} onChange={props.onChange} />
+      <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
       <Equipe e={e} onChange={props.onChange} />
       <PlanDeSalle e={e} onChange={props.onChange} />
       <ImprimantesProduction e={e} onChange={props.onChange} />
@@ -584,8 +584,34 @@ function Rattacher(props: { e: EtablissementAdmin; responsable: boolean; onChang
   );
 }
 
-function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> }) {
+/** Résumé d'un rapport de vérification. */
+function ResumeRapport({ rapport, objet }: { rapport: RapportVerification | string; objet: string }) {
+  return (
+    <p className={typeof rapport !== "string" && !rapport.integre ? "erreur" : "admin-ok"}>
+      {typeof rapport === "string"
+        ? rapport
+        : rapport.integre
+          ? `${objet} intègre : ${pluriel(rapport.compteurs.tickets ?? 0, "ticket")}, ${pluriel(rapport.compteurs.evenements ?? 0, "événement")}, ${pluriel(rapport.compteurs.clotures ?? 0, "clôture")}.`
+          : `${pluriel(rapport.anomalies.length, "anomalie")} : ${rapport.anomalies
+              .slice(0, 3)
+              .map((x) => `${x.chaine ?? ""} n°${x.numero ?? "?"} ${x.code}${x.detail ? ` (${x.detail})` : ""}`)
+              .join(", ")}`}
+    </p>
+  );
+}
+
+function Caisses(props: { e: EtablissementAdmin; caisses: CaisseAdmin[]; onChange: () => Promise<void> }) {
   const [rapports, setRapports] = useState<Record<string, RapportVerification | string>>({});
+  const [rapportEtablissement, setRapportEtablissement] = useState<RapportVerification | string | null>(null);
+  /** Clôtures, chaînage entre appareils et totaux de toutes les caisses ensemble. */
+  const verifierEtablissement = async () => {
+    setRapportEtablissement("Vérification…");
+    try {
+      setRapportEtablissement(await api.verifierEtablissement(props.e.id));
+    } catch (e) {
+      setRapportEtablissement(message(e));
+    }
+  };
   const [clotures, setClotures] = useState<Record<string, ResumeCloture[] | undefined>>({});
   const basculerClotures = async (id: string) => {
     if (clotures[id]) return setClotures((x) => ({ ...x, [id]: undefined }));
@@ -617,6 +643,19 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
   return (
     <section className="admin-section">
       <Titre icone={TabletSmartphone}>Appareils rattachés</Titre>
+      <p className="explication">
+        Les clôtures (Z, mois, exercice) valent pour tout l'établissement, quel que soit l'appareil qui les a faites. Le contrôle
+        d'établissement vérifie qu'elles couvrent chaque caisse sans trou ni double compte.
+      </p>
+      {props.e.anomalieCloture && <p className="erreur">Clôtures : {props.e.anomalieCloture}</p>}
+      {rapportEtablissement && <ResumeRapport rapport={rapportEtablissement} objet="Établissement" />}
+      {props.caisses.length > 0 && (
+        <div className="admin-actions">
+          <button className="bouton" onClick={() => void verifierEtablissement()} title="Vérifier les clôtures de tout l'établissement">
+            <AvecIcone icone={ShieldCheck}>Vérifier l'établissement</AvecIcone>
+          </button>
+        </div>
+      )}
       {props.caisses.length === 0 ? (
         <p className="explication">Aucun iPad ni iPhone pour l'instant.</p>
       ) : (
@@ -672,18 +711,7 @@ function Caisses(props: { caisses: CaisseAdmin[]; onChange: () => Promise<void> 
                     )}
                   </div>
                 )}
-                {rapport && (
-                  <p className={typeof rapport !== "string" && !rapport.integre ? "erreur" : "admin-ok"}>
-                    {typeof rapport === "string"
-                      ? rapport
-                      : rapport.integre
-                        ? `Chaîne intègre : ${pluriel(rapport.compteurs.tickets ?? 0, "ticket")}, ${pluriel(rapport.compteurs.evenements ?? 0, "événement")}, ${pluriel(rapport.compteurs.clotures ?? 0, "clôture")}.`
-                        : `${pluriel(rapport.anomalies.length, "anomalie")} : ${rapport.anomalies
-                            .slice(0, 3)
-                            .map((x) => `${x.chaine ?? ""} n°${x.numero ?? "?"} ${x.code}`)
-                            .join(", ")}`}
-                  </p>
-                )}
+                {rapport && <ResumeRapport rapport={rapport} objet="Chaîne" />}
                 <div className="admin-actions">
                   <button className="bouton" onClick={() => void verifier(c.id)} title="Vérifier la chaîne fiscale">
                     <AvecIcone icone={ShieldCheck}>Vérifier</AvecIcone>

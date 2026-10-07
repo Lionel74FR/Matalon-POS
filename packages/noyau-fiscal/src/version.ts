@@ -11,6 +11,6 @@
  * Versions 0.x : développement, avant attestation. La 1.0.0 sera la première
  * version attestée, mise en service au Moka.
  */
-export const VERSION_NOYAU_FISCAL = "0.6.0";
+export const VERSION_NOYAU_FISCAL = "0.7.0";
 
 export const NOM_LOGICIEL = "Matalon POS";

@@ -216,14 +216,25 @@ function corpsTotaux(r: Recu, t: TotauxPeriode): void {
 
 const LIBELLES_PERIODE = { JOUR: "CLÔTURE JOURNALIÈRE Z", MOIS: "CLÔTURE MENSUELLE", EXERCICE: "CLÔTURE D'EXERCICE" } as const;
 
-export function gabaritCloture(c: Cloture, config: Configuration, comptage?: Evenement | null): Recu {
+export function gabaritCloture(c: Cloture, config: Configuration, comptage?: Evenement | null, appareils?: Record<string, string>): Recu {
   const r = new Recu();
   entete(r, config);
   r.texte(LIBELLES_PERIODE[c.periode], { align: "centre", gras: true });
   r.texte(`n° ${numero(c.numero)} · ${c.identifiantPeriode}`, { align: "centre", gras: true });
   r.colonnes("Éditée le", dateHeure(c.horodatage));
   r.colonnes("Par", nomUtilisateur(config, c.operateurId));
-  r.colonnes("Tickets", c.premierTicket == null ? "aucun" : `${numero(c.premierTicket)} à ${numero(c.dernierTicket!)}`);
+  const nom = (id: string) => (id === config.caisseId ? config.caisseNom : (appareils?.[id] ?? id));
+  if (c.etablissement) {
+    // Clôture de l'établissement : toutes les caisses, quel que soit l'appareil qui l'a faite.
+    r.texte("Tout l'établissement", { align: "centre" });
+    if (c.periode === "JOUR") {
+      for (const x of c.etablissement.caisses) {
+        r.colonnes(nom(x.caisseId), x.premierTicket == null ? "aucun ticket" : `${numero(x.premierTicket)} à ${numero(x.dernierTicketCouvert)}`);
+      }
+    } else r.colonnes("Clôtures agrégées", String(c.etablissement.agregees.length));
+  } else {
+    r.colonnes("Tickets", c.premierTicket == null ? "aucun" : `${numero(c.premierTicket)} à ${numero(c.dernierTicket!)}`);
+  }
   r.filet();
   corpsTotaux(r, c);
   r.filet();
@@ -231,7 +242,7 @@ export function gabaritCloture(c: Cloture, config: Configuration, comptage?: Eve
   r.colonnes("Cumul perpétuel absolu", formaterEuros(c.cumulPerpetuelAbsolu));
   r.filet();
   if (comptage) corpsComptage(r, comptage);
-  r.texte(`${c.caisseId} · Matalon POS ${c.versionLogiciel}`, { align: "centre" });
+  r.texte(`${c.etablissement ? `Scellée par ${nom(c.caisseId)} · ` : ""}${c.caisseId} · Matalon POS ${c.versionLogiciel}`, { align: "centre" });
   r.texte(`Empreinte ${c.hash.slice(0, 32)}`, { align: "centre" });
   return r;
 }

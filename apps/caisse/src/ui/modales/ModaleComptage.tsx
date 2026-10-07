@@ -2,8 +2,28 @@ import { Calculator, Coins, Lock } from "lucide-react";
 import { AvecIcone } from "../icones";
 import { useEffect, useMemo, useState } from "react";
 import { COUPURES, etatJournee, rapprocher, totalCoupures, type EtatJournee, type SaisieComptage } from "../../metier/tresorerie";
+import type { ReponseJournee } from "@matalon/serveur/partage";
+import { fraicheur } from "../../fiscal/journee";
 import { centimesDepuisSaisie, ChampEuros, Modale, saisieDepuisCentimes } from "../communs";
 import { euros, useCaisse } from "../contexte";
+
+/**
+ * Appareils couverts par la clôture, avec la fraîcheur de leur
+ * synchronisation : un ticket qu'un appareil n'a pas encore envoyé entrera
+ * dans la Z suivante.
+ */
+export function AppareilsDeLaJournee(props: { journee: ReponseJournee; caisseId: string }) {
+  const ids = Object.keys(props.journee.appareils);
+  if (ids.length < 2) return null;
+  const autres = ids.filter((id) => id !== props.caisseId);
+  return (
+    <p className="explication appareils-journee">
+      Appareils : {props.journee.appareils[props.caisseId] ?? "cet appareil"} (cet appareil)
+      {autres.map((id) => `, ${props.journee.appareils[id]} (${fraicheur(props.journee.synchros[id] ?? null)})`).join("")}. Un ticket
+      encore sur un appareil hors ligne entrera dans la clôture suivante.
+    </p>
+  );
+}
 
 const coupureLisible = (c: number) => (c >= 100 ? `${c / 100} €` : `${c} c`);
 
@@ -23,11 +43,13 @@ function Ecart(props: { valeur: number }) {
  */
 export function ModaleComptage(props: {
   commandesOuvertes: number;
+  /** Journée de l'établissement reçue du serveur (verrou de clôture pris) ; null : hors ligne, appareil seul. */
+  journee: ReponseJournee | null;
   enCours?: boolean;
   onValide: (saisie: SaisieComptage, etat: EtatJournee) => void;
   onFermer: () => void;
 }) {
-  const { caisse, imprimanteConfiguree } = useCaisse();
+  const { caisse, config, imprimanteConfiguree, notifier } = useCaisse();
   const [etat, setEtat] = useState<EtatJournee | null>(null);
   const [fond, setFond] = useState("");
   const [detail, setDetail] = useState<SaisieComptage["detail"]>({});
@@ -39,11 +61,18 @@ export function ModaleComptage(props: {
   const [motif, setMotif] = useState("");
 
   useEffect(() => {
-    void etatJournee(caisse.stockage).then((e) => {
-      setEtat(e);
-      setFond(saisieDepuisCentimes(e.fondDeclare ?? e.fondPropose ?? null));
-    });
-  }, [caisse.stockage]);
+    etatJournee(caisse, props.journee).then(
+      (e) => {
+        setEtat(e);
+        setFond(saisieDepuisCentimes(e.fondDeclare ?? e.fondPropose ?? null));
+      },
+      (e) => {
+        notifier(e instanceof Error ? e.message : String(e), "erreur");
+        props.onFermer();
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caisse, props.journee]);
 
   const especesComptees = totalDirect != null ? centimesDepuisSaisie(totalDirect) : totalCoupures(detail);
   const trPapierCaisse = etat?.totaux.paiements.find((p) => p.mode === "TITRE_RESTAURANT_PAPIER")?.montant ?? 0;
@@ -100,8 +129,14 @@ export function ModaleComptage(props: {
       }
     >
       <p className="explication">
-        {t.nbVentes} vente{t.nbVentes > 1 ? "s" : ""} pour {euros(t.totalTTC)}. La clôture fige la journée et ne peut pas être annulée.
+        {t.nbVentes} vente{t.nbVentes > 1 ? "s" : ""} pour {euros(t.totalTTC)}, tous appareils confondus. La clôture fige la journée de
+        l'établissement et ne peut pas être annulée.
       </p>
+      {props.journee ? (
+        <AppareilsDeLaJournee journee={props.journee} caisseId={config.caisseId} />
+      ) : (
+        <p className="explication">Hors ligne : cet appareil est le seul de l'établissement, la clôture se fait sans le serveur.</p>
+      )}
       {etat.journees.length > 1 && (
         <p className="erreur">
           La clôture de la veille a été oubliée : {etat.journees.length} Z seront produites ({etat.journees.join(", ")}). Le comptage

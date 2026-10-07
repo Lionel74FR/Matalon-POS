@@ -2,9 +2,10 @@ import { canonique, contenuScelle } from "./canonique.js";
 import { HASH_GENESE, sha256Hex, verifierSignature, type ResolveurCle } from "./crypto.js";
 import { listeMois } from "./dates.js";
 import { cumulerVentilations, paiementsNets, TAUX_TVA_AUTORISES, ventiler, ventilerTranche } from "./montants.js";
+import { cleRef, couvertureAncienne, ordonner, ticketCouvertPar, unir } from "./etablissement.js";
 import { champsTotaux, montantEnCompte, TOTAUX_VIDES, totauxClotures, totauxTickets } from "./registre.js";
 import type { StockageFiscal } from "./stockage.js";
-import type { Chaine, Cloture, Enregistrement, Ticket } from "./types.js";
+import type { Chaine, Cloture, CouvertureCaisse, Enregistrement, Evenement, Ticket } from "./types.js";
 
 export interface Anomalie {
   chaine: Chaine;
@@ -20,7 +21,9 @@ export interface Anomalie {
     | "CLOTURE_DETACHEE"
     | "COUVERTURE_Z"
     | "TOTAUX_CLOTURE"
-    | "AGREGAT_INVALIDE";
+    | "AGREGAT_INVALIDE"
+    /** Clôtures d'établissement : la précédente désignée n'est pas la bonne (0.7.0). */
+    | "CHAINAGE_CLOTURES";
   detail: string;
 }
 
@@ -161,7 +164,10 @@ export function verifierCorrections(tickets: Ticket[], clotures: Cloture[] = [])
     if (t.type !== "CORRECTION" || !t.ticketOrigine) continue;
     const v = parNumero.get(t.ticketOrigine.numero);
     const annuleeAvant = tickets.some((x) => x.type === "ANNULATION" && x.ticketOrigine?.numero === v?.numero && x.numero < t.numero);
-    const zEntre = clotures.some((c) => c.periode === "JOUR" && c.dernierTicketCouvert != null && v && c.dernierTicketCouvert >= v.numero && c.dernierTicketCouvert < t.numero);
+    const zEntre = clotures.some((c) => {
+      const couvert = ticketCouvertPar(c, t.caisseId);
+      return couvert != null && !!v && couvert >= v.numero && couvert < t.numero;
+    });
     let ok = !!v && v.type === "VENTE" && v.hash === t.ticketOrigine.hash && v.numero < t.numero && !annuleeAvant && !zEntre;
     if (ok) {
       const parMode = effectifs.get(v!.numero) ?? new Map(paiementsNets(v!.paiements, v!.renduMonnaie).map((p) => [p.mode, p.montant]));
@@ -258,7 +264,16 @@ export function verifierLiensClotures(clotures: Cloture[], tickets: Map<number, 
  * recouvrement et leurs totaux sont exacts ; chaque clôture mensuelle ou
  * d'exercice agrège exactement ses sources, une seule fois.
  */
-export function verifierClotures(clotures: Cloture[], tickets: Ticket[]): Anomalie[] {
+export function verifierClotures(clotures: Cloture[], tickets: Ticket[], evenements?: Evenement[]): Anomalie[] {
+  const caisseId = clotures[0]?.caisseId ?? tickets[0]?.caisseId;
+  return [
+    ...verifierCloturesCaisse(clotures.filter((c) => !c.etablissement), tickets),
+    ...(caisseId ? verifierEtablissement([{ caisseId, tickets, clotures, ...(evenements ? { evenements } : {}) }]) : []),
+  ];
+}
+
+/** Clôtures propres à une caisse (avant 0.7.0). */
+function verifierCloturesCaisse(clotures: Cloture[], tickets: Ticket[]): Anomalie[] {
   const anomalies: Anomalie[] = [];
   const parNumero = new Map(clotures.map((c) => [c.numero, c]));
   const ajouter = (c: Cloture, code: Anomalie["code"], detail: string) =>
@@ -342,7 +357,7 @@ export async function verifierRegistre(
     ...verifierImputationsLocales(tickets),
     ...verifierCorrections(tickets, clotures),
     ...verifierLiensClotures(clotures, new Map(tickets.map((t) => [t.numero, t]))),
-    ...verifierClotures(clotures, tickets),
+    ...verifierClotures(clotures, tickets, evenements),
   ];
   return {
     integre: anomalies.length === 0,
@@ -350,4 +365,186 @@ export async function verifierRegistre(
     compteurs: { tickets: tickets.length, evenements: evenements.length, clotures: clotures.length },
     anomalies,
   };
+}
+
+/** Chaîne d'une caisse, telle que connue de qui vérifie (les tickets et le journal peuvent manquer). */
+export interface ChaineCaisse {
+  caisseId: string;
+  clotures: Cloture[];
+  tickets?: Ticket[];
+  evenements?: Evenement[];
+}
+
+/**
+ * Clôtures d'établissement (0.7.0), sur les chaînes fournies : chaque Z suit
+ * la précédente, couvre chaque caisse à la suite de la Z d'avant, sans trou
+ * ni recouvrement, pointe sur les bons tickets et le bon journal, et ses
+ * totaux sont exacts ; les clôtures mensuelles et d'exercice agrègent
+ * exactement leurs sources. Ce qui dépend d'une caisse absente est laissé de
+ * côté : sur le serveur, toutes les caisses sont fournies et tout est contrôlé.
+ */
+export function verifierEtablissement(chaines: ChaineCaisse[]): Anomalie[] {
+  const anomalies: Anomalie[] = [];
+  const ajouter = (c: Cloture, code: Anomalie["code"], detail: string) =>
+    anomalies.push({ chaine: "clotures", numero: c.numero, code, detail: `${c.caisseId} : ${detail}` });
+  const toutes = unir(...chaines.map((c) => c.clotures));
+  if (!toutes.some((c) => c.etablissement)) return anomalies;
+  const index = new Map(toutes.map((c) => [cleRef(c), c]));
+  const connues = new Set(chaines.map((c) => c.caisseId));
+  const tickets = new Map(chaines.filter((c) => c.tickets).map((c) => [c.caisseId, new Map(c.tickets!.map((t) => [t.numero, t]))]));
+  const journaux = new Map(chaines.filter((c) => c.evenements).map((c) => [c.caisseId, new Map(c.evenements!.map((e) => [e.numero, e]))]));
+  // Toutes les caisses en jeu sont-elles fournies, tickets compris ? Alors on contrôle aussi qu'aucun ticket n'échappe aux Z.
+  const enJeu = new Set(toutes.flatMap((c) => [c.caisseId, ...(c.etablissement?.caisses.map((x) => x.caisseId) ?? [])]));
+  const complet = [...enJeu].every((id) => tickets.has(id));
+
+  // Chaînage : chaque clôture désigne celle qui la précède, une seule fois.
+  for (const periode of ["JOUR", "MOIS", "EXERCICE"] as const) {
+    const liste = ordonner(toutes, periode);
+    const suivies = new Map<string, Cloture>();
+    let premiere: Cloture | null = null;
+    for (const [i, c] of liste.entries()) {
+      const p = c.etablissement!.precedente;
+      if (!p) {
+        if (premiere) ajouter(c, "CHAINAGE_CLOTURES", `deuxième première clôture (après ${cleRef(premiere)})`);
+        premiere ??= c;
+        continue;
+      }
+      const deja = suivies.get(cleRef(p));
+      if (deja) ajouter(c, "CHAINAGE_CLOTURES", `${cleRef(p)} est déjà suivie par ${cleRef(deja)}`);
+      suivies.set(cleRef(p), c);
+      const cible = index.get(cleRef(p));
+      if (!cible) {
+        if (connues.has(p.caisseId)) ajouter(c, "CHAINAGE_CLOTURES", `clôture précédente ${cleRef(p)} introuvable`);
+      } else if (cible.hash !== p.hash || cible.periode !== periode || !cible.etablissement || liste.indexOf(cible) !== i - 1) {
+        ajouter(c, "CHAINAGE_CLOTURES", `${cleRef(p)} n'est pas la clôture qui la précède`);
+      }
+    }
+  }
+
+  // Z : couverture de chaque caisse, rattachement aux tickets et au journal, totaux.
+  const plages = new Map<string, Array<{ premier: number; dernier: number; z: string }>>();
+  const plage = (id: string, premier: number, dernier: number, z: string) => plages.set(id, [...(plages.get(id) ?? []), { premier, dernier, z }]);
+  for (const c of toutes) if (!c.etablissement && c.periode === "JOUR" && c.premierTicket != null && c.dernierTicket != null) plage(c.caisseId, c.premierTicket, c.dernierTicket, cleRef(c));
+  const moisClos = ordonner(toutes, "MOIS");
+  let cov: Map<string, CouvertureCaisse> | null = null;
+  let precedente: Cloture | null = null;
+  let jourPrecedent = "";
+  for (const z of ordonner(toutes, "JOUR")) {
+    const e = z.etablissement!;
+    const p = e.precedente;
+    // À la suite de la Z examinée juste avant (sinon une Z d'une caisse absente s'intercale : on repart de celle-ci).
+    const suite = p === null ? precedente === null : precedente !== null && cleRef(p) === cleRef(precedente);
+    const avant = suite ? (cov ?? new Map<string, CouvertureCaisse>()) : null;
+    if (z.identifiantPeriode < jourPrecedent) ajouter(z, "COUVERTURE_Z", `Z du ${z.identifiantPeriode} après celle du ${jourPrecedent}`);
+    jourPrecedent = z.identifiantPeriode;
+    const close = moisClos.find((m) => m.horodatage < z.horodatage && z.identifiantPeriode.startsWith(`${m.identifiantPeriode}-`));
+    if (close) ajouter(z, "COUVERTURE_Z", `Z dans le mois ${close.identifiantPeriode} déjà clôturé`);
+
+    const ids = e.caisses.map((x) => x.caisseId);
+    if (new Set(ids).size !== ids.length) ajouter(z, "COUVERTURE_Z", "une caisse figure deux fois");
+    if (avant) for (const id of avant.keys()) if (!ids.includes(id)) ajouter(z, "COUVERTURE_Z", `la caisse ${id} n'est plus couverte`);
+    let totauxConnus = true;
+    const contenu: Ticket[] = [];
+    for (const x of e.caisses) {
+      const prec = avant ? (avant.get(x.caisseId) ?? couvertureAncienne(toutes, x.caisseId)) : null;
+      if (prec) {
+        const ticketsOk = x.premierTicket != null ? x.premierTicket === prec.dernierTicketCouvert + 1 && x.dernierTicketCouvert >= x.premierTicket : x.dernierTicketCouvert === prec.dernierTicketCouvert;
+        if (!ticketsOk) ajouter(z, "COUVERTURE_Z", `${x.caisseId} : tickets attendus à partir du n°${prec.dernierTicketCouvert + 1}`);
+        const journalOk = x.premierEvenement != null ? x.premierEvenement === prec.dernierEvenement + 1 && x.dernierEvenement >= x.premierEvenement : x.dernierEvenement === prec.dernierEvenement;
+        if (!journalOk) ajouter(z, "COUVERTURE_Z", `${x.caisseId} : journal attendu à partir du n°${prec.dernierEvenement + 1}`);
+      }
+      if (x.premierTicket != null) plage(x.caisseId, x.premierTicket, x.dernierTicketCouvert, cleRef(z));
+      const ts = tickets.get(x.caisseId);
+      if (ts) {
+        if (x.dernierTicketCouvert > 0) {
+          const t = ts.get(x.dernierTicketCouvert);
+          if (!t || t.hash !== x.hashDernierTicketCouvert || t.grandTotalPerpetuel !== x.grandTotalPerpetuel || t.cumulPerpetuelAbsolu !== x.cumulPerpetuelAbsolu) {
+            ajouter(z, "CLOTURE_DETACHEE", `${x.caisseId} : le ticket ${x.dernierTicketCouvert} ne correspond pas à la Z`);
+          }
+        }
+        if (x.premierTicket != null) {
+          for (let n = x.premierTicket; n <= x.dernierTicketCouvert; n++) {
+            const t = ts.get(n);
+            if (t) contenu.push(t);
+            else totauxConnus = false;
+          }
+        }
+      } else if (x.premierTicket != null) totauxConnus = false;
+      const evs = journaux.get(x.caisseId);
+      if (evs && x.dernierEvenement > 0 && evs.get(x.dernierEvenement)?.hash !== x.hashDernierEvenement) {
+        ajouter(z, "CLOTURE_DETACHEE", `${x.caisseId} : l'événement ${x.dernierEvenement} ne correspond pas à la Z`);
+      }
+    }
+    if (totauxConnus && !memesTotaux(z, totauxTickets(contenu))) ajouter(z, "TOTAUX_CLOTURE", "totaux différents de ceux des tickets des caisses");
+    if (z.grandTotalPerpetuel !== e.caisses.reduce((s, x) => s + x.grandTotalPerpetuel, 0) || z.cumulPerpetuelAbsolu !== e.caisses.reduce((s, x) => s + x.cumulPerpetuelAbsolu, 0)) {
+      ajouter(z, "TOTAUX_CLOTURE", "grand total différent de la somme des caisses");
+    }
+    const propre = e.caisses.find((x) => x.caisseId === z.caisseId);
+    if (
+      !propre ||
+      propre.premierTicket !== z.premierTicket ||
+      propre.dernierTicketCouvert !== z.dernierTicketCouvert ||
+      (propre.premierTicket != null && (z.dernierTicket !== propre.dernierTicketCouvert || z.hashDernierTicket !== propre.hashDernierTicketCouvert))
+    ) {
+      ajouter(z, "COUVERTURE_Z", "la plage de la caisse qui clôture est incohérente");
+    }
+    cov = new Map(e.caisses.map((x) => [x.caisseId, x]));
+    precedente = z;
+  }
+
+  // Aucun ticket compté deux fois ; si toutes les caisses sont là, aucun ticket oublié avant le dernier couvert.
+  for (const [id, liste] of plages) {
+    const triees = [...liste].sort((a, b) => a.premier - b.premier);
+    let fin = 0;
+    for (const r of triees) {
+      const z = index.get(r.z)!;
+      if (r.premier <= fin) ajouter(z, "COUVERTURE_Z", `${id} : tickets ${r.premier} à ${Math.min(fin, r.dernier)} déjà couverts`);
+      else if (complet && r.premier !== fin + 1) ajouter(z, "COUVERTURE_Z", `${id} : tickets ${fin + 1} à ${r.premier - 1} jamais clôturés`);
+      fin = Math.max(fin, r.dernier);
+    }
+  }
+
+  // Clôtures mensuelles et d'exercice.
+  const agregeesPar = new Map<string, string>();
+  for (const periode of ["MOIS", "EXERCICE"] as const) {
+    const identifiants = new Set<string>();
+    for (const c of ordonner(toutes, periode)) {
+      if (identifiants.has(c.identifiantPeriode)) ajouter(c, "AGREGAT_INVALIDE", `${c.identifiantPeriode} clôturé deux fois`);
+      identifiants.add(c.identifiantPeriode);
+      const refs = c.etablissement!.agregees;
+      const sources: Cloture[] = [];
+      let toutesConnues = true;
+      for (const r of refs) {
+        const s = index.get(cleRef(r));
+        if (!s) {
+          toutesConnues = false;
+          if (connues.has(r.caisseId)) ajouter(c, "AGREGAT_INVALIDE", `source ${cleRef(r)} introuvable`);
+          continue;
+        }
+        const niveau = periode === "MOIS" ? "JOUR" : "MOIS";
+        if (s.hash !== r.hash || s.periode !== niveau) ajouter(c, "AGREGAT_INVALIDE", `source ${cleRef(r)} invalide`);
+        const deja = agregeesPar.get(cleRef(r));
+        if (deja) ajouter(c, "AGREGAT_INVALIDE", `${cleRef(r)} déjà agrégée par ${deja}`);
+        agregeesPar.set(cleRef(r), cleRef(c));
+        sources.push(s);
+      }
+      if (periode === "MOIS") {
+        const moisPropres = new Set(toutes.filter((m) => !m.etablissement && m.periode === "MOIS").map((m) => `${m.caisseId}#${m.identifiantPeriode}`));
+        const attendues = toutes
+          .filter((z) => z.periode === "JOUR" && z.identifiantPeriode.startsWith(`${c.identifiantPeriode}-`))
+          .filter((z) => z.etablissement || !moisPropres.has(`${z.caisseId}#${c.identifiantPeriode}`))
+          .map(cleRef)
+          .sort();
+        const obtenues = refs.map(cleRef).filter((k) => index.has(k)).sort();
+        if (canonique(attendues) !== canonique(obtenues)) ajouter(c, "AGREGAT_INVALIDE", "la clôture mensuelle n'agrège pas exactement les Z du mois");
+      } else {
+        const mois = sources.map((s) => s.identifiantPeriode);
+        if (toutesConnues && !(mois.length > 0 && canonique(listeMois(mois[0]!, mois.at(-1)!)) === canonique(mois))) {
+          ajouter(c, "AGREGAT_INVALIDE", "les mois de l'exercice ne sont pas continus");
+        }
+      }
+      if (toutesConnues && !memesTotaux(c, totauxClotures(sources))) ajouter(c, "TOTAUX_CLOTURE", "totaux différents de ceux des clôtures agrégées");
+    }
+  }
+  return anomalies;
 }

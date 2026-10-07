@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 34, copiée le 7 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 35, copiée le 7 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -33,7 +33,7 @@ La V1 couvre le cycle complet d'une vente, de la prise de commande à la clôtur
 | Correction du paiement | Le détail d'un ticket montre ses moyens de paiement. Un mode erroné se corrige avant la Z de la journée, par un responsable, avec un motif : le ticket reste intact et un ticket de correction signé, de total nul, porte l'écart entre modes ; la Z et une annulation ultérieure tiennent compte des modes corrigés. Exclu pour les ventes en compte. Ajouté le 6 octobre 2026, noyau fiscal 0.6.0. |
 | Ticket et note | Mentions légales (raison sociale, SIRET, adresse, n° TVA, date et heure, numéro séquentiel, lignes, TVA par taux, totaux HT et TTC, version du logiciel), impression à la demande, envoi par e-mail en option |
 | Facture | Facture client sur demande, générée depuis le ticket, numérotation propre |
-| Clôtures | Lecture X à tout moment, clôture Z journalière, clôtures mensuelle et annuelle, fond de caisse, comptage espèces et écart. Les tickets et les clôtures de tous les appareils de l'établissement se consultent depuis chacun ; annulation, correction, facture et archive restent sur l'appareil qui a encaissé ou clôturé (7 octobre 2026) |
+| Clôtures | Lecture X à tout moment, clôture Z journalière, clôtures mensuelle et annuelle, fond de caisse, comptage espèces et écart. Les tickets et les clôtures de tous les appareils de l'établissement se consultent depuis chacun ; annulation, correction et facture restent sur l'appareil qui a encaissé (7 octobre 2026). La lecture X, la Z et les clôtures mensuelle et annuelle portent sur tout l'établissement, quel que soit le nombre de caisses, et se font depuis n'importe quel appareil, en ligne : un seul appareil clôture à la fois ; un ticket pas encore reçu d'un appareil hors ligne entre dans la Z suivante ; le fond de caisse déclaré sur un appareil vaut pour tous ; un appareil seul de son établissement peut encore clôturer hors ligne (7 octobre 2026, noyau fiscal 0.7.0) |
 | Utilisateurs | Connexion par code PIN, changement rapide d'utilisateur, rôles vendeur, responsable, administrateur |
 | Comptes clients | Vente portée au compte d'un client (accord d'un responsable), réglée plus tard sur n'importe quel appareil, annulation d'un règlement. Fiche client : nom, téléphone, e-mail ; chaque note due se rouvre depuis la fiche, même encaissée sur un autre appareil. La vente compte dans le CA du jour ; la TVA est exigible au règlement (restauration sur place = prestation de services). Ajouté le 6 octobre 2026, noyau fiscal 0.5.0. |
 | Bons de production | Chaque catégorie de la carte désigne un poste (bar, cuisine) ; l'établissement associe une imprimante à chaque poste. « Envoyer » imprime les nouveaux articles par poste, le reste part à l'encaissement, un retrait après envoi imprime un bon d'annulation. Hors périmètre fiscal. Dans l'éditeur de carte, deux catégories au même taux de TVA peuvent être fusionnées. Ajouté le 6 octobre 2026. |

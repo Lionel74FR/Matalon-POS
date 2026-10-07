@@ -245,12 +245,14 @@ describe("clôtures", () => {
     await registre.cloturerJournee("lionel");
     const mois = await registre.cloturerMois("2026-10", "lionel");
     expect(mois).toMatchObject({ periode: "MOIS", totalTTC: 400, nbVentes: 1, dernierTicket: 1 });
-    expect(mois.cloturesAgregees).toEqual([1]);
+    // Depuis 0.7.0 : clôture de l'établissement, sources désignées par caisse et empreinte.
+    expect(mois.etablissement?.agregees.map((r) => r.numero)).toEqual([1]);
     await expect(registre.cloturerMois("2026-10", "lionel")).rejects.toThrow(/déjà clôturé/);
 
     await expect(registre.cloturerExercice("2026", "2026-10", "2026-11", "lionel")).rejects.toThrow(/2026-11/);
     const exercice = await registre.cloturerExercice("2026", "2026-10", "2026-10", "lionel");
-    expect(exercice).toMatchObject({ periode: "EXERCICE", totalTTC: 400, cloturesAgregees: [mois.numero] });
+    expect(exercice).toMatchObject({ periode: "EXERCICE", totalTTC: 400 });
+    expect(exercice.etablissement?.agregees.map((r) => r.numero)).toEqual([mois.numero]);
     await expect(registre.cloturerExercice("2026-bis", "2026-10", "2026-10", "lionel")).rejects.toThrow(
       /déjà à un exercice/,
     );
@@ -333,7 +335,7 @@ describe("clôtures", () => {
     await registre.cloturerMois("2026-10", "lionel");
     const { verifierClotures, totauxClotures } = await import("../src/index.js");
     const [z1, z2, mois] = await stockage.lister("clotures");
-    const incomplet = { ...mois!, ...totauxClotures([z2!]), cloturesAgregees: [z2!.numero] };
+    const incomplet = { ...mois!, ...totauxClotures([z2!]), etablissement: { ...mois!.etablissement!, agregees: mois!.etablissement!.agregees.slice(1) } };
     expect(verifierClotures([z1!, z2!, incomplet], await stockage.lister("tickets")).map((a) => a.code)).toContain(
       "AGREGAT_INVALIDE",
     );

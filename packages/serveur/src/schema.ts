@@ -28,6 +28,9 @@ export const MIGRATIONS: string[] = [
   // Plan de salle : zones dimensionnées et décor ; la version refuse d'écraser une modification faite ailleurs.
   `alter table etablissements add column if not exists zones jsonb not null default '[]'::jsonb`,
   `alter table etablissements add column if not exists plan_version integer not null default 0`,
+  // Clôtures d'établissement (noyau 0.7.0) : un seul appareil clôture à la fois ; anomalie de chaînage signalée.
+  `alter table etablissements add column if not exists verrou_cloture jsonb`,
+  `alter table etablissements add column if not exists anomalie_cloture text`,
   `create table if not exists utilisateurs (
     id text primary key,
     etablissement_id text not null references etablissements(id),
@@ -70,6 +73,9 @@ export const MIGRATIONS: string[] = [
     recu_le text not null,
     primary key (caisse_id, chaine, numero)
   )`,
+  // Journée de l'établissement (0.7.0) : fond, comptage et clôtures retrouvés sans parcourir tout le journal.
+  `create index if not exists enregistrements_evenements_code on enregistrements ((contenu->>'code'), horodatage) where chaine = 'evenements'`,
+  `create index if not exists enregistrements_clotures_periode on enregistrements ((contenu->>'periode'), horodatage) where chaine = 'clotures'`,
   // Inaltérabilité côté serveur : aucune modification ni suppression possible.
   `create or replace function interdire_modification_fiscale() returns trigger as $$
     begin

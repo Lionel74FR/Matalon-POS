@@ -103,21 +103,24 @@ export function Coque() {
   const [horlogeSuspecte, setHorlogeSuspecte] = useState(false);
   const maintenant = useHorloge();
   /** Fond de caisse à déclarer pour la journée en cours (null : déjà fait ou remis à plus tard). */
-  const [fondADeclarer, setFondADeclarer] = useState<{ propose: number | null; z: number } | null>(null);
+  const [fondADeclarer, setFondADeclarer] = useState<{ propose: number | null; z: string } | null>(null);
   /** « Plus tard » vaut pour la journée en cours (repérée par sa dernière Z) : redemandé après la Z suivante. */
-  const [fondRemisPourZ, setFondRemisPourZ] = useState<number | null>(null);
+  const [fondRemisPourZ, setFondRemisPourZ] = useState<string | null>(null);
 
   useEffect(() => {
     if (vue.nom !== "salle") return;
     let annule = false;
-    void etatJournee(caisse.stockage).then((e) => {
-      const z = e.derniereZ?.numero ?? 0;
+    // Le fond vaut pour l'établissement : déclaré sur un appareil, il ne se redemande pas sur les autres.
+    void (async () => {
+      const journee = await caisse.client.journee(true).catch(() => null);
+      const e = await etatJournee(caisse, journee).catch(() => etatJournee(caisse, null));
+      const z = e.derniereZ ? `${e.derniereZ.caisseId}#${e.derniereZ.numero}` : "aucune";
       if (!annule && e.fondDeclare == null && fondRemisPourZ !== z) setFondADeclarer({ propose: e.fondPropose, z });
-    });
+    })();
     return () => {
       annule = true;
     };
-  }, [vue.nom, caisse.stockage, fondRemisPourZ]);
+  }, [vue.nom, caisse, fondRemisPourZ]);
 
   useEffect(() => {
     void caisse.db.getAll("commandes").then((liste) => setCommandes(new Map(liste.map((c) => [c.tableId, c]))));

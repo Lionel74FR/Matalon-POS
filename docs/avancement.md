@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 6 octobre 2026.
+Dernière mise à jour : 7 octobre 2026.
 
 ## Règle de conduite
 
@@ -14,7 +14,7 @@ Dernière mise à jour : 6 octobre 2026.
 | Lot | État | Ce qui reste |
 | --- | --- | --- |
 | 0. Cadrage | En cours, côté Lionel | Fiches techniques du Moka, caisse de transition conforme (plan B), outil comptable destinataire des Z, calendrier de facturation électronique B2B (Audrex) |
-| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.6.0 : comptes clients, correction du paiement) | Attestation éditeur rédigée (7 octobre), à compléter, valider par Audrex et signer ; noyau à geler en 1.0.0. Ticket envoyé par e-mail (optionnel) : non fait |
+| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients) | Attestation éditeur rédigée (7 octobre), à compléter, valider par Audrex et signer ; noyau à geler en 1.0.0. Ticket envoyé par e-mail (optionnel) : non fait |
 | 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
 | 4. Stock et fiches techniques | Pas commencé | Attend les fiches techniques et le feu vert |
@@ -24,6 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (à venir) | Clôtures d'établissement (noyau 0.7.0) : la lecture X, la Z, les clôtures mensuelle et d'exercice couvrent toutes les caisses et se font depuis n'importe quel appareil, en ligne, un seul à la fois (verrou serveur) ; fond de caisse commun ; archive serveur au format 2 (toutes les caisses d'une Z) ; contrôle d'établissement dans l'administration ; un appareil seul clôture encore hors ligne |
 | a3f648c | Tickets et clôtures partagés entre appareils (copie du serveur, lecture seule hors de l'appareil d'origine) ; duplicatas et Z imprimés avec l'appareil et la version de l'enregistrement d'origine |
 | 4118ce8 | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
 | 6eaabbb | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
@@ -50,6 +51,7 @@ Dernière mise à jour : 6 octobre 2026.
 - Correction du paiement (0.6.0) : ticket `CORRECTION` sans ligne ni total, `ticketOrigine` = la vente, `paiements` = écart de somme nulle (mode erroné en négatif). Seulement avant la Z qui couvrirait la vente (correction et vente sont donc dans la même archive), jamais pour une vente en compte, jamais annulable (on corrige à nouveau). `paiementsEffectifs` sert à l'annulation, au détail et aux factures ; `verifierCorrections` contrôle la cohérence avec la vente.
 - Commande : brouillon jusqu'à « Envoyer » (ou l'encaissement). Avant envoi, un retrait efface sans trace ; après envoi, il est barré, journalisé (`SUPPRESSION_LIGNE`, `apresEnvoi`) et donne un bon d'annulation s'il y a des imprimantes de production. Le CA reste enregistré à l'encaissement uniquement (ticket scellé).
 - Tickets et clôtures des autres appareils : lus sur le serveur (`GET /api/caisse/tickets`, `/api/caisse/clotures`), en lecture seule. Une annulation, une correction ou une facture ne se fait que sur l'appareil qui a encaissé : chaque chaîne fiscale reste propre à son appareil (numérotation, signature). Les commandes ouvertes, elles, restent propres à chaque appareil.
+- Clôtures d'établissement (0.7.0, demande de Lionel : « le Z et la clôture se font pour l'ensemble de l'établissement, peu importe le nombre de caisses », depuis n'importe quel appareil) : la clôture reste un enregistrement de la chaîne de l'appareil qui la scelle, avec un champ `etablissement` = la clôture précédente de l'établissement (`precedente`, où qu'elle soit), la couverture de chaque caisse (`caisses` : plages de tickets et d'événements, grands totaux) et, pour un mois ou un exercice, les sources (`agregees`). Totaux et grand total = ceux de l'établissement. L'appareil reçoit du serveur (`GET /api/caisse/journee`, `POST …/journee/verrou`) les tickets non couverts des autres caisses et les vérifie (signatures, chaînage, ancrage sur la dernière Z) avant de sceller. Un ticket pas encore reçu entre dans la Z suivante (datée au plus tôt du jour de la dernière Z). Verrou de 10 min, rendu à la réception de la clôture ; une Z faite quand même depuis une précédente déjà suivie est acceptée mais signalée (`anomalie_cloture`, `CHAINAGE_CLOTURES`). Z hors ligne refusée dès que l'établissement a deux appareils en service. Correction de paiement : couverture lue sur le serveur (en ligne). Archive d'une clôture multi-caisses : celle du serveur (`matalon-archive-serveur/2`, clés de chaque caisse) ; l'appareil ne signe que celles qui ne couvrent que lui. Fond de caisse et dernier comptage communs à l'établissement.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -59,6 +61,8 @@ Dernière mise à jour : 6 octobre 2026.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
+- [ ] Tag `noyau-fiscal-v0.7.0` sur le commit des clôtures d'établissement.
+- [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
 - [ ] Geler le noyau en 1.0.0 (au plus tard au go/no-go du 13 octobre) et poser le tag `noyau-fiscal-v1.0.0` : c'est la version citée par l'attestation.
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
@@ -70,4 +74,4 @@ Dernière mise à jour : 6 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 7 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 8 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

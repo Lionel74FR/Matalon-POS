@@ -1,7 +1,8 @@
-import { ErreurFiscale, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
+import { type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { Banknote, Check, CreditCard, Ticket as TicketPapier, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { LIBELLES_PAIEMENT } from "../../impression/gabarits";
+import { ErreurApi } from "../../serveur/client";
 import { centimesDepuisSaisie, Modale, saisieDepuisCentimes } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { AvecIcone } from "../icones";
@@ -45,11 +46,17 @@ export function ModaleCorrection(props: { ticket: Ticket; avant: Paiement[]; onC
     if (!responsable) return;
     setEnCours(true);
     try {
-      const c = await caisse.registre.enregistrerCorrection({ numeroTicket: props.ticket.numero, paiements, motif, operateurId: responsable });
+      // La Z peut avoir été faite sur un autre appareil : le serveur dit jusqu'où l'établissement est clôturé.
+      const journee = await caisse.client.journee(true).catch((e) => {
+        throw e instanceof ErreurApi && e.code === "HORS_LIGNE"
+          ? new Error("Connexion nécessaire : la journée a peut-être été clôturée sur un autre appareil.")
+          : e;
+      });
+      const c = await caisse.registre.enregistrerCorrection({ numeroTicket: props.ticket.numero, paiements, motif, operateurId: responsable }, journee.contexte);
       notifier(`Paiement du ticket n° ${props.ticket.numero} corrigé (ticket n° ${c.numero}).`);
       props.onCorrige(c);
     } catch (e) {
-      notifier(e instanceof ErreurFiscale ? e.message : String(e), "erreur");
+      notifier(e instanceof Error ? e.message : String(e), "erreur");
     } finally {
       setEnCours(false);
     }

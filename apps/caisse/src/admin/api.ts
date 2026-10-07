@@ -27,6 +27,8 @@ export interface EtablissementAdmin extends EtablissementApi {
   utilisateurs: UtilisateurApi[];
   codes: Array<{ code: string; nomCaisse: string; expireLe: string }>;
   caisses: CaisseAdmin[];
+  /** Deux clôtures faites depuis la même précédente (noyau 0.7.0). */
+  anomalieCloture: string | null;
 }
 
 export interface RapportVerification {
@@ -81,6 +83,7 @@ export const api = {
     appel<{ code: string; expireLe: string; nomCaisse: string }>("POST", `/etablissements/${etablissementId}/codes`, { nomCaisse }),
   revoquer: (caisseId: string) => appel("POST", `/caisses/${caisseId}/revoquer`, {}),
   verifier: (caisseId: string) => appel<RapportVerification>("GET", `/caisses/${caisseId}/verification`),
+  verifierEtablissement: (etablissementId: string) => appel<RapportVerification>("GET", `/etablissements/${etablissementId}/verification`),
   cartes: () => appel<{ cartes: ResumeCarte[] }>("GET", "/cartes"),
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),
   enregistrerCarte: (id: string, carte: Catalogue, version: number) => appel<ReponseCarte>("PUT", `/cartes/${id}`, { carte, version }),

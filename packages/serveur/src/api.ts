@@ -9,9 +9,18 @@ import {
   verifierRegistre,
   verifierScellement,
   verifierTotauxTickets,
+  verifierEtablissement,
+  cleRef,
+  couvertures,
+  premierJourMoisSuivant,
+  tete,
+  unir,
+  type Anomalie,
   type Chaine,
   type Cloture,
   type Enregistrement,
+  type Evenement,
+  type PeriodeCloture,
   type Ticket,
 } from "@matalon/noyau-fiscal";
 import { ErreurHttp, type Db } from "./db.js";
@@ -35,6 +44,7 @@ import {
   type ReponseComptes,
   type ReponseTickets,
   type ReponseClotures,
+  type ReponseJournee,
   type EtablissementApi,
   type IdentiteEtablissement,
   type ReponseEtat,
@@ -56,7 +66,7 @@ import {
   verifierMotDePasse,
   verifierTotp,
 } from "./securite.js";
-import { empreinteCle, FORMAT_ARCHIVE_SERVEUR, type ContenuArchiveServeur } from "./archive.js";
+import { empreinteCle, FORMAT_ARCHIVE_SERVEUR, type ContenuArchiveServeur, type PartieCaisse } from "./archive.js";
 import { StockageServeur } from "./stockage-db.js";
 
 export interface Environnement {
@@ -72,6 +82,8 @@ const DUREE_CODE_MS = 48 * 3600_000;
 const ECHECS_MAX = 5;
 const BLOCAGE_MS = 15 * 60_000;
 const COOKIE = "mp_admin";
+/** Durée du verrou de clôture : le temps du comptage et de la Z sur l'appareil qui clôture. */
+const DUREE_VERROU_MS = 10 * 60_000;
 
 // ───────── Utilitaires HTTP ─────────
 
@@ -357,6 +369,149 @@ async function ticketEtablissement(env: Environnement, etablissementId: string, 
   return json(200, { ticket: l.contenu });
 }
 
+// ───────── Clôtures de l'établissement (noyau 0.7.0) ─────────
+
+/**
+ * Clôtures de l'établissement utiles à une nouvelle clôture : les mensuelles
+ * et d'exercice récentes, les Z depuis le dernier mois clôturé (et les plus
+ * récentes), la dernière Z propre de chaque caisse (avant 0.7.0).
+ */
+async function cloturesUtiles(env: Environnement, etablissementId: string): Promise<Cloture[]> {
+  const base = `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.chaine = 'clotures'`;
+  const lire = async (suite: string, params: unknown[] = []) =>
+    (await env.db.requete<{ contenu: Cloture }>(`${base} ${suite}`, [etablissementId, ...params])).map((l) => l.contenu);
+  const agregats = await lire(`and e.contenu->>'periode' <> 'JOUR' order by e.horodatage desc limit 60`);
+  const dernierMois = agregats.filter((c) => c.periode === "MOIS" && c.etablissement).map((c) => c.identifiantPeriode).sort().at(-1);
+  const depuis = dernierMois ? premierJourMoisSuivant(dernierMois) : "";
+  const jours = await lire(`and e.contenu->>'periode' = 'JOUR' and e.contenu->>'identifiantPeriode' >= $2`, [depuis]);
+  const recentes = await lire(`and e.contenu->>'periode' = 'JOUR' order by e.horodatage desc limit 5`);
+  const anciennes = (
+    await env.db.requete<{ contenu: Cloture }>(
+      `select distinct on (e.caisse_id) e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+       where c.etablissement_id = $1 and e.chaine = 'clotures' and e.contenu->>'periode' = 'JOUR' and not (e.contenu ? 'etablissement')
+       order by e.caisse_id, e.numero desc`,
+      [etablissementId],
+    )
+  ).map((l) => l.contenu);
+  return unir(agregats, jours, recentes, anciennes);
+}
+
+async function dernierEvenementDeCode(env: Environnement, etablissementId: string, code: string, apres: string): Promise<Evenement | null> {
+  const [l] = await env.db.requete<{ contenu: Evenement }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.chaine = 'evenements' and e.contenu->>'code' = $2 and e.horodatage > $3
+     order by e.horodatage desc limit 1`,
+    [etablissementId, code, apres],
+  );
+  return l?.contenu ?? null;
+}
+
+/**
+ * Journée de l'établissement vue par une caisse : clôtures récentes, et pour
+ * chaque autre caisse son dernier ticket couvert, les tickets reçus depuis et
+ * son dernier événement ; clés publiques ; fond et comptage ; verrou.
+ */
+async function journee(env: Environnement, c: LigneCaisse, resume = false): Promise<ReponseJournee> {
+  const utiles = await cloturesUtiles(env, c.etablissement_id);
+  // Résumé (fond de caisse, correction d'un paiement) : les dernières clôtures seulement, sans les tickets des autres caisses.
+  const tetes = (["JOUR", "MOIS", "EXERCICE"] as const).map((p) => tete(utiles, p)).filter((x): x is Cloture => !!x);
+  const clotures = resume ? tetes : utiles;
+  const caisses = await env.db.requete<{ id: string; nom: string; cle_id: string; cle_publique: JsonWebKey; derniere_synchro: string | null }>(
+    "select id, nom, cle_id, cle_publique, derniere_synchro from caisses where etablissement_id = $1 order by id",
+    [c.etablissement_id],
+  );
+  const autres = resume ? [] : caisses.filter((x) => x.id !== c.id);
+  const cov = couvertures(clotures, autres.map((x) => x.id));
+  const parties = await Promise.all(
+    autres.map(async (x) => {
+      const stockage = new StockageServeur(env.db, x.id);
+      const n = cov.get(x.id)!.dernierTicketCouvert;
+      return {
+        caisseId: x.id,
+        ancre: n > 0 ? await stockage.trouver("tickets", n) : null,
+        tickets: await stockage.lister("tickets", n + 1),
+        dernierEvenement: await stockage.dernier("evenements"),
+      };
+    }),
+  );
+  const [e] = await env.db.requete<{ verrou_cloture: { caisseId: string; expireLe: string } | null; anomalie_cloture: string | null }>(
+    "select verrou_cloture, anomalie_cloture from etablissements where id = $1",
+    [c.etablissement_id],
+  );
+  const maintenant = horloge(env).toISOString();
+  const derniereZ = tete(utiles, "JOUR") ?? utiles.filter((x) => x.periode === "JOUR").sort((a, b) => a.horodatage.localeCompare(b.horodatage)).at(-1);
+  return {
+    contexte: { clotures, caisses: parties, cles: Object.fromEntries(caisses.map((x) => [x.cle_id, x.cle_publique])) },
+    appareils: Object.fromEntries(caisses.map((x) => [x.id, x.nom])),
+    synchros: Object.fromEntries(caisses.map((x) => [x.id, x.derniere_synchro])),
+    fond: await dernierEvenementDeCode(env, c.etablissement_id, "FOND_DE_CAISSE", derniereZ?.horodatage ?? ""),
+    comptage: await dernierEvenementDeCode(env, c.etablissement_id, "COMPTAGE_CAISSE", ""),
+    verrou: e?.verrou_cloture && e.verrou_cloture.expireLe > maintenant ? e.verrou_cloture : null,
+    anomalie: e?.anomalie_cloture ?? null,
+  };
+}
+
+async function journeeCaisse(env: Environnement, requete: Request): Promise<Response> {
+  const resume = new URL(requete.url).searchParams.get("resume") === "1";
+  return json(200, await journee(env, await caisseAuthentifiee(env, requete), resume));
+}
+
+/**
+ * Verrou de clôture : une seule caisse clôture à la fois. Il tombe à la
+ * réception de la clôture, à l'abandon, ou au bout de 10 minutes.
+ */
+async function prendreVerrouCloture(env: Environnement, requete: Request): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const maintenant = horloge(env);
+  const verrou = { caisseId: c.id, expireLe: new Date(maintenant.getTime() + DUREE_VERROU_MS).toISOString() };
+  const pris = await env.db.requete<{ id: string }>(
+    `update etablissements set verrou_cloture = $2::jsonb
+     where id = $1 and (verrou_cloture is null or verrou_cloture->>'caisseId' = $3 or verrou_cloture->>'expireLe' < $4)
+     returning id`,
+    [c.etablissement_id, JSON.stringify(verrou), c.id, maintenant.toISOString()],
+  );
+  if (!pris.length) {
+    const [e] = await env.db.requete<{ nom: string }>(
+      `select c.nom from etablissements e join caisses c on c.id = e.verrou_cloture->>'caisseId' where e.id = $1`,
+      [c.etablissement_id],
+    );
+    throw new ErreurHttp(409, "CLOTURE_EN_COURS", `Une clôture est en cours sur « ${e?.nom ?? "un autre appareil"} ». Réessayez dans quelques minutes.`);
+  }
+  return json(200, await journee(env, c));
+}
+
+async function rendreVerrouCloture(env: Environnement, requete: Request): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  await env.db.requete(`update etablissements set verrou_cloture = null where id = $1 and verrou_cloture->>'caisseId' = $2`, [c.etablissement_id, c.id]);
+  return json(200, { ok: true });
+}
+
+/**
+ * Contrôle d'une clôture d'établissement reçue : elle doit suivre la dernière
+ * de sa période. Sinon (deux appareils ont clôturé depuis la même), elle est
+ * acceptée — elle est scellée sur l'appareil — mais l'anomalie est signalée.
+ */
+async function controlerClotures(env: Environnement, c: LigneCaisse, nouvelles: Cloture[], maintenant: string) {
+  const etab = nouvelles.filter((x) => x.etablissement);
+  if (!etab.length) return [];
+  const connues = await cloturesUtiles(env, c.etablissement_id);
+  const problemes: string[] = [];
+  for (const x of etab) {
+    const attendue = tete(connues, x.periode as PeriodeCloture);
+    const p = x.etablissement!.precedente;
+    if ((p ? cleRef(p) : null) !== (attendue ? cleRef(attendue) : null)) {
+      problemes.push(`${x.periode} ${x.identifiantPeriode} (${cleRef(x)}) suit ${p ? cleRef(p) : "aucune"} au lieu de ${attendue ? cleRef(attendue) : "aucune"}`);
+    }
+    connues.push(x);
+  }
+  const requetes = [{ texte: `update etablissements set verrou_cloture = null where id = $1 and verrou_cloture->>'caisseId' = $2`, params: [c.etablissement_id, c.id] }];
+  if (problemes.length) {
+    requetes.push({ texte: "update etablissements set anomalie_cloture = $2 where id = $1", params: [c.etablissement_id, `${maintenant} · ${problemes.join(" ; ")}`] });
+  }
+  return requetes;
+}
+
 async function derniers(db: Db, caisseId: string): Promise<Derniers> {
   const lignes = await db.requete<{ chaine: Chaine; numero: number; hash: string }>(
     `select e.chaine, e.numero, e.hash from enregistrements e
@@ -470,6 +625,12 @@ async function etatCaisse(env: Environnement, requete: Request): Promise<Respons
     clients: await clients(env.db, c.etablissement_id),
     derniers: await derniers(env.db, c.id),
     heure: horloge(env).toISOString(),
+    appareils: Object.fromEntries(
+      (await env.db.requete<{ id: string; nom: string }>("select id, nom from caisses where etablissement_id = $1 and revoquee_le is null order by id", [c.etablissement_id])).map((x) => [
+        x.id,
+        x.nom,
+      ]),
+    ),
   };
   return json(200, reponse);
 }
@@ -526,6 +687,7 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
   const resoudre = (id: string) => (id === c.cle_id ? c.cle_publique : null);
   const aInserer: Array<{ texte: string; params: unknown[] }> = [];
   const ticketsNouveaux: Ticket[] = [];
+  const cloturesNouvelles: Cloture[] = [];
   const maintenant = horloge(env).toISOString();
 
   const divergence = async (message: string): Promise<never> => {
@@ -557,6 +719,7 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
     const anomalies = await verifierScellement(chaine, e as Enregistrement, resoudre);
     if (anomalies.length) await divergence(`${chaine} n°${e.numero} : ${anomalies.map((a) => a.code).join(", ")}`);
     if (chaine === "tickets") ticketsNouveaux.push(e as Ticket);
+    if (chaine === "clotures") cloturesNouvelles.push(e as Cloture);
 
     aInserer.push({
       texte: `insert into enregistrements (caisse_id, chaine, numero, hash, hash_precedent, horodatage, contenu, recu_le)
@@ -589,6 +752,7 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
     }
   }
 
+  aInserer.push(...(await controlerClotures(env, c, cloturesNouvelles, maintenant)));
   aInserer.push({ texte: "update caisses set derniere_synchro = $2 where id = $1", params: [c.id, maintenant] });
   await env.db.lot(aInserer);
   const reponse: ReponseSynchro = { acceptes: aInserer.filter((x) => x.texte.includes("insert into enregistrements")).length, derniers: queues };
@@ -941,10 +1105,12 @@ async function listeEtablissements(env: Environnement): Promise<Response> {
     "select code, etablissement_id, nom_caisse, expire_le from codes_rattachement where utilise_le is null and expire_le > $1",
     [horloge(env).toISOString()],
   );
+  const anomalies = await env.db.requete<{ id: string; anomalie_cloture: string | null }>("select id, anomalie_cloture from etablissements");
   const resultat = [];
   for (const e of etabs) {
     resultat.push({
       ...versEtablissement(e),
+      anomalieCloture: anomalies.find((a) => a.id === e.id)?.anomalie_cloture ?? null,
       utilisateurs: await utilisateurs(env.db, e.id),
       codes: codes.filter((c) => c.etablissement_id === e.id).map((c) => ({ code: c.code, nomCaisse: c.nom_caisse, expireLe: c.expire_le })),
       caisses: await Promise.all(
@@ -1054,6 +1220,37 @@ async function verifierCaisse(env: Environnement, admin: { id: string }, caisseI
   return json(200, rapport);
 }
 
+/**
+ * Contrôle de tout l'établissement : chaque chaîne, puis les clôtures
+ * d'établissement sur l'ensemble des caisses (couverture, chaînage, totaux).
+ */
+async function verifierEtablissementAdmin(env: Environnement, admin: { id: string }, etablissementId: string): Promise<Response> {
+  const caisses = await env.db.requete<{ id: string; nom: string; cle_id: string; cle_publique: JsonWebKey }>(
+    "select id, nom, cle_id, cle_publique from caisses where etablissement_id = $1 order by id",
+    [etablissementId],
+  );
+  const cles = new Map(caisses.map((c) => [c.cle_id, c.cle_publique]));
+  const resoudre = (id: string) => cles.get(id) ?? null;
+  const anomalies: Anomalie[] = [];
+  const compteurs = { tickets: 0, evenements: 0, clotures: 0 };
+  const chaines = [];
+  for (const c of caisses) {
+    const stockage = new StockageServeur(env.db, c.id);
+    const r = await verifierRegistre(stockage, resoudre);
+    anomalies.push(...r.anomalies.map((a) => ({ ...a, detail: `${c.nom} : ${a.detail}` })));
+    for (const k of CHAINES) compteurs[k] += r.compteurs[k];
+    chaines.push({ caisseId: c.id, tickets: await stockage.lister("tickets"), evenements: await stockage.lister("evenements"), clotures: await stockage.lister("clotures") });
+  }
+  const noms = new Map(caisses.map((c) => [c.id, c.nom]));
+  for (const a of verifierEtablissement(chaines)) {
+    const doublon = anomalies.some((b) => b.code === a.code && b.numero === a.numero && b.chaine === a.chaine);
+    if (!doublon) anomalies.push({ ...a, detail: [...noms].reduce((d, [id, nom]) => d.replaceAll(id, nom), a.detail) });
+  }
+  const rapport = { integre: anomalies.length === 0, verifieLe: horloge(env).toISOString(), compteurs, anomalies };
+  await journaliserAdmin(env, admin.id, "verification_etablissement", { etablissement: etablissementId, integre: rapport.integre });
+  return json(200, rapport);
+}
+
 async function exporterCaisse(env: Environnement, admin: { id: string }, caisseId: string): Promise<Response> {
   await cleDeCaisse(env, caisseId);
   const clotures = await new StockageServeur(env.db, caisseId).lister("clotures");
@@ -1114,23 +1311,60 @@ async function listeCloturesCaisse(env: Environnement, caisseId: string): Promis
 
 /**
  * Archive d'une clôture produite depuis la copie du serveur, sans l'iPad :
- * même contenu que l'archive de l'iPad (clôture, tickets et événements
- * couverts, ancrages), chaque enregistrement gardant la signature de l'iPad.
- * Le serveur ne signe pas : l'empreinte du fichier est tracée au journal
+ * clôture, tickets et événements couverts de chaque caisse, ancrages, clés
+ * publiques ; chaque enregistrement garde la signature de sa caisse. Le
+ * serveur ne signe pas : l'empreinte du fichier est tracée au journal
  * d'administration au moment de l'export.
  */
-async function archiveCloture(env: Environnement, admin: { id: string }, caisseId: string, numero: number): Promise<Response> {
-  const c = await cleDeCaisse(env, caisseId);
-  const stockage = new StockageServeur(env.db, caisseId);
-  const cloture = await stockage.trouver("clotures", numero);
-  if (!cloture) throw new ErreurHttp(404, "CLOTURE_INCONNUE", "Clôture introuvable.");
-  const agregees = await Promise.all(cloture.cloturesAgregees.map((n) => stockage.trouver("clotures", n)));
+async function construireArchiveServeur(env: Environnement, etablissementId: string, caisseId: string, numero: number) {
+  const [ligne] = await env.db.requete<{ contenu: Cloture }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.caisse_id = $2 and e.chaine = 'clotures' and e.numero = $3`,
+    [etablissementId, caisseId, numero],
+  );
+  if (!ligne) throw new ErreurHttp(404, "CLOTURE_INCONNUE", "Clôture introuvable.");
+  const cloture = ligne.contenu;
+  const etab = cloture.etablissement;
+  const refs = etab ? etab.agregees : cloture.cloturesAgregees.map((n) => ({ caisseId, numero: n }));
+  const agregees = await Promise.all(refs.map((r) => new StockageServeur(env.db, r.caisseId).trouver("clotures", r.numero)));
   if (agregees.some((x) => !x)) throw new ErreurHttp(500, "ARCHIVE_INCOMPLETE", "Une clôture agrégée manque dans la copie du serveur.");
-  const tickets = cloture.premierTicket != null && cloture.dernierTicket != null ? await stockage.lister("tickets", cloture.premierTicket, cloture.dernierTicket) : [];
-  const evenements =
-    cloture.premierEvenement != null && cloture.dernierEvenement != null ? await stockage.lister("evenements", cloture.premierEvenement, cloture.dernierEvenement) : [];
-  const tPrec = cloture.premierTicket && cloture.premierTicket > 1 ? await stockage.trouver("tickets", cloture.premierTicket - 1) : null;
-  const ePrec = cloture.premierEvenement && cloture.premierEvenement > 1 ? await stockage.trouver("evenements", cloture.premierEvenement - 1) : null;
+
+  const partie = async (id: string, tickets: [number, number] | null, evenements: [number, number] | null): Promise<PartieCaisse> => {
+    const c = await cleDeCaisse(env, id);
+    const stockage = new StockageServeur(env.db, id);
+    const tPrec = tickets && tickets[0] > 1 ? await stockage.trouver("tickets", tickets[0] - 1) : null;
+    const ePrec = evenements && evenements[0] > 1 ? await stockage.trouver("evenements", evenements[0] - 1) : null;
+    return {
+      caisseId: id,
+      cleId: c.cle_id,
+      clePublique: c.cle_publique,
+      empreinteCle: await empreinteCle(c.cle_publique),
+      tickets: tickets ? await stockage.lister("tickets", tickets[0], tickets[1]) : [],
+      evenements: evenements ? await stockage.lister("evenements", evenements[0], evenements[1]) : [],
+      ancrages: {
+        ticketPrecedent: tPrec
+          ? { numero: tPrec.numero, hash: tPrec.hash, grandTotalPerpetuel: tPrec.grandTotalPerpetuel, cumulPerpetuelAbsolu: tPrec.cumulPerpetuelAbsolu }
+          : null,
+        evenementPrecedent: ePrec ? { numero: ePrec.numero, hash: ePrec.hash } : null,
+      },
+    };
+  };
+  const { caisseId: _id, ...propre } = await partie(
+    caisseId,
+    cloture.premierTicket != null && cloture.dernierTicket != null ? [cloture.premierTicket, cloture.dernierTicket] : null,
+    cloture.premierEvenement != null && cloture.dernierEvenement != null ? [cloture.premierEvenement, cloture.dernierEvenement] : null,
+  );
+  // Autres caisses : leurs plages pour une Z, leur clé pour les clôtures agrégées qu'elles ont scellées.
+  const autres = new Map<string, PartieCaisse>();
+  for (const x of etab?.caisses ?? []) {
+    if (x.caisseId === caisseId || cloture.periode !== "JOUR" || (x.premierTicket == null && x.premierEvenement == null)) continue;
+    autres.set(
+      x.caisseId,
+      await partie(x.caisseId, x.premierTicket != null ? [x.premierTicket, x.dernierTicketCouvert] : null, x.premierEvenement != null ? [x.premierEvenement, x.dernierEvenement] : null),
+    );
+  }
+  for (const r of refs) if (r.caisseId !== caisseId && !autres.has(r.caisseId)) autres.set(r.caisseId, await partie(r.caisseId, null, null));
+
   const contenu: ContenuArchiveServeur = {
     format: FORMAT_ARCHIVE_SERVEUR,
     logiciel: NOM_LOGICIEL,
@@ -1138,31 +1372,41 @@ async function archiveCloture(env: Environnement, admin: { id: string }, caisseI
     etablissementId: cloture.etablissementId,
     caisseId,
     genereeLe: horloge(env).toISOString(),
-    cleId: c.cle_id,
-    clePublique: c.cle_publique,
-    empreinteCle: await empreinteCle(c.cle_publique),
+    ...propre,
     cloture,
     cloturesAgregees: agregees as Cloture[],
-    tickets,
-    evenements,
-    ancrages: {
-      ticketPrecedent: tPrec
-        ? { numero: tPrec.numero, hash: tPrec.hash, grandTotalPerpetuel: tPrec.grandTotalPerpetuel, cumulPerpetuelAbsolu: tPrec.cumulPerpetuelAbsolu }
-        : null,
-      evenementPrecedent: ePrec ? { numero: ePrec.numero, hash: ePrec.hash } : null,
-    },
+    autresCaisses: [...autres.values()].sort((a, b) => a.caisseId.localeCompare(b.caisseId)),
   };
   const empreinte = await sha256Hex(canonique(contenu));
-  await journaliserAdmin(env, admin.id, "export_archive", { caisse: caisseId, cloture: numero, empreinte });
   const nom = `archive-${cloture.etablissementId}-${caisseId}-${cloture.periode.toLowerCase()}-${cloture.identifiantPeriode}.json`;
-  return new Response(JSON.stringify({ ...contenu, empreinte }, null, 1), {
+  return { contenu, empreinte, nom };
+}
+
+function reponseArchive(a: Awaited<ReturnType<typeof construireArchiveServeur>>): Response {
+  return new Response(JSON.stringify({ ...a.contenu, empreinte: a.empreinte }, null, 1), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${nom}"`,
+      "Content-Disposition": `attachment; filename="${a.nom}"`,
       "Cache-Control": "no-store",
-      "X-Empreinte-Archive": empreinte,
+      "X-Empreinte-Archive": a.empreinte,
     },
   });
+}
+
+async function archiveCloture(env: Environnement, admin: { id: string }, caisseId: string, numero: number): Promise<Response> {
+  const [c] = await env.db.requete<{ etablissement_id: string }>("select etablissement_id from caisses where id = $1", [caisseId]);
+  if (!c) throw new ErreurHttp(404, "CAISSE_INCONNUE", "Caisse introuvable.");
+  const a = await construireArchiveServeur(env, c.etablissement_id, caisseId, numero);
+  await journaliserAdmin(env, admin.id, "export_archive", { caisse: caisseId, cloture: numero, empreinte: a.empreinte });
+  return reponseArchive(a);
+}
+
+/** La même archive, demandée depuis une caisse de l'établissement (clôture faite sur n'importe quel appareil). */
+async function archiveClotureCaisse(env: Environnement, requete: Request, caisseId: string, numero: number): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const a = await construireArchiveServeur(env, c.etablissement_id, caisseId, numero);
+  await journaliserAdmin(env, null, "export_archive_caisse", { demandeePar: c.id, caisse: caisseId, cloture: numero, empreinte: a.empreinte });
+  return reponseArchive(a);
 }
 
 // ───────── Routage ─────────
@@ -1187,6 +1431,13 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const c = await caisseAuthentifiee(env, requete);
       const limite = Math.min(500, Math.max(1, Number(url.searchParams.get("limite") ?? 150) || 150));
       return await ticketsEtablissement(env, c.etablissement_id, limite);
+    }
+    if (chemin === "/api/caisse/journee" && m === "GET") return await journeeCaisse(env, requete);
+    if (chemin === "/api/caisse/journee/verrou" && m === "POST") return await prendreVerrouCloture(env, requete);
+    if (chemin === "/api/caisse/journee/verrou" && m === "DELETE") return await rendreVerrouCloture(env, requete);
+    {
+      const a = /^\/api\/caisse\/clotures\/(ipad-[0-9a-f]{8})\/(\d{1,9})\/archive\.json$/.exec(chemin);
+      if (a && m === "GET") return await archiveClotureCaisse(env, requete, a[1]!, Number(a[2]));
     }
     if (chemin === "/api/caisse/clotures" && m === "GET") {
       const c = await caisseAuthentifiee(env, requete);
@@ -1247,6 +1498,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         await journaliserAdmin(env, admin.id, "client_enregistre", { etablissement: e.id, client: client.id, nom: client.nom, actif: client.actif });
         return json(200, { client });
       }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/verification$/.exec(chemin);
+      if (p && m === "GET") return await verifierEtablissementAdmin(env, admin, (await etablissement(env.db, p[1]!)).id);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/codes$/.exec(chemin);
       if (p && m === "POST") return await genererCode(env, requete, admin, p[1]!);
       p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/revoquer$/.exec(chemin);

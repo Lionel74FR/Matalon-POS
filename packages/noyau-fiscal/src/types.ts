@@ -252,6 +252,62 @@ export interface Cloture extends EnTeteEnregistrement, Scellement, TotauxPeriode
   hashDernierEvenement: string | null;
   grandTotalPerpetuel: Centimes;
   cumulPerpetuelAbsolu: Centimes;
+  /**
+   * Clôture de l'établissement (depuis 0.7.0) : elle vaut pour toutes ses
+   * caisses, quel que soit l'appareil qui l'a scellée. Les totaux sont ceux de
+   * l'établissement ; `premierTicket`, `dernierTicket`, `hashDernierTicket`,
+   * `dernierTicketCouvert` et la plage d'événements restent ceux de la caisse
+   * qui clôture (lien avec sa propre chaîne) ; les grands totaux sont la somme
+   * de ceux des caisses. Absent : clôture d'une seule caisse (0.6 et avant).
+   */
+  etablissement?: ClotureEtablissement;
+}
+
+/** Désigne une clôture dans la chaîne d'une caisse. */
+export interface RefCloture {
+  caisseId: string;
+  numero: number;
+  hash: string;
+}
+
+/** Ce qu'une clôture d'établissement couvre d'une caisse. */
+export interface CouvertureCaisse {
+  caisseId: string;
+  /** Premier ticket de cette caisse dans la Z ; null si elle n'en apporte aucun. */
+  premierTicket: number | null;
+  /** Dernier ticket de la caisse couvert par les Z de l'établissement à ce jour (0 : aucun). */
+  dernierTicketCouvert: number;
+  hashDernierTicketCouvert: string | null;
+  /** Événements de la caisse couverts à ce jour ; premierEvenement : null si la Z n'en ajoute aucun. */
+  premierEvenement: number | null;
+  dernierEvenement: number;
+  hashDernierEvenement: string | null;
+  /** Grands totaux de la caisse à son dernier ticket couvert. */
+  grandTotalPerpetuel: Centimes;
+  cumulPerpetuelAbsolu: Centimes;
+}
+
+export interface ClotureEtablissement {
+  /** Clôture précédente de même période de l'établissement (toutes caisses) ; null pour la première. */
+  precedente: RefCloture | null;
+  /** Couverture de chaque caisse connue (une Z reprend toutes celles de la précédente). */
+  caisses: CouvertureCaisse[];
+  /** Clôtures agrégées, toutes caisses confondues (MOIS : les Z ; EXERCICE : les mois). */
+  agregees: RefCloture[];
+}
+
+/**
+ * Ce que l'appareil qui clôture apprend du serveur sur les autres caisses
+ * (0.7.0). Tout y est vérifié par le noyau (signatures, chaînage, totaux)
+ * avant d'être couvert : le serveur transmet, il ne fait jamais foi.
+ */
+export interface ContexteEtablissement {
+  /** Clôtures récentes de l'établissement, toutes caisses (au moins les dernières de chaque période). */
+  clotures: Cloture[];
+  /** Pour chaque autre caisse : son dernier ticket couvert (ancre), les tickets reçus depuis, son dernier événement reçu. */
+  caisses: Array<{ caisseId: string; ancre: Ticket | null; tickets: Ticket[]; dernierEvenement: Evenement | null }>;
+  /** Clés publiques des caisses, par identifiant de clé. */
+  cles: Record<string, JsonWebKey>;
 }
 
 export type Enregistrement = Ticket | Evenement | Cloture;

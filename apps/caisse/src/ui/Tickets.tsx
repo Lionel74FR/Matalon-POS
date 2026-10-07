@@ -1,6 +1,6 @@
 import { Eye, FileText, Printer, QrCode, RefreshCw, Undo2, Wallet } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
-import { ErreurFiscale, paiementsEffectifs, type Ticket } from "@matalon/noyau-fiscal";
+import { ErreurFiscale, paiementsEffectifs, ticketCouvertPar, type Ticket } from "@matalon/noyau-fiscal";
 import { useCallback, useEffect, useState } from "react";
 import { gabaritNote, LIBELLES_PAIEMENT, nomTable, nomUtilisateur } from "../impression/gabarits";
 import { Modale, Vide } from "./communs";
@@ -55,8 +55,14 @@ export function Tickets() {
     setAnnules(
       new Set(liste.filter((t) => t.type === "ANNULATION" && t.ticketOrigine).map((t) => cle({ caisseId: t.caisseId, numero: t.ticketOrigine!.numero }))),
     );
-    const z = (await caisse.stockage.lister("clotures")).filter((c) => c.periode === "JOUR").at(-1);
-    setCouvertParZ(z?.dernierTicketCouvert ?? 0);
+    // Couverture par les Z de l'établissement, faites sur cet appareil ou sur un autre.
+    let clotures = await caisse.stockage.derniers("clotures", 30);
+    try {
+      clotures = [...clotures, ...(await caisse.client.cloturesEtablissement(30)).clotures];
+    } catch {
+      /* hors ligne : les Z de cet appareil ; la correction le revérifie en ligne */
+    }
+    setCouvertParZ(Math.max(0, ...clotures.map((c) => ticketCouvertPar(c, config.caisseId) ?? 0)));
     const emises = await listerFactures(caisse.stockage);
     setFactures(new Map(emises.map((f) => [f.ticket, f.numero])));
     setVentesFacturees(new Set(emises.filter((f) => f.nature === "FACTURE").map((f) => f.ticket)));

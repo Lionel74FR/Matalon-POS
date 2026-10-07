@@ -3,7 +3,17 @@
  * Ce module ne dépend d'aucune bibliothèque serveur : la caisse l'importe.
  */
 import type { Catalogue } from "@matalon/catalogue";
-import { canonique, montantEnCompte, ventilerTranche, type Chaine, type Cloture, type Enregistrement, type Ticket } from "@matalon/noyau-fiscal";
+import {
+  canonique,
+  montantEnCompte,
+  ventilerTranche,
+  type Chaine,
+  type Cloture,
+  type ContexteEtablissement,
+  type Enregistrement,
+  type Evenement,
+  type Ticket,
+} from "@matalon/noyau-fiscal";
 
 export type Role = "serveur" | "responsable";
 
@@ -172,6 +182,8 @@ export interface ReponseEtat {
   derniers: Derniers;
   /** Heure du serveur (ISO), pour contrôler l'horloge de l'iPad. */
   heure: string;
+  /** Appareils en service de l'établissement (identifiant → nom). Seul, un appareil peut clôturer hors ligne. Depuis 0.7.0. */
+  appareils?: Record<string, string>;
 }
 
 export interface EntreeSynchro {
@@ -279,6 +291,25 @@ export interface ReponseTickets {
 export interface ReponseClotures {
   clotures: Cloture[];
   appareils: Record<string, string>;
+}
+
+/**
+ * Journée de l'établissement (0.7.0) : ce que l'appareil qui fait la lecture X
+ * ou la Z doit savoir des autres caisses. Le contexte est vérifié par le noyau.
+ */
+export interface ReponseJournee {
+  contexte: ContexteEtablissement;
+  appareils: Record<string, string>;
+  /** Dernière synchronisation de chaque caisse : un appareil en retard verra ses tickets dans la Z suivante. */
+  synchros: Record<string, string | null>;
+  /** Fond de caisse déclaré depuis la dernière Z, sur n'importe quel appareil. */
+  fond: Evenement | null;
+  /** Dernier comptage de l'établissement (fond conservé pour le lendemain). */
+  comptage: Evenement | null;
+  /** Clôture en cours sur un appareil : les autres attendent. */
+  verrou: { caisseId: string; expireLe: string } | null;
+  /** Anomalie relevée à la réception d'une clôture (deux Z depuis la même précédente). */
+  anomalie: string | null;
 }
 
 export interface ReponseComptes {

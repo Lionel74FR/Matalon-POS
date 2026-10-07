@@ -1,6 +1,7 @@
 import { canonique } from "./canonique.js";
 import { HASH_GENESE, sha256Hex, type Signataire } from "./crypto.js";
 import { dateComptable as calculerDateComptable, listeMois, premierJourMoisSuivant } from "./dates.js";
+import { cleRef, couvertures, ordonner, refDe, tete, unir } from "./etablissement.js";
 import {
   calculerLigne,
   controlerPaiements,
@@ -21,6 +22,9 @@ import {
   type Cloture,
   type CodeEvenement,
   type ContexteCaisse,
+  type ContexteEtablissement,
+  type CouvertureCaisse,
+  type RefCloture,
   type Evenement,
   type ImputationReglement,
   type Paiement,
@@ -28,7 +32,21 @@ import {
   type Ticket,
   type TotauxPeriode,
 } from "./types.js";
+import { verifierChaine, verifierScellement, verifierTotauxTickets } from "./verification.js";
 import { VERSION_NOYAU_FISCAL } from "./version.js";
+
+/** Ce que l'établissement a clôturé et ce qui reste à clôturer, toutes caisses. */
+interface EtatEtablissement {
+  /** Clôtures connues : celles de cette caisse et celles reçues du serveur, vérifiées. */
+  clotures: Cloture[];
+  tetes: Record<"JOUR" | "MOIS" | "EXERCICE", Cloture | null>;
+  /** Couverture de chaque caisse par la dernière Z. */
+  couvertures: Map<string, CouvertureCaisse>;
+  /** Tickets non couverts de chaque caisse (celle-ci comprise), dans l'ordre de leur chaîne. */
+  restants: Map<string, Ticket[]>;
+  /** Dernier événement reçu de chaque autre caisse. */
+  evenements: Map<string, { numero: number; hash: string }>;
+}
 
 export interface OptionsRegistre {
   stockage: StockageFiscal;
@@ -549,15 +567,16 @@ export class Registre {
    * vente reste intacte, les encaissements par mode de la Z en tiennent compte.
    * Exclut les ventes en compte (la part due et la TVA exigible en dépendent).
    */
-  enregistrerCorrection(s: SaisieCorrection): Promise<Ticket> {
+  enregistrerCorrection(s: SaisieCorrection, ctx?: ContexteEtablissement): Promise<Ticket> {
     return this.operation(async (lot, maintenant) => {
       if (!s.operateurId) throw new ErreurFiscale("OPERATEUR_OBLIGATOIRE", "opérateur obligatoire");
       if (!s.motif?.trim()) throw new ErreurFiscale("MOTIF_OBLIGATOIRE", "une correction exige un motif");
       const origine = await this.stockage.trouver("tickets", s.numeroTicket);
       if (!origine) throw new ErreurFiscale("TICKET_INCONNU", `ticket ${s.numeroTicket} introuvable`);
       if (origine.type !== "VENTE") throw new ErreurFiscale("CORRECTION_INTERDITE", "seuls les paiements d'une vente se corrigent");
-      const { derniereZ } = await this.etatZ(lot);
-      if (origine.numero <= (derniereZ?.dernierTicketCouvert ?? 0)) {
+      // Couverture par les Z de l'établissement, quel que soit l'appareil qui les a faites.
+      const couvert = (await this.etatEtablissement(lot, ctx)).couvertures.get(this.contexte.caisseId)!.dernierTicketCouvert;
+      if (origine.numero <= couvert) {
         throw new ErreurFiscale("CORRECTION_INTERDITE", `le ticket ${origine.numero} est déjà clôturé : la correction n'est possible qu'avant la Z`);
       }
       const suivants = await this.stockage.lister("tickets", origine.numero + 1);
@@ -713,22 +732,124 @@ export class Registre {
     });
   }
 
-  /** Dernière clôture journalière et tickets qui restent à clôturer. */
-  private async etatZ(lot: Lot): Promise<{ derniereZ: Cloture | null; restants: Ticket[] }> {
-    const derniereZ = (await lot.clotures()).filter((c) => c.periode === "JOUR").at(-1) ?? null;
-    const restants = await this.stockage.lister("tickets", (derniereZ?.dernierTicketCouvert ?? 0) + 1);
-    return { derniereZ, restants };
+  /**
+   * État de l'établissement : clôtures de cette caisse et du contexte reçu du
+   * serveur, couverture de chaque caisse, tickets qui restent à clôturer.
+   * Tout ce qui vient du serveur est vérifié (signatures, chaînage, totaux,
+   * ancrage sur la dernière Z) ; la moindre anomalie refuse l'opération.
+   * Sans contexte, l'établissement se réduit à cette caisse.
+   */
+  private async etatEtablissement(lot: Lot, ctx?: ContexteEtablissement): Promise<EtatEtablissement> {
+    const moi = this.contexte.caisseId;
+    const invalide = (detail: string) => new ErreurFiscale("CONTEXTE_INVALIDE", `données du serveur refusées : ${detail}`);
+    const resoudre = (id: string) => ctx?.cles[id] ?? null;
+    const codes = (a: Array<{ code: string; numero: number }>) => a.map((x) => `${x.code} n°${x.numero}`).join(", ");
+
+    const externes = (ctx?.clotures ?? []).filter((c) => c.caisseId !== moi);
+    for (const c of externes) {
+      if (c.etablissementId !== this.contexte.etablissementId) throw invalide(`clôture ${cleRef(c)} d'un autre établissement`);
+      const a = await verifierScellement("clotures", c, resoudre);
+      if (a.length) throw invalide(`clôture ${cleRef(c)} : ${codes(a)}`);
+    }
+    const clotures = unir(await lot.clotures(), externes);
+    const autres = (ctx?.caisses ?? []).filter((x) => x.caisseId !== moi);
+    const cov = couvertures(clotures, [moi, ...autres.map((x) => x.caisseId)]);
+    const restants = new Map<string, Ticket[]>();
+    const evenements = new Map<string, { numero: number; hash: string }>();
+
+    // Cette caisse : la couverture annoncée doit tomber sur ses propres enregistrements.
+    const propre = cov.get(moi)!;
+    if (propre.dernierTicketCouvert > 0) {
+      const t = await this.stockage.trouver("tickets", propre.dernierTicketCouvert);
+      if (!t || (propre.hashDernierTicketCouvert && t.hash !== propre.hashDernierTicketCouvert)) throw invalide("couverture des tickets de cette caisse");
+      cov.set(moi, { ...propre, hashDernierTicketCouvert: t.hash, grandTotalPerpetuel: t.grandTotalPerpetuel, cumulPerpetuelAbsolu: t.cumulPerpetuelAbsolu });
+    }
+    if (propre.dernierEvenement > 0) {
+      const ev = await this.stockage.trouver("evenements", propre.dernierEvenement);
+      if (!ev || (propre.hashDernierEvenement && ev.hash !== propre.hashDernierEvenement)) throw invalide("couverture du journal de cette caisse");
+    }
+    restants.set(moi, await this.stockage.lister("tickets", propre.dernierTicketCouvert + 1));
+
+    for (const x of autres) {
+      const c = cov.get(x.caisseId)!;
+      const n = c.dernierTicketCouvert;
+      if (n === 0 ? x.ancre !== null : x.ancre?.numero !== n) throw invalide(`ancre des tickets de ${x.caisseId}`);
+      for (const t of x.ancre ? [x.ancre, ...x.tickets] : x.tickets) {
+        if (t.caisseId !== x.caisseId || t.etablissementId !== this.contexte.etablissementId) throw invalide(`ticket étranger à ${x.caisseId}`);
+      }
+      if (x.ancre) {
+        const a = await verifierScellement("tickets", x.ancre, resoudre);
+        if (a.length || (c.hashDernierTicketCouvert && c.hashDernierTicketCouvert !== x.ancre.hash)) throw invalide(`ancre des tickets de ${x.caisseId}`);
+      }
+      const anomalies = [
+        ...(await verifierChaine("tickets", x.tickets, resoudre, x.ancre ? { numero: x.ancre.numero, hash: x.ancre.hash } : undefined)),
+        ...verifierTotauxTickets(x.tickets, x.ancre?.grandTotalPerpetuel ?? 0, x.ancre?.cumulPerpetuelAbsolu ?? 0),
+      ];
+      if (anomalies.length) throw invalide(`tickets de ${x.caisseId} : ${codes(anomalies)}`);
+      cov.set(x.caisseId, {
+        ...c,
+        hashDernierTicketCouvert: x.ancre?.hash ?? null,
+        grandTotalPerpetuel: x.ancre?.grandTotalPerpetuel ?? 0,
+        cumulPerpetuelAbsolu: x.ancre?.cumulPerpetuelAbsolu ?? 0,
+      });
+      restants.set(x.caisseId, x.tickets);
+      const e = x.dernierEvenement;
+      if (e) {
+        const a = await verifierScellement("evenements", e, resoudre);
+        const recule = e.numero < c.dernierEvenement || (e.numero === c.dernierEvenement && !!c.hashDernierEvenement && e.hash !== c.hashDernierEvenement);
+        if (a.length || e.caisseId !== x.caisseId || recule) throw invalide(`journal de ${x.caisseId}`);
+        evenements.set(x.caisseId, { numero: e.numero, hash: e.hash });
+      }
+    }
+    return {
+      clotures,
+      tetes: { JOUR: tete(clotures, "JOUR"), MOIS: tete(clotures, "MOIS"), EXERCICE: tete(clotures, "EXERCICE") },
+      couvertures: cov,
+      restants,
+      evenements,
+    };
   }
 
-  /** Lecture X : totaux depuis la dernière clôture, sans rien figer. */
-  lectureX(operateurId: string): Promise<TotauxPeriode & { dateComptable: string }> {
+  /** Tous les tickets restants, par caisse puis par numéro. */
+  private static tousRestants(e: EtatEtablissement): Ticket[] {
+    return [...e.restants.keys()].sort().flatMap((id) => e.restants.get(id)!);
+  }
+
+  /** Date d'une Z : jamais avant la dernière Z de l'établissement, ni dans un mois clôturé. */
+  private static plancherEtablissement(e: EtatEtablissement): string {
+    const jour = e.clotures.filter((c) => c.periode === "JOUR").map((c) => c.identifiantPeriode).sort().at(-1) ?? "";
+    const mois = e.clotures.filter((c) => c.periode === "MOIS").map((c) => c.identifiantPeriode).sort().at(-1);
+    return [jour, mois ? premierJourMoisSuivant(mois) : ""].sort().at(-1)!;
+  }
+
+  /**
+   * Ce qui reste à clôturer pour l'établissement (comptage, écran des
+   * clôtures), sans rien écrire : totaux, tickets, dernière Z.
+   */
+  etatCloture(ctx?: ContexteEtablissement): Promise<{
+    totaux: TotauxPeriode;
+    tickets: Ticket[];
+    derniereZ: Cloture | null;
+    couvertures: CouvertureCaisse[];
+  }> {
+    return this.exclusif(async () => {
+      const e = await this.etatEtablissement(new Lot(this.stockage), ctx);
+      const tickets = Registre.tousRestants(e);
+      const derniereZ = e.tetes.JOUR ?? e.clotures.filter((c) => c.periode === "JOUR" && c.caisseId === this.contexte.caisseId).at(-1) ?? null;
+      return { totaux: totauxTickets(tickets), tickets, derniereZ, couvertures: [...e.couvertures.values()] };
+    });
+  }
+
+  /** Lecture X : totaux de l'établissement depuis la dernière Z, sans rien figer. */
+  lectureX(operateurId: string, ctx?: ContexteEtablissement): Promise<TotauxPeriode & { dateComptable: string }> {
     return this.operation(async (lot, maintenant) => {
-      const { restants } = await this.etatZ(lot);
-      const totaux = totauxTickets(restants);
-      await this.evenement(lot, "LECTURE_X", { totalTTC: totaux.totalTTC }, operateurId, maintenant);
+      const e = await this.etatEtablissement(lot, ctx);
+      const tickets = Registre.tousRestants(e);
+      const totaux = totauxTickets(tickets);
+      await this.evenement(lot, "LECTURE_X", { totalTTC: totaux.totalTTC, caisses: e.couvertures.size }, operateurId, maintenant);
       return {
         ...totaux,
-        dateComptable: restants.at(-1)?.dateComptable ?? calculerDateComptable(maintenant, this.heureBascule),
+        dateComptable: tickets.map((t) => t.dateComptable).sort().at(-1) ?? calculerDateComptable(maintenant, this.heureBascule),
       };
     });
   }
@@ -747,38 +868,70 @@ export class Registre {
   }
 
   /**
-   * Clôture Z : fige les tickets non clôturés, une clôture par journée
-   * comptable concernée. Sans ticket, produit une clôture à zéro.
+   * Clôture Z de l'établissement : fige les tickets non clôturés de toutes les
+   * caisses (ceux de cette caisse et ceux que le serveur a reçus des autres),
+   * une clôture par journée comptable concernée. Un ticket arrivé après la Z
+   * de sa journée entre dans la Z suivante. Sans ticket, une clôture à zéro.
    */
-  cloturerJournee(operateurId: string): Promise<Cloture[]> {
+  cloturerJournee(operateurId: string, ctx?: ContexteEtablissement): Promise<Cloture[]> {
     return this.operation(async (lot, maintenant) => {
       if (!operateurId) throw new ErreurFiscale("OPERATEUR_OBLIGATOIRE", "opérateur obligatoire");
-      const { derniereZ, restants } = await this.etatZ(lot);
+      const moi = this.contexte.caisseId;
+      const e = await this.etatEtablissement(lot, ctx);
+      const plancher = Registre.plancherEtablissement(e);
 
-      // Regroupe par journée en suivant l'ordre des tickets ; tout est validé avant de sceller.
-      const journees: Array<{ jour: string; tickets: Ticket[] }> = [];
-      for (const t of restants) {
-        const courante = journees.at(-1);
-        if (courante?.jour === t.dateComptable) courante.tickets.push(t);
-        else if (journees.some((j) => j.jour === t.dateComptable) || (courante && t.dateComptable < courante.jour)) {
-          throw new ErreurFiscale(
-            "JOURNEES_ENTRELACEES",
-            `ticket ${t.numero} hors de l'ordre des journées : vérifier l'horloge de la caisse`,
-          );
-        } else journees.push({ jour: t.dateComptable, tickets: [t] });
+      // Regroupe par journée ; les tickets d'une caisse restent dans l'ordre de sa chaîne. Tout est validé avant de sceller.
+      const parJour = new Map<string, Map<string, Ticket[]>>();
+      for (const [caisseId, tickets] of e.restants) {
+        let precedente = "";
+        for (const t of tickets) {
+          if (t.dateComptable < precedente) {
+            throw new ErreurFiscale("JOURNEES_ENTRELACEES", `ticket ${t.numero} de ${caisseId} hors de l'ordre des journées : vérifier l'horloge de la caisse`);
+          }
+          precedente = t.dateComptable;
+          const jour = t.dateComptable < plancher ? plancher : t.dateComptable;
+          const groupe = parJour.get(jour) ?? new Map<string, Ticket[]>();
+          groupe.set(caisseId, [...(groupe.get(caisseId) ?? []), t]);
+          parJour.set(jour, groupe);
+        }
       }
-      if (journees.length === 0) {
-        const jour = [calculerDateComptable(maintenant, this.heureBascule), await this.plancherDate(lot)].sort().at(-1)!;
-        journees.push({ jour, tickets: [] });
+      const jours = [...parJour.keys()].sort();
+      if (jours.length === 0) {
+        jours.push([calculerDateComptable(maintenant, this.heureBascule), await this.plancherDate(lot), plancher].sort().at(-1)!);
       }
 
-      const dernierTicketGlobal = await lot.dernier("tickets");
-      let couvert = derniereZ?.dernierTicketCouvert ?? 0;
+      const cov = new Map(e.couvertures);
+      const ids = [...cov.keys()].sort();
+      let precedente: RefCloture | null = e.tetes.JOUR ? refDe(e.tetes.JOUR) : null;
       const resultat: Cloture[] = [];
-      for (const { jour, tickets } of journees) {
-        const premier = tickets[0] ?? null;
-        const dernier = tickets.at(-1) ?? null;
-        couvert = dernier?.numero ?? couvert;
+      for (const [rang, jour] of jours.entries()) {
+        const groupe = parJour.get(jour) ?? new Map<string, Ticket[]>();
+        const tickets: Ticket[] = [];
+        for (const id of ids) {
+          const avant = cov.get(id)!;
+          const ts = groupe.get(id) ?? [];
+          const dernier = ts.at(-1);
+          let n: CouvertureCaisse = { ...avant, premierTicket: ts[0]?.numero ?? null, premierEvenement: null };
+          if (dernier) {
+            n = {
+              ...n,
+              dernierTicketCouvert: dernier.numero,
+              hashDernierTicketCouvert: dernier.hash,
+              grandTotalPerpetuel: dernier.grandTotalPerpetuel,
+              cumulPerpetuelAbsolu: dernier.cumulPerpetuelAbsolu,
+            };
+          }
+          // Journal : celui de cette caisse jusqu'à son dernier événement ; celui des autres, tel que reçu, dans la première Z.
+          const ev = id === moi ? await lot.dernier("evenements") : rang === 0 ? e.evenements.get(id) : undefined;
+          if (ev && ev.numero > avant.dernierEvenement) {
+            n = { ...n, premierEvenement: avant.dernierEvenement + 1, dernierEvenement: ev.numero, hashDernierEvenement: ev.hash };
+          }
+          cov.set(id, n);
+          tickets.push(...ts);
+        }
+        const caisses = ids.map((id) => cov.get(id)!);
+        const propre = cov.get(moi)!;
+        const ts = groupe.get(moi) ?? [];
         const cloture = await this.sceller(
           lot,
           "clotures",
@@ -787,21 +940,25 @@ export class Registre {
             identifiantPeriode: jour,
             operateurId,
             ...totauxTickets(tickets),
-            premierTicket: premier?.numero ?? null,
-            dernierTicket: dernier?.numero ?? null,
-            hashDernierTicket: dernier?.hash ?? null,
-            dernierTicketCouvert: couvert,
+            premierTicket: ts[0]?.numero ?? null,
+            dernierTicket: ts.at(-1)?.numero ?? null,
+            hashDernierTicket: ts.at(-1)?.hash ?? null,
+            dernierTicketCouvert: propre.dernierTicketCouvert,
             cloturesAgregees: [],
-            ...(await this.plageEvenements(lot, "JOUR")),
-            grandTotalPerpetuel: (dernier ?? dernierTicketGlobal)?.grandTotalPerpetuel ?? 0,
-            cumulPerpetuelAbsolu: (dernier ?? dernierTicketGlobal)?.cumulPerpetuelAbsolu ?? 0,
+            premierEvenement: propre.premierEvenement,
+            dernierEvenement: propre.premierEvenement == null ? null : propre.dernierEvenement,
+            hashDernierEvenement: propre.premierEvenement == null ? null : propre.hashDernierEvenement,
+            grandTotalPerpetuel: caisses.reduce((s, c) => s + c.grandTotalPerpetuel, 0),
+            cumulPerpetuelAbsolu: caisses.reduce((s, c) => s + c.cumulPerpetuelAbsolu, 0),
+            etablissement: { precedente, caisses, agregees: [] },
           },
           maintenant,
         );
+        precedente = refDe(cloture);
         await this.evenement(
           lot,
           "CLOTURE",
-          { periode: "JOUR", identifiantPeriode: jour, cloture: cloture.numero, totalTTC: cloture.totalTTC },
+          { periode: "JOUR", identifiantPeriode: jour, cloture: cloture.numero, totalTTC: cloture.totalTTC, caisses: caisses.length },
           operateurId,
           maintenant,
         );
@@ -811,54 +968,91 @@ export class Registre {
     });
   }
 
-  /** Clôture mensuelle ("2026-10") : agrège les clôtures Z du mois, une fois le mois terminé. */
-  cloturerMois(mois: string, operateurId: string): Promise<Cloture> {
+  /**
+   * Z de l'établissement d'un mois, en remontant la chaîne des Z depuis la
+   * dernière : le contexte doit les contenir toutes. Y figurent aussi les Z
+   * propres à une caisse (avant 0.7.0) du mois, non encore agrégées.
+   */
+  private static zDuMois(e: EtatEtablissement, mois: string): { sources: Cloture[]; anterieure: Cloture | null } {
+    const index = new Map(e.clotures.map((c) => [cleRef(c), c]));
+    const debut = `${mois}-01`;
+    const chaine: Cloture[] = [];
+    let anterieure: Cloture | null = null;
+    for (let z = e.tetes.JOUR; z; ) {
+      if (z.identifiantPeriode < debut) {
+        anterieure = z;
+        break;
+      }
+      if (z.identifiantPeriode.startsWith(`${mois}-`)) chaine.unshift(z);
+      const p: RefCloture | null = z.etablissement!.precedente;
+      if (!p) break;
+      const suivante = index.get(cleRef(p));
+      if (!suivante || suivante.hash !== p.hash) {
+        throw new ErreurFiscale("CONTEXTE_INCOMPLET", `la clôture ${cleRef(p)} manque : réessayez une fois les appareils synchronisés`);
+      }
+      z = suivante;
+    }
+    const moisClos = new Set(e.clotures.filter((c) => !c.etablissement && c.periode === "MOIS").map((c) => `${c.caisseId}#${c.identifiantPeriode}`));
+    const anciennes = e.clotures
+      .filter((c) => !c.etablissement && c.periode === "JOUR" && c.identifiantPeriode.startsWith(`${mois}-`) && !moisClos.has(`${c.caisseId}#${mois}`))
+      .sort((a, b) => a.caisseId.localeCompare(b.caisseId) || a.numero - b.numero);
+    if (!anterieure && chaine.length === 0) {
+      anterieure = e.clotures.filter((c) => c.periode === "JOUR" && c.identifiantPeriode < debut).sort((a, b) => a.horodatage.localeCompare(b.horodatage)).at(-1) ?? null;
+    }
+    return { sources: [...anciennes, ...chaine], anterieure };
+  }
+
+  /** Clôture mensuelle de l'établissement ("2026-10") : agrège ses Z du mois, une fois le mois terminé. */
+  cloturerMois(mois: string, operateurId: string, ctx?: ContexteEtablissement): Promise<Cloture> {
     return this.operation(async (lot, maintenant) => {
       if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mois)) throw new ErreurFiscale("PERIODE_INVALIDE", `mois invalide : ${mois}`);
       if (calculerDateComptable(maintenant, this.heureBascule).slice(0, 7) <= mois) {
         throw new ErreurFiscale("PERIODE_EN_COURS", `le mois ${mois} n'est pas terminé`);
       }
-      const clotures = await lot.clotures();
-      if (clotures.some((c) => c.periode === "MOIS" && c.identifiantPeriode === mois)) {
+      const e = await this.etatEtablissement(lot, ctx);
+      const moi = this.contexte.caisseId;
+      if (e.clotures.some((c) => c.periode === "MOIS" && c.identifiantPeriode === mois && (c.etablissement || c.caisseId === moi))) {
         throw new ErreurFiscale("DEJA_CLOTURE", `le mois ${mois} est déjà clôturé`);
       }
-      const { restants } = await this.etatZ(lot);
-      if (restants.some((t) => t.dateComptable.slice(0, 7) <= mois)) {
+      if (Registre.tousRestants(e).some((t) => t.dateComptable.slice(0, 7) <= mois)) {
         throw new ErreurFiscale("CLOTURE_Z_MANQUANTE", `des tickets du mois ${mois} ne sont pas clôturés en Z`);
       }
-      const z = clotures.filter((c) => c.periode === "JOUR");
-      const zDuMois = z.filter((c) => c.identifiantPeriode.startsWith(`${mois}-`));
-      const zAnterieure = z.filter((c) => c.identifiantPeriode < `${mois}-01`).at(-1) ?? null;
-      return this.cloturerAgregat(lot, "MOIS", mois, zDuMois, zAnterieure, operateurId, maintenant);
+      const { sources, anterieure } = Registre.zDuMois(e, mois);
+      return this.cloturerAgregat(lot, e, "MOIS", mois, sources, anterieure, operateurId, maintenant);
     });
   }
 
-  /** Clôture d'exercice : agrège les clôtures mensuelles de `moisDebut` à `moisFin`, toutes obligatoires. */
-  cloturerExercice(identifiant: string, moisDebut: string, moisFin: string, operateurId: string): Promise<Cloture> {
+  /** Clôture d'exercice de l'établissement : agrège ses clôtures mensuelles de `moisDebut` à `moisFin`, toutes obligatoires. */
+  cloturerExercice(identifiant: string, moisDebut: string, moisFin: string, operateurId: string, ctx?: ContexteEtablissement): Promise<Cloture> {
     return this.operation(async (lot, maintenant) => {
       const mois = listeMois(moisDebut, moisFin);
       if (!identifiant || mois.length === 0 || mois.length > 24 || mois.at(-1) !== moisFin) {
         throw new ErreurFiscale("PERIODE_INVALIDE", "exercice invalide (1 à 24 mois)");
       }
-      const clotures = await lot.clotures();
-      if (clotures.some((c) => c.periode === "EXERCICE" && c.identifiantPeriode === identifiant)) {
+      const e = await this.etatEtablissement(lot, ctx);
+      const moi = this.contexte.caisseId;
+      const exercices = e.clotures.filter((c) => c.periode === "EXERCICE" && (c.etablissement || c.caisseId === moi));
+      if (exercices.some((c) => c.identifiantPeriode === identifiant)) {
         throw new ErreurFiscale("DEJA_CLOTURE", `l'exercice ${identifiant} est déjà clôturé`);
       }
-      const dejaAgreges = new Set(clotures.filter((c) => c.periode === "EXERCICE").flatMap((c) => c.cloturesAgregees));
+      const dejaAgreges = new Set(
+        exercices.flatMap((c) => (c.etablissement ? c.etablissement.agregees.map(cleRef) : c.cloturesAgregees.map((n) => cleRef({ caisseId: moi, numero: n })))),
+      );
       const mensuelles = mois.map((m) => {
-        const c = clotures.find((x) => x.periode === "MOIS" && x.identifiantPeriode === m);
+        const c =
+          ordonner(e.clotures, "MOIS").filter((x) => x.identifiantPeriode === m).at(-1) ??
+          e.clotures.find((x) => !x.etablissement && x.caisseId === moi && x.periode === "MOIS" && x.identifiantPeriode === m);
         if (!c) throw new ErreurFiscale("CLOTURE_MOIS_MANQUANTE", `le mois ${m} n'est pas clôturé`);
-        if (dejaAgreges.has(c.numero)) {
-          throw new ErreurFiscale("DEJA_CLOTURE", `le mois ${m} appartient déjà à un exercice clôturé`);
-        }
+        if (dejaAgreges.has(cleRef(c))) throw new ErreurFiscale("DEJA_CLOTURE", `le mois ${m} appartient déjà à un exercice clôturé`);
         return c;
       });
-      return this.cloturerAgregat(lot, "EXERCICE", identifiant, mensuelles, null, operateurId, maintenant);
+      return this.cloturerAgregat(lot, e, "EXERCICE", identifiant, mensuelles, null, operateurId, maintenant);
     });
   }
 
   private async cloturerAgregat(
     lot: Lot,
+    e: EtatEtablissement,
     periode: "MOIS" | "EXERCICE",
     identifiant: string,
     sources: Cloture[],
@@ -867,9 +1061,21 @@ export class Registre {
     maintenant: Date,
   ): Promise<Cloture> {
     if (!operateurId) throw new ErreurFiscale("OPERATEUR_OBLIGATOIRE", "opérateur obligatoire");
-    const avecTickets = sources.filter((c) => c.premierTicket != null);
-    const derniere = avecTickets.at(-1);
+    const moi = this.contexte.caisseId;
     const reference = sources.at(-1) ?? anterieure;
+    // Tickets de cette caisse dans les clôtures agrégées : lien avec sa propre chaîne.
+    const propres = sources.flatMap((s) => {
+      if (s.etablissement) {
+        const c = s.etablissement.caisses.find((x) => x.caisseId === moi);
+        return c?.premierTicket != null ? [{ premier: c.premierTicket, dernier: c.dernierTicketCouvert, hash: c.hashDernierTicketCouvert }] : [];
+      }
+      return s.caisseId === moi && s.premierTicket != null ? [{ premier: s.premierTicket, dernier: s.dernierTicket, hash: s.hashDernierTicket }] : [];
+    });
+    const couvertPropre = reference?.etablissement
+      ? (reference.etablissement.caisses.find((x) => x.caisseId === moi)?.dernierTicketCouvert ?? 0)
+      : reference?.caisseId === moi
+        ? reference.dernierTicketCouvert
+        : 0;
     const cloture = await this.sceller(
       lot,
       "clotures",
@@ -878,14 +1084,19 @@ export class Registre {
         identifiantPeriode: identifiant,
         operateurId,
         ...totauxClotures(sources),
-        premierTicket: avecTickets[0]?.premierTicket ?? null,
-        dernierTicket: derniere?.dernierTicket ?? null,
-        hashDernierTicket: derniere?.hashDernierTicket ?? null,
-        dernierTicketCouvert: reference?.dernierTicketCouvert ?? 0,
-        cloturesAgregees: sources.map((c) => c.numero),
+        premierTicket: propres[0]?.premier ?? null,
+        dernierTicket: propres.at(-1)?.dernier ?? null,
+        hashDernierTicket: propres.at(-1)?.hash ?? null,
+        dernierTicketCouvert: couvertPropre,
+        cloturesAgregees: [],
         ...(await this.plageEvenements(lot, periode)),
         grandTotalPerpetuel: reference?.grandTotalPerpetuel ?? 0,
         cumulPerpetuelAbsolu: reference?.cumulPerpetuelAbsolu ?? 0,
+        etablissement: {
+          precedente: e.tetes[periode] ? refDe(e.tetes[periode]!) : null,
+          caisses: (reference?.etablissement?.caisses ?? []).map((c) => ({ ...c, premierTicket: null, premierEvenement: null })),
+          agregees: sources.map(refDe),
+        },
       },
       maintenant,
     );

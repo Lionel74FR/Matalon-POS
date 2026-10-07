@@ -47,8 +47,15 @@ export async function construireArchive(
   const cloture = await stockage.trouver("clotures", numeroCloture);
   if (!cloture) throw new ErreurFiscale("CLOTURE_INCONNUE", `clôture ${numeroCloture} introuvable`);
 
+  // Clôture d'établissement (0.7.0) : l'appareil n'a que sa propre chaîne. Si d'autres caisses y figurent,
+  // l'archive complète vient du serveur, qui détient toutes les chaînes.
+  const e = cloture.etablissement;
+  if (e && (e.caisses.some((x) => x.caisseId !== cloture.caisseId && x.premierTicket != null) || e.agregees.some((r) => r.caisseId !== cloture.caisseId))) {
+    throw new ErreurFiscale("ARCHIVE_ETABLISSEMENT", "clôture de plusieurs caisses : son archive se télécharge depuis le serveur");
+  }
+  const numerosAgreges = e ? e.agregees.map((r) => r.numero) : cloture.cloturesAgregees;
   const cloturesAgregees = await Promise.all(
-    cloture.cloturesAgregees.map(async (n) => {
+    numerosAgreges.map(async (n) => {
       const c = await stockage.trouver("clotures", n);
       if (!c) throw new ErreurFiscale("CLOTURE_INCONNUE", `clôture agrégée ${n} introuvable`);
       return c;

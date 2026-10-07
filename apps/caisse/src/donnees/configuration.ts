@@ -40,6 +40,8 @@ export interface Configuration {
   clients?: ClientApi[];
   /** Imprimantes de production de l'établissement : poste de la carte → imprimante. */
   postesProduction?: PostesProduction;
+  /** Appareils en service de l'établissement, au dernier contact avec le serveur (clôture hors ligne d'un appareil seul). */
+  appareils?: Record<string, string>;
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`) et sa version. */
   zones?: ZonePlan[];
   planVersion?: number;
@@ -48,7 +50,7 @@ export interface Configuration {
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
 export function fusionnerReferentiel(
   config: Configuration,
-  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients">,
+  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients" | "appareils">,
 ): Configuration | null {
   const serveur = etat.clients;
   const clients = serveur
@@ -65,6 +67,7 @@ export function fusionnerReferentiel(
     seuilNoteAutomatique: etat.etablissement.seuilNote,
     ...(etat.etablissement.postesProduction ? { postesProduction: etat.etablissement.postesProduction } : {}),
     ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
+    ...(etat.appareils ? { appareils: etat.appareils } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
 }

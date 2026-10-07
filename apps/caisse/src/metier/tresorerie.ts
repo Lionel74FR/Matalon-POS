@@ -1,27 +1,11 @@
-import { totauxTickets, type Cloture, type Evenement, type ModePaiement, type StockageFiscal, type TotauxPeriode } from "@matalon/noyau-fiscal";
+import type { Cloture, Evenement, ModePaiement, Registre, StockageFiscal, TotauxPeriode } from "@matalon/noyau-fiscal";
+import type { ReponseJournee } from "@matalon/serveur/partage";
 
 /** Billets et pièces en euros, en centimes, du plus grand au plus petit. */
 export const COUPURES = [50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100, 50, 20, 10, 5, 2, 1] as const;
 
-/** Dernière clôture journalière, ou null. */
-export async function derniereZ(stockage: StockageFiscal): Promise<Cloture | null> {
-  const dernier = await stockage.dernier("clotures");
-  if (!dernier) return null;
-  // Les clôtures mensuelles et annuelles suivent toujours leurs Z : on remonte au plus quelques enregistrements.
-  for (let n = dernier.numero; n >= 1 && n > dernier.numero - 30; n--) {
-    const c = await stockage.trouver("clotures", n);
-    if (c?.periode === "JOUR") return c;
-  }
-  return (await stockage.lister("clotures")).filter((c) => c.periode === "JOUR").at(-1) ?? null;
-}
-
-/** Événements écrits depuis la dernière Z, c'est-à-dire de la journée en cours. */
-export async function evenementsDeLaJournee(stockage: StockageFiscal, z?: Cloture | null): Promise<Evenement[]> {
-  const derniere = z === undefined ? await derniereZ(stockage) : z;
-  return stockage.lister("evenements", (derniere?.dernierEvenement ?? 0) + 1);
-}
-
 export interface EtatJournee {
+  /** Dernière Z de l'établissement (faite sur n'importe quel appareil), ou de cet appareil hors ligne. */
   derniereZ: Cloture | null;
   /** Fond déclaré pour la journée en cours, en centimes, ou null s'il ne l'a pas été. */
   fondDeclare: number | null;
@@ -32,26 +16,40 @@ export interface EtatJournee {
   dateComptable: string | null;
   /** Journées comptables couvertes par les tickets non clôturés (plusieurs si une Z a été oubliée). */
   journees: string[];
+  /** Vrai : toutes les caisses de l'établissement (journée reçue du serveur) ; faux : cet appareil seul. */
+  etablissement: boolean;
 }
 
-export async function etatJournee(stockage: StockageFiscal): Promise<EtatJournee> {
-  const z = await derniereZ(stockage);
-  const evenements = await evenementsDeLaJournee(stockage, z);
-  const fond = evenements.filter((e) => e.code === "FOND_DE_CAISSE").at(-1);
-  let fondPropose: number | null = null;
-  if (z) {
-    const comptage = await comptageDeLaZ(stockage, z);
-    if (typeof comptage?.details.fondConserve === "number") fondPropose = comptage.details.fondConserve;
-  }
-  const tickets = await stockage.lister("tickets", (z?.dernierTicketCouvert ?? 0) + 1);
-  const journees = [...new Set(tickets.map((t) => t.dateComptable))];
+const nombre = (v: unknown) => (typeof v === "number" ? v : null);
+
+/**
+ * Journée en cours de l'établissement : totaux non clôturés de toutes les
+ * caisses, fond déclaré et fond proposé, quel que soit l'appareil où ils ont
+ * été saisis. Sans journée du serveur (hors ligne), cet appareil seul.
+ */
+export async function etatJournee(
+  caisse: { registre: Registre; stockage: StockageFiscal & { derniers?: (c: "evenements", n: number) => Promise<Evenement[]> } },
+  journee: ReponseJournee | null,
+): Promise<EtatJournee> {
+  const r = await caisse.registre.etatCloture(journee?.contexte);
+  const z = r.derniereZ;
+  // Ce que cet appareil a saisi depuis la dernière Z (peut-être pas encore reçu par le serveur), sinon ce qu'en sait le serveur.
+  const recents = caisse.stockage.derniers ? await caisse.stockage.derniers("evenements", 400) : await caisse.stockage.lister("evenements");
+  const depuisZ = recents.filter((e) => !z || e.horodatage > z.horodatage).sort((a, b) => a.numero - b.numero);
+  const fondLocal = nombre(depuisZ.filter((e) => e.code === "FOND_DE_CAISSE").at(-1)?.details.montant);
+  const comptageLocal = [...recents].sort((a, b) => a.numero - b.numero).filter((e) => e.code === "COMPTAGE_CAISSE").at(-1);
+  const comptage = [comptageLocal, journee?.comptage].filter((e): e is Evenement => !!e).sort((a, b) => a.horodatage.localeCompare(b.horodatage)).at(-1);
+  const fondDeclare = fondLocal ?? nombre(journee?.fond?.details.montant);
+  const fondPropose = nombre(comptage?.details.fondConserve);
+  const journees = [...new Set(r.tickets.map((t) => t.dateComptable))].sort();
   return {
-    journees,
     derniereZ: z,
-    fondDeclare: typeof fond?.details.montant === "number" ? fond.details.montant : null,
+    fondDeclare,
     fondPropose,
-    totaux: totauxTickets(tickets),
-    dateComptable: tickets.at(-1)?.dateComptable ?? null,
+    totaux: r.totaux,
+    dateComptable: journees.at(-1) ?? null,
+    journees,
+    etablissement: !!journee,
   };
 }
 

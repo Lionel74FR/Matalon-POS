@@ -408,6 +408,88 @@ describe("tickets partagés", () => {
   });
 });
 
+describe("clôtures de l'établissement", () => {
+  it("une Z faite sur un appareil couvre toutes les caisses ; un seul appareil clôture à la fois", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await b.registre.enregistrerVente({ lignes: [SPRITZ], paiements: [{ mode: "ESPECES", montant: 1100 }], operateurId: "u-lea" });
+    await b.registre.journaliser("FOND_DE_CAISSE", { montant: 15000 }, "u-lea");
+    expect((await a.synchro()).statut).toBe(200);
+    expect((await b.synchro()).statut).toBe(200);
+
+    // Lecture X sur l'iPad : les deux caisses, et le fond déclaré sur l'iPhone.
+    const j = await appel("GET", "/api/caisse/journee", undefined, a.bearer);
+    expect(j.statut).toBe(200);
+    expect(j.corps.fond.details.montant).toBe(15000);
+    expect((await a.registre.lectureX("u-lea", j.corps.contexte)).totalTTC).toBe(1500);
+
+    // L'iPhone prend le verrou : l'iPad attend.
+    instant += 60_000;
+    const v = await appel("POST", "/api/caisse/journee/verrou", undefined, b.bearer);
+    expect(v.statut).toBe(200);
+    const refus = await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer);
+    expect(refus.statut).toBe(409);
+    expect(refus.corps.code).toBe("CLOTURE_EN_COURS");
+    const [z] = await b.registre.cloturerJournee("u-lea", v.corps.contexte);
+    expect(z).toMatchObject({ totalTTC: 1500, nbVentes: 2 });
+    expect((await b.synchro()).statut).toBe(200);
+    // Clôture reçue : verrou rendu, l'iPad peut clôturer à son tour (Z à zéro, à la suite de celle de l'iPhone).
+    const v2 = await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer);
+    expect(v2.statut).toBe(200);
+    expect(v2.corps.fond).toBeNull();
+    instant += 60_000;
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    const [z2] = await a.registre.cloturerJournee("u-lea", v2.corps.contexte);
+    expect(z2!.etablissement!.precedente).toMatchObject({ caisseId: b.caisseId, numero: z!.numero });
+    expect(z2!.totalTTC).toBe(400);
+    expect((await a.synchro()).statut).toBe(200);
+    expect((await appel("DELETE", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
+
+    // Contrôle de l'établissement : chaînes et clôtures d'établissement intègres.
+    const verif = await appel("GET", "/api/admin/etablissements/moka/verification", undefined, { Cookie: cookie });
+    expect(verif.corps).toMatchObject({ integre: true, anomalies: [] });
+
+    // Archive de la Z de l'iPhone : les tickets des deux caisses, avec leurs clés.
+    const r = await appel("GET", `/api/caisse/clotures/${b.caisseId}/${z!.numero}/archive.json`, undefined, a.bearer);
+    expect(r.statut).toBe(200);
+    expect(r.corps.format).toBe("matalon-archive-serveur/2");
+    expect(r.corps.autresCaisses.map((p: any) => [p.caisseId, p.tickets.length])).toEqual([[a.caisseId, 1]]);
+    const empreintes = Object.fromEntries(
+      (await appel("GET", "/api/admin/etablissements", undefined, { Cookie: cookie })).corps.etablissements[0].caisses.map((c: any) => [c.id, c.empreinteCle]),
+    );
+    expect(await verifierArchiveServeur(r.corps, empreintes)).toEqual({ integre: true, anomalies: [] });
+    const modifiee = structuredClone(r.corps);
+    modifiee.autresCaisses[0].tickets[0].totalTTC = 1;
+    expect((await verifierArchiveServeur(modifiee, empreintes)).integre).toBe(false);
+    const amputee = structuredClone(r.corps);
+    amputee.autresCaisses = [];
+    const { empreinte: _e, ...reste } = amputee;
+    amputee.empreinte = await sha256Hex(canonique(reste));
+    expect((await verifierArchiveServeur(amputee, empreintes)).anomalies.map((x) => x.code)).toContain("TOTAUX_CLOTURE");
+  });
+
+  it("signale deux Z faites depuis la même précédente", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    expect((await a.synchro()).statut).toBe(200);
+    const ctxB = (await appel("GET", "/api/caisse/journee", undefined, b.bearer)).corps.contexte;
+    await a.registre.cloturerJournee("u-lea", (await appel("GET", "/api/caisse/journee", undefined, a.bearer)).corps.contexte);
+    expect((await a.synchro()).statut).toBe(200);
+    // L'iPhone clôture hors verrou, sur un contexte périmé : sa Z est reçue, l'anomalie est signalée.
+    await b.registre.cloturerJournee("u-lea", ctxB);
+    expect((await b.synchro()).statut).toBe(200);
+    const j = await appel("GET", "/api/caisse/journee", undefined, a.bearer);
+    expect(j.corps.anomalie).toMatch(/suit aucune au lieu de ipad-0a1b2c3d#1/);
+    const verif = await appel("GET", "/api/admin/etablissements/moka/verification", undefined, { Cookie: cookie });
+    expect(verif.corps.integre).toBe(false);
+    expect(verif.corps.anomalies.map((x: any) => x.code)).toContain("CHAINAGE_CLOTURES");
+  });
+});
+
 describe("plan de salle", () => {
   it("enregistre formes, chaises et décor ; refuse une version dépassée et une table supprimée", async () => {
     const cookie = await adminConnecte();

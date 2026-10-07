@@ -5,6 +5,7 @@ import type {
   ReponseComptes,
   ReponseTickets,
   ReponseClotures,
+  ReponseJournee,
   EtablissementApi,
   IdentiteEtablissement,
   PostesProduction,
@@ -102,6 +103,29 @@ export class ClientApi {
   /** Un ticket d'une caisse de l'établissement, depuis la copie du serveur. */
   ticket(caisseId: string, numero: number) {
     return this.appel<{ ticket: Ticket }>("GET", `/api/caisse/tickets/${encodeURIComponent(caisseId)}/${numero}`);
+  }
+
+  /**
+   * Journée de l'établissement : clôtures, tickets non clôturés des autres
+   * caisses, fond et comptage. `resume` : sans les tickets (fond de caisse,
+   * correction d'un paiement).
+   */
+  journee(resume = false) {
+    return this.appel<ReponseJournee>("GET", `/api/caisse/journee${resume ? "?resume=1" : ""}`);
+  }
+
+  /** Verrou de clôture (une caisse à la fois) et journée complète. 409 CLOTURE_EN_COURS si un autre appareil clôture. */
+  prendreVerrouCloture() {
+    return this.appel<ReponseJournee>("POST", "/api/caisse/journee/verrou");
+  }
+
+  rendreVerrouCloture() {
+    return this.appel<{ ok: true }>("DELETE", "/api/caisse/journee/verrou");
+  }
+
+  /** Archive d'une clôture produite par le serveur (toutes les caisses qu'elle couvre). */
+  archive(caisseId: string, numero: number) {
+    return this.appel<Record<string, unknown>>("GET", `/api/caisse/clotures/${encodeURIComponent(caisseId)}/${numero}/archive.json`);
   }
 
   comptes() {
