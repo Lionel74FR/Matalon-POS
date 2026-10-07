@@ -24,7 +24,7 @@ Dernière mise à jour : 7 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (à venir) | Clôtures d'établissement (noyau 0.7.0) : la lecture X, la Z, les clôtures mensuelle et d'exercice couvrent toutes les caisses et se font depuis n'importe quel appareil, en ligne, un seul à la fois (verrou serveur) ; fond de caisse commun ; archive serveur au format 2 (toutes les caisses d'une Z) ; contrôle d'établissement dans l'administration ; un appareil seul clôture encore hors ligne |
+| fefbad6 | Clôtures d'établissement (noyau 0.7.0) : la lecture X, la Z, les clôtures mensuelle et d'exercice couvrent toutes les caisses et se font depuis n'importe quel appareil, en ligne, un seul à la fois (verrou serveur) ; fond de caisse commun ; archive serveur au format 2 (toutes les caisses d'une Z) ; contrôle d'établissement dans l'administration ; un appareil seul clôture encore hors ligne |
 | a3f648c | Tickets et clôtures partagés entre appareils (copie du serveur, lecture seule hors de l'appareil d'origine) ; duplicatas et Z imprimés avec l'appareil et la version de l'enregistrement d'origine |
 | 4118ce8 | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
 | 6eaabbb | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
@@ -61,7 +61,7 @@ Dernière mise à jour : 7 octobre 2026.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
-- [ ] Tag `noyau-fiscal-v0.7.0` sur le commit des clôtures d'établissement.
+- [ ] Tag `noyau-fiscal-v0.7.0` sur fefbad6 (clôtures d'établissement).
 - [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
 - [ ] Geler le noyau en 1.0.0 (au plus tard au go/no-go du 13 octobre) et poser le tag `noyau-fiscal-v1.0.0` : c'est la version citée par l'attestation.
