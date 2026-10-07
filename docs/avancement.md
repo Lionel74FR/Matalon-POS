@@ -14,7 +14,7 @@ Dernière mise à jour : 6 octobre 2026.
 | Lot | État | Ce qui reste |
 | --- | --- | --- |
 | 0. Cadrage | En cours, côté Lionel | Fiches techniques du Moka, caisse de transition conforme (plan B), outil comptable destinataire des Z, calendrier de facturation électronique B2B (Audrex) |
-| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.6.0 : comptes clients, correction du paiement) | **L'attestation éditeur n'est pas rédigée**, alors que le cahier en fait un critère de sortie. Ticket envoyé par e-mail (optionnel) : non fait |
+| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.6.0 : comptes clients, correction du paiement) | Attestation éditeur rédigée (7 octobre), à compléter, valider par Audrex et signer ; noyau à geler en 1.0.0. Ticket envoyé par e-mail (optionnel) : non fait |
 | 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
 | 4. Stock et fiches techniques | Pas commencé | Attend les fiches techniques et le feu vert |
@@ -54,8 +54,9 @@ Dernière mise à jour : 6 octobre 2026.
 - [ ] Remplir les mentions légales des factures dans l'administration.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
-- [ ] Créer le tag `noyau-fiscal-v0.6.0` sur le commit 6eaabbb (release GitHub ou Codespace).
-- [ ] Attestation : citer le ticket CORRECTION (0.6.0) parmi les enregistrements, avec ses règles (avant Z, responsable, motif).
+- [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
+- [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : compléter l'identité de proIA Conseil et de l'exploitant, faire valider par Audrex (même dirigeant pour l'éditeur et l'utilisateur, § 375 ; régime rétabli par la LF 2026), puis signer.
+- [ ] Geler le noyau en 1.0.0 (au plus tard au go/no-go du 13 octobre) et poser le tag `noyau-fiscal-v1.0.0` : c'est la version citée par l'attestation.
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
 - [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.
