@@ -5,7 +5,7 @@ import type { Cloture, Evenement, Ticket } from "./types.js";
 import { ErreurFiscale } from "./types.js";
 import { NOM_LOGICIEL, VERSION_NOYAU_FISCAL } from "./version.js";
 import { champsTotaux, totauxClotures, totauxTickets } from "./registre.js";
-import { verifierChaine, verifierScellement, verifierTotauxTickets, type Anomalie } from "./verification.js";
+import { verifierChaine, verifierCorrections, verifierScellement, verifierTotauxTickets, type Anomalie } from "./verification.js";
 
 export const FORMAT_ARCHIVE = "matalon-archive-fiscale/1";
 
@@ -123,6 +123,8 @@ export async function verifierArchive(
       ticketPrecedent?.grandTotalPerpetuel ?? 0,
       ticketPrecedent?.cumulPerpetuelAbsolu ?? 0,
     ),
+    // Une correction et sa vente sont dans la même journée, donc dans la même archive.
+    ...verifierCorrections(contenu.tickets),
   );
 
   // La clôture archivée et ses sources doivent être authentiques et exactes.

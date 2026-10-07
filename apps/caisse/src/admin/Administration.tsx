@@ -859,7 +859,12 @@ function ComptesClients(props: { etablissementId: string }) {
     ev.preventDefault();
     if (!edition) return;
     void envoyer(async () => {
-      await api.enregistrerClient(props.etablissementId, { ...edition, nom: edition.nom.trim(), telephone: edition.telephone.trim() });
+      await api.enregistrerClient(props.etablissementId, {
+        ...edition,
+        nom: edition.nom.trim(),
+        telephone: edition.telephone.trim(),
+        email: (edition.email ?? "").trim().toLowerCase(),
+      });
       setEdition(null);
       setDonnees(await api.comptes(props.etablissementId));
     });
@@ -890,7 +895,7 @@ function ComptesClients(props: { etablissementId: string }) {
                 <td>
                   {c.client.nom}
                   <br />
-                  <small>{[c.client.telephone, c.client.id].filter(Boolean).join(" · ")}</small>
+                  <small>{[c.client.telephone, c.client.email, c.client.id].filter(Boolean).join(" · ")}</small>
                 </td>
                 <td>{c.ventes.length ? pluriel(c.ventes.length, "note due") : "—"}</td>
                 <td className="nombre">{euros(c.soldeTTC)}</td>
@@ -907,6 +912,7 @@ function ComptesClients(props: { etablissementId: string }) {
         <form className="admin-ligne" onSubmit={enregistrer}>
           <input value={edition.nom} onChange={(ev) => setEdition({ ...edition, nom: ev.target.value })} placeholder="Nom du client" required maxLength={80} />
           <input value={edition.telephone} onChange={(ev) => setEdition({ ...edition, telephone: ev.target.value })} placeholder="Téléphone" maxLength={30} />
+          <input value={edition.email ?? ""} onChange={(ev) => setEdition({ ...edition, email: ev.target.value })} placeholder="E-mail" type="email" maxLength={254} />
           <label className="case">
             <input type="checkbox" checked={edition.actif} onChange={(ev) => setEdition({ ...edition, actif: ev.target.checked })} />
             Actif
@@ -920,7 +926,7 @@ function ComptesClients(props: { etablissementId: string }) {
         </form>
       ) : (
         <div className="admin-ligne">
-          <button className="bouton" onClick={() => setEdition({ id: nouvelIdClient(), nom: "", telephone: "", actif: true })}>
+          <button className="bouton" onClick={() => setEdition({ id: nouvelIdClient(), nom: "", telephone: "", email: "", actif: true })}>
             <AvecIcone icone={UserPlus}>Nouveau client</AvecIcone>
           </button>
           <button className="bouton" disabled={enCours} onClick={() => void charger()}>

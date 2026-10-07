@@ -14,6 +14,7 @@ import {
   totauxClotures,
   totauxTickets,
   verifierChaine,
+  verifierCorrections,
   verifierScellement,
   verifierTotauxTickets,
   type Cloture,
@@ -71,6 +72,7 @@ export async function verifierArchiveServeur(
     ...(await verifierChaine("tickets", contenu.tickets, resoudre, ticketPrecedent ?? undefined)),
     ...(await verifierChaine("evenements", contenu.evenements, resoudre, evenementPrecedent ?? undefined)),
     ...verifierTotauxTickets(contenu.tickets, ticketPrecedent?.grandTotalPerpetuel ?? 0, ticketPrecedent?.cumulPerpetuelAbsolu ?? 0),
+    ...verifierCorrections(contenu.tickets),
     ...(await verifierScellement("clotures", contenu.cloture, resoudre)),
   );
   for (const c of contenu.cloturesAgregees) anomalies.push(...(await verifierScellement("clotures", c, resoudre)));

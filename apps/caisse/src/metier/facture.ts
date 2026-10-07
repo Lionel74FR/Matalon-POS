@@ -162,7 +162,7 @@ export function emettreFacture(
   const suite = file.then(async () => {
     if (o.ticket.type !== "VENTE") throw new Error("Une facture s'établit sur une vente, pas sur une annulation.");
     if (o.ticket.totalTTC <= 0) throw new Error("Ce ticket n'a pas de montant à facturer.");
-    const annulation = (await stockage.lister("tickets", o.ticket.numero + 1)).find((t) => t.ticketOrigine?.numero === o.ticket.numero);
+    const annulation = (await stockage.lister("tickets", o.ticket.numero + 1)).find((t) => t.type === "ANNULATION" && t.ticketOrigine?.numero === o.ticket.numero);
     if (annulation) throw new Error(`Ce ticket a été annulé (ticket n° ${annulation.numero}) : pas de facture possible.`);
     const factures = await listerFactures(stockage);
     const deja = factures.find((f) => f.nature === "FACTURE" && f.ticket === o.ticket.numero);

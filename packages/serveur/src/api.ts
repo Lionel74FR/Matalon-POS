@@ -23,6 +23,7 @@ import {
   PIN_VALIDE,
   calculerComptes,
   CLIENT_ID_VALIDE,
+  EMAIL_VALIDE,
   type ClientApi,
   posteValide,
   problemePlan,
@@ -300,7 +301,7 @@ async function utilisateurs(db: Db, etablissementId: string): Promise<Utilisateu
 
 async function clients(db: Db, etablissementId: string): Promise<ClientApi[]> {
   return db.requete<ClientApi>(
-    "select id, nom, telephone, actif from clients where etablissement_id = $1 order by nom",
+    "select id, nom, telephone, email, actif from clients where etablissement_id = $1 order by nom",
     [etablissementId],
   );
 }
@@ -314,6 +315,20 @@ async function comptes(env: Environnement, etablissementId: string): Promise<Rep
     [etablissementId],
   );
   return { ...calculerComptes(lignes.map((l) => l.contenu), await clients(env.db, etablissementId)), calculeLe: horloge(env).toISOString() };
+}
+
+/**
+ * Un ticket d'une caisse de l'établissement (copie du serveur), pour consulter
+ * depuis la fiche d'un compte une note encaissée sur un autre appareil.
+ */
+async function ticketEtablissement(env: Environnement, etablissementId: string, caisseId: string, numero: number): Promise<Response> {
+  const [l] = await env.db.requete<{ contenu: Ticket }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.caisse_id = $2 and e.chaine = 'tickets' and e.numero = $3`,
+    [etablissementId, caisseId, numero],
+  );
+  if (!l) throw new ErreurHttp(404, "TICKET_INCONNU", "Ticket introuvable sur le serveur (pas encore synchronisé ?).");
+  return json(200, { ticket: l.contenu });
 }
 
 async function derniers(db: Db, caisseId: string): Promise<Derniers> {
@@ -440,23 +455,28 @@ async function comptesCaisse(env: Environnement, requete: Request): Promise<Resp
   return json(200, reponse);
 }
 
-/** Fiche client (nom, téléphone, actif), créée ou modifiée par une caisse ou par l'administration. */
+/** Fiche client (nom, téléphone, e-mail, actif), créée ou modifiée par une caisse ou par l'administration. */
 async function enregistrerClient(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<ClientApi> {
   const id = texte(corps.id, "id", 12);
   if (!CLIENT_ID_VALIDE.test(id)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Identifiant de client invalide.");
   const nom = texte(corps.nom, "nom", 80).trim();
   if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le nom du client est obligatoire.");
   const telephone = texte(corps.telephone ?? "", "telephone", 30).trim();
+  // Champ absent (caisse d'une version antérieure) : l'e-mail enregistré est conservé.
+  const email = corps.email === undefined ? null : texte(corps.email, "email", 254).trim().toLowerCase();
+  if (email && !EMAIL_VALIDE.test(email)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Adresse e-mail invalide.");
   const [existant] = await env.db.requete<{ etablissement_id: string }>("select etablissement_id from clients where id = $1", [id]);
   if (existant && existant.etablissement_id !== etablissementId) throw new ErreurHttp(403, "INTERDIT", "Client d'un autre établissement.");
   const maintenant = horloge(env).toISOString();
   await env.db.requete(
-    `insert into clients (id, etablissement_id, nom, telephone, actif, cree_le, maj_le) values ($1, $2, $3, $4, $5, $6, $6)
-     on conflict (id) do update set nom = excluded.nom, telephone = excluded.telephone, actif = excluded.actif, maj_le = excluded.maj_le
+    `insert into clients (id, etablissement_id, nom, telephone, email, actif, cree_le, maj_le) values ($1, $2, $3, $4, coalesce($7, ''), $5, $6, $6)
+     on conflict (id) do update set nom = excluded.nom, telephone = excluded.telephone, email = coalesce($7, clients.email),
+       actif = excluded.actif, maj_le = excluded.maj_le
      where clients.etablissement_id = excluded.etablissement_id`,
-    [id, etablissementId, nom, telephone, corps.actif !== false, maintenant],
+    [id, etablissementId, nom, telephone, corps.actif !== false, maintenant, email],
   );
-  return { id, nom, telephone, actif: corps.actif !== false };
+  const [fiche] = await env.db.requete<{ email: string }>("select email from clients where id = $1", [id]);
+  return { id, nom, telephone, email: fiche?.email ?? "", actif: corps.actif !== false };
 }
 
 async function majClientCaisse(env: Environnement, requete: Request): Promise<Response> {
@@ -1137,6 +1157,11 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
     if (chemin === "/api/caisse/comptes" && m === "GET") return await comptesCaisse(env, requete);
     if (chemin === "/api/caisse/clients" && m === "PUT") return await majClientCaisse(env, requete);
+    const ticketCaisse = /^\/api\/caisse\/tickets\/([a-z0-9-]{1,60})\/(\d{1,9})$/.exec(chemin);
+    if (ticketCaisse && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      return await ticketEtablissement(env, c.etablissement_id, ticketCaisse[1]!, Number(ticketCaisse[2]));
+    }
     if (chemin === "/api/caisse/plan" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
       return json(200, { etablissement: await majPlan(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });

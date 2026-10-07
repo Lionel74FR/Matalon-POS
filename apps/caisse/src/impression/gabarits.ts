@@ -59,6 +59,7 @@ function paiements(r: Recu, liste: Paiement[], rendu: number): void {
 /** Note client (ticket de caisse) d'une vente ou d'une annulation, éventuellement en duplicata. */
 export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: number): Recu {
   if (ticket.reglement) return gabaritReglement(ticket, config, duplicata);
+  if (ticket.type === "CORRECTION") return gabaritCorrection(ticket, config, duplicata);
   const r = new Recu();
   entete(r, config);
   if (duplicata) r.texte(`DUPLICATA n° ${duplicata}`, { align: "centre", gras: true }).filet();
@@ -88,6 +89,25 @@ export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: n
   r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
   r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   if (!duplicata && ticket.type === "VENTE") r.saut().texte("Merci et à bientôt !", { align: "centre" });
+  return r;
+}
+
+/** Pièce de correction des moyens de paiement d'une vente : l'écart par mode, total inchangé. */
+export function gabaritCorrection(ticket: Ticket, config: Configuration, duplicata?: number): Recu {
+  const r = new Recu();
+  entete(r, config);
+  if (duplicata) r.texte(`DUPLICATA n° ${duplicata}`, { align: "centre", gras: true }).filet();
+  r.texte(`CORRECTION DU PAIEMENT du ticket n° ${numero(ticket.ticketOrigine!.numero)}`, { align: "centre", gras: true });
+  if (ticket.motif) r.texte(`Motif : ${ticket.motif}`, { align: "centre" });
+  r.filet();
+  r.colonnes(`Pièce n° ${numero(ticket.numero)}`, dateHeure(ticket.horodatage), { gras: true });
+  r.texte(`Validée par ${nomUtilisateur(config, ticket.operateurId)}`);
+  r.filet();
+  for (const p of ticket.paiements) r.colonnes(`${LIBELLES_PAIEMENT[p.mode]} ${p.montant < 0 ? "retiré" : "ajouté"}`, formaterEuros(p.montant));
+  r.filet();
+  r.texte("Total de la vente inchangé", { align: "centre" });
+  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   return r;
 }
 

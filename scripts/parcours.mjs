@@ -169,6 +169,24 @@ await p.locator(".qr-note svg").waitFor();
 await capture("10b-duplicata-qr");
 await p.getByRole("button", { name: "Fermer" }).last().click();
 await p.getByRole("button", { name: "Fermer" }).last().click();
+
+// Erreur de mode de paiement corrigée avant la Z : espèces → carte, puis retour aux espèces.
+const corriger = async (vers) => {
+  await p.locator(".tableau-tickets tbody tr", { hasText: /Table 6/ }).first().click();
+  await p.locator(".detail-paiements").waitFor();
+  await clic("Corriger le paiement");
+  await p.locator(".modale .mode", { hasText: vers }).click();
+  await p.getByRole("button", { name: /^Corriger ·/ }).click();
+  await p.getByText(/Paiement du ticket n° \d+ corrigé/).first().waitFor();
+};
+await corriger("Carte bancaire");
+await p.locator(".tableau-tickets tbody tr", { hasText: /Table 6/ }).first().click();
+const paiementCorrige = await p.locator(".detail-paiements").textContent();
+await capture("10d-paiement-corrige");
+await p.getByRole("button", { name: "Fermer" }).last().click();
+await corriger("Espèces");
+await p.waitForFunction(() => document.querySelectorAll(".tableau-tickets tbody tr.correction").length === 2, null, { timeout: 10000 }).catch(() => {});
+const corrections = await p.locator(".tableau-tickets tbody tr.correction").count();
 await p.getByRole("tab", { name: "Clôtures" }).click();
 await clic("Lecture X");
 await clic("Clôturer la journée (Z)");
@@ -205,5 +223,5 @@ const serveurIntegre = await a.getByText(/Chaîne intègre/).count();
 await a.screenshot({ path: `${sortie}/14-admin-verification.png`, fullPage: true });
 
 await b.close();
-console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, numeroFacture, attendu, zAvecComptage, erreurs }, null, 2));
-if (!integre || !serveurIntegre || !zAvecComptage || erreurs.length) process.exit(1);
+console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, numeroFacture, attendu, zAvecComptage, corrections, paiementCorrige, erreurs }, null, 2));
+if (!integre || !serveurIntegre || !zAvecComptage || corrections !== 2 || !/Carte bancaire/.test(paiementCorrige ?? "") || erreurs.length) process.exit(1);

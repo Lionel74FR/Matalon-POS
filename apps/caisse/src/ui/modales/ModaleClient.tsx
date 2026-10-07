@@ -1,4 +1,4 @@
-import type { ClientApi } from "@matalon/serveur/partage";
+import { EMAIL_VALIDE, type ClientApi } from "@matalon/serveur/partage";
 import { Check, Search, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { nouvelIdClient } from "../../donnees/clients";
@@ -28,10 +28,11 @@ export function ModaleClient(props: {
   const [creation, setCreation] = useState(false);
   const [nom, setNom] = useState("");
   const [telephone, setTelephone] = useState("");
+  const [email, setEmail] = useState("");
   const clients = useMemo(() => {
     const q = normaliser(recherche.trim());
     return (config.clients ?? [])
-      .filter((c) => c.actif && (!q || normaliser(`${c.nom} ${c.telephone}`).includes(q)))
+      .filter((c) => c.actif && (!q || normaliser(`${c.nom} ${c.telephone} ${c.email ?? ""}`).includes(q)))
       .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
   }, [config.clients, recherche]);
 
@@ -39,7 +40,9 @@ export function ModaleClient(props: {
     const n = nom.trim().replace(/\s+/g, " ");
     if (!n) return notifier("Indiquez le nom du client.", "erreur");
     if (n.length > 80) return notifier("Nom trop long (80 caractères au plus).", "erreur");
-    props.onChoisir({ id: nouvelIdClient(), nom: n, telephone: telephone.trim().slice(0, 30), actif: true }, true);
+    const e = email.trim().toLowerCase();
+    if (e && !EMAIL_VALIDE.test(e)) return notifier("Adresse e-mail invalide.", "erreur");
+    props.onChoisir({ id: nouvelIdClient(), nom: n, telephone: telephone.trim().slice(0, 30), email: e, actif: true }, true);
   };
 
   return (
@@ -61,6 +64,12 @@ export function ModaleClient(props: {
               Téléphone <small>Facultatif</small>
             </span>
             <input value={telephone} onChange={(e) => setTelephone(e.target.value)} inputMode="tel" maxLength={30} />
+          </label>
+          <label className="champ">
+            <span>
+              E-mail <small>Facultatif · factures et relances</small>
+            </span>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" maxLength={254} />
           </label>
           <div className="options">
             <button type="button" className="bouton" onClick={() => setCreation(false)}>
@@ -87,7 +96,7 @@ export function ModaleClient(props: {
               <li key={c.id}>
                 <button className="client-choix" onClick={() => props.onChoisir(c, false)}>
                   <strong>{c.nom}</strong>
-                  {c.telephone && <small>{c.telephone}</small>}
+                  {(c.telephone || c.email) && <small>{[c.telephone, c.email].filter(Boolean).join(" · ")}</small>}
                 </button>
               </li>
             ))}

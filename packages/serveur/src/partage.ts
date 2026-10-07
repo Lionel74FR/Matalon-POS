@@ -239,8 +239,13 @@ export interface ClientApi {
   id: string;
   nom: string;
   telephone: string;
+  /** Pour lui envoyer factures et relances. Depuis le 6 octobre 2026 ; vide si inconnu. */
+  email?: string;
   actif: boolean;
 }
+
+/** Adresse e-mail plausible (contrôle de forme seulement). */
+export const EMAIL_VALIDE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 
 export const CLIENT_ID_VALIDE = /^cli-[0-9a-f]{8}$/;
 

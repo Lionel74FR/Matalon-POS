@@ -101,6 +101,8 @@ export const MIGRATIONS: string[] = [
     cree_le text not null,
     maj_le text not null
   )`,
+  // Comptes clients : e-mail du client (factures, relances).
+  `alter table clients add column if not exists email text not null default ''`,
   `create table if not exists admins (
     id text primary key,
     identifiant text not null unique,

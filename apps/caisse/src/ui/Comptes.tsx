@@ -1,8 +1,9 @@
 import { ErreurFiscale, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
-import type { CompteClient, ReponseComptes } from "@matalon/serveur/partage";
-import { Banknote, Check, CreditCard, NotebookPen, Printer, RefreshCw, TriangleAlert, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
+import type { CompteClient, ReponseComptes, VenteOuverte } from "@matalon/serveur/partage";
+import { Banknote, Check, ChevronRight, CreditCard, Eye, NotebookPen, Printer, RefreshCw, TriangleAlert, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { gabaritReglement, LIBELLES_PAIEMENT } from "../impression/gabarits";
+import { gabaritNote, gabaritReglement, LIBELLES_PAIEMENT } from "../impression/gabarits";
+import { DetailTicket } from "./DetailTicket";
 import { ErreurApi } from "../serveur/client";
 import { appliquerToucheMontant, Modale, Pave, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
@@ -137,6 +138,7 @@ function ModaleReglement(props: { compte: CompteClient; onFermer: () => void; on
   const [saisie, setSaisie] = useState<number | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [recu, setRecu] = useState<Ticket | null>(null);
+  const [note, setNote] = useState<VenteOuverte | null>(null);
   const paye = paiements.reduce((s, p) => s + p.montant, 0);
   const reste = Math.max(0, aRegler - paye);
   const montant = saisie ?? reste;
@@ -273,10 +275,14 @@ function ModaleReglement(props: { compte: CompteClient; onFermer: () => void; on
           <ul className="detail-lignes">
             {compte.ventes.map((v) => (
               <li key={`${v.caisseId}-${v.numero}`}>
-                <span>
-                  Note n° {v.numero} <small>· {jour(v.horodatage)}</small>
-                </span>
-                <span>{euros(v.resteTTC)}</span>
+                <button className="lien-note" onClick={() => setNote(v)} aria-label={`Ouvrir la note n° ${v.numero}`}>
+                  <span>
+                    Note n° {v.numero} <small>· {jour(v.horodatage)}</small>
+                  </span>
+                  <span>
+                    {euros(v.resteTTC)} <ChevronRight className="icone" size={16} aria-hidden="true" />
+                  </span>
+                </button>
               </li>
             ))}
             <li className="total">
@@ -344,6 +350,80 @@ function ModaleReglement(props: { compte: CompteClient; onFermer: () => void; on
           {imprimanteConfiguree && <p className="explication">Le reçu s'imprime à l'encaissement.</p>}
         </div>
       </div>
+      {note && <ModaleNoteCompte vente={note} onFermer={() => setNote(null)} />}
+    </Modale>
+  );
+}
+
+/**
+ * Note portée en compte, rouverte depuis la fiche du client : lignes, moyens
+ * de paiement, reste dû. Celle d'un autre appareil vient de la copie du serveur.
+ */
+function ModaleNoteCompte(props: { vente: VenteOuverte; onFermer: () => void }) {
+  const { caisse, config, utilisateur, imprimer, imprimanteConfiguree } = useCaisse();
+  const v = props.vente;
+  const locale = v.caisseId === config.caisseId;
+  const [etat, setEtat] = useState<{ ticket: Ticket; tickets: Ticket[] } | { erreur: string } | null>(null);
+
+  useEffect(() => {
+    let annule = false;
+    void (async () => {
+      try {
+        if (locale) {
+          const tickets = await caisse.stockage.lister("tickets", v.numero);
+          const t = tickets.find((x) => x.numero === v.numero && x.hash === v.hash);
+          if (t) return !annule && setEtat({ ticket: t, tickets });
+        }
+        const r = await caisse.client.ticket(v.caisseId, v.numero);
+        if (!annule) setEtat({ ticket: r.ticket, tickets: [] });
+      } catch (e) {
+        if (annule) return;
+        setEtat({
+          erreur:
+            e instanceof ErreurApi && e.code === "HORS_LIGNE"
+              ? "Connexion nécessaire pour ouvrir une note encaissée sur un autre appareil."
+              : e instanceof Error
+                ? e.message
+                : String(e),
+        });
+      }
+    })();
+    return () => {
+      annule = true;
+    };
+  }, [caisse, locale, v.caisseId, v.numero, v.hash]);
+
+  const duplicata = async (t: Ticket) => {
+    const evts = await caisse.stockage.lister("evenements");
+    const n = evts.filter((e) => e.code === "REIMPRESSION_TICKET" && e.details.ticket === t.numero).length + 1;
+    await imprimer(gabaritNote(t, config, n), `Duplicata n° ${n}`);
+    await caisse.registre.journaliser("REIMPRESSION_TICKET", { ticket: t.numero, duplicata: n, canal: imprimanteConfiguree ? "papier" : "ecran" }, utilisateur.id);
+  };
+
+  return (
+    <Modale
+      titre={`Note n° ${v.numero} · ${jour(v.horodatage)}`}
+      onFermer={props.onFermer}
+      pied={
+        etat && "ticket" in etat && locale ? (
+          <button className="bouton" onClick={() => void duplicata(etat.ticket)}>
+            <AvecIcone icone={imprimanteConfiguree ? Printer : Eye}>{imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}</AvecIcone>
+          </button>
+        ) : undefined
+      }
+    >
+      <p className="explication">
+        Reste dû : <strong>{euros(v.resteTTC)}</strong>
+        {v.regleTTC > 0 && ` (déjà réglé ${euros(v.regleTTC)})`}
+        {!locale && ` · encaissée sur l'appareil ${v.caisseId}`}
+      </p>
+      {etat == null ? (
+        <p className="explication">Chargement de la note…</p>
+      ) : "erreur" in etat ? (
+        <p className="erreur">{etat.erreur}</p>
+      ) : (
+        <DetailTicket ticket={etat.ticket} tickets={etat.tickets} />
+      )}
     </Modale>
   );
 }

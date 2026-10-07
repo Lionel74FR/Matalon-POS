@@ -71,6 +71,14 @@ export interface SaisieReglement {
   operateurId: string;
 }
 
+export interface SaisieCorrection {
+  numeroTicket: number;
+  /** Moyens de paiement réellement reçus, nets (sans rendu), pour le total de la vente ; jamais EN_COMPTE. */
+  paiements: Paiement[];
+  motif: string;
+  operateurId: string;
+}
+
 export interface SaisieAnnulation {
   numeroTicket: number;
   motif: string;
@@ -131,6 +139,19 @@ function clientValide(c: ClientCompte | undefined): ClientCompte {
 /** Montant d'une vente porté en compte (signé : négatif sur une annulation). */
 export function montantEnCompte(t: Ticket): number {
   return t.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((s, p) => s + p.montant, 0);
+}
+
+/**
+ * Moyens de paiement effectifs d'une vente : ceux du ticket, nets du rendu,
+ * puis les écarts de ses corrections (tickets CORRECTION qui la désignent).
+ */
+export function paiementsEffectifs(vente: Ticket, tickets: Ticket[]): Paiement[] {
+  const corrections = tickets.filter(
+    (t) => t.type === "CORRECTION" && t.ticketOrigine?.numero === vente.numero && t.ticketOrigine.hash === vente.hash,
+  );
+  return cumulerPaiements([paiementsNets(vente.paiements, vente.renduMonnaie), ...corrections.map((c) => c.paiements)]).filter(
+    (p) => p.montant !== 0,
+  );
 }
 
 /** Règlements reçus (positifs) ou annulés (négatifs) de chaque vente, sur un ensemble de tickets. */
@@ -437,7 +458,7 @@ export class Registre {
       if (!s.motif?.trim()) throw new ErreurFiscale("MOTIF_OBLIGATOIRE", "une annulation exige un motif");
       const origine = await this.stockage.trouver("tickets", s.numeroTicket);
       if (!origine) throw new ErreurFiscale("TICKET_INCONNU", `ticket ${s.numeroTicket} introuvable`);
-      if (origine.type === "ANNULATION") {
+      if (origine.type === "ANNULATION" || origine.type === "CORRECTION") {
         throw new ErreurFiscale("ANNULATION_INTERDITE", "seule une vente ou un règlement peut être annulé");
       }
       const suivants = await this.stockage.lister("tickets", origine.numero + 1);
@@ -453,7 +474,8 @@ export class Registre {
       const ventilationTVA = ventiler(lignes);
       const totalTTC = 0 - origine.totalTTC;
       const totalHT = ventilationTVA.reduce((t, v) => t + v.baseHT, 0);
-      const remboursements = paiementsNets(origine.paiements, origine.renduMonnaie).map((p) => ({
+      // Remboursement sur les moyens de paiement effectifs, corrections comprises.
+      const remboursements = paiementsEffectifs(origine, suivants).map((p) => ({
         mode: p.mode,
         montant: -p.montant,
       }));
@@ -518,6 +540,75 @@ export class Registre {
         maintenant,
       );
       return annulation;
+    });
+  }
+
+  /**
+   * Corrige les moyens de paiement d'une vente encore dans la journée en cours
+   * (pas encore couverte par une Z), par un ticket CORRECTION de total nul : la
+   * vente reste intacte, les encaissements par mode de la Z en tiennent compte.
+   * Exclut les ventes en compte (la part due et la TVA exigible en dépendent).
+   */
+  enregistrerCorrection(s: SaisieCorrection): Promise<Ticket> {
+    return this.operation(async (lot, maintenant) => {
+      if (!s.operateurId) throw new ErreurFiscale("OPERATEUR_OBLIGATOIRE", "opérateur obligatoire");
+      if (!s.motif?.trim()) throw new ErreurFiscale("MOTIF_OBLIGATOIRE", "une correction exige un motif");
+      const origine = await this.stockage.trouver("tickets", s.numeroTicket);
+      if (!origine) throw new ErreurFiscale("TICKET_INCONNU", `ticket ${s.numeroTicket} introuvable`);
+      if (origine.type !== "VENTE") throw new ErreurFiscale("CORRECTION_INTERDITE", "seuls les paiements d'une vente se corrigent");
+      const { derniereZ } = await this.etatZ(lot);
+      if (origine.numero <= (derniereZ?.dernierTicketCouvert ?? 0)) {
+        throw new ErreurFiscale("CORRECTION_INTERDITE", `le ticket ${origine.numero} est déjà clôturé : la correction n'est possible qu'avant la Z`);
+      }
+      const suivants = await this.stockage.lister("tickets", origine.numero + 1);
+      if (suivants.some((t) => t.type === "ANNULATION" && t.ticketOrigine?.numero === origine.numero)) {
+        throw new ErreurFiscale("DEJA_ANNULE", `le ticket ${origine.numero} est annulé`);
+      }
+      const avant = paiementsEffectifs(origine, suivants);
+      if (avant.some((p) => p.mode === "EN_COMPTE") || s.paiements.some((p) => p.mode === "EN_COMPTE")) {
+        throw new ErreurFiscale("CORRECTION_INTERDITE", "une vente en compte ne se corrige pas : annulez-la");
+      }
+      // Paiements reçus, nets : exactement le total, sans rendu.
+      const { renduMonnaie } = controlerPaiements(origine.totalTTC, s.paiements);
+      if (renduMonnaie !== 0) throw new ErreurFiscale("MONTANT_INVALIDE", "les paiements corrigés doivent égaler le total de la vente");
+      const apres = cumulerPaiements([s.paiements]);
+      const ecart = cumulerPaiements([apres, avant.map((p) => ({ mode: p.mode, montant: -p.montant }))]).filter((p) => p.montant !== 0);
+      if (ecart.length === 0) throw new ErreurFiscale("CORRECTION_VIDE", "les moyens de paiement sont déjà ceux-là");
+
+      const dateComptable = await this.dateComptableSure(lot, maintenant);
+      const precedent = await lot.dernier("tickets");
+      const correction = await this.sceller(
+        lot,
+        "tickets",
+        {
+          type: "CORRECTION",
+          dateComptable,
+          operateurId: s.operateurId,
+          tableId: origine.tableId,
+          couverts: null,
+          lignes: [],
+          ventilationTVA: [],
+          totalHT: 0,
+          totalTVA: 0,
+          totalTTC: 0,
+          paiements: ecart,
+          renduMonnaie: 0,
+          ticketOrigine: { numero: origine.numero, hash: origine.hash },
+          motif: s.motif.trim(),
+          grandTotalPerpetuel: precedent?.grandTotalPerpetuel ?? 0,
+          cumulPerpetuelAbsolu: precedent?.cumulPerpetuelAbsolu ?? 0,
+        },
+        maintenant,
+      );
+      const resume = (l: Paiement[]) => l.map((p) => `${p.mode} ${p.montant}`).join(" + ");
+      await this.evenement(
+        lot,
+        "CORRECTION_PAIEMENT",
+        { ticket: correction.numero, ticketOrigine: origine.numero, avant: resume(avant), apres: resume(apres), motif: correction.motif },
+        s.operateurId,
+        maintenant,
+      );
+      return correction;
     });
   }
 

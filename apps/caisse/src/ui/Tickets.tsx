@@ -1,12 +1,14 @@
-import { Eye, FileText, Printer, QrCode, Undo2 } from "lucide-react";
+import { Eye, FileText, Printer, QrCode, Undo2, Wallet } from "lucide-react";
 import { AvecIcone } from "./icones";
-import { ErreurFiscale, type Ticket } from "@matalon/noyau-fiscal";
+import { ErreurFiscale, paiementsEffectifs, type Ticket } from "@matalon/noyau-fiscal";
 import { useCallback, useEffect, useState } from "react";
 import { gabaritNote, LIBELLES_PAIEMENT, nomTable, nomUtilisateur } from "../impression/gabarits";
 import { Modale, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { QrNote, urlNoteTicket } from "./QrNote";
 import { ModaleFacture } from "./modales/ModaleFacture";
+import { ModaleCorrection } from "./modales/ModaleCorrection";
+import { DetailTicket } from "./DetailTicket";
 import { emettreAvoir, listerFactures } from "../metier/facture";
 
 const MOTIFS_ANNULATION = ["Erreur de saisie", "Erreur de table", "Client parti sans consommer", "Réclamation client"];
@@ -20,6 +22,9 @@ export function Tickets() {
   const [annules, setAnnules] = useState<Set<number>>(new Set());
   const [choisi, setChoisi] = useState<Ticket | null>(null);
   const [annulation, setAnnulation] = useState<Ticket | null>(null);
+  const [correction, setCorrection] = useState<Ticket | null>(null);
+  /** Dernier ticket couvert par une Z : au-delà, les paiements se corrigent encore. */
+  const [couvertParZ, setCouvertParZ] = useState(0);
   const [motif, setMotif] = useState("");
   const [factureDe, setFactureDe] = useState<Ticket | null>(null);
   const [factures, setFactures] = useState<Map<number, string>>(new Map());
@@ -29,7 +34,9 @@ export function Tickets() {
   const charger = useCallback(async () => {
     const liste = await caisse.stockage.derniers("tickets", 150);
     setTickets(liste);
-    setAnnules(new Set(liste.filter((t) => t.ticketOrigine).map((t) => t.ticketOrigine!.numero)));
+    setAnnules(new Set(liste.filter((t) => t.type === "ANNULATION" && t.ticketOrigine).map((t) => t.ticketOrigine!.numero)));
+    const z = (await caisse.stockage.lister("clotures")).filter((c) => c.periode === "JOUR").at(-1);
+    setCouvertParZ(z?.dernierTicketCouvert ?? 0);
     const emises = await listerFactures(caisse.stockage);
     setFactures(new Map(emises.map((f) => [f.ticket, f.numero])));
     setVentesFacturees(new Set(emises.filter((f) => f.nature === "FACTURE").map((f) => f.ticket)));
@@ -42,6 +49,14 @@ export function Tickets() {
     const evts = await caisse.stockage.lister("evenements");
     return evts.filter((e) => e.code === "REIMPRESSION_TICKET" && e.details.ticket === t.numero).length + 1;
   };
+
+  /** Vente du jour (pas encore couverte par une Z), non annulée, sans part en compte. */
+  const corrigeable = (t: Ticket) =>
+    t.type === "VENTE" &&
+    t.totalTTC > 0 &&
+    t.numero > couvertParZ &&
+    !annules.has(t.numero) &&
+    !paiementsEffectifs(t, tickets).some((p) => p.mode === "EN_COMPTE");
 
   const duplicata = async (t: Ticket) => {
     const n = await prochainDuplicata(t);
@@ -115,7 +130,7 @@ export function Tickets() {
     <div className="page">
       <header className="page-tete">
         <h1>Tickets</h1>
-        <p>Les 150 derniers tickets. Un ticket ne se modifie pas : une erreur se corrige par une annulation.</p>
+        <p>Les 150 derniers tickets. Un ticket ne se modifie pas : une erreur se corrige par une annulation, ou par une correction du paiement avant la Z.</p>
       </header>
       {tickets.length === 0 ? (
         <Vide>Aucun ticket pour l'instant. Ils apparaîtront ici après le premier encaissement.</Vide>
@@ -133,15 +148,29 @@ export function Tickets() {
           </thead>
           <tbody>
             {tickets.map((t) => (
-              <tr key={t.numero} onClick={() => setChoisi(t)} className={t.type === "ANNULATION" ? "annulation" : annules.has(t.numero) ? "annule" : ""}>
+              <tr
+                key={t.numero}
+                onClick={() => setChoisi(t)}
+                className={t.type === "ANNULATION" ? "annulation" : t.type === "CORRECTION" ? "correction" : annules.has(t.numero) ? "annule" : ""}
+              >
                 <td>{t.numero}</td>
                 <td>
                   {new Date(t.horodatage).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </td>
-                <td>{t.reglement ? `${t.type === "REGLEMENT" ? "Règlement" : "Annulation de règlement"} · ${t.client?.nom ?? ""}` : nomTable(config, t.tableId)}</td>
+                <td>
+                  {t.reglement
+                    ? `${t.type === "REGLEMENT" ? "Règlement" : "Annulation de règlement"} · ${t.client?.nom ?? ""}`
+                    : t.type === "CORRECTION"
+                      ? `Correction du n° ${t.ticketOrigine?.numero}`
+                      : nomTable(config, t.tableId)}
+                </td>
                 <td>{nomUtilisateur(config, t.operateurId)}</td>
-                <td>{t.paiements.map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ") || "—"}</td>
-                <td className="nombre">{t.reglement ? <small>reçu {euros(t.reglement.montantTTC)}</small> : euros(t.totalTTC)}</td>
+                <td>
+                  {t.type === "CORRECTION"
+                    ? `${t.paiements.filter((p) => p.montant < 0).map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ")} → ${t.paiements.filter((p) => p.montant > 0).map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ")}`
+                    : (t.type === "VENTE" ? paiementsEffectifs(t, tickets) : t.paiements).map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ") || "—"}
+                </td>
+                <td className="nombre">{t.reglement ? <small>reçu {euros(t.reglement.montantTTC)}</small> : t.type === "CORRECTION" ? "—" : euros(t.totalTTC)}</td>
               </tr>
             ))}
           </tbody>
@@ -150,13 +179,18 @@ export function Tickets() {
 
       {choisi && !annulation && (
         <Modale
-          titre={`${choisi.type === "ANNULATION" ? "Annulation" : choisi.type === "REGLEMENT" ? "Règlement de compte" : "Ticket"} n° ${choisi.numero}`}
+          titre={`${{ ANNULATION: "Annulation", REGLEMENT: "Règlement de compte", CORRECTION: "Correction de paiement", VENTE: "Ticket" }[choisi.type]} n° ${choisi.numero}`}
           onFermer={() => setChoisi(null)}
           pied={
             <>
               {(choisi.type === "VENTE" || choisi.type === "REGLEMENT") && !annules.has(choisi.numero) && (
                 <button className="bouton danger" onClick={() => setAnnulation(choisi)}>
                   <AvecIcone icone={Undo2}>{choisi.type === "REGLEMENT" ? "Annuler ce règlement" : "Annuler ce ticket"}</AvecIcone>
+                </button>
+              )}
+              {corrigeable(choisi) && (
+                <button className="bouton" onClick={() => setCorrection(choisi)}>
+                  <AvecIcone icone={Wallet}>Corriger le paiement</AvecIcone>
                 </button>
               )}
               {(choisi.type === "VENTE" ? !annules.has(choisi.numero) || factures.has(choisi.numero) : factures.has(choisi.numero)) && (
@@ -172,7 +206,7 @@ export function Tickets() {
                     <AvecIcone icone={FileText}>Émettre l'avoir</AvecIcone>
                   </button>
                 )}
-              {!choisi.reglement && (
+              {!choisi.reglement && choisi.type !== "CORRECTION" && (
                 <button className="bouton" onClick={() => void duplicataQr(choisi)}>
                   <AvecIcone icone={QrCode}>QR code</AvecIcone>
                 </button>
@@ -186,56 +220,27 @@ export function Tickets() {
           {annules.has(choisi.numero) && <p className="erreur">Ce ticket a été annulé.</p>}
           {choisi.motif && <p className="explication">Motif : {choisi.motif}</p>}
           {factures.has(choisi.numero) && <p className="explication">Facturé : n° {factures.get(choisi.numero)}</p>}
-          {choisi.client && !choisi.reglement && (
-            <p className="explication">
-              Au compte de <strong>{choisi.client.nom}</strong> :{" "}
-              {euros(choisi.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((x, p) => x + p.montant, 0))}
-            </p>
-          )}
-          {choisi.reglement && (
-            <>
-              <p className="explication">
-                Règlement de <strong>{choisi.client?.nom}</strong> : {choisi.paiements.map((p) => `${LIBELLES_PAIEMENT[p.mode]} ${euros(p.montant)}`).join(", ")}
-                {choisi.renduMonnaie > 0 ? ` · rendu ${euros(choisi.renduMonnaie)}` : ""}
-              </p>
-              <ul className="detail-lignes">
-                {choisi.reglement.imputations.map((i) => (
-                  <li key={`${i.caisseId}-${i.numero}`}>
-                    <span>
-                      Note n° {i.numero}
-                      {i.caisseId !== config.caisseId && <small> · {i.caisseId}</small>}
-                    </span>
-                    <span>{euros(i.montantTTC)}</span>
-                  </li>
-                ))}
-                <li className="total">
-                  <span>Total réglé</span>
-                  <span>{euros(choisi.reglement.montantTTC)}</span>
-                </li>
-              </ul>
-            </>
-          )}
-          {!choisi.reglement && <ul className="detail-lignes">
-            {choisi.lignes.map((l, i) => (
-              <li key={i}>
-                <span>
-                  {l.quantite} × {l.libelle}
-                  {l.remiseTTC !== 0 && <small> · remise {euros(l.remiseTTC)} ({l.motifRemise})</small>}
-                </span>
-                <span>{euros(l.montantTTC)}</span>
-              </li>
-            ))}
-            <li className="total">
-              <span>Total</span>
-              <span>{euros(choisi.totalTTC)}</span>
-            </li>
-          </ul>}
+          <DetailTicket ticket={choisi} tickets={tickets} />
         </Modale>
+      )}
+
+      {correction && (
+        <ModaleCorrection
+          ticket={correction}
+          avant={paiementsEffectifs(correction, tickets)}
+          onCorrige={() => {
+            setCorrection(null);
+            setChoisi(null);
+            void charger();
+          }}
+          onFermer={() => setCorrection(null)}
+        />
       )}
 
       {factureDe && (
         <ModaleFacture
-          ticket={factureDe}
+          // Les mentions de paiement de la facture reprennent les moyens corrigés, s'il y a eu correction.
+          ticket={factureDe.type === "VENTE" ? { ...factureDe, paiements: paiementsEffectifs(factureDe, tickets), renduMonnaie: 0 } : factureDe}
           onFermer={() => {
             setFactureDe(null);
             void charger();
@@ -267,7 +272,7 @@ export function Tickets() {
           ) : (
             <p className="explication">
               Un ticket négatif de {euros(-annulation.totalTTC)} sera émis. Les paiements sont remboursés sur les mêmes moyens :{" "}
-              {annulation.paiements.map((p) => `${LIBELLES_PAIEMENT[p.mode]} ${euros(p.montant)}`).join(", ") || "aucun"}
+              {paiementsEffectifs(annulation, tickets).map((p) => `${LIBELLES_PAIEMENT[p.mode]} ${euros(p.montant)}`).join(", ") || "aucun"}
               {annulation.client ? ` ; la part en compte est retirée du compte de ${annulation.client.nom}` : ""}.
             </p>
           )}

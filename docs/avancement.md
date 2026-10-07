@@ -14,7 +14,7 @@ Dernière mise à jour : 6 octobre 2026.
 | Lot | État | Ce qui reste |
 | --- | --- | --- |
 | 0. Cadrage | En cours, côté Lionel | Fiches techniques du Moka, caisse de transition conforme (plan B), outil comptable destinataire des Z, calendrier de facturation électronique B2B (Audrex) |
-| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.5.0 avec les comptes clients) | **L'attestation éditeur n'est pas rédigée**, alors que le cahier en fait un critère de sortie. Ticket envoyé par e-mail (optionnel) : non fait |
+| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.6.0 : comptes clients, correction du paiement) | **L'attestation éditeur n'est pas rédigée**, alors que le cahier en fait un critère de sortie. Ticket envoyé par e-mail (optionnel) : non fait |
 | 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
 | 4. Stock et fiches techniques | Pas commencé | Attend les fiches techniques et le feu vert |
@@ -24,6 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
 | c2985fa | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
 | 3857124 | Imprimantes de production : poste par catégorie dans l'éditeur de carte, imprimante par poste (Réglages de la caisse et administration, bon d'essai), bouton « Envoyer (n) », envoi d'office à l'encaissement, bon d'annulation au retrait d'un article envoyé, formules réparties entre postes |
 | d4f1939 | Cartes : fusion de deux catégories au même taux de TVA |
@@ -44,6 +45,7 @@ Dernière mise à jour : 6 octobre 2026.
 - Une divergence de synchronisation est signalée mais ne bloque pas l'encaissement. L'encaissement est bloqué si l'iPad est révoqué ou si son horloge s'écarte de plus de 5 min.
 - Bons de production : hors périmètre fiscal (rien au registre, sauf `apresEnvoi` sur `SUPPRESSION_LIGNE`). Sans aucune imprimante de production réglée, la fonction est invisible. Une ligne envoyée ne se regroupe plus avec un nouvel article identique ; augmenter sa quantité crée une ligne à envoyer. Un bon en échec laisse toute la ligne à envoyer (un doublon en cuisine plutôt qu'un oubli).
 - Plan de salle : les tables ne changent plus que par la route du plan (`PUT …/plan`, avec `version` : 409 si le plan a bougé ailleurs) ; la mise à jour de l'établissement les ignore. Une table n'est jamais supprimée (`masquee`). Positions en cases de 25 cm (`CASE_CM`) ; une table sans position est placée d'office, et l'enregistrement fige toutes les positions. Tables assemblées : `Commande.jointes` (hors fiscal) ; le ticket ne porte que la table principale.
+- Correction du paiement (0.6.0) : ticket `CORRECTION` sans ligne ni total, `ticketOrigine` = la vente, `paiements` = écart de somme nulle (mode erroné en négatif). Seulement avant la Z qui couvrirait la vente (correction et vente sont donc dans la même archive), jamais pour une vente en compte, jamais annulable (on corrige à nouveau). `paiementsEffectifs` sert à l'annulation, au détail et aux factures ; `verifierCorrections` contrôle la cohérence avec la vente.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -51,7 +53,9 @@ Dernière mise à jour : 6 octobre 2026.
 - [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
 - [ ] Remplir les mentions légales des factures dans l'administration.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
-- [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026). Le commentaire de `packages/noyau-fiscal/src/version.ts` (`noyau-fiscal@<version>`) sera aligné sur `noyau-fiscal-v<version>` à la prochaine modification du noyau.
+- [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
+- [ ] Créer le tag `noyau-fiscal-v0.6.0` sur le commit de la correction du paiement (release GitHub ou Codespace).
+- [ ] Attestation : citer le ticket CORRECTION (0.6.0) parmi les enregistrements, avec ses règles (avant Z, responsable, motif).
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
 - [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.

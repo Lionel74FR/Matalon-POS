@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 29, copiée le 6 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 31, copiée le 6 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -30,11 +30,12 @@ La V1 couvre le cycle complet d'une vente, de la prise de commande à la clôtur
 | Encaissement | CB sur TPE autonome (montant ressaisi), espèces avec rendu monnaie, titres-restaurant papier et carte, paiement fractionné sur plusieurs moyens |
 | Remises et offerts | Motif obligatoire, autorisés selon le rôle, tracés au journal des événements |
 | Annulations et remboursements | Jamais de suppression : ticket d'annulation négatif lié au ticket d'origine, motif obligatoire, tracé |
+| Correction du paiement | Le détail d'un ticket montre ses moyens de paiement. Un mode erroné se corrige avant la Z de la journée, par un responsable, avec un motif : le ticket reste intact et un ticket de correction signé, de total nul, porte l'écart entre modes ; la Z et une annulation ultérieure tiennent compte des modes corrigés. Exclu pour les ventes en compte. Ajouté le 6 octobre 2026, noyau fiscal 0.6.0. |
 | Ticket et note | Mentions légales (raison sociale, SIRET, adresse, n° TVA, date et heure, numéro séquentiel, lignes, TVA par taux, totaux HT et TTC, version du logiciel), impression à la demande, envoi par e-mail en option |
 | Facture | Facture client sur demande, générée depuis le ticket, numérotation propre |
 | Clôtures | Lecture X à tout moment, clôture Z journalière, clôtures mensuelle et annuelle, fond de caisse, comptage espèces et écart |
 | Utilisateurs | Connexion par code PIN, changement rapide d'utilisateur, rôles vendeur, responsable, administrateur |
-| Comptes clients | Vente portée au compte d'un client (accord d'un responsable), réglée plus tard sur n'importe quel appareil, annulation d'un règlement. La vente compte dans le CA du jour ; la TVA est exigible au règlement (restauration sur place = prestation de services). Ajouté le 6 octobre 2026, noyau fiscal 0.5.0. |
+| Comptes clients | Vente portée au compte d'un client (accord d'un responsable), réglée plus tard sur n'importe quel appareil, annulation d'un règlement. Fiche client : nom, téléphone, e-mail ; chaque note due se rouvre depuis la fiche, même encaissée sur un autre appareil. La vente compte dans le CA du jour ; la TVA est exigible au règlement (restauration sur place = prestation de services). Ajouté le 6 octobre 2026, noyau fiscal 0.5.0. |
 | Bons de production | Chaque catégorie de la carte désigne un poste (bar, cuisine) ; l'établissement associe une imprimante à chaque poste. « Envoyer » imprime les nouveaux articles par poste, le reste part à l'encaissement, un retrait après envoi imprime un bon d'annulation. Hors périmètre fiscal. Dans l'éditeur de carte, deux catégories au même taux de TVA peuvent être fusionnées. Ajouté le 6 octobre 2026. |
 | Plan de salle | Tables carrées, rectangulaires ou rondes avec leur nombre de chaises, placées sur une grille de 25 cm, zone par zone, avec des repères (bar, porte, murs). Dessiné dans l'administration ou sur l'iPad par un responsable ; une modification faite ailleurs entre-temps est refusée plutôt qu'écrasée. Une table n'est jamais supprimée, elle est masquée (les tickets la citent). En caisse : plan avec l'état de chaque table, couverts sur chaises, zoom et bascule en liste (iPhone). Tables assemblées pour un groupe : une commande, libérées ensemble. Ajouté le 6 octobre 2026. |
 

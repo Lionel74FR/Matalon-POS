@@ -28,6 +28,8 @@ export {
   type SaisieReglement,
   type SaisieImputation,
   type SaisieAnnulation,
+  type SaisieCorrection,
+  paiementsEffectifs,
 } from "./registre.js";
 export {
   verifierRegistre,
@@ -37,6 +39,7 @@ export {
   verifierClotures,
   verifierScellement,
   verifierImputationsLocales,
+  verifierCorrections,
   type Anomalie,
   type RapportVerification,
 } from "./verification.js";

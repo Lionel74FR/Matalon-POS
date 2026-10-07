@@ -99,11 +99,14 @@ export function App() {
                 /* nouvel essai à la prochaine synchronisation ; on garde la carte en place */
               }
             }
-            // Clients créés ici hors ligne : leur fiche complète (téléphone) part dès que le serveur répond.
+            // Clients créés ici hors ligne : leur fiche complète (téléphone, e-mail) part dès que le serveur répond.
+            // Le serveur a pu apprendre le client par le ticket en compte (nom seul) : la fiche est alors complétée.
             const connus = etat.clients;
             if (connus) {
               for (const c of (caisseCourante.current ?? actuelle).config.clients ?? []) {
-                if (CLIENT_ID_VALIDE.test(c.id) && !connus.some((x) => x.id === c.id)) await actuelle.client.enregistrerClient(c).catch(() => undefined);
+                const s = connus.find((x) => x.id === c.id);
+                const nue = !!s && !s.telephone && !s.email && !!(c.telephone || c.email);
+                if (CLIENT_ID_VALIDE.test(c.id) && (!s || nue)) await actuelle.client.enregistrerClient(c).catch(() => undefined);
               }
             }
             // Relue après l'attente réseau : une modification locale faite entre-temps (imprimante…) est conservée.

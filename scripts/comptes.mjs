@@ -43,6 +43,7 @@ await ipad.p.locator(".mode", { hasText: "En compte" }).click();
 await ipad.clic("Nouveau client");
 await ipad.p.locator(".formulaire-client input").first().fill("M. Martin");
 await ipad.p.locator(".formulaire-client input").nth(1).fill("06 12 34 56 78");
+await ipad.p.locator(".formulaire-client input").nth(2).fill("martin@exemple.fr");
 await ipad.p.screenshot({ path: `${sortie}/k01-nouveau-client.png` });
 await ipad.clic("Créer et choisir");
 await ipad.p.getByRole("button", { name: /^Valider l'encaissement/ }).click();
@@ -80,6 +81,13 @@ await iphone.p.locator(".compte", { hasText: "M. Martin" }).waitFor({ timeout: 1
 const soldeAvant = await iphone.p.locator(".compte", { hasText: "M. Martin" }).locator(".montant").textContent();
 await iphone.p.screenshot({ path: `${sortie}/k04-comptes-iphone.png` });
 await iphone.p.locator(".compte", { hasText: "M. Martin" }).click();
+// La note portée en compte sur l'iPad se rouvre depuis la fiche, sur l'iPhone (copie du serveur).
+await iphone.p.getByRole("button", { name: /^Ouvrir la note n° / }).first().click();
+const modaleNote = iphone.p.getByRole("dialog", { name: /^Note n° / });
+await modaleNote.locator(".detail-lignes", { hasText: "Cappuccino" }).waitFor({ timeout: 15000 });
+const noteRouverte = await modaleNote.locator(".detail-lignes").first().textContent();
+await iphone.p.screenshot({ path: `${sortie}/k04b-note-rouverte.png` });
+await iphone.p.getByRole("button", { name: "Fermer" }).last().click();
 await iphone.p.locator(".modale .mode", { hasText: "Espèces" }).click();
 await iphone.p.screenshot({ path: `${sortie}/k05-reglement.png` });
 await iphone.p.getByRole("button", { name: /^Encaisser/ }).click();
@@ -104,8 +112,8 @@ await iphone.p.locator(".compte", { hasText: "M. Martin" }).waitFor({ timeout: 1
 const soldeApresAnnulation = await iphone.p.locator(".compte", { hasText: "M. Martin" }).locator(".montant").textContent();
 const comptesFin = await appel("GET", "/etablissements/moka/comptes");
 await b.close();
-const resultat = { soldeAvant, soldeServeur: martin?.soldeTTC, soldeApresAnnulation, anomaliesFin: comptesFin.anomalies, telephone: martin?.client.telephone, anomalies: comptes.anomalies, lectureX: venteZ?.slice(0, 160), erreurs };
+const resultat = { noteRouverte: noteRouverte?.slice(0, 80), email: martin?.client.email, soldeAvant, soldeServeur: martin?.soldeTTC, soldeApresAnnulation, anomaliesFin: comptesFin.anomalies, telephone: martin?.client.telephone, anomalies: comptes.anomalies, lectureX: venteZ?.slice(0, 160), erreurs };
 console.log(JSON.stringify(resultat, null, 2));
-if (erreurs.length || martin?.soldeTTC !== 0 || comptes.anomalies.length || comptesFin.anomalies.length || !/15,00/.test(soldeAvant ?? "") || !/15,00/.test(soldeApresAnnulation ?? "")) {
+if (erreurs.length || !/Spritz/.test(noteRouverte ?? "") || martin?.client.email !== "martin@exemple.fr" || martin?.soldeTTC !== 0 || comptes.anomalies.length || comptesFin.anomalies.length || !/15,00/.test(soldeAvant ?? "") || !/15,00/.test(soldeApresAnnulation ?? "")) {
   process.exit(1);
 }

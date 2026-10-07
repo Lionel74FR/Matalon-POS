@@ -1,3 +1,4 @@
+import type { Ticket } from "@matalon/noyau-fiscal";
 import type {
   ClientApi as FicheClient,
   EntreeSynchro,
@@ -84,6 +85,11 @@ export class ClientApi {
 
   carte() {
     return this.appel<ReponseCarte>("GET", "/api/caisse/carte");
+  }
+
+  /** Un ticket d'une caisse de l'établissement, depuis la copie du serveur. */
+  ticket(caisseId: string, numero: number) {
+    return this.appel<{ ticket: Ticket }>("GET", `/api/caisse/tickets/${encodeURIComponent(caisseId)}/${numero}`);
   }
 
   comptes() {

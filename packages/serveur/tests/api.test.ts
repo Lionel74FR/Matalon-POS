@@ -317,7 +317,7 @@ describe("comptes clients", () => {
     });
     expect((await a.synchro()).statut).toBe(200);
     const etat = (await appel("GET", "/api/caisse/etat", undefined, b.bearer)).corps as ReponseEtat;
-    expect(etat.clients).toEqual([{ ...martin, telephone: "", actif: true }]);
+    expect(etat.clients).toEqual([{ ...martin, telephone: "", email: "", actif: true }]);
 
     let comptes = (await appel("GET", "/api/caisse/comptes", undefined, b.bearer)).corps;
     expect(comptes.comptes[0]).toMatchObject({ client: { id: martin.id }, soldeTTC: 1000 });
@@ -337,11 +337,20 @@ describe("comptes clients", () => {
     expect(comptes.dernierTicketCaisse).toBe(1);
 
     // Fiche client complétée par la caisse, puis vue de l'administration.
-    const maj = await appel("PUT", "/api/caisse/clients", { id: martin.id, nom: "Martin Paul", telephone: "06 00 00 00 00" }, a.bearer);
-    expect(maj.corps.clients[0]).toMatchObject({ nom: "Martin Paul", telephone: "06 00 00 00 00" });
+    const maj = await appel("PUT", "/api/caisse/clients", { id: martin.id, nom: "Martin Paul", telephone: "06 00 00 00 00", email: "Paul.Martin@Exemple.fr " }, a.bearer);
+    expect(maj.corps.clients[0]).toMatchObject({ nom: "Martin Paul", telephone: "06 00 00 00 00", email: "paul.martin@exemple.fr" });
+    // Une caisse d'une version antérieure n'envoie pas l'e-mail : il est conservé.
+    const ancienne = await appel("PUT", "/api/caisse/clients", { id: martin.id, nom: "Martin Paul", telephone: "06 00 00 00 00" }, a.bearer);
+    expect(ancienne.corps.client.email).toBe("paul.martin@exemple.fr");
+    expect((await appel("PUT", "/api/caisse/clients", { id: martin.id, nom: "Martin Paul", email: "pas-un-email" }, a.bearer)).statut).toBe(400);
     const admin = await appel("GET", "/api/admin/etablissements/moka/comptes", undefined, { Cookie: cookie });
     expect(admin.corps.comptes[0]).toMatchObject({ client: { nom: "Martin Paul" }, soldeTTC: 400 });
     expect((await appel("PUT", "/api/caisse/clients", { id: "pas-un-id", nom: "X" }, a.bearer)).statut).toBe(400);
+    // La fiche du compte rouvre la note d'origine, même encaissée sur une autre caisse.
+    const ouverte = comptes.comptes[0].ventes[0];
+    const note = await appel("GET", `/api/caisse/tickets/${ouverte.caisseId}/${ouverte.numero}`, undefined, a.bearer);
+    expect(note.corps.ticket).toMatchObject({ numero: ouverte.numero, hash: ouverte.hash, client: { id: martin.id } });
+    expect((await appel("GET", `/api/caisse/tickets/${ouverte.caisseId}/999`, undefined, a.bearer)).statut).toBe(404);
 
     // Un sur-règlement (deux caisses qui règlent la même dette) est signalé, jamais bloqué.
     await a.registre.enregistrerReglement({

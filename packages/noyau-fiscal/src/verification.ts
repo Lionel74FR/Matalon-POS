@@ -1,7 +1,7 @@
 import { canonique, contenuScelle } from "./canonique.js";
 import { HASH_GENESE, sha256Hex, verifierSignature, type ResolveurCle } from "./crypto.js";
 import { listeMois } from "./dates.js";
-import { cumulerVentilations, TAUX_TVA_AUTORISES, ventiler, ventilerTranche } from "./montants.js";
+import { cumulerVentilations, paiementsNets, TAUX_TVA_AUTORISES, ventiler, ventilerTranche } from "./montants.js";
 import { champsTotaux, montantEnCompte, TOTAUX_VIDES, totauxClotures, totauxTickets } from "./registre.js";
 import type { StockageFiscal } from "./stockage.js";
 import type { Chaine, Cloture, Enregistrement, Ticket } from "./types.js";
@@ -88,6 +88,7 @@ export async function verifierChaine(
  * chacune étant la tranche de TVA attendue de la vente réglée.
  */
 function comptesCoherents(t: Ticket): boolean {
+  if (t.type === "CORRECTION") return correctionCoherente(t);
   const enCompte = montantEnCompte(t);
   if (!t.reglement) {
     if (t.type === "REGLEMENT") return false;
@@ -123,6 +124,55 @@ function comptesCoherents(t: Ticket): boolean {
     r.montantTTC === r.imputations.reduce((s, i) => s + i.montantTTC, 0) &&
     canonique(r.ventilationTVA) === canonique(cumulerVentilations(r.imputations.map((i) => i.ventilationTVA)))
   );
+}
+
+/**
+ * Correction de paiements (0.6.0) : ni ligne ni total, une vente désignée, un
+ * motif, un écart de somme nulle entre moyens de paiement réels (jamais EN_COMPTE).
+ */
+function correctionCoherente(t: Ticket): boolean {
+  return (
+    t.lignes.length === 0 &&
+    t.totalTTC === 0 &&
+    t.totalHT === 0 &&
+    t.ventilationTVA.length === 0 &&
+    t.renduMonnaie === 0 &&
+    !!t.ticketOrigine &&
+    !!t.motif?.trim() &&
+    !t.client &&
+    !t.reglement &&
+    t.paiements.length > 0 &&
+    t.paiements.every((p) => p.mode !== "EN_COMPTE" && Number.isSafeInteger(p.montant) && p.montant !== 0) &&
+    t.paiements.reduce((s, p) => s + p.montant, 0) === 0
+  );
+}
+
+/**
+ * Corrections de paiements, contrôlées avec la vente qu'elles désignent :
+ * vente de la même caisse, non annulée avant, dans la même journée (aucune Z
+ * entre les deux), et moyens de paiement effectifs jamais négatifs. Une
+ * correction et sa vente sont toujours dans la même archive de Z.
+ */
+export function verifierCorrections(tickets: Ticket[], clotures: Cloture[] = []): Anomalie[] {
+  const anomalies: Anomalie[] = [];
+  const parNumero = new Map(tickets.map((t) => [t.numero, t]));
+  const effectifs = new Map<number, Map<string, number>>();
+  for (const t of tickets) {
+    if (t.type !== "CORRECTION" || !t.ticketOrigine) continue;
+    const v = parNumero.get(t.ticketOrigine.numero);
+    const annuleeAvant = tickets.some((x) => x.type === "ANNULATION" && x.ticketOrigine?.numero === v?.numero && x.numero < t.numero);
+    const zEntre = clotures.some((c) => c.periode === "JOUR" && c.dernierTicketCouvert != null && v && c.dernierTicketCouvert >= v.numero && c.dernierTicketCouvert < t.numero);
+    let ok = !!v && v.type === "VENTE" && v.hash === t.ticketOrigine.hash && v.numero < t.numero && !annuleeAvant && !zEntre;
+    if (ok) {
+      const parMode = effectifs.get(v!.numero) ?? new Map(paiementsNets(v!.paiements, v!.renduMonnaie).map((p) => [p.mode, p.montant]));
+      if (parMode.has("EN_COMPTE")) ok = false;
+      for (const p of t.paiements) parMode.set(p.mode, (parMode.get(p.mode) ?? 0) + p.montant);
+      if ([...parMode.values()].some((m) => m < 0)) ok = false;
+      effectifs.set(v!.numero, parMode);
+    }
+    if (!ok) anomalies.push({ chaine: "tickets", numero: t.numero, code: "TOTAUX_INCOHERENTS", detail: `correction incohérente avec la vente n°${t.ticketOrigine.numero}` });
+  }
+  return anomalies;
 }
 
 /** Contrôle complet d'un règlement d'une vente de cette caisse : la tranche de TVA est celle de la vente. */
@@ -290,6 +340,7 @@ export async function verifierRegistre(
     ...(await verifierChaine("clotures", clotures, resoudreCle)),
     ...verifierTotauxTickets(tickets),
     ...verifierImputationsLocales(tickets),
+    ...verifierCorrections(tickets, clotures),
     ...verifierLiensClotures(clotures, new Map(tickets.map((t) => [t.numero, t]))),
     ...verifierClotures(clotures, tickets),
   ];

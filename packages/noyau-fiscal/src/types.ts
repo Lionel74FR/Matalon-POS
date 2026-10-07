@@ -129,8 +129,13 @@ export interface Ticket extends EnTeteEnregistrement, Scellement {
    * REGLEMENT (depuis 0.5.0) : encaissement d'une dette client, sans vente
    * (aucune ligne, totaux à zéro) ; le montant et la TVA exigible sont dans
    * `reglement`. Une ANNULATION d'un règlement en est le miroir négatif.
+   *
+   * CORRECTION (depuis 0.6.0) : correction des moyens de paiement d'une vente
+   * de la même journée (avant sa Z), sans ligne ni total. Ses `paiements` sont
+   * l'écart, de somme nulle : le mode erroné en négatif, le bon en positif.
+   * La vente d'origine reste intacte ; elle est désignée par `ticketOrigine`.
    */
-  type: "VENTE" | "ANNULATION" | "REGLEMENT";
+  type: "VENTE" | "ANNULATION" | "REGLEMENT" | "CORRECTION";
   dateComptable: string;
   operateurId: string;
   tableId: string | null;
@@ -142,7 +147,7 @@ export interface Ticket extends EnTeteEnregistrement, Scellement {
   totalTTC: Centimes;
   paiements: Paiement[];
   renduMonnaie: Centimes;
-  /** Ticket annulé (ANNULATION uniquement). */
+  /** Ticket annulé (ANNULATION) ou vente corrigée (CORRECTION). */
   ticketOrigine: { numero: number; hash: string } | null;
   motif: string | null;
   /** Client débiteur : vente en compte, son annulation, ou règlement. Absent sinon. */
@@ -178,6 +183,8 @@ export type CodeEvenement =
   | "TRANSFERT_TABLE"
   /** Règlement reçu d'un client débiteur (le ticket REGLEMENT porte le détail). Depuis 0.5.0. */
   | "REGLEMENT_COMPTE"
+  /** Moyens de paiement d'une vente corrigés (le ticket CORRECTION porte l'écart). Depuis 0.6.0. */
+  | "CORRECTION_PAIEMENT"
   | "LECTURE_X"
   | "CLOTURE"
   | "ARCHIVAGE"
