@@ -24,7 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
+| 4118ce8 | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
 | 6eaabbb | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
 | c2985fa | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
 | 3857124 | Imprimantes de production : poste par catégorie dans l'éditeur de carte, imprimante par poste (Réglages de la caisse et administration, bon d'essai), bouton « Envoyer (n) », envoi d'office à l'encaissement, bon d'annulation au retrait d'un article envoyé, formules réparties entre postes |
