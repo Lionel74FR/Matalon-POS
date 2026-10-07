@@ -24,7 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
+| 6eaabbb | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
 | c2985fa | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
 | 3857124 | Imprimantes de production : poste par catégorie dans l'éditeur de carte, imprimante par poste (Réglages de la caisse et administration, bon d'essai), bouton « Envoyer (n) », envoi d'office à l'encaissement, bon d'annulation au retrait d'un article envoyé, formules réparties entre postes |
 | d4f1939 | Cartes : fusion de deux catégories au même taux de TVA |
@@ -54,7 +54,7 @@ Dernière mise à jour : 6 octobre 2026.
 - [ ] Remplir les mentions légales des factures dans l'administration.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
-- [ ] Créer le tag `noyau-fiscal-v0.6.0` sur le commit de la correction du paiement (release GitHub ou Codespace).
+- [ ] Créer le tag `noyau-fiscal-v0.6.0` sur le commit 6eaabbb (release GitHub ou Codespace).
 - [ ] Attestation : citer le ticket CORRECTION (0.6.0) parmi les enregistrements, avec ses règles (avant Z, responsable, motif).
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
 - [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
