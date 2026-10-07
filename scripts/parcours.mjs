@@ -87,7 +87,7 @@ await capture("02b-fond-de-caisse");
 await clic("Enregistrer le fond");
 
 // Table 4 : deux cappuccinos, un spritz, une eau 100 cl, un bubble tea taro + perles.
-await p.locator(".grille-tables .table", { hasText: /^4/ }).click();
+await p.getByRole("button", { name: /^Table 4,/ }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).click();
 await clic("Bubble tea");

@@ -373,6 +373,48 @@ describe("imprimantes de production", () => {
   });
 });
 
+describe("plan de salle", () => {
+  it("enregistre formes, chaises et décor ; refuse une version dépassée et une table supprimée", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const depart = (await appel("GET", "/api/caisse/etat", undefined, a.bearer)).corps as ReponseEtat;
+    expect(depart.etablissement.planVersion).toBe(0);
+    const tables = depart.etablissement.tables.map((t, i) => ({ ...t, forme: "rond", chaises: 4, x: 2 + (i % 6) * 6, y: 2 + Math.floor(i / 6) * 6 }));
+    const zones = [{ nom: "Salle", largeur: 40, hauteur: 24, decor: [{ id: "bar", type: "bar", x: 0, y: 20, largeur: 12, hauteur: 3, libelle: "Bar" }] }];
+    const r = await appel("PUT", "/api/admin/etablissements/moka/plan", { version: 0, zones, tables }, { Cookie: cookie });
+    expect(r.statut).toBe(200);
+    expect(r.corps.etablissement).toMatchObject({ planVersion: 1, zones });
+    expect(r.corps.etablissement.tables[0]).toMatchObject({ forme: "rond", chaises: 4, x: 2, y: 2 });
+
+    // L'iPad d'un responsable modifie le plan qu'il a reçu.
+    const etat = (await appel("GET", "/api/caisse/etat", undefined, a.bearer)).corps as ReponseEtat;
+    const deplacee = etat.etablissement.tables.map((t) => (t.id === "t1" ? { ...t, x: 30, rotation: 90 as const } : t));
+    const c = await appel("PUT", "/api/caisse/plan", { version: etat.etablissement.planVersion, zones, tables: deplacee }, a.bearer);
+    expect(c.statut).toBe(200);
+    expect(c.corps.etablissement.planVersion).toBe(2);
+    // L'administration travaillait sur la version 1 : refus, rien d'écrasé.
+    const conflit = await appel("PUT", "/api/admin/etablissements/moka/plan", { version: 1, zones, tables }, { Cookie: cookie });
+    expect(conflit.statut).toBe(409);
+    expect(conflit.corps.code).toBe("PLAN_MODIFIE");
+
+    const plan = (t: unknown[]) => ({ version: 2, zones, tables: t });
+    const suppression = await appel("PUT", "/api/caisse/plan", plan(deplacee.slice(1)), a.bearer);
+    expect(suppression.statut).toBe(400);
+    expect(suppression.corps.message).toMatch(/masquez-la/);
+    expect((await appel("PUT", "/api/caisse/plan", plan(deplacee.map((t) => ({ ...t, zone: "Cave" }))), a.bearer)).statut).toBe(400);
+    expect((await appel("PUT", "/api/caisse/plan", plan(deplacee.map((t) => ({ ...t, chaises: 99 }))), a.bearer)).statut).toBe(400);
+    expect((await appel("PUT", "/api/caisse/plan", plan(deplacee.map((t) => ({ ...t, nom: "1" }))), a.bearer)).statut).toBe(400);
+    const masquee = await appel("PUT", "/api/caisse/plan", plan(deplacee.map((t) => (t.id === "t2" ? { ...t, masquee: true } : t))), a.bearer);
+    expect(masquee.corps.etablissement.tables.find((t: any) => t.id === "t2").masquee).toBe(true);
+
+    // Modifier l'identité de l'établissement ne touche plus aux tables.
+    await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, tables: [], seuilNote: 2500 }, { Cookie: cookie });
+    const apres = (await appel("GET", "/api/caisse/etat", undefined, a.bearer)).corps as ReponseEtat;
+    expect(apres.etablissement.tables).toHaveLength(12);
+    expect(apres.etablissement.tables[0]).toMatchObject({ x: 30, rotation: 90 });
+  });
+});
+
 describe("archives côté serveur", () => {
   it("exporte l'archive d'une Z depuis la copie du serveur, vérifiable seule", async () => {
     const cookie = await adminConnecte();

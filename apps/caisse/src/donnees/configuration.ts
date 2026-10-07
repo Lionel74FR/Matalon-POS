@@ -1,6 +1,6 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
 import { CARTES, type Catalogue } from "@matalon/catalogue";
-import type { ClientApi, IdentiteEtablissement, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { ClientApi, IdentiteEtablissement, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export type { Role, Table };
 export type Utilisateur = UtilisateurApi;
@@ -40,6 +40,9 @@ export interface Configuration {
   clients?: ClientApi[];
   /** Imprimantes de production de l'établissement : poste de la carte → imprimante. */
   postesProduction?: PostesProduction;
+  /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`) et sa version. */
+  zones?: ZonePlan[];
+  planVersion?: number;
 }
 
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
@@ -61,6 +64,7 @@ export function fusionnerReferentiel(
     // La carte (et son identifiant) ne change qu'une fois la nouvelle carte téléchargée.
     seuilNoteAutomatique: etat.etablissement.seuilNote,
     ...(etat.etablissement.postesProduction ? { postesProduction: etat.etablissement.postesProduction } : {}),
+    ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
 }

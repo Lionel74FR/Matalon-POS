@@ -25,6 +25,9 @@ const dateHeure = (iso: string) =>
 const numero = (n: number) => String(n).padStart(6, "0");
 export const nomTable = (config: Configuration, tableId: string | null) =>
   !tableId || tableId === "comptoir" ? "Comptoir" : `Table ${config.tables.find((t) => t.id === tableId)?.nom ?? tableId}`;
+/** Nom d'une commande : sa table et les tables assemblées (« Table 5 + 6 »). */
+export const nomCommande = (config: Configuration, c: Pick<Commande, "tableId" | "jointes">) =>
+  [nomTable(config, c.tableId), ...(c.jointes ?? []).map((id) => config.tables.find((t) => t.id === id)?.nom ?? id)].join(" + ");
 export const nomUtilisateur = (config: Configuration, id: string | null) =>
   config.utilisateurs.find((u) => u.id === id)?.nom ?? id ?? "";
 
@@ -126,7 +129,7 @@ export function gabaritAddition(commande: Commande, config: Configuration, opera
   const totaux = totauxCommande(commande);
   entete(r, config);
   r.texte("ADDITION", { align: "centre", gras: true });
-  r.colonnes(nomTable(config, commande.tableId), dateHeure(new Date().toISOString()));
+  r.colonnes(nomCommande(config, commande), dateHeure(new Date().toISOString()));
   if (commande.couverts) r.texte(`${commande.couverts} couvert(s) · servi par ${nomUtilisateur(config, operateurId)}`);
   r.filet();
   for (const l of lignesActives(commande)) {
@@ -148,7 +151,7 @@ export function gabaritBon(bon: Bon, commande: Commande, config: Configuration, 
   const r = new Recu();
   if (bon.annulation) r.texte("*** ANNULATION ***", { align: "centre", gras: true, grand: true });
   r.texte(bon.poste.toUpperCase(), { align: "centre", gras: true, grand: !bon.annulation });
-  r.colonnes(nomTable(config, commande.tableId), new Date().toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" }), {
+  r.colonnes(nomCommande(config, commande), new Date().toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" }), {
     gras: true,
     grand: true,
   });

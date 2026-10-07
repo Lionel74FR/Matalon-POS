@@ -43,6 +43,13 @@ export interface Commande {
   additionsImprimees: number;
   /** Note libre sur la commande (« anniversaire, servir le dessert avec une bougie »). */
   note?: string;
+  /** Tables assemblées à celle de la commande pour un groupe : occupées avec elle, libérées avec elle. */
+  jointes?: string[];
+}
+
+/** Tables qu'occupe une commande : la sienne, puis celles qui lui sont assemblées. */
+export function tablesDeCommande(c: Commande): string[] {
+  return [c.tableId, ...(c.jointes ?? [])];
 }
 
 export function nouvelleCommande(tableId: string, operateurId: string, couverts: number | null = null): Commande {
@@ -180,7 +187,9 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
 
 /** Commande déplacée sur une autre table (libre). */
 export function transfererCommande(c: Commande, versTableId: string): Commande {
-  return { ...c, tableId: versTableId };
+  // Le groupe change de place : les tables assemblées restent où elles sont, libres.
+  const { jointes: _, ...reste } = c;
+  return { ...reste, tableId: versTableId };
 }
 
 /**
@@ -196,5 +205,9 @@ export function fusionnerCommandes(cible: Commande, source: Commande): Commande 
     lignes: [...cible.lignes, ...source.lignes],
     additionsImprimees: Math.max(cible.additionsImprimees, source.additionsImprimees),
     ...(notes.length ? { note: notes.join(" · ") } : {}),
+    ...(jointesFusion(cible, source).length ? { jointes: jointesFusion(cible, source) } : {}),
   };
 }
+
+const jointesFusion = (cible: Commande, source: Commande) =>
+  [...new Set([...(cible.jointes ?? []), ...(source.jointes ?? [])])].filter((id) => id !== cible.tableId);

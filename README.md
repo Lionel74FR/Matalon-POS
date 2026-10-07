@@ -62,6 +62,7 @@ URL=… node scripts/journee-hors-ligne.mjs captures # journée entière hors li
 URL=… node scripts/note-et-iphone.mjs captures     # note client et écrans iPhone
 URL=… node scripts/comptes.mjs captures            # vente en compte hors ligne, règlement sur iPhone, annulation du règlement
 URL=… node scripts/production.mjs captures         # bons bar et cuisine : Envoyer, annulation, envoi à l'encaissement (imprimantes simulées)
+URL=… node scripts/plan.mjs captures               # plan de salle dessiné dans l'administration, tables assemblées, retouche sur l'iPad, conflit de version
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

@@ -25,7 +25,10 @@ import {
   CLIENT_ID_VALIDE,
   type ClientApi,
   posteValide,
+  problemePlan,
   type Derniers,
+  type ElementDecor,
+  type ZonePlan,
   type EntreeSynchro,
   type PostesProduction,
   type ReponseComptes,
@@ -111,6 +114,8 @@ interface LigneEtablissement {
   tables: Table[];
   seuil_note: number;
   postes_production: PostesProduction | null;
+  zones: ZonePlan[] | null;
+  plan_version: number | null;
 }
 
 const SELECT_ETABLISSEMENT = `select e.*, c.version as carte_version from etablissements e left join cartes c on c.id = e.carte_id`;
@@ -133,6 +138,8 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     tables: l.tables,
     seuilNote: l.seuil_note,
     postesProduction: l.postes_production ?? {},
+    zones: l.zones ?? [],
+    planVersion: l.plan_version ?? 0,
   };
 }
 
@@ -205,6 +212,67 @@ function lireTables(v: unknown): Table[] {
     const o = (t ?? {}) as Record<string, unknown>;
     return { id: texte(o.id, `tables[${i}].id`, 40), nom: texte(o.nom, `tables[${i}].nom`, 20), zone: texte(o.zone, `tables[${i}].zone`, 40) };
   });
+}
+
+const entier = (v: unknown) => (typeof v === "number" ? v : NaN);
+
+/** Plan reçu : seuls les champs connus sont gardés, le contrôle de fond est `problemePlan`. */
+function lirePlan(corps: Record<string, unknown>): { zones: ZonePlan[]; tables: Table[]; version: number } {
+  if (!Array.isArray(corps.zones) || !Array.isArray(corps.tables) || !Number.isSafeInteger(corps.version)) {
+    throw new ErreurHttp(400, "CHAMP_INVALIDE", "Plan de salle invalide.");
+  }
+  const zones: ZonePlan[] = corps.zones.map((v) => {
+    const z = (v ?? {}) as Record<string, unknown>;
+    const decor = Array.isArray(z.decor) ? z.decor : [];
+    return {
+      nom: typeof z.nom === "string" ? z.nom : "",
+      largeur: entier(z.largeur),
+      hauteur: entier(z.hauteur),
+      decor: decor.map((w): ElementDecor => {
+        const d = (w ?? {}) as Record<string, unknown>;
+        return {
+          id: typeof d.id === "string" ? d.id : "",
+          type: d.type as ElementDecor["type"],
+          x: entier(d.x),
+          y: entier(d.y),
+          largeur: entier(d.largeur),
+          hauteur: entier(d.hauteur),
+          ...(typeof d.libelle === "string" && d.libelle.trim() ? { libelle: d.libelle.trim() } : {}),
+        };
+      }),
+    };
+  });
+  const tables: Table[] = corps.tables.map((v) => {
+    const t = (v ?? {}) as Record<string, unknown>;
+    return {
+      id: typeof t.id === "string" ? t.id : "",
+      nom: typeof t.nom === "string" ? t.nom : "",
+      zone: typeof t.zone === "string" ? t.zone : "",
+      ...(t.forme !== undefined ? { forme: t.forme as Table["forme"] } : {}),
+      ...(t.chaises !== undefined ? { chaises: entier(t.chaises) } : {}),
+      ...(t.x !== undefined || t.y !== undefined ? { x: entier(t.x), y: entier(t.y) } : {}),
+      ...(t.rotation !== undefined ? { rotation: t.rotation as 0 | 90 } : {}),
+      ...(t.masquee === true ? { masquee: true } : {}),
+    };
+  });
+  return { zones, tables, version: corps.version as number };
+}
+
+/** Enregistre le plan de salle si personne ne l'a modifié depuis la version lue. */
+async function majPlan(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
+  const plan = lirePlan(corps);
+  const actuel = await etablissement(env.db, etablissementId);
+  const probleme = problemePlan(plan.zones, plan.tables, actuel.tables);
+  if (probleme) throw new ErreurHttp(400, "PLAN_INVALIDE", probleme);
+  const [maj] = await env.db.requete<{ id: string }>(
+    `update etablissements set tables = $2::jsonb, zones = $3::jsonb, plan_version = plan_version + 1, maj_le = $4
+     where id = $1 and plan_version = $5 returning id`,
+    [etablissementId, JSON.stringify(plan.tables), JSON.stringify(plan.zones), horloge(env).toISOString(), plan.version],
+  );
+  if (!maj) {
+    throw new ErreurHttp(409, "PLAN_MODIFIE", "Le plan a été modifié ailleurs entre-temps : rechargez-le, puis refaites vos changements.");
+  }
+  return etablissement(env.db, etablissementId);
 }
 
 function lireSeuil(v: unknown): number {
@@ -532,7 +600,8 @@ async function majEtablissementCaisse(env: Environnement, requete: Request): Pro
 
 async function majEtablissement(env: Environnement, id: string, corps: Record<string, unknown>, creation: boolean) {
   const identite = lireIdentite(corps.identite);
-  const tables = lireTables(corps.tables ?? []);
+  // Les tables ne se créent qu'avec l'établissement ; ensuite, elles passent par le plan de salle.
+  const tables = creation ? lireTables(corps.tables ?? []) : [];
   const seuil = lireSeuil(corps.seuilNote ?? 2500);
   const maintenant = horloge(env).toISOString();
   const valeurs = [
@@ -561,9 +630,9 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
   } else {
     const [maj] = await env.db.requete<{ id: string }>(
       `update etablissements set enseigne = $2, raison_sociale = $3, adresse = $4, code_postal_ville = $5, telephone = $6,
-         siret = $7, tva_intracom = $8, tables = $9::jsonb, seuil_note = $10, maj_le = $11, mentions_legales = coalesce($12, mentions_legales)
+         siret = $7, tva_intracom = $8, seuil_note = $9, maj_le = $10, mentions_legales = coalesce($11, mentions_legales)
        where id = $1 returning id`,
-      valeurs,
+      valeurs.filter((_, i) => i !== 8),
     );
     if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
     if (corps.carteId !== undefined) {
@@ -1068,6 +1137,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
     if (chemin === "/api/caisse/comptes" && m === "GET") return await comptesCaisse(env, requete);
     if (chemin === "/api/caisse/clients" && m === "PUT") return await majClientCaisse(env, requete);
+    if (chemin === "/api/caisse/plan" && m === "PUT") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { etablissement: await majPlan(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
+    }
     if (chemin === "/api/caisse/postes" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
       return json(200, { etablissement: await majPostes(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
@@ -1094,6 +1167,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "POST") return await enregistrerUtilisateurAdmin(env, requete, admin, p[1]!);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/comptes$/.exec(chemin);
       if (p && m === "GET") return json(200, await comptes(env, (await etablissement(env.db, p[1]!)).id));
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/plan$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await majPlan(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
+        await journaliserAdmin(env, admin.id, "plan_salle", { etablissement: e.id, version: e.planVersion ?? 0, tables: e.tables.length });
+        return json(200, { etablissement: e });
+      }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/postes$/.exec(chemin);
       if (p && m === "PUT") {
         const e = await majPostes(env, p[1]!, await lireJson<Record<string, unknown>>(requete));

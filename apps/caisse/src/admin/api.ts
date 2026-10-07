@@ -1,5 +1,5 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi } from "@matalon/serveur/partage";
+import type { ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -73,7 +73,7 @@ export const api = {
   etablissements: () => appel<{ etablissements: EtablissementAdmin[]; cartes: Array<{ id: string; nom: string }> }>("GET", "/etablissements"),
   creerEtablissement: (corps: { id: string; identite: Partial<IdentiteEtablissement>; carteId: string; tables: Table[]; seuilNote: number }) =>
     appel("POST", "/etablissements", corps),
-  modifierEtablissement: (id: string, corps: { identite: IdentiteEtablissement; carteId: string; tables: Table[]; seuilNote: number }) =>
+  modifierEtablissement: (id: string, corps: { identite: IdentiteEtablissement; carteId: string; seuilNote: number }) =>
     appel("PUT", `/etablissements/${id}`, corps),
   enregistrerUtilisateur: (etablissementId: string, corps: { id?: string; nom: string; role: Role; pin?: string; actif: boolean }) =>
     appel("POST", `/etablissements/${etablissementId}/utilisateurs`, corps),
@@ -85,6 +85,8 @@ export const api = {
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),
   enregistrerCarte: (id: string, carte: Catalogue, version: number) => appel<ReponseCarte>("PUT", `/cartes/${id}`, { carte, version }),
   creerCarte: (corps: { id: string; nom: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
+  enregistrerPlan: (etablissementId: string, plan: { zones: ZonePlan[]; tables: Table[]; version: number }) =>
+    appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/plan`, plan),
   enregistrerPostes: (etablissementId: string, postes: PostesProduction) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/postes`, { postes }),
   comptes: (etablissementId: string) => appel<ReponseComptes>("GET", `/etablissements/${etablissementId}/comptes`),

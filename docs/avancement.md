@@ -24,6 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
 | 3857124 | Imprimantes de production : poste par catégorie dans l'éditeur de carte, imprimante par poste (Réglages de la caisse et administration, bon d'essai), bouton « Envoyer (n) », envoi d'office à l'encaissement, bon d'annulation au retrait d'un article envoyé, formules réparties entre postes |
 | d4f1939 | Cartes : fusion de deux catégories au même taux de TVA |
 | e81d18c | Comptes clients (noyau 0.5.0) : vente en compte (mode EN_COMPTE, client scellé, accord responsable), règlement sur n'importe quel appareil (ticket REGLEMENT, TVA exigible au règlement par tranches exactes), annulation d'un règlement, soldes recalculés par le serveur, page Comptes, section admin, Z avec ventes en compte, règlements et TVA exigible, mentions de facture « reste dû » |
@@ -42,6 +43,7 @@ Dernière mise à jour : 6 octobre 2026.
 - La carte vient du serveur (`/api/caisse/carte`) ; `carteDe(config)` tombe sur la carte livrée avec le code seulement avant la première réception.
 - Une divergence de synchronisation est signalée mais ne bloque pas l'encaissement. L'encaissement est bloqué si l'iPad est révoqué ou si son horloge s'écarte de plus de 5 min.
 - Bons de production : hors périmètre fiscal (rien au registre, sauf `apresEnvoi` sur `SUPPRESSION_LIGNE`). Sans aucune imprimante de production réglée, la fonction est invisible. Une ligne envoyée ne se regroupe plus avec un nouvel article identique ; augmenter sa quantité crée une ligne à envoyer. Un bon en échec laisse toute la ligne à envoyer (un doublon en cuisine plutôt qu'un oubli).
+- Plan de salle : les tables ne changent plus que par la route du plan (`PUT …/plan`, avec `version` : 409 si le plan a bougé ailleurs) ; la mise à jour de l'établissement les ignore. Une table n'est jamais supprimée (`masquee`). Positions en cases de 25 cm (`CASE_CM`) ; une table sans position est placée d'office, et l'enregistrement fige toutes les positions. Tables assemblées : `Commande.jointes` (hors fiscal) ; le ticket ne porte que la table principale.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -59,4 +61,4 @@ Dernière mise à jour : 6 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 6 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 7 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

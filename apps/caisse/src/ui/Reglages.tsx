@@ -7,7 +7,6 @@ import type { PostesProduction } from "@matalon/serveur/partage";
 import { useEffect, useState } from "react";
 import {
   carteDe,
-  genererTables,
   hacherPin,
   identifiantAleatoire,
   type Configuration,
@@ -35,7 +34,7 @@ const CHAMPS: Array<[keyof Etablissement, string]> = [
 ];
 
 /** Message lisible pour une modification refusée ou impossible hors ligne. */
-function messageServeur(e: unknown): string {
+export function messageServeur(e: unknown): string {
   if (e instanceof ErreurApi && e.code === "HORS_LIGNE") {
     return "Connexion Internet nécessaire : l'établissement et l'équipe sont partagés par toutes les caisses du groupe.";
   }
@@ -49,8 +48,6 @@ export function Reglages(props: { onAssistant: () => void }) {
   const [etablissement, setEtablissement] = useState(config.etablissement);
   const [imprimante, setImprimante] = useState(config.imprimante);
   const [seuil, setSeuil] = useState(config.seuilNoteAutomatique / 100);
-  const [salle, setSalle] = useState(config.tables.filter((t) => t.zone === "Salle").length);
-  const [terrasse, setTerrasse] = useState(config.tables.filter((t) => t.zone === "Terrasse").length);
   const [nouveau, setNouveau] = useState<{ nom: string; role: Role; pin: string }>({ nom: "", role: "serveur", pin: "" });
   const [persistant, setPersistant] = useState<boolean | null>(null);
 
@@ -59,17 +56,15 @@ export function Reglages(props: { onAssistant: () => void }) {
   }, []);
 
   const enregistrer = async () => {
-    const tables = [...genererTables(salle, terrasse), ...config.tables.filter((t) => t.zone !== "Salle" && t.zone !== "Terrasse")];
     const seuilNote = Math.round(seuil * 100);
     let suivante: Configuration = { ...config, imprimante: { ...imprimante, adresse: imprimante.adresse.trim() } };
     const partageModifie =
-      JSON.stringify([etablissement, tables, seuilNote]) !== JSON.stringify([config.etablissement, config.tables, config.seuilNoteAutomatique]);
+      JSON.stringify([etablissement, seuilNote]) !== JSON.stringify([config.etablissement, config.seuilNoteAutomatique]);
     setEnvoi(true);
     try {
       if (partageModifie) {
         const { etablissement: e } = await caisse.client.enregistrerEtablissement({
           identite: { ...etablissement, siret: etablissement.siret.replace(/\s/g, "") },
-          tables,
           seuilNote,
         });
         // La carte suit sa propre mise à jour (téléchargement à la synchronisation).
@@ -219,17 +214,6 @@ export function Reglages(props: { onAssistant: () => void }) {
             />
           </fieldset>
 
-          <fieldset>
-            <legend>Salle</legend>
-            <label className="champ">
-              <span>Tables en salle</span>
-              <input type="number" min={0} max={60} value={salle} onChange={(e) => setSalle(Number(e.target.value))} />
-            </label>
-            <label className="champ">
-              <span>Tables en terrasse</span>
-              <input type="number" min={0} max={60} value={terrasse} onChange={(e) => setTerrasse(Number(e.target.value))} />
-            </label>
-          </fieldset>
         </div>
       </div>
 

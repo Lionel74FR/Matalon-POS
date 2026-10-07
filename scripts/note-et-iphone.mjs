@@ -43,8 +43,13 @@ await capture("m02b-fond");
 await clic("Plus tard");
 await capture("m03-salle");
 largeurs.salle = await debordement();
+// Plan de salle sur iPhone, puis la liste en un toucher.
+await p.getByRole("button", { name: "Afficher la liste des tables" }).click();
+await capture("m03b-salle-liste");
+largeurs.salleListe = await debordement();
+await p.getByRole("button", { name: "Afficher le plan de salle" }).click();
 
-await p.locator(".grille-tables .table", { hasText: /^2/ }).click();
+await p.getByRole("button", { name: /^Table 2,/ }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).click();
 await p.getByRole("tab", { name: "Bar", exact: true }).click();

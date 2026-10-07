@@ -1,10 +1,11 @@
 import { afficherCode, ID_ETABLISSEMENT_VALIDE, PIN_VALIDE, type IdentiteEtablissement, type Role, type UtilisateurApi } from "@matalon/serveur/partage";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { genererTables } from "../donnees/configuration";
 import type { ClientApi, PostesProduction, ReponseComptes, ResumeCarte } from "@matalon/serveur/partage";
 import { postesDeLaCarte } from "@matalon/catalogue";
 import { EditeurPostes } from "../ui/EditeurPostes";
+import { EditeurPlan } from "../ui/EditeurPlan";
 import { nouvelIdClient } from "../donnees/clients";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
@@ -15,6 +16,7 @@ import {
   FileJson,
   FileSpreadsheet,
   KeyRound,
+  LayoutGrid,
   NotebookPen,
   Pencil,
   LogIn,
@@ -500,6 +502,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
       <Caisses caisses={e.caisses} onChange={props.onChange} />
       <Equipe e={e} onChange={props.onChange} />
+      <PlanDeSalle e={e} onChange={props.onChange} />
       <ImprimantesProduction e={e} onChange={props.onChange} />
       <ComptesClients etablissementId={e.id} />
       <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
@@ -798,6 +801,30 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
 }
 
 /** Comptes clients (ardoises) : soldes recalculés par le serveur sur toutes les caisses, fiches clients. */
+/** Plan de salle : tables (forme, chaises, place) et repères, zone par zone. */
+function PlanDeSalle(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
+  const { e } = props;
+  const plan = useMemo(() => ({ zones: e.zones ?? [], tables: e.tables, version: e.planVersion ?? 0 }), [e.zones, e.tables, e.planVersion]);
+  const [ok, setOk] = useState(false);
+  return (
+    <section className="admin-section">
+      <Titre icone={LayoutGrid}>Plan de salle</Titre>
+      <p className="explication">
+        Ajoutez les tables (carré, rectangle, rond), réglez leurs chaises et glissez-les à leur place ; bar, porte et murs servent de
+        repères. Grille de 25 cm. Un responsable peut aussi modifier le plan depuis l'iPad. {ok && <span className="admin-ok">Plan enregistré.</span>}
+      </p>
+      <EditeurPlan
+        plan={plan}
+        onEnregistrer={async (p) => {
+          await api.enregistrerPlan(e.id, p);
+          setOk(true);
+          await props.onChange();
+        }}
+      />
+    </section>
+  );
+}
+
 /** Postes de production de la carte de l'établissement → imprimantes de son réseau. */
 function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
   const [postesCarte, setPostesCarte] = useState<string[] | null>(null);
@@ -911,8 +938,6 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
   const [identite, setIdentite] = useState(e.identite);
   const [carteId, setCarteId] = useState(e.carteId);
   const [seuil, setSeuil] = useState(e.seuilNote / 100);
-  const [salle, setSalle] = useState(e.tables.filter((t) => t.zone === "Salle").length);
-  const [terrasse, setTerrasse] = useState(e.tables.filter((t) => t.zone === "Terrasse").length);
   const [enregistre, setEnregistre] = useState(false);
   const { enCours, erreur, envoyer } = useEnvoi();
 
@@ -920,11 +945,9 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
     ev.preventDefault();
     setEnregistre(false);
     void envoyer(async () => {
-      const autres = e.tables.filter((t) => t.zone !== "Salle" && t.zone !== "Terrasse");
       await api.modifierEtablissement(e.id, {
         identite: { ...identite, siret: identite.siret.replace(/\s/g, "") },
         carteId,
-        tables: [...genererTables(salle, terrasse), ...autres],
         seuilNote: Math.round(seuil * 100),
       });
       setEnregistre(true);
@@ -934,7 +957,7 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
 
   return (
     <form className="admin-section" onSubmit={enregistrer}>
-      <Titre icone={Store}>Identité, carte et salle</Titre>
+      <Titre icone={Store}>Identité et carte</Titre>
       <div className="formulaire-colonnes">
         <div>
           {CHAMPS_IDENTITE.map(([cle, libelle, aide]) => (
@@ -952,12 +975,6 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
                 </option>
               ))}
             </select>
-          </Champ>
-          <Champ libelle="Tables en salle">
-            <input type="number" min={0} max={60} value={salle} onChange={(ev) => setSalle(Number(ev.target.value))} />
-          </Champ>
-          <Champ libelle="Tables en terrasse">
-            <input type="number" min={0} max={60} value={terrasse} onChange={(ev) => setTerrasse(Number(ev.target.value))} />
           </Champ>
           <Champ libelle="Note imprimée d'office à partir de (€)" aide={`Actuellement ${euros(e.seuilNote)}`}>
             <input type="number" min={0} step={1} value={seuil} onChange={(ev) => setSeuil(Number(ev.target.value))} />

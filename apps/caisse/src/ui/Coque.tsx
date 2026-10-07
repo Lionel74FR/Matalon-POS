@@ -15,11 +15,19 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { ID_COMPTOIR } from "../donnees/configuration";
-import { commandeAGarder, fusionnerCommandes, nouvelleCommande, totauxCommande, transfererCommande, type Commande } from "../metier/commande";
-import { nomTable } from "../impression/gabarits";
+import {
+  commandeAGarder,
+  fusionnerCommandes,
+  nouvelleCommande,
+  tablesDeCommande,
+  totauxCommande,
+  transfererCommande,
+  type Commande,
+} from "../metier/commande";
+import { nomCommande, nomTable } from "../impression/gabarits";
 import { MODE_TEST } from "../fiscal/caisse";
 import type { EtatSynchro } from "../serveur/synchro";
 import { etatJournee } from "../metier/tresorerie";
@@ -147,11 +155,20 @@ export function Coque() {
     [enregistrerCommande],
   );
 
-  const ouvrirTable = (tableId: string) => setVue({ nom: "commande", tableId });
+  /** Table occupée → table de sa commande (une table assemblée renvoie à la table principale). */
+  const occupation = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of commandes.values()) for (const id of tablesDeCommande(c)) if (!m.has(id)) m.set(id, c.tableId);
+    return m;
+  }, [commandes]);
+
+  const ouvrirTable = (tableId: string) => setVue({ nom: "commande", tableId: occupation.get(tableId) ?? tableId });
 
   /** Déplace une commande ouverte vers une autre table, ou la regroupe avec celle qui s'y trouve. */
-  const transferer = async (de: string, vers: string) => {
+  const transferer = async (de: string, versChoisie: string) => {
     const source = commandes.get(de);
+    // Une table assemblée à une autre commande regroupe sur la table principale de celle-ci.
+    const vers = occupation.get(versChoisie) ?? versChoisie;
     if (!source || de === vers) return;
     const cible = commandes.get(vers);
     const resultat = cible ? fusionnerCommandes(cible, source) : transfererCommande(source, vers);
@@ -274,9 +291,10 @@ export function Coque() {
         {vue.nom === "commande" && (
           <PriseCommande
             key={vue.tableId}
-            titre={nomTable(config, vue.tableId)}
+            titre={nomCommande(config, commandes.get(vue.tableId) ?? { tableId: vue.tableId })}
             commande={commandes.get(vue.tableId) ?? nouvelleCommande(vue.tableId, utilisateur.id)}
-            tablesOuvertes={new Set(commandes.keys())}
+            tablesOuvertes={new Set(occupation.keys())}
+            occupeesAilleurs={new Set([...occupation].filter(([, principale]) => principale !== vue.tableId).map(([id]) => id))}
             onTransferer={(vers) => void transferer(vue.tableId, vers)}
             onChange={(c) => void enregistrerCommande(c, vue.tableId)}
             onMaj={(f) => majCommande(vue.tableId, f)}

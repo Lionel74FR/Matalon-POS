@@ -120,6 +120,7 @@ export async function rattacher(
     imprimante: { adresse: "", sansAccents: false },
     seuilNoteAutomatique: r.etablissement.seuilNote,
     ...(r.etablissement.postesProduction ? { postesProduction: r.etablissement.postesProduction } : {}),
+    ...(r.etablissement.zones ? { zones: r.etablissement.zones, planVersion: r.etablissement.planVersion ?? 0 } : {}),
   };
   const connexion: ConnexionServeur = {
     jeton: r.jeton,

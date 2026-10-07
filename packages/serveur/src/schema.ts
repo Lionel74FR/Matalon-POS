@@ -25,6 +25,9 @@ export const MIGRATIONS: string[] = [
   `alter table etablissements add column if not exists mentions_legales text not null default ''`,
   // Imprimantes de production : poste de la carte (« Bar », « Cuisine »…) → imprimante de l'établissement.
   `alter table etablissements add column if not exists postes_production jsonb not null default '{}'::jsonb`,
+  // Plan de salle : zones dimensionnées et décor ; la version refuse d'écraser une modification faite ailleurs.
+  `alter table etablissements add column if not exists zones jsonb not null default '[]'::jsonb`,
+  `alter table etablissements add column if not exists plan_version integer not null default 0`,
   `create table if not exists utilisateurs (
     id text primary key,
     etablissement_id text not null references etablissements(id),

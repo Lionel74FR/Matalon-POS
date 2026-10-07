@@ -33,7 +33,7 @@ async function appareil(nom, options, codeRattachement, libelleRattacher) {
 // ── iPad : table 5, partie sans payer, hors ligne ──
 const ipad = await appareil("iPad", { viewport: { width: 1180, height: 820 }, hasTouch: true }, code, "Rattacher l'iPad");
 await ipad.ctx.setOffline(true);
-await ipad.p.locator(".grille-tables .table", { hasText: /^5/ }).click();
+await ipad.p.getByRole("button", { name: /^Table 5,/ }).click();
 await ipad.p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await ipad.p.getByRole("tab", { name: "Bar", exact: true }).click();
 await ipad.clic("Spritz");

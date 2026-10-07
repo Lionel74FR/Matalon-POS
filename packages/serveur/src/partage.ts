@@ -23,6 +23,99 @@ export interface Table {
   id: string;
   nom: string;
   zone: string;
+  /** Plan de salle (depuis le plan) : forme, chaises, position et rotation sur la grille de la zone. */
+  forme?: FormeTable;
+  chaises?: number;
+  /** Coin haut-gauche, en cases de la grille (CASE_CM). Absent : placée d'office. */
+  x?: number;
+  y?: number;
+  rotation?: 0 | 90;
+  /** Une table n'est jamais supprimée (les tickets la citent) : elle est masquée. */
+  masquee?: boolean;
+}
+
+export type FormeTable = "carre" | "rectangle" | "rond";
+
+/** Pas de la grille du plan de salle, en centimètres. */
+export const CASE_CM = 25;
+
+/** Repère non cliquable du plan (bar, porte, mur). */
+export interface ElementDecor {
+  id: string;
+  type: "bar" | "porte" | "mur";
+  x: number;
+  y: number;
+  largeur: number;
+  hauteur: number;
+  libelle?: string;
+}
+
+/** Espace du plan de salle (« Salle », « Terrasse ») : dimensions en cases, décor. */
+export interface ZonePlan {
+  nom: string;
+  largeur: number;
+  hauteur: number;
+  decor: ElementDecor[];
+}
+
+export interface PlanSalle {
+  zones: ZonePlan[];
+  tables: Table[];
+  /** Incrémentée à chaque enregistrement : une modification faite ailleurs entre-temps est refusée. */
+  version: number;
+}
+
+export const ID_PLAN_VALIDE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/**
+ * Contrôle d'un plan reçu ; renvoie le premier problème, ou null. Partagé par
+ * le serveur (qui refuse) et l'éditeur (qui prévient avant d'envoyer).
+ * `anciennes` : tables déjà enregistrées, qui ne peuvent pas disparaître.
+ */
+export function problemePlan(zones: ZonePlan[], tables: Table[], anciennes: Table[] = []): string | null {
+  if (zones.length > 10) return "10 zones au plus.";
+  if (tables.length > 200) return "200 tables au plus.";
+  const nomsZones = new Set<string>();
+  for (const z of zones) {
+    if (!z.nom || z.nom.length > 40 || z.nom.trim() !== z.nom) return "Nom de zone invalide.";
+    if (nomsZones.has(z.nom)) return `Deux zones s'appellent « ${z.nom} ».`;
+    nomsZones.add(z.nom);
+    if (![z.largeur, z.hauteur].every((v) => Number.isInteger(v) && v >= 8 && v <= 200)) return `${z.nom} : dimensions invalides.`;
+    if (z.decor.length > 60) return `${z.nom} : 60 éléments de décor au plus.`;
+    const ids = new Set<string>();
+    for (const d of z.decor) {
+      if (!ID_PLAN_VALIDE.test(d.id) || ids.has(d.id)) return `${z.nom} : élément de décor mal identifié.`;
+      ids.add(d.id);
+      if (!["bar", "porte", "mur"].includes(d.type)) return `${z.nom} : type de décor inconnu.`;
+      if (![d.x, d.y].every((v) => Number.isInteger(v) && v >= 0 && v <= 200)) return `${z.nom} : décor mal placé.`;
+      if (![d.largeur, d.hauteur].every((v) => Number.isInteger(v) && v >= 1 && v <= 200)) return `${z.nom} : décor mal dimensionné.`;
+      if (d.libelle !== undefined && (typeof d.libelle !== "string" || d.libelle.length > 30)) return `${z.nom} : libellé de décor trop long.`;
+    }
+  }
+  const ids = new Set<string>();
+  const noms = new Map<string, string>();
+  for (const t of tables) {
+    if (!ID_PLAN_VALIDE.test(t.id) || ids.has(t.id)) return `Table « ${t.nom} » mal identifiée.`;
+    ids.add(t.id);
+    if (!t.nom || t.nom.length > 20 || t.nom.trim() !== t.nom) return "Nom de table invalide (20 caractères au plus).";
+    if (!t.zone || t.zone.length > 40 || (zones.length && !nomsZones.has(t.zone))) return `Table ${t.nom} : zone inconnue.`;
+    if (!t.masquee) {
+      const cle = t.nom.toLowerCase();
+      if (noms.has(cle)) return `Deux tables s'appellent « ${t.nom} ».`;
+      noms.set(cle, t.id);
+    }
+    if (t.forme !== undefined && !["carre", "rectangle", "rond"].includes(t.forme)) return `Table ${t.nom} : forme inconnue.`;
+    if (t.chaises !== undefined && !(Number.isInteger(t.chaises) && t.chaises >= 0 && t.chaises <= 20)) return `Table ${t.nom} : 0 à 20 chaises.`;
+    if ((t.x === undefined) !== (t.y === undefined)) return `Table ${t.nom} : position incomplète.`;
+    if (t.x !== undefined && ![t.x, t.y].every((v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 200)) {
+      return `Table ${t.nom} : position invalide.`;
+    }
+    if (t.rotation !== undefined && t.rotation !== 0 && t.rotation !== 90) return `Table ${t.nom} : rotation invalide.`;
+    if (t.masquee !== undefined && typeof t.masquee !== "boolean") return `Table ${t.nom} : état invalide.`;
+  }
+  const disparue = anciennes.find((a) => !ids.has(a.id));
+  if (disparue) return `La table ${disparue.nom} ne peut pas être supprimée (les tickets la citent) : masquez-la.`;
+  return null;
 }
 
 export interface EtablissementApi {
@@ -36,6 +129,9 @@ export interface EtablissementApi {
   seuilNote: number;
   /** Imprimantes de production : poste de la carte → imprimante Epson du réseau de l'établissement. */
   postesProduction?: PostesProduction;
+  /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`). */
+  zones?: ZonePlan[];
+  planVersion?: number;
 }
 
 export type PostesProduction = Record<string, { adresse: string; sansAccents: boolean }>;

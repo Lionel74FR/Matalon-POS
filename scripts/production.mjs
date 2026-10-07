@@ -53,7 +53,7 @@ await clic("Plus tard");
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 
 // ── Sans imprimante de production, pas de bouton Envoyer ──
-await p.locator(".grille-tables .table", { hasText: /^5/ }).click();
+await p.getByRole("button", { name: /^Table 5,/ }).click();
 const envoyerAvant = await p.getByRole("button", { name: /^Envoy/ }).count();
 await p.getByRole("button", { name: "Retour à la salle" }).click();
 
@@ -70,7 +70,7 @@ const essai = recus.at(-1);
 
 // ── Table 5 : envoi par poste ──
 await p.getByRole("tab", { name: "Salle" }).click();
-await p.locator(".grille-tables .table", { hasText: /^5/ }).click();
+await p.getByRole("button", { name: /^Table 5,/ }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await p.getByRole("tab", { name: "Cuisine", exact: true }).click();

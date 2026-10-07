@@ -11,6 +11,7 @@ import type {
   ReponseSynchro,
   Table,
   UtilisateurApi,
+  ZonePlan,
 } from "@matalon/serveur/partage";
 
 /** Erreur renvoyée par le serveur, ou `HORS_LIGNE` quand il n'a pas pu être joint. */
@@ -93,6 +94,10 @@ export class ClientApi {
     return this.appel<{ client: FicheClient; clients: FicheClient[] }>("PUT", "/api/caisse/clients", client);
   }
 
+  enregistrerPlan(plan: { zones: ZonePlan[]; tables: Table[]; version: number }) {
+    return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/plan", plan);
+  }
+
   enregistrerPostes(postes: PostesProduction) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/postes", { postes });
   }
@@ -101,7 +106,7 @@ export class ClientApi {
     return this.appel<{ utilisateurs: UtilisateurApi[] }>("PUT", "/api/caisse/utilisateurs", { utilisateurs });
   }
 
-  enregistrerEtablissement(corps: { identite: IdentiteEtablissement; tables: Table[]; seuilNote: number }) {
+  enregistrerEtablissement(corps: { identite: IdentiteEtablissement; seuilNote: number }) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/etablissement", corps);
   }
 }

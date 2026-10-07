@@ -696,6 +696,20 @@ code {
   color: var(--sable);
 }
 
+.salle-outils {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Plan de salle : défile quand il est zoomé (iPhone). */
+.plan-defilant {
+  margin-top: 14px;
+  overflow: auto;
+  border-radius: var(--rayon);
+  -webkit-overflow-scrolling: touch;
+}
+
 .zone h2 {
   margin: 22px 0 10px;
   color: var(--sable);

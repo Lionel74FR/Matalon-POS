@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, DoorOpen, Printer, Send, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, StickyNote, Users } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
@@ -13,7 +13,7 @@ import { ModaleArticle } from "./modales/ModaleArticle";
 import { ModaleCouverts } from "./modales/ModaleCouverts";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
 import { ModaleLigne } from "./modales/ModaleLigne";
-import { ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
+import { ModaleAssembler, ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
 import { productionActive, useEnvoiProduction } from "./production";
 
 const TEINTES: Record<string, string> = {
@@ -29,8 +29,10 @@ const TEINTES: Record<string, string> = {
 interface ProprietesCommande {
   titre: string;
   commande: Commande;
-  /** Tables déjà ouvertes, pour le transfert. */
+  /** Tables déjà ouvertes (assemblées comprises), pour le transfert. */
   tablesOuvertes: Set<string>;
+  /** Tables occupées par d'autres commandes, pour l'assemblage. */
+  occupeesAilleurs: Set<string>;
   onTransferer: (versTableId: string) => void;
   onChange: (c: Commande) => void;
   /** Mise à jour appliquée à la dernière version de la commande (après une impression). */
@@ -74,6 +76,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const [encaissement, setEncaissement] = useState(false);
   const [transfertOuvert, setTransfertOuvert] = useState(false);
   const [noteOuverte, setNoteOuverte] = useState(false);
+  const [assemblageOuvert, setAssemblageOuvert] = useState(false);
   /** Sur téléphone, la commande s'ouvre par-dessus la carte. */
   const [ticketOuvert, setTicketOuvert] = useState(false);
   const totaux = totauxCommande(c);
@@ -134,6 +137,9 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           </div>
           <div className="ticket-outils">
             <BoutonIcone icone={StickyNote} variante="discret" libelle="Note sur la commande" onClick={() => setNoteOuverte(true)} />
+            {!estComptoir && (
+              <BoutonIcone icone={Link2} variante="discret" libelle="Assembler des tables" onClick={() => setAssemblageOuvert(true)} />
+            )}
             <BoutonIcone icone={ArrowRightLeft} variante="discret" libelle="Transférer vers une autre table" disabled={!commandeAGarder(c)} onClick={() => setTransfertOuvert(true)} />
           </div>
           <button className="bouton fermer-mobile" onClick={() => setTicketOuvert(false)}>
@@ -289,11 +295,25 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         <ModaleTransfert
           depuis={c.tableId}
           tablesOuvertes={props.tablesOuvertes}
+          {...(c.jointes ? { jointes: c.jointes } : {})}
           onChoisir={(t) => {
             setTransfertOuvert(false);
             props.onTransferer(t);
           }}
           onFermer={() => setTransfertOuvert(false)}
+        />
+      )}
+      {assemblageOuvert && (
+        <ModaleAssembler
+          tableId={c.tableId}
+          jointes={c.jointes ?? []}
+          occupees={props.occupeesAilleurs}
+          onValider={(jointes) => {
+            const { jointes: _, ...reste } = c;
+            props.onChange(jointes.length ? { ...reste, jointes } : reste);
+            setAssemblageOuvert(false);
+          }}
+          onFermer={() => setAssemblageOuvert(false)}
         />
       )}
       {noteOuverte && (

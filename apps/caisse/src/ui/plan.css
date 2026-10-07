@@ -1,0 +1,242 @@
+/* Plan de salle (SVG en cases de 25 cm) : caisse et éditeurs. */
+.plan-salle {
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  font-family: var(--police-chiffres);
+}
+
+.plan-salle.edition {
+  touch-action: none;
+}
+
+.plan-sol {
+  fill: var(--espresso-2, #3a2a22);
+  stroke: var(--espresso-3, #4d392e);
+  stroke-width: 0.12;
+}
+
+.plan-grille line {
+  stroke: rgba(233, 220, 203, 0.07);
+  stroke-width: 0.04;
+}
+
+.plan-grille line.metre {
+  stroke: rgba(233, 220, 203, 0.16);
+}
+
+.plan-decor rect {
+  fill: #5a463a;
+  stroke: #6e5747;
+  stroke-width: 0.08;
+}
+
+.plan-decor.bar rect {
+  fill: #6b4a35;
+}
+
+.plan-decor.porte rect {
+  fill: none;
+  stroke: var(--sable, #bfa98f);
+  stroke-dasharray: 0.4 0.25;
+  stroke-width: 0.14;
+}
+
+.plan-decor.mur rect {
+  fill: #9a8673;
+  stroke: none;
+}
+
+.plan-libelle-decor {
+  fill: var(--mousse, #e9dccb);
+  font-size: 0.8px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.edition .plan-decor,
+.edition .plan-table {
+  cursor: grab;
+}
+
+.plan-table {
+  cursor: pointer;
+  outline: none;
+}
+
+.plan-chaise {
+  fill: #7d6a5a;
+}
+
+.plan-plateau {
+  fill: var(--papier, #f7eee3);
+  stroke: #d8c8b4;
+  stroke-width: 0.1;
+}
+
+.plan-nom {
+  fill: var(--encre, #2b1e18);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.plan-info {
+  fill: var(--encre, #2b1e18);
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.plan-table.occupee .plan-plateau,
+.plan-table.jointe .plan-plateau {
+  fill: var(--terre, #c0562e);
+  stroke: var(--terre-fonce, #9e4220);
+}
+
+.plan-table.addition .plan-plateau {
+  fill: #d9a441;
+  stroke: #b8852a;
+}
+
+.plan-table.occupee .plan-nom,
+.plan-table.occupee .plan-info,
+.plan-table.jointe .plan-nom,
+.plan-table.jointe .plan-info {
+  fill: #fff;
+}
+
+.plan-table.occupee .plan-chaise,
+.plan-table.addition .plan-chaise,
+.plan-table.jointe .plan-chaise {
+  fill: #a8836a;
+}
+
+.plan-table.alerte .plan-plateau {
+  stroke: #ffd36b;
+  stroke-width: 0.25;
+}
+
+.plan-table.choisi .plan-plateau,
+.plan-decor.choisi rect,
+.plan-table:focus-visible .plan-plateau {
+  stroke: #7fc4ff;
+  stroke-width: 0.28;
+}
+
+.plan-table.conflit .plan-plateau {
+  stroke: var(--rouge, #c2412d);
+  stroke-width: 0.28;
+  stroke-dasharray: 0.5 0.3;
+}
+
+.plan-lien {
+  stroke: var(--terre, #c0562e);
+  stroke-width: 0.35;
+  stroke-linecap: round;
+  stroke-dasharray: 0.1 0.6;
+}
+
+/* Éditeur du plan (administration et iPad). */
+.editeur-plan {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.editeur-plan-tete {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.onglets-zones,
+.editeur-plan-actions,
+.outils-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.nouvelle-zone {
+  display: flex;
+  gap: 6px;
+}
+
+.nouvelle-zone input,
+.editeur-plan-panneau input {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit, 8px);
+  border: 2px solid var(--espresso-3, #4d392e);
+  background: var(--espresso, #2b1e18);
+  color: var(--mousse, #e9dccb);
+}
+
+.outils-plan .separateur {
+  width: 1px;
+  align-self: stretch;
+  background: var(--espresso-3, #4d392e);
+  margin: 0 4px;
+}
+
+.editeur-plan-corps {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.editeur-plan-zone {
+  min-width: 0;
+  overflow: auto;
+  border-radius: var(--rayon, 14px);
+}
+
+.editeur-plan-panneau {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--rayon, 14px);
+  background: var(--espresso-2, #3a2a22);
+}
+
+.editeur-plan-panneau h3 {
+  margin: 0;
+}
+
+.editeur-plan-panneau .champ {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.editeur-plan-panneau .quantite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tables-masquees summary {
+  cursor: pointer;
+  color: var(--sable, #bfa98f);
+  margin-bottom: 6px;
+}
+
+.tables-masquees {
+  display: grid;
+  gap: 4px;
+}
+
+@media (max-width: 900px) {
+  .editeur-plan-corps {
+    grid-template-columns: 1fr;
+  }
+}
