@@ -117,7 +117,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
   const liens: Array<[string, string]> = occupees.flatMap((c) => (c.jointes ?? []).map((j): [string, string] => [c.tableId, j]));
 
   return (
-    <div className="salle">
+    <div className={`salle${vue === "plan" ? " avec-plan" : ""}`}>
       <header className="salle-tete">
         <h1>Salle</h1>
         <p>
@@ -164,7 +164,15 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
             </div>
           )}
           <div className="plan-defilant">
-            <PlanSalle zone={zone} tables={placees} etats={etats} liens={liens} onTable={props.onOuvrir} {...(ZOOMS[zoom]! > 1 ? { zoom: ZOOMS[zoom]! } : {})} />
+            <PlanSalle
+              zone={zone}
+              tables={placees}
+              etats={etats}
+              liens={liens}
+              onTable={props.onOuvrir}
+              ajuste
+              {...(ZOOMS[zoom]! > 1 ? { zoom: ZOOMS[zoom]! } : {})}
+            />
           </div>
         </>
       ) : (

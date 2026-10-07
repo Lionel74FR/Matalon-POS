@@ -21,14 +21,15 @@ export interface LigneCommande {
   ajouteePar: string;
   ajouteeLe: string;
   /**
-   * Ligne retirée de la commande : elle reste affichée barrée à l'écran pour
-   * le service, mais ne compte plus (ni total, ni addition, ni ticket).
-   * Le retrait est aussi tracé au journal des événements.
+   * Ligne retirée après envoi : elle reste affichée barrée à l'écran pour le
+   * service, mais ne compte plus (ni total, ni addition, ni ticket). Le retrait
+   * est tracé au journal des événements. Avant envoi, une ligne retirée
+   * disparaît simplement : la commande n'est qu'un brouillon.
    */
   retiree?: { le: string; par: string };
   /** Formule : catégorie de chaque choix, pour envoyer chacun à son poste de production. */
   composants?: Array<{ libelle: string; categorieId: string }>;
-  /** Bon de production imprimé (Envoyer, ou à l'encaissement). */
+  /** Commande validée (« Envoyer », ou d'office à l'encaissement) ; bons de production imprimés s'il y a des imprimantes. */
   envoyee?: { le: string; par: string };
   /** Ligne retirée après envoi : bon d'annulation imprimé. */
   annulationEnvoyee?: boolean;
@@ -105,9 +106,9 @@ export function commandeAGarder(c: Commande | null): c is Commande {
 }
 
 /**
- * Modifie une ligne. Un retrait (ligne entière, ou une partie de sa quantité)
- * laisse une ligne barrée à sa place au lieu de la faire disparaître ; si la
- * ligne était partie en production, la partie barrée donnera un bon d'annulation.
+ * Modifie une ligne. Avant envoi, un retrait efface simplement (brouillon).
+ * Après envoi, un retrait (ligne entière, ou une partie de sa quantité) laisse
+ * une ligne barrée à sa place, tracée, qui donnera un bon d'annulation.
  */
 export function modifierLigne(
   c: Commande,
@@ -122,7 +123,7 @@ export function modifierLigne(
     if (x.uid !== ligneUid) {
       lignes.push(x);
     } else if (!nouvelle) {
-      lignes.push({ ...x, retiree });
+      if (x.envoyee) lignes.push({ ...x, retiree });
     } else if (x.envoyee && nouvelle.quantite > x.quantite) {
       // Ligne déjà partie en production : le supplément devient une ligne à envoyer.
       const { envoyee: _, ...reste } = nouvelle;
@@ -130,7 +131,7 @@ export function modifierLigne(
       lignes.push({ ...avecQuantite(reste, nouvelle.quantite - x.quantite), uid: uid(), ajouteeLe: retiree.le, ajouteePar: par });
     } else {
       lignes.push(nouvelle);
-      if (unitesRetirees > 0) lignes.push({ ...avecQuantite(x, unitesRetirees), uid: uid(), retiree });
+      if (unitesRetirees > 0 && x.envoyee) lignes.push({ ...avecQuantite(x, unitesRetirees), uid: uid(), retiree });
     }
   }
   return { ...c, lignes };

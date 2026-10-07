@@ -702,7 +702,21 @@ code {
   margin-left: auto;
 }
 
-/* Plan de salle : défile quand il est zoomé (iPhone). */
+/* Plan de salle : il occupe la hauteur restante de l'écran ; zoomé, il défile. */
+.salle.avec-plan {
+  display: flex;
+  flex-direction: column;
+}
+
+.salle.avec-plan > * {
+  flex-shrink: 0;
+}
+
+.salle.avec-plan > .plan-defilant {
+  flex: 1 1 0;
+  min-height: 260px;
+}
+
 .plan-defilant {
   margin-top: 14px;
   overflow: auto;

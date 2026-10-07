@@ -35,6 +35,8 @@ interface Proprietes {
   };
   /** Agrandissement (1,5 ; 2…) : le plan déborde et défile ; absent : toute la largeur. */
   zoom?: number;
+  /** Le plan tient dans son conteneur, en largeur comme en hauteur (salle de la caisse). */
+  ajuste?: boolean;
 }
 
 const LIBELLES_DECOR: Record<ElementDecor["type"], string> = { bar: "Bar", porte: "Porte", mur: "" };
@@ -108,6 +110,8 @@ export function PlanSalle(props: Proprietes) {
       className={`plan-salle${edition ? " edition" : ""}`}
       viewBox={`-1.5 -1.5 ${largeur + 3} ${hauteur + 3}`}
       width={`${(props.zoom ?? 1) * 100}%`}
+      // Ajusté : le plan entier tient dans la place restante (largeur et hauteur), sans défiler.
+      {...(props.ajuste && !(props.zoom && props.zoom > 1) ? { height: "100%" } : {})}
       role="group"
       aria-label={`Plan : ${props.zone.nom}`}
       onPointerMove={deplacement}

@@ -1,7 +1,7 @@
 import type { Catalogue } from "@matalon/catalogue";
 import { describe, expect, it } from "vitest";
 import { ajouterLigne, modifierLigne, nouvelleCommande, type Commande } from "../src/metier/commande";
-import { bonsAEnvoyer, marquerEnvoyees, nbLignesAEnvoyer, posteArticle, type Bon } from "../src/metier/production";
+import { aEnvoyerDans, bonsAEnvoyer, nbLignesAEnvoyer, posteArticle, validerEnvoi, type Bon } from "../src/metier/production";
 
 const carte: Catalogue = {
   id: "c",
@@ -28,7 +28,7 @@ const ligne = (articleId: string, libelle: string, prix: number) => ({
 const cafe = ligne("cafe", "Espresso", 270);
 const croque = ligne("croque", "Croque", 900);
 
-const toutEnvoyer = (c: Commande) => marquerEnvoyees(c, bonsAEnvoyer(c, carte), new Set(), "u1");
+const toutEnvoyer = (c: Commande) => validerEnvoi(c, aEnvoyerDans(c, true), new Set(), "u1");
 
 describe("bons de production", () => {
   it("regroupe les articles par poste ; une catégorie sans poste n'imprime rien", () => {
@@ -38,7 +38,8 @@ describe("bons de production", () => {
       ["Bar", ["Espresso"]],
       ["Cuisine", ["Croque"]],
     ]);
-    expect(nbLignesAEnvoyer(c, carte)).toBe(2);
+    // « Envoyer » valide aussi la ligne sans poste (cookie) : trois lignes, deux bons.
+    expect(nbLignesAEnvoyer(c, true)).toBe(3);
   });
 
   it("une variante ou un supplément suit le poste de son article", () => {
@@ -91,21 +92,35 @@ describe("bons de production", () => {
     const annulations = bonsAEnvoyer(c, carte, { annulationsSeules: true });
     expect(annulations).toHaveLength(1);
     expect(annulations[0]).toMatchObject({ poste: "Bar", annulation: true, articles: [{ quantite: 2, libelle: "Espresso" }] });
-    c = marquerEnvoyees(c, annulations, new Set(), "u2");
+    c = validerEnvoi(c, aEnvoyerDans(c, true, { annulationsSeules: true }), new Set(), "u2");
     expect(bonsAEnvoyer(c, carte)).toEqual([]);
   });
 
-  it("retirer un article jamais envoyé n'imprime rien", () => {
-    let c = ajouterLigne(nouvelleCommande("t1", "u1"), cafe);
+  it("avant envoi, la commande est un brouillon : un retrait efface la ligne, sans bon", () => {
+    let c = ajouterLigne(nouvelleCommande("t1", "u1"), { ...cafe, quantite: 3 });
+    c = modifierLigne(c, c.lignes[0]!.uid, { ...c.lignes[0]!, quantite: 1 }, 2, "u2");
+    expect(c.lignes.map((l) => [l.quantite, !!l.retiree])).toEqual([[1, false]]);
     c = modifierLigne(c, c.lignes[0]!.uid, null, 1, "u2");
+    expect(c.lignes).toEqual([]);
     expect(bonsAEnvoyer(c, carte)).toEqual([]);
+  });
+
+  it("sans imprimante de production, Envoyer valide la commande sans bon", () => {
+    const c = ajouterLigne(ajouterLigne(nouvelleCommande("t1", "u1"), cafe), croque);
+    expect(nbLignesAEnvoyer(c, false)).toBe(2);
+    const suite = validerEnvoi(c, aEnvoyerDans(c, false), new Set(), "u1");
+    expect(suite.lignes.every((l) => l.envoyee)).toBe(true);
+    // Un retrait après envoi est barré, sans annulation à imprimer.
+    const retiree = modifierLigne(suite, suite.lignes[0]!.uid, null, 1, "u1");
+    expect(retiree.lignes[0]!.retiree).toBeDefined();
+    expect(nbLignesAEnvoyer(retiree, false)).toBe(0);
   });
 
   it("un bon en échec laisse ses lignes à envoyer, les autres postes sont marqués", () => {
     const c = ajouterLigne(ajouterLigne(nouvelleCommande("t1", "u1"), cafe), croque);
     const bons = bonsAEnvoyer(c, carte);
     const cuisine = bons.find((b) => b.poste === "Cuisine")!;
-    const suite = marquerEnvoyees(c, bons, new Set<Bon>([cuisine]), "u1");
+    const suite = validerEnvoi(c, aEnvoyerDans(c, true), new Set<Bon>([cuisine]), "u1");
     expect(suite.lignes.map((l) => [l.libelle, !!l.envoyee])).toEqual([
       ["Espresso", true],
       ["Croque", false],
@@ -115,9 +130,9 @@ describe("bons de production", () => {
 
   it("un article ajouté pendant l'impression reste à envoyer", () => {
     const c = ajouterLigne(nouvelleCommande("t1", "u1"), cafe);
-    const bons = bonsAEnvoyer(c, carte);
+    const prevu = aEnvoyerDans(c, true);
     const pendant = ajouterLigne(c, croque);
-    const suite = marquerEnvoyees(pendant, bons, new Set(), "u1");
+    const suite = validerEnvoi(pendant, prevu, new Set(), "u1");
     expect(bonsAEnvoyer(suite, carte).map((b) => b.poste)).toEqual(["Cuisine"]);
   });
 });

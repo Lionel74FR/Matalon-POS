@@ -52,9 +52,13 @@ for (const x of "1234") await p.locator(".pave .touche", { hasText: new RegExp(`
 await clic("Plus tard");
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 
-// ── Sans imprimante de production, pas de bouton Envoyer ──
+// ── Sans imprimante de production, Envoyer valide la commande sans imprimer ──
 await p.getByRole("button", { name: /^Table 5,/ }).click();
-const envoyerAvant = await p.getByRole("button", { name: /^Envoy/ }).count();
+await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
+// Brouillon : supprimé avant envoi, l'article disparaît sans trace.
+await p.locator(".ticket-ligne", { hasText: "Cappuccino" }).click();
+await clic("Supprimer");
+const envoyerAvant = await p.locator(".ticket-ligne").count();
 await p.getByRole("button", { name: "Retour à la salle" }).click();
 
 // ── Réglages : une imprimante par poste, bon d'essai ──

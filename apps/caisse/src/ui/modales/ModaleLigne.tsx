@@ -9,7 +9,11 @@ const MOTIFS = ["Geste commercial", "Client habitué", "Erreur de service", "Rep
 const POURCENTAGES = [10, 20, 50, 100];
 const NOTES_RAPIDES = ["Sans sucre", "Lait végétal", "Sans glace", "Allergie", "À servir après"];
 
-/** Quantité, remise ou retrait d'une ligne de commande. Tout retrait est tracé au journal. */
+/**
+ * Quantité, remise ou retrait d'une ligne de commande. Avant envoi, la
+ * commande est un brouillon : un retrait efface sans trace. Après envoi, il
+ * est barré et tracé au journal.
+ */
 export function ModaleLigne(props: {
   ligne: LigneCommande;
   tableId: string;
@@ -25,8 +29,9 @@ export function ModaleLigne(props: {
   const [erreur, setErreur] = useState("");
   const [note, setNote] = useState(l.note ?? "");
 
-  const tracerRetrait = (unites: number) =>
-    caisse.registre.journaliser(
+  const tracerRetrait = async (unites: number) => {
+    if (!l.envoyee) return;
+    await caisse.registre.journaliser(
       "SUPPRESSION_LIGNE",
       {
         table: props.tableId,
@@ -39,6 +44,7 @@ export function ModaleLigne(props: {
       },
       utilisateur.id,
     );
+  };
 
   const valider = async () => {
     if (pourcentage > 0 && !motif) return setErreur("Choisissez le motif de la remise.");
@@ -75,7 +81,7 @@ export function ModaleLigne(props: {
       pied={
         <>
           <button className="bouton danger" onClick={() => void supprimer()}>
-            <AvecIcone icone={Trash2}>Retirer de la commande</AvecIcone>
+            <AvecIcone icone={Trash2}>{l.envoyee ? "Retirer de la commande" : "Supprimer"}</AvecIcone>
           </button>
           <button className="bouton principal" onClick={() => void valider()}>
             <AvecIcone icone={Check}>Valider · {euros(montantLigne(apercu))}</AvecIcone>

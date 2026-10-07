@@ -10,8 +10,10 @@ import {
   avecQuantite,
 } from "../src/metier/commande";
 
-const cafe = { articleId: "cafe", libelle: "Espresso", details: [], quantite: 1, prixUnitaireTTC: 270, tauxTVA: 1000, ajouteePar: "u1" };
-const the = { articleId: "the", libelle: "Thé", details: [], quantite: 1, prixUnitaireTTC: 400, tauxTVA: 1000, ajouteePar: "u1" };
+// Lignes déjà envoyées : leurs retraits restent barrés (avant envoi, un retrait efface, voir production.test.ts).
+const envoyee = { le: "2026-10-15T10:00:00Z", par: "u1" };
+const cafe = { articleId: "cafe", libelle: "Espresso", details: [], quantite: 1, prixUnitaireTTC: 270, tauxTVA: 1000, ajouteePar: "u1", envoyee };
+const the = { articleId: "the", libelle: "Thé", details: [], quantite: 1, prixUnitaireTTC: 400, tauxTVA: 1000, ajouteePar: "u1", envoyee };
 
 describe("lignes retirées", () => {
   it("une ligne retirée reste dans la commande, barrée, sans compter", () => {

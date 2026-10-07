@@ -10,7 +10,7 @@ import { lignesActives, totauxCommande, versSaisie, type Commande } from "../../
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
-import { useEnvoiProduction } from "../production";
+import { productionActive, useEnvoiProduction } from "../production";
 import { ModaleClient } from "./ModaleClient";
 import type { ClientApi } from "@matalon/serveur/partage";
 
@@ -105,7 +105,7 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
       setTicket(t);
       // Ce qui n'a pas été envoyé en production part maintenant (la commande se ferme : rien à marquer).
       const carte = carteDe(config);
-      if (carte) void envoyerProduction(props.commande, carte);
+      if (carte && productionActive(config)) void envoyerProduction(props.commande, carte);
       // Sans imprimante, rien ne sort : la note passe par le QR code.
       if (imprimanteConfiguree) {
         const avecEspeces = paiements.some((p) => p.mode === "ESPECES");

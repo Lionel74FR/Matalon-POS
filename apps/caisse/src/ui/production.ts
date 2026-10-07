@@ -4,7 +4,7 @@ import type { Configuration } from "../donnees/configuration";
 import { envoyerEpson } from "../impression/epson";
 import { gabaritBon } from "../impression/gabarits";
 import type { Commande } from "../metier/commande";
-import { bonsAEnvoyer, marquerEnvoyees, type Bon } from "../metier/production";
+import { aEnvoyerDans, bonsAEnvoyer, validerEnvoi, type Bon } from "../metier/production";
 import { useCaisse } from "./contexte";
 
 /** Imprimantes de production en service : au moins un poste relié à une imprimante. */
@@ -13,20 +13,23 @@ export function productionActive(config: Configuration): boolean {
 }
 
 /**
- * Envoi des bons de production. Rend la mise à jour à appliquer à la
- * commande la plus récente (lignes marquées envoyées), ou null s'il n'y avait
- * rien à envoyer. Un poste sans imprimante est signalé et ses lignes sont
- * marquées : on le prépare d'après l'écran. Un échec d'impression laisse les
- * lignes à envoyer pour le prochain essai (ou l'encaissement).
+ * « Envoyer » : valide la commande. Les articles envoyés ne s'effacent plus,
+ * un retrait est alors barré et tracé. S'il y a des imprimantes de
+ * production, les bons partent poste par poste ; un poste sans imprimante est
+ * signalé (préparé d'après l'écran), un bon en échec laisse ses lignes à
+ * envoyer. Rend la mise à jour à appliquer à la dernière version de la
+ * commande, ou null s'il n'y avait rien à envoyer.
  */
 export function useEnvoiProduction() {
   const { config, utilisateur, notifier } = useCaisse();
   const enCours = useRef(false);
   return useCallback(
     async (c: Commande, carte: Catalogue, o: { annulationsSeules?: boolean } = {}): Promise<((c: Commande) => Commande) | null> => {
-      if (!productionActive(config) || enCours.current) return null;
-      const bons = bonsAEnvoyer(c, carte, o);
-      if (bons.length === 0) return null;
+      if (enCours.current) return null;
+      const production = productionActive(config);
+      const prevu = aEnvoyerDans(c, production, o);
+      if (prevu.envois.size + prevu.annulations.size === 0) return null;
+      const bons = production ? bonsAEnvoyer(c, carte, o) : [];
       enCours.current = true;
       const echecs = new Set<Bon>();
       const sansImprimante = new Set<string>();
@@ -52,8 +55,10 @@ export function useEnvoiProduction() {
       const imprimes = bons.filter((b) => !echecs.has(b) && !sansImprimante.has(b.poste));
       if (imprimes.length) {
         notifier(`Envoyé : ${[...new Set(imprimes.map((b) => (b.annulation ? `annulation ${b.poste}` : b.poste)))].join(", ")}.`);
+      } else if (!echecs.size && prevu.envois.size) {
+        notifier("Commande envoyée.");
       }
-      return (derniere) => marquerEnvoyees(derniere, bons, echecs, utilisateur.id);
+      return (derniere) => validerEnvoi(derniere, prevu, echecs, utilisateur.id);
     },
     [config, utilisateur.id, notifier],
   );

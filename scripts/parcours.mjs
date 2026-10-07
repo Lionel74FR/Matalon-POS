@@ -124,9 +124,12 @@ await clic("Offert");
 await clic("Offert maison");
 await p.getByRole("button", { name: /^Valider/ }).click();
 
-// Retrait d'un egg muffin : tracé au journal.
+// Commande envoyée, puis retrait d'un egg muffin : barré et tracé au journal (avant envoi, il serait simplement effacé).
+await p.getByRole("button", { name: /^Envoyer \(\d+\)/ }).click();
+await p.getByRole("button", { name: "Envoyé", exact: true }).waitFor();
 await p.locator(".ticket-ligne", { hasText: "Egg muffin" }).click();
 await clic("Retirer de la commande");
+await p.locator(".ticket-ligne.retiree", { hasText: "Egg muffin" }).waitFor();
 await capture("05-commande-remise");
 
 // Transfert de la table 4 vers la table 6 (libre).

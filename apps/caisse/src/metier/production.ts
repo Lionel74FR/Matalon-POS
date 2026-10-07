@@ -69,28 +69,44 @@ export function bonsAEnvoyer(c: Commande, carte: Catalogue, o: { annulationsSeul
   return [...bons.values()];
 }
 
-/** Nombre de lignes qu'« Envoyer » ferait partir (envois et annulations). */
-export function nbLignesAEnvoyer(c: Commande, carte: Catalogue): number {
-  return new Set(bonsAEnvoyer(c, carte).flatMap((b) => b.ligneUids)).size;
+/**
+ * Lignes qu'« Envoyer » validerait : celles pas encore envoyées, et, quand il y
+ * a des imprimantes de production, les retraits après envoi dont le bon
+ * d'annulation n'est pas parti.
+ */
+export function aEnvoyerDans(c: Commande, production: boolean, o: { annulationsSeules?: boolean } = {}) {
+  return {
+    envois: new Set(o.annulationsSeules ? [] : c.lignes.filter(aEnvoyer).map((l) => l.uid)),
+    annulations: new Set(production ? c.lignes.filter(aAnnuler).map((l) => l.uid) : []),
+  };
+}
+
+export function nbLignesAEnvoyer(c: Commande, production: boolean): number {
+  const { envois, annulations } = aEnvoyerDans(c, production);
+  return envois.size + annulations.size;
 }
 
 /**
- * Marque les lignes dont tous les bons sont partis. Une ligne dont un bon a
- * échoué reste à envoyer en entier : mieux vaut un doublon en cuisine qu'un oubli.
+ * Valide l'envoi sur la dernière version de la commande : les lignes prévues
+ * sont marquées envoyées (ou leur annulation partie), sauf celles d'un bon en
+ * échec, qui restent à envoyer en entier : mieux vaut un doublon en cuisine
+ * qu'un oubli. Un article ajouté pendant l'impression n'est pas concerné.
  */
-export function marquerEnvoyees(c: Commande, bons: Bon[], echecs: ReadonlySet<Bon>, par: string): Commande {
+export function validerEnvoi(
+  c: Commande,
+  prevu: { envois: ReadonlySet<string>; annulations: ReadonlySet<string> },
+  echecs: ReadonlySet<Bon>,
+  par: string,
+): Commande {
   const bloquees = new Set([...echecs].flatMap((b) => b.ligneUids));
-  const ok = (annulation: boolean) =>
-    new Set(bons.filter((b) => b.annulation === annulation).flatMap((b) => b.ligneUids).filter((u) => !bloquees.has(u)));
-  const envoyees = ok(false);
-  const annulees = ok(true);
   const le = new Date().toISOString();
   return {
     ...c,
     lignes: c.lignes.map((l) => {
-      if (annulees.has(l.uid) && l.envoyee) return { ...l, annulationEnvoyee: true };
+      if (bloquees.has(l.uid)) return l;
+      if (prevu.annulations.has(l.uid) && l.envoyee) return { ...l, annulationEnvoyee: true };
       // Ligne retirée pendant l'impression : elle est partie, son annulation partira au prochain envoi.
-      if (envoyees.has(l.uid) && !l.envoyee) return { ...l, envoyee: { le, par } };
+      if (prevu.envois.has(l.uid) && !l.envoyee) return { ...l, envoyee: { le, par } };
       return l;
     }),
   };

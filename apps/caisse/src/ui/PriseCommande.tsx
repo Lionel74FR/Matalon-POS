@@ -85,7 +85,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const nbActives = lignesActives(c).length;
   const production = productionActive(config);
   const envoyerProduction = useEnvoiProduction();
-  const nbAEnvoyer = production ? nbLignesAEnvoyer(c, CARTE) : 0;
+  const nbAEnvoyer = nbLignesAEnvoyer(c, production);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
 
   const envoyer = async (commande: Commande, o: { annulationsSeules?: boolean } = {}) => {
@@ -167,7 +167,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                   {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
                   {l.note && <small className="note-ligne">{l.note}</small>}
                   {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
-                  {production && l.envoyee && !l.retiree && <small className="mention-envoyee">Envoyé</small>}
+                  {l.envoyee && !l.retiree && <small className="mention-envoyee">Envoyé</small>}
                   {production && l.envoyee && l.retiree && !l.annulationEnvoyee && <small className="mention-envoyee">Annulation à envoyer</small>}
                   {l.remise && (
                     <small className="remise">
@@ -187,11 +187,9 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             <strong>{euros(totaux.totalTTC)}</strong>
           </div>
           <div className="ticket-actions">
-            {production && (
-              <button className="bouton" disabled={nbAEnvoyer === 0 || envoiEnCours} onClick={() => void envoyer(c)}>
-                <AvecIcone icone={Send}>{nbAEnvoyer ? `Envoyer (${nbAEnvoyer})` : "Envoyé"}</AvecIcone>
-              </button>
-            )}
+            <button className="bouton" disabled={nbAEnvoyer === 0 || envoiEnCours} onClick={() => void envoyer(c)}>
+              <AvecIcone icone={Send}>{nbAEnvoyer ? `Envoyer (${nbAEnvoyer})` : c.lignes.some((l) => l.envoyee) ? "Envoyé" : "Envoyer"}</AvecIcone>
+            </button>
             {!estComptoir && (
               <button className="bouton" disabled={nbActives === 0} onClick={() => void imprimerAddition()}>
                 <AvecIcone icone={Printer}>Addition</AvecIcone>

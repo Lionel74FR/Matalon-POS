@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 31, copiée le 6 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 33, copiée le 7 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -26,7 +26,7 @@ La V1 couvre le cycle complet d'une vente, de la prise de commande à la clôtur
 
 | Fonction | Exigences V1 |
 | --- | --- |
-| Prise de commande | Catalogue par catégories, options et suppléments, note libre, service au comptoir et à table (plan de salle, ouverture, transfert et addition par table), tickets en attente ; pas de vente à emporter |
+| Prise de commande | Catalogue par catégories, options et suppléments, note libre, service au comptoir et à table (plan de salle, ouverture, transfert et addition par table), tickets en attente ; pas de vente à emporter. « Envoyer » valide la commande : avant envoi, c'est un brouillon (un retrait efface la ligne sans trace) ; après envoi, un retrait reste barré et est tracé au journal. Le CA s'enregistre à l'encaissement (7 octobre 2026) |
 | Encaissement | CB sur TPE autonome (montant ressaisi), espèces avec rendu monnaie, titres-restaurant papier et carte, paiement fractionné sur plusieurs moyens |
 | Remises et offerts | Motif obligatoire, autorisés selon le rôle, tracés au journal des événements |
 | Annulations et remboursements | Jamais de suppression : ticket d'annulation négatif lié au ticket d'origine, motif obligatoire, tracé |
