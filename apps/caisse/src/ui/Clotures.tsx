@@ -122,7 +122,10 @@ function ResumeComptage({ e }: { e: Evenement }) {
 /** Lecture X, clôtures, export comptable, archives et contrôle d'intégrité. */
 export function Clotures(props: { commandesOuvertes: number }) {
   const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree } = useCaisse();
+  /** Clôtures de cet appareil (elles seules pilotent les clôtures mensuelles à faire ici). */
   const [clotures, setClotures] = useState<Cloture[]>([]);
+  /** Clôtures des autres appareils, depuis le serveur ; null : hors ligne. */
+  const [distantes, setDistantes] = useState<{ clotures: Cloture[]; appareils: Record<string, string> } | null>(null);
   const [lecture, setLecture] = useState<(TotauxPeriode & { dateComptable: string }) | null>(null);
   const [confirmationZ, setConfirmationZ] = useState(false);
   const [rapport, setRapport] = useState<RapportVerification | null>(null);
@@ -132,13 +135,29 @@ export function Clotures(props: { commandesOuvertes: number }) {
   useEffect(() => {
     setComptageChoisie(null);
     let annule = false;
-    if (choisie) void comptageDeLaZ(caisse.stockage, choisie).then((c) => !annule && setComptageChoisie(c));
+    // Le comptage est un événement de l'appareil qui a clôturé : introuvable ici pour une autre caisse.
+    if (choisie && choisie.caisseId === config.caisseId) void comptageDeLaZ(caisse.stockage, choisie).then((c) => !annule && setComptageChoisie(c));
     return () => {
       annule = true;
     };
-  }, [choisie, caisse.stockage]);
+  }, [choisie, caisse.stockage, config.caisseId]);
 
-  const charger = useCallback(async () => setClotures((await caisse.stockage.derniers("clotures", 120)).reverse()), [caisse.stockage]);
+  const charger = useCallback(async () => {
+    setClotures((await caisse.stockage.derniers("clotures", 120)).reverse());
+    try {
+      const r = await caisse.client.cloturesEtablissement(120);
+      setDistantes({ clotures: r.clotures.filter((c) => c.caisseId !== config.caisseId), appareils: r.appareils });
+    } catch {
+      setDistantes(null);
+    }
+  }, [caisse.stockage, caisse.client, config.caisseId]);
+  const locale = (c: Cloture) => c.caisseId === config.caisseId;
+  const appareil = (c: Cloture) => (locale(c) ? config.caisseNom : (distantes?.appareils[c.caisseId] ?? c.caisseId));
+  /** Toutes les clôtures de l'établissement, de la plus récente à la plus ancienne. */
+  const toutes = [...clotures, ...(distantes?.clotures ?? [])].sort(
+    (a, b) => b.horodatage.localeCompare(a.horodatage) || b.numero - a.numero,
+  );
+  const plusieursAppareils = new Set(toutes.map((c) => c.caisseId)).size > 1;
   useEffect(() => void charger(), [charger]);
 
   const moisCourant = dateComptable(new Date(), HEURE_BASCULE).slice(0, 7);
@@ -267,13 +286,15 @@ export function Clotures(props: { commandesOuvertes: number }) {
         </section>
       )}
 
-      {clotures.length === 0 ? (
+      {distantes === null && <p className="explication">Hors ligne : seules les clôtures de cet appareil sont affichées.</p>}
+      {toutes.length === 0 ? (
         <Vide>Aucune clôture. La première apparaîtra ici après la clôture Z du premier soir.</Vide>
       ) : (
         <table className="tableau tableau-clotures">
           <thead>
             <tr>
               <th>N°</th>
+              {plusieursAppareils && <th>Appareil</th>}
               <th>Type</th>
               <th>Période</th>
               <th>Tickets</th>
@@ -281,9 +302,10 @@ export function Clotures(props: { commandesOuvertes: number }) {
             </tr>
           </thead>
           <tbody>
-            {[...clotures].reverse().map((c) => (
-              <tr key={c.numero} onClick={() => setChoisie(c)}>
+            {toutes.map((c) => (
+              <tr key={`${c.caisseId}#${c.numero}`} onClick={() => setChoisie(c)}>
                 <td>{c.numero}</td>
+                {plusieursAppareils && <td>{appareil(c)}</td>}
                 <td>{LIBELLES[c.periode]}</td>
                 <td>{c.identifiantPeriode}</td>
                 <td>{c.premierTicket == null ? "—" : `${c.premierTicket} à ${c.dernierTicket}`}</td>
@@ -305,13 +327,15 @@ export function Clotures(props: { commandesOuvertes: number }) {
 
       {choisie && (
         <Modale
-          titre={`${LIBELLES[choisie.periode]} ${choisie.identifiantPeriode} · n° ${choisie.numero}`}
+          titre={`${LIBELLES[choisie.periode]} ${choisie.identifiantPeriode} · n° ${choisie.numero}${plusieursAppareils ? ` · ${appareil(choisie)}` : ""}`}
           onFermer={() => setChoisie(null)}
           pied={
             <>
-              <button className="bouton" onClick={() => void archiver(choisie)}>
-                <AvecIcone icone={Download}>Télécharger l'archive</AvecIcone>
-              </button>
+              {locale(choisie) && (
+                <button className="bouton" onClick={() => void archiver(choisie)}>
+                  <AvecIcone icone={Download}>Télécharger l'archive</AvecIcone>
+                </button>
+              )}
               <button
                 className="bouton"
                 onClick={() => void imprimer(gabaritCloture(choisie, config, comptageChoisie), `Clôture ${choisie.identifiantPeriode}`)}
@@ -321,6 +345,12 @@ export function Clotures(props: { commandesOuvertes: number }) {
             </>
           }
         >
+          {!locale(choisie) && (
+            <p className="explication">
+              Clôture de l'appareil « {appareil(choisie)} » : son comptage et son archive se consultent depuis cet appareil, ou dans
+              l'administration.
+            </p>
+          )}
           <Totaux t={choisie} />
           <p className="explication">Grand total perpétuel : {euros(choisie.grandTotalPerpetuel)}</p>
           {comptageChoisie && <ResumeComptage e={comptageChoisie} />}

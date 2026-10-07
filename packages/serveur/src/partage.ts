@@ -3,7 +3,7 @@
  * Ce module ne dépend d'aucune bibliothèque serveur : la caisse l'importe.
  */
 import type { Catalogue } from "@matalon/catalogue";
-import { canonique, montantEnCompte, ventilerTranche, type Chaine, type Enregistrement, type Ticket } from "@matalon/noyau-fiscal";
+import { canonique, montantEnCompte, ventilerTranche, type Chaine, type Cloture, type Enregistrement, type Ticket } from "@matalon/noyau-fiscal";
 
 export type Role = "serveur" | "responsable";
 
@@ -267,6 +267,18 @@ export interface CompteClient {
   client: ClientApi;
   soldeTTC: number;
   ventes: VenteOuverte[];
+}
+
+/** Derniers tickets de toutes les caisses de l'établissement (copie du serveur), avec le nom de chaque appareil. */
+export interface ReponseTickets {
+  tickets: Ticket[];
+  appareils: Record<string, string>;
+}
+
+/** Dernières clôtures de toutes les caisses de l'établissement (copie du serveur). */
+export interface ReponseClotures {
+  clotures: Cloture[];
+  appareils: Record<string, string>;
 }
 
 export interface ReponseComptes {

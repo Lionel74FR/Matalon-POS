@@ -1,5 +1,5 @@
-import { Eye, FileText, Printer, QrCode, Undo2, Wallet } from "lucide-react";
-import { AvecIcone } from "./icones";
+import { Eye, FileText, Printer, QrCode, RefreshCw, Undo2, Wallet } from "lucide-react";
+import { AvecIcone, BoutonIcone } from "./icones";
 import { ErreurFiscale, paiementsEffectifs, type Ticket } from "@matalon/noyau-fiscal";
 import { useCallback, useEffect, useState } from "react";
 import { gabaritNote, LIBELLES_PAIEMENT, nomTable, nomUtilisateur } from "../impression/gabarits";
@@ -14,12 +14,20 @@ import { emettreAvoir, listerFactures } from "../metier/facture";
 const MOTIFS_ANNULATION = ["Erreur de saisie", "Erreur de table", "Client parti sans consommer", "Réclamation client"];
 const MOTIFS_ANNULATION_REGLEMENT = ["Erreur de client", "Erreur de montant", "Paiement refusé"];
 
-/** Derniers tickets : détail, duplicata, annulation. */
+const cle = (t: Pick<Ticket, "caisseId" | "numero">) => `${t.caisseId}#${t.numero}`;
+
+/**
+ * Derniers tickets de l'établissement : ceux de cet appareil (même hors ligne)
+ * et ceux des autres caisses, depuis la copie du serveur. Détail pour tous ;
+ * annulation, correction, facture et duplicata sur l'appareil qui a encaissé.
+ */
 export function Tickets() {
   const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree } = useCaisse();
   const [qr, setQr] = useState<{ ticket: Ticket; url: string } | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [annules, setAnnules] = useState<Set<number>>(new Set());
+  const [annules, setAnnules] = useState<Set<string>>(new Set());
+  /** Noms des appareils de l'établissement ; null : tickets des autres caisses indisponibles (hors ligne). */
+  const [appareils, setAppareils] = useState<Record<string, string> | null>(null);
   const [choisi, setChoisi] = useState<Ticket | null>(null);
   const [annulation, setAnnulation] = useState<Ticket | null>(null);
   const [correction, setCorrection] = useState<Ticket | null>(null);
@@ -32,17 +40,33 @@ export function Tickets() {
   const [ventesFacturees, setVentesFacturees] = useState<Set<number>>(new Set());
 
   const charger = useCallback(async () => {
-    const liste = await caisse.stockage.derniers("tickets", 150);
+    const locaux = await caisse.stockage.derniers("tickets", 150);
+    // Ceux des autres caisses viennent du serveur ; ceux de cet appareil font foi (même pas encore synchronisés).
+    let distants: Ticket[] = [];
+    try {
+      const r = await caisse.client.ticketsEtablissement(150);
+      distants = r.tickets.filter((t) => t.caisseId !== config.caisseId);
+      setAppareils(r.appareils);
+    } catch {
+      setAppareils(null);
+    }
+    const liste = [...locaux, ...distants].sort((a, b) => b.horodatage.localeCompare(a.horodatage) || b.numero - a.numero).slice(0, 150);
     setTickets(liste);
-    setAnnules(new Set(liste.filter((t) => t.type === "ANNULATION" && t.ticketOrigine).map((t) => t.ticketOrigine!.numero)));
+    setAnnules(
+      new Set(liste.filter((t) => t.type === "ANNULATION" && t.ticketOrigine).map((t) => cle({ caisseId: t.caisseId, numero: t.ticketOrigine!.numero }))),
+    );
     const z = (await caisse.stockage.lister("clotures")).filter((c) => c.periode === "JOUR").at(-1);
     setCouvertParZ(z?.dernierTicketCouvert ?? 0);
     const emises = await listerFactures(caisse.stockage);
     setFactures(new Map(emises.map((f) => [f.ticket, f.numero])));
     setVentesFacturees(new Set(emises.filter((f) => f.nature === "FACTURE").map((f) => f.ticket)));
-  }, [caisse.stockage]);
+  }, [caisse.stockage, caisse.client, config.caisseId]);
 
   useEffect(() => void charger(), [charger]);
+
+  const locale = (t: Ticket) => t.caisseId === config.caisseId;
+  const appareil = (t: Ticket) => (locale(t) ? config.caisseNom : (appareils?.[t.caisseId] ?? t.caisseId));
+  const plusieursAppareils = new Set(tickets.map((t) => t.caisseId)).size > 1;
 
   /** Numéro du prochain duplicata d'un ticket, papier ou QR code confondus. */
   const prochainDuplicata = async (t: Ticket) => {
@@ -55,7 +79,7 @@ export function Tickets() {
     t.type === "VENTE" &&
     t.totalTTC > 0 &&
     t.numero > couvertParZ &&
-    !annules.has(t.numero) &&
+    !annules.has(cle(t)) &&
     !paiementsEffectifs(t, tickets).some((p) => p.mode === "EN_COMPTE");
 
   const duplicata = async (t: Ticket) => {
@@ -130,7 +154,12 @@ export function Tickets() {
     <div className="page">
       <header className="page-tete">
         <h1>Tickets</h1>
-        <p>Les 150 derniers tickets. Un ticket ne se modifie pas : une erreur se corrige par une annulation, ou par une correction du paiement avant la Z.</p>
+        <BoutonIcone icone={RefreshCw} variante="discret" libelle="Actualiser les tickets" onClick={() => void charger()} />
+        <p>
+          Les 150 derniers tickets de l'établissement
+          {appareils === null ? " (hors ligne : seulement ceux de cet appareil)" : ""}. Un ticket ne se modifie pas : une erreur se corrige par
+          une annulation, ou par une correction du paiement avant la Z.
+        </p>
       </header>
       {tickets.length === 0 ? (
         <Vide>Aucun ticket pour l'instant. Ils apparaîtront ici après le premier encaissement.</Vide>
@@ -139,6 +168,7 @@ export function Tickets() {
           <thead>
             <tr>
               <th>N°</th>
+              {plusieursAppareils && <th>Appareil</th>}
               <th>Heure</th>
               <th>Table</th>
               <th>Par</th>
@@ -149,11 +179,12 @@ export function Tickets() {
           <tbody>
             {tickets.map((t) => (
               <tr
-                key={t.numero}
+                key={cle(t)}
                 onClick={() => setChoisi(t)}
-                className={t.type === "ANNULATION" ? "annulation" : t.type === "CORRECTION" ? "correction" : annules.has(t.numero) ? "annule" : ""}
+                className={t.type === "ANNULATION" ? "annulation" : t.type === "CORRECTION" ? "correction" : annules.has(cle(t)) ? "annule" : ""}
               >
                 <td>{t.numero}</td>
+                {plusieursAppareils && <td>{appareil(t)}</td>}
                 <td>
                   {new Date(t.horodatage).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </td>
@@ -182,8 +213,9 @@ export function Tickets() {
           titre={`${{ ANNULATION: "Annulation", REGLEMENT: "Règlement de compte", CORRECTION: "Correction de paiement", VENTE: "Ticket" }[choisi.type]} n° ${choisi.numero}`}
           onFermer={() => setChoisi(null)}
           pied={
+            locale(choisi) ? (
             <>
-              {(choisi.type === "VENTE" || choisi.type === "REGLEMENT") && !annules.has(choisi.numero) && (
+              {(choisi.type === "VENTE" || choisi.type === "REGLEMENT") && !annules.has(cle(choisi)) && (
                 <button className="bouton danger" onClick={() => setAnnulation(choisi)}>
                   <AvecIcone icone={Undo2}>{choisi.type === "REGLEMENT" ? "Annuler ce règlement" : "Annuler ce ticket"}</AvecIcone>
                 </button>
@@ -193,7 +225,7 @@ export function Tickets() {
                   <AvecIcone icone={Wallet}>Corriger le paiement</AvecIcone>
                 </button>
               )}
-              {(choisi.type === "VENTE" ? !annules.has(choisi.numero) || factures.has(choisi.numero) : factures.has(choisi.numero)) && (
+              {(choisi.type === "VENTE" ? !annules.has(cle(choisi)) || factures.has(choisi.numero) : factures.has(choisi.numero)) && (
                 <button className="bouton" onClick={() => setFactureDe(choisi)}>
                   <AvecIcone icone={FileText}>{factures.has(choisi.numero) ? (choisi.type === "VENTE" ? "Facture" : "Avoir") : "Facture"}</AvecIcone>
                 </button>
@@ -215,11 +247,18 @@ export function Tickets() {
                 <AvecIcone icone={imprimanteConfiguree ? Printer : Eye}>{imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}</AvecIcone>
               </button>
             </>
+            ) : undefined
           }
         >
-          {annules.has(choisi.numero) && <p className="erreur">Ce ticket a été annulé.</p>}
+          {!locale(choisi) && (
+            <p className="explication">
+              Encaissé sur l'appareil « {appareil(choisi)} » : l'annulation, la correction du paiement, la facture et le duplicata se font
+              depuis cet appareil.
+            </p>
+          )}
+          {annules.has(cle(choisi)) && <p className="erreur">Ce ticket a été annulé.</p>}
           {choisi.motif && <p className="explication">Motif : {choisi.motif}</p>}
-          {factures.has(choisi.numero) && <p className="explication">Facturé : n° {factures.get(choisi.numero)}</p>}
+          {locale(choisi) && factures.has(choisi.numero) && <p className="explication">Facturé : n° {factures.get(choisi.numero)}</p>}
           <DetailTicket ticket={choisi} tickets={tickets} />
         </Modale>
       )}

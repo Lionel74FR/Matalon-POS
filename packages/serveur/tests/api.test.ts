@@ -382,6 +382,32 @@ describe("imprimantes de production", () => {
   });
 });
 
+describe("tickets partagés", () => {
+  it("chaque appareil voit les derniers tickets de toutes les caisses de l'établissement", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    instant += 60_000;
+    await b.registre.enregistrerVente({ lignes: [SPRITZ], paiements: [{ mode: "ESPECES", montant: 1100 }], operateurId: "u-lea" });
+    expect((await a.synchro()).statut).toBe(200);
+    expect((await b.synchro()).statut).toBe(200);
+    const r = await appel("GET", "/api/caisse/tickets?limite=10", undefined, a.bearer);
+    expect(r.statut).toBe(200);
+    expect(r.corps.tickets.map((t: any) => [t.caisseId, t.numero])).toEqual([
+      ["ipad-1111aaaa", 1],
+      ["ipad-0a1b2c3d", 1],
+    ]);
+    expect(r.corps.appareils).toMatchObject({ "ipad-0a1b2c3d": "Comptoir", "ipad-1111aaaa": "Comptoir" });
+    expect((await appel("GET", "/api/caisse/tickets", undefined, {})).statut).toBe(401);
+    // Idem pour les clôtures : la Z de l'iPhone se consulte depuis l'iPad.
+    await b.registre.cloturerJournee("u-lea");
+    expect((await b.synchro()).statut).toBe(200);
+    const z = await appel("GET", "/api/caisse/clotures", undefined, a.bearer);
+    expect(z.corps.clotures.map((c: any) => [c.caisseId, c.periode, c.totalTTC])).toEqual([["ipad-1111aaaa", "JOUR", 1100]]);
+  });
+});
+
 describe("plan de salle", () => {
   it("enregistre formes, chaises et décor ; refuse une version dépassée et une table supprimée", async () => {
     const cookie = await adminConnecte();

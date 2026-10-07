@@ -24,6 +24,7 @@ Dernière mise à jour : 6 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Tickets et clôtures partagés entre appareils (copie du serveur, lecture seule hors de l'appareil d'origine) ; duplicatas et Z imprimés avec l'appareil et la version de l'enregistrement d'origine |
 | 4118ce8 | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
 | 6eaabbb | Correction du paiement (noyau 0.6.0, ticket CORRECTION avant la Z, accord responsable) et moyens de paiement dans le détail des tickets ; e-mail des clients en compte ; note d'un compte rouverte depuis la fiche (copie serveur pour un autre appareil) |
 | c2985fa | Plan de salle : éditeur (administration et iPad responsable) avec tables carrées, rectangulaires et rondes, chaises, rotation, décor bar/porte/mur, zones dimensionnées, tables masquées ; contrôle de version du plan ; salle en plan (états, couverts sur chaises, zoom, liste) ; tables assemblées pour un groupe |
@@ -48,6 +49,7 @@ Dernière mise à jour : 6 octobre 2026.
 - Plan de salle : les tables ne changent plus que par la route du plan (`PUT …/plan`, avec `version` : 409 si le plan a bougé ailleurs) ; la mise à jour de l'établissement les ignore. Une table n'est jamais supprimée (`masquee`). Positions en cases de 25 cm (`CASE_CM`) ; une table sans position est placée d'office, et l'enregistrement fige toutes les positions. Tables assemblées : `Commande.jointes` (hors fiscal) ; le ticket ne porte que la table principale.
 - Correction du paiement (0.6.0) : ticket `CORRECTION` sans ligne ni total, `ticketOrigine` = la vente, `paiements` = écart de somme nulle (mode erroné en négatif). Seulement avant la Z qui couvrirait la vente (correction et vente sont donc dans la même archive), jamais pour une vente en compte, jamais annulable (on corrige à nouveau). `paiementsEffectifs` sert à l'annulation, au détail et aux factures ; `verifierCorrections` contrôle la cohérence avec la vente.
 - Commande : brouillon jusqu'à « Envoyer » (ou l'encaissement). Avant envoi, un retrait efface sans trace ; après envoi, il est barré, journalisé (`SUPPRESSION_LIGNE`, `apresEnvoi`) et donne un bon d'annulation s'il y a des imprimantes de production. Le CA reste enregistré à l'encaissement uniquement (ticket scellé).
+- Tickets et clôtures des autres appareils : lus sur le serveur (`GET /api/caisse/tickets`, `/api/caisse/clotures`), en lecture seule. Une annulation, une correction ou une facture ne se fait que sur l'appareil qui a encaissé : chaque chaîne fiscale reste propre à son appareil (numérotation, signature). Les commandes ouvertes, elles, restent propres à chaque appareil.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel

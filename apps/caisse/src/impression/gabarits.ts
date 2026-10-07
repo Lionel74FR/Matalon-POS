@@ -86,7 +86,7 @@ export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: n
   if (ticket.client) r.texte(`Au compte de : ${ticket.client.nom}`, { gras: true });
   r.filet();
   r.texte("Prix nets, service compris", { align: "centre" });
-  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`${ticket.caisseId} · Matalon POS ${ticket.versionLogiciel}`, { align: "centre" });
   r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   if (!duplicata && ticket.type === "VENTE") r.saut().texte("Merci et à bientôt !", { align: "centre" });
   return r;
@@ -106,7 +106,7 @@ export function gabaritCorrection(ticket: Ticket, config: Configuration, duplica
   for (const p of ticket.paiements) r.colonnes(`${LIBELLES_PAIEMENT[p.mode]} ${p.montant < 0 ? "retiré" : "ajouté"}`, formaterEuros(p.montant));
   r.filet();
   r.texte("Total de la vente inchangé", { align: "centre" });
-  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`${ticket.caisseId} · Matalon POS ${ticket.versionLogiciel}`, { align: "centre" });
   r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   return r;
 }
@@ -138,7 +138,7 @@ export function gabaritReglement(ticket: Ticket, config: Configuration, duplicat
   r.filet();
   paiements(r, ticket.paiements, ticket.renduMonnaie);
   r.filet();
-  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`${ticket.caisseId} · Matalon POS ${ticket.versionLogiciel}`, { align: "centre" });
   r.texte(`Empreinte ${ticket.hash.slice(0, 16)}`, { align: "centre" });
   return r;
 }
@@ -231,7 +231,7 @@ export function gabaritCloture(c: Cloture, config: Configuration, comptage?: Eve
   r.colonnes("Cumul perpétuel absolu", formaterEuros(c.cumulPerpetuelAbsolu));
   r.filet();
   if (comptage) corpsComptage(r, comptage);
-  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`${c.caisseId} · Matalon POS ${c.versionLogiciel}`, { align: "centre" });
   r.texte(`Empreinte ${c.hash.slice(0, 32)}`, { align: "centre" });
   return r;
 }
@@ -297,7 +297,7 @@ export function gabaritFacture(f: Facture, ticket: Ticket, config: Configuration
   if (f.client.siren) r.texte(mentions.professionnels);
   r.texte(`Établie d'après le ticket n° ${numero(ticket.numero)}`);
   r.filet();
-  r.texte(`${config.caisseId} · Matalon POS ${VERSION_NOYAU_FISCAL}`, { align: "centre" });
+  r.texte(`${ticket.caisseId} · Matalon POS ${ticket.versionLogiciel}`, { align: "centre" });
   return r;
 }
 

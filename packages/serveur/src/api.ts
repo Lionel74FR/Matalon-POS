@@ -33,6 +33,8 @@ import {
   type EntreeSynchro,
   type PostesProduction,
   type ReponseComptes,
+  type ReponseTickets,
+  type ReponseClotures,
   type EtablissementApi,
   type IdentiteEtablissement,
   type ReponseEtat,
@@ -315,6 +317,30 @@ async function comptes(env: Environnement, etablissementId: string): Promise<Rep
     [etablissementId],
   );
   return { ...calculerComptes(lignes.map((l) => l.contenu), await clients(env.db, etablissementId)), calculeLe: horloge(env).toISOString() };
+}
+
+/** Derniers enregistrements d'une chaîne pour tout l'établissement, du plus récent au plus ancien. */
+async function derniersEtablissement<T>(env: Environnement, etablissementId: string, chaine: "tickets" | "clotures", limite: number) {
+  const lignes = await env.db.requete<{ contenu: T }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.chaine = $3
+     order by e.horodatage desc, e.numero desc limit $2`,
+    [etablissementId, limite, chaine],
+  );
+  const caisses = await env.db.requete<{ id: string; nom: string }>("select id, nom from caisses where etablissement_id = $1", [etablissementId]);
+  return { liste: lignes.map((l) => l.contenu), appareils: Object.fromEntries(caisses.map((c) => [c.id, c.nom])) };
+}
+
+async function ticketsEtablissement(env: Environnement, etablissementId: string, limite: number): Promise<Response> {
+  const { liste, appareils } = await derniersEtablissement<Ticket>(env, etablissementId, "tickets", limite);
+  const reponse: ReponseTickets = { tickets: liste, appareils };
+  return json(200, reponse);
+}
+
+async function cloturesEtablissement(env: Environnement, etablissementId: string, limite: number): Promise<Response> {
+  const { liste, appareils } = await derniersEtablissement<Cloture>(env, etablissementId, "clotures", limite);
+  const reponse: ReponseClotures = { clotures: liste, appareils };
+  return json(200, reponse);
 }
 
 /**
@@ -1157,6 +1183,16 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
     if (chemin === "/api/caisse/comptes" && m === "GET") return await comptesCaisse(env, requete);
     if (chemin === "/api/caisse/clients" && m === "PUT") return await majClientCaisse(env, requete);
+    if (chemin === "/api/caisse/tickets" && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      const limite = Math.min(500, Math.max(1, Number(url.searchParams.get("limite") ?? 150) || 150));
+      return await ticketsEtablissement(env, c.etablissement_id, limite);
+    }
+    if (chemin === "/api/caisse/clotures" && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      const limite = Math.min(500, Math.max(1, Number(url.searchParams.get("limite") ?? 120) || 120));
+      return await cloturesEtablissement(env, c.etablissement_id, limite);
+    }
     const ticketCaisse = /^\/api\/caisse\/tickets\/([a-z0-9-]{1,60})\/(\d{1,9})$/.exec(chemin);
     if (ticketCaisse && m === "GET") {
       const c = await caisseAuthentifiee(env, requete);

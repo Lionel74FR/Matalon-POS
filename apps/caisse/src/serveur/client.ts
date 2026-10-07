@@ -3,6 +3,8 @@ import type {
   ClientApi as FicheClient,
   EntreeSynchro,
   ReponseComptes,
+  ReponseTickets,
+  ReponseClotures,
   EtablissementApi,
   IdentiteEtablissement,
   PostesProduction,
@@ -85,6 +87,16 @@ export class ClientApi {
 
   carte() {
     return this.appel<ReponseCarte>("GET", "/api/caisse/carte");
+  }
+
+  /** Derniers tickets de toutes les caisses de l'établissement, depuis la copie du serveur. */
+  ticketsEtablissement(limite = 150) {
+    return this.appel<ReponseTickets>("GET", `/api/caisse/tickets?limite=${limite}`);
+  }
+
+  /** Dernières clôtures de toutes les caisses de l'établissement, depuis la copie du serveur. */
+  cloturesEtablissement(limite = 120) {
+    return this.appel<ReponseClotures>("GET", `/api/caisse/clotures?limite=${limite}`);
   }
 
   /** Un ticket d'une caisse de l'établissement, depuis la copie du serveur. */

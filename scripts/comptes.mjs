@@ -102,6 +102,12 @@ const martin = comptes.comptes.find((c) => c.client.nom === "M. Martin");
 
 // Erreur de saisie : le règlement s'annule, la dette renaît.
 await iphone.p.getByRole("tab", { name: "Tickets" }).click();
+// Tickets partagés : la vente encaissée sur l'iPad apparaît aussi sur l'iPhone, en consultation.
+const venteIpad = iphone.p.locator(".tableau-tickets tbody tr", { hasText: "Table 5" });
+await venteIpad.first().waitFor({ timeout: 15000 });
+await venteIpad.first().click();
+const venteIpadLecture = await iphone.p.getByText(/Encaissé sur l'appareil/).count();
+await iphone.p.getByRole("button", { name: "Fermer" }).last().click();
 await iphone.p.locator(".tableau-tickets tbody tr", { hasText: "Règlement" }).first().click();
 await iphone.clic("Annuler ce règlement");
 await iphone.clic("Erreur de client");
@@ -112,8 +118,8 @@ await iphone.p.locator(".compte", { hasText: "M. Martin" }).waitFor({ timeout: 1
 const soldeApresAnnulation = await iphone.p.locator(".compte", { hasText: "M. Martin" }).locator(".montant").textContent();
 const comptesFin = await appel("GET", "/etablissements/moka/comptes");
 await b.close();
-const resultat = { noteRouverte: noteRouverte?.slice(0, 80), email: martin?.client.email, soldeAvant, soldeServeur: martin?.soldeTTC, soldeApresAnnulation, anomaliesFin: comptesFin.anomalies, telephone: martin?.client.telephone, anomalies: comptes.anomalies, lectureX: venteZ?.slice(0, 160), erreurs };
+const resultat = { venteIpadLecture, noteRouverte: noteRouverte?.slice(0, 80), email: martin?.client.email, soldeAvant, soldeServeur: martin?.soldeTTC, soldeApresAnnulation, anomaliesFin: comptesFin.anomalies, telephone: martin?.client.telephone, anomalies: comptes.anomalies, lectureX: venteZ?.slice(0, 160), erreurs };
 console.log(JSON.stringify(resultat, null, 2));
-if (erreurs.length || !/Spritz/.test(noteRouverte ?? "") || martin?.client.email !== "martin@exemple.fr" || martin?.soldeTTC !== 0 || comptes.anomalies.length || comptesFin.anomalies.length || !/15,00/.test(soldeAvant ?? "") || !/15,00/.test(soldeApresAnnulation ?? "")) {
+if (erreurs.length || venteIpadLecture !== 1 || !/Spritz/.test(noteRouverte ?? "") || martin?.client.email !== "martin@exemple.fr" || martin?.soldeTTC !== 0 || comptes.anomalies.length || comptesFin.anomalies.length || !/15,00/.test(soldeAvant ?? "") || !/15,00/.test(soldeApresAnnulation ?? "")) {
   process.exit(1);
 }
