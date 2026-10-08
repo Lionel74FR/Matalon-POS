@@ -24,7 +24,7 @@ Dernière mise à jour : 8 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (à venir) | Sécurité et alertes : 5 codes PIN faux bloquent 5 minutes (caisse et serveur) ; l'équipe ne se modifie depuis une caisse qu'avec le code d'un responsable vérifié par le serveur ; alertes dans l'administration (prix ou TVA différents de la carte, article hors carte, code PIN bloqué) ; historique des versions de carte ; test de cloisonnement entre établissements |
+| 3ac1619 | Sécurité et alertes : 5 codes PIN faux bloquent 5 minutes (caisse et serveur) ; l'équipe ne se modifie depuis une caisse qu'avec le code d'un responsable vérifié par le serveur ; alertes dans l'administration (prix ou TVA différents de la carte, article hors carte, code PIN bloqué) ; historique des versions de carte ; test de cloisonnement entre établissements |
 | fefbad6 | Clôtures d'établissement (noyau 0.7.0) : la lecture X, la Z, les clôtures mensuelle et d'exercice couvrent toutes les caisses et se font depuis n'importe quel appareil, en ligne, un seul à la fois (verrou serveur) ; fond de caisse commun ; archive serveur au format 2 (toutes les caisses d'une Z) ; contrôle d'établissement dans l'administration ; un appareil seul clôture encore hors ligne |
 | a3f648c | Tickets et clôtures partagés entre appareils (copie du serveur, lecture seule hors de l'appareil d'origine) ; duplicatas et Z imprimés avec l'appareil et la version de l'enregistrement d'origine |
 | 4118ce8 | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
