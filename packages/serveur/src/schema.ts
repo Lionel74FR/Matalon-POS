@@ -79,6 +79,8 @@ export const MIGRATIONS: string[] = [
   // Journée de l'établissement (0.7.0) : fond, comptage et clôtures retrouvés sans parcourir tout le journal.
   `create index if not exists enregistrements_evenements_code on enregistrements ((contenu->>'code'), horodatage) where chaine = 'evenements'`,
   `create index if not exists enregistrements_clotures_periode on enregistrements ((contenu->>'periode'), horodatage) where chaine = 'clotures'`,
+  // Statistiques : tickets d'une période retrouvés par journée comptable.
+  `create index if not exists enregistrements_tickets_jour on enregistrements ((contenu->>'dateComptable')) where chaine = 'tickets'`,
   // Inaltérabilité côté serveur : aucune modification ni suppression possible.
   `create or replace function interdire_modification_fiscale() returns trigger as $$
     begin

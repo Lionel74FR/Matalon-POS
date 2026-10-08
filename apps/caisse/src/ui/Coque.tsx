@@ -7,6 +7,7 @@ import {
   Coffee,
   LayoutGrid,
   LogOut,
+  ChartColumn,
   NotebookPen,
   Printer,
   Receipt,
@@ -31,6 +32,7 @@ import { nomCommande, nomTable } from "../impression/gabarits";
 import { MODE_TEST } from "../fiscal/caisse";
 import type { EtatSynchro } from "../serveur/synchro";
 import { etatJournee } from "../metier/tresorerie";
+import { Statistiques } from "./Statistiques";
 import { ModaleFondDeCaisse } from "./modales/ModaleFondDeCaisse";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Clotures } from "./Clotures";
@@ -41,7 +43,7 @@ import { Reglages } from "./Reglages";
 import { Salle } from "./Salle";
 import { Tickets } from "./Tickets";
 
-type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "comptes" } | { nom: "clotures" } | { nom: "reglages" };
+type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "comptes" } | { nom: "clotures" } | { nom: "statistiques" } | { nom: "reglages" };
 
 const LIBELLES_SYNCHRO: Record<EtatSynchro["statut"], string> = {
   synchronise: "Synchronisé",
@@ -200,6 +202,7 @@ export function Coque() {
     { vue: "tickets", libelle: "Tickets", icone: Receipt },
     { vue: "comptes", libelle: "Comptes", icone: NotebookPen },
     { vue: "clotures", libelle: "Clôtures", icone: Archive },
+    { vue: "statistiques", libelle: "Stats", icone: ChartColumn, responsable: true },
     { vue: "reglages", libelle: "Réglages", icone: Settings, responsable: true },
   ];
 
@@ -311,6 +314,7 @@ export function Coque() {
         {vue.nom === "tickets" && <Tickets />}
         {vue.nom === "comptes" && <Comptes />}
         {vue.nom === "clotures" && <Clotures commandesOuvertes={commandes.size} />}
+        {vue.nom === "statistiques" && <Statistiques />}
         {vue.nom === "reglages" && <Reglages onAssistant={() => setAssistant(true)} />}
       </main>
       {fondADeclarer && !blocage && (

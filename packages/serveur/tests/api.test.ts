@@ -531,6 +531,67 @@ describe("alertes", () => {
   });
 });
 
+describe("statistiques", () => {
+  it("calcule CA, ticket moyen, couverts, heures, articles, serveurs, zones et compare à la période précédente", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    const lea = a.rattachement.utilisateurs[0]!.id;
+    const cap = { ...CAFE, articleId: "cappuccino" };
+    // Veille (14 octobre, période précédente) : une vente de 4,00 €.
+    instant = Date.parse("2026-10-14T09:00:00Z");
+    await a.registre.enregistrerVente({ lignes: [cap], paiements: [{ mode: "CB", montant: 400 }], operateurId: lea });
+    // 15 octobre : table 2 (2 couverts, 10 h à Paris), un offert ; comptoir sur l'iPhone à 12 h ; une annulation.
+    instant = Date.parse("2026-10-15T08:10:00Z");
+    await a.registre.enregistrerVente({
+      lignes: [{ ...cap, quantite: 2 }, { ...SPRITZ, remise: { montantTTC: 1100, motif: "Fidélité" } }],
+      paiements: [{ mode: "CB", montant: 800 }],
+      operateurId: lea,
+      tableId: "t2",
+      couverts: 2,
+    });
+    instant = Date.parse("2026-10-15T10:05:00Z");
+    await b.registre.enregistrerVente({ lignes: [cap], paiements: [{ mode: "ESPECES", montant: 500 }], operateurId: lea });
+    await b.registre.enregistrerVente({ lignes: [{ ...cap, quantite: 3 }], paiements: [{ mode: "CB", montant: 1200 }], operateurId: lea });
+    await b.registre.enregistrerAnnulation({ numeroTicket: 2, motif: "Erreur de saisie", operateurId: lea });
+    expect((await a.synchro()).statut).toBe(200);
+    expect((await b.synchro()).statut).toBe(200);
+
+    const r = await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-15", undefined, a.bearer);
+    expect(r.statut).toBe(200);
+    const st = r.corps;
+    expect(st.precedente).toEqual({ du: "2026-10-14", au: "2026-10-14" });
+    expect(st.indicateurs).toMatchObject({ caTTC: 1200, nbVentes: 3, ventesConservees: 2, nbAnnulations: 1, montantAnnule: 1200, ticketMoyen: 600, couverts: 2, parCouvert: 400, offerts: 1100, remises: 0, articles: 4 });
+    expect(st.indicateursPrecedents).toMatchObject({ caTTC: 400, nbVentes: 1 });
+    expect(st.parHeure[10]).toEqual({ heure: 10, ttc: 800, tickets: 1 });
+    expect(st.parHeure[12]).toEqual({ heure: 12, ttc: 400, tickets: 2 });
+    expect(st.paiements).toEqual([
+      { mode: "CB", montant: 800, tickets: 3 },
+      { mode: "ESPECES", montant: 400, tickets: 1 },
+    ]);
+    expect(st.articles.map((x: any) => [x.libelle, x.quantite, x.ttc, x.detail])).toEqual([
+      ["Cappuccino", 3, 1200, "Cafés"],
+      ["Spritz Aperol", 1, 0, "Spritz"],
+    ]);
+    expect(st.zones.map((z: any) => [z.libelle, z.ttc, z.tickets])).toEqual([
+      ["Salle", 800, 1],
+      ["Comptoir", 400, 2],
+    ]);
+    expect(st.tables[0]).toMatchObject({ libelle: "Table 2", ttc: 800, couverts: 2 });
+    expect(st.serveurs[0]).toMatchObject({ nom: "Léa", ttc: 1200, tickets: 3, annulations: 1, offerts: 1100 });
+    expect(st.appareils.map((x: any) => x.ttc).sort()).toEqual([400, 800]);
+    expect(st.remisesParMotif[0]).toMatchObject({ libelle: "Offert · Fidélité", ttc: 1100 });
+    expect(st.annulationsParMotif[0]).toMatchObject({ libelle: "Erreur de saisie", ttc: 1200, tickets: 1 });
+    expect(st.parJour).toEqual([{ jour: "2026-10-15", ttc: 1200, tickets: 3, couverts: 2 }]);
+    expect(st.parJourSemaine[3]).toMatchObject({ jour: 3, ttc: 1200, moyenne: 1200 });
+
+    expect((await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-01", undefined, a.bearer)).statut).toBe(400);
+    expect((await appel("GET", "/api/caisse/statistiques?du=2025-01-01&au=2026-10-15", undefined, a.bearer)).statut).toBe(400);
+    expect((await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie })).corps.indicateurs.caTTC).toBe(1200);
+    expect((await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-15")).statut).toBe(401);
+  });
+});
+
 describe("cloisonnement entre établissements", () => {
   it("une caisse ne lit ni ne modifie rien d'un autre établissement, même en forgeant les identifiants", async () => {
     const cookie = await adminConnecte();

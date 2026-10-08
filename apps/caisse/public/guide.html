@@ -338,6 +338,17 @@
     <p class="attendu"><b>Attendu :</b> au 4e code faux, « 1 essai avant blocage » ; au 5e, le pavé se grise jusqu'à l'heure affichée (5 minutes), même le bon code ne passe plus. L'ajout à l'équipe demande le code d'un responsable, même si vous êtes responsable. L'administration affiche l'alerte « Code PIN bloqué » ; « Vu » la retire de la liste.</p>
   </section>
 
+  <section class="scenario" data-id="s6j">
+    <label><input type="checkbox">Statistiques</label>
+    <ol>
+      <li>Connecté en responsable, onglet <span class="bouton">Stats</span> (absent pour un serveur).</li>
+      <li>Comparez « Aujourd'hui » au ticket X de la journée (Clôtures › Lecture X).</li>
+      <li>Touchez une colonne de « CA par heure », puis choisissez « 7 jours » et « Mois dernier ».</li>
+      <li>Si une alerte est en tête, touchez <span class="bouton">Vu</span> et validez avec un code responsable.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> le CA et les moyens de paiement égalent ceux de la lecture X (tous les appareils synchronisés) ; chaque indicateur montre l'écart avec la période précédente ; la colonne touchée affiche son montant et ses tickets ; l'alerte disparaît une fois vue. Sur iPhone, tout tient en une colonne.</p>
+  </section>
+
   <section class="scenario" data-id="s7">
     <label><input type="checkbox">Imprimante en défaut (si imprimante connectée)</label>
     <ol>

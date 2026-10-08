@@ -46,6 +46,7 @@ import {
   type ReponseTickets,
   type ReponseClotures,
   type ReponseJournee,
+  type ReponseStatistiques,
   type EtablissementApi,
   type IdentiteEtablissement,
   type ReponseEtat,
@@ -70,6 +71,7 @@ import {
 } from "./securite.js";
 import { empreinteCle, FORMAT_ARCHIVE_SERVEUR, type ContenuArchiveServeur, type PartieCaisse } from "./archive.js";
 import { StockageServeur } from "./stockage-db.js";
+import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre } from "./statistiques.js";
 
 export interface Environnement {
   db: Db;
@@ -782,15 +784,20 @@ async function majUtilisateursCaisse(env: Environnement, requete: Request): Prom
   return json(200, { utilisateurs: await utilisateurs(env.db, c.etablissement_id) });
 }
 
-async function verifierPinResponsable(env: Environnement, c: LigneCaisse, r: { id?: unknown; pin?: unknown } | undefined): Promise<{ id: string; nom: string }> {
+async function verifierPinResponsable(
+  env: Environnement,
+  c: LigneCaisse,
+  r: { id?: unknown; pin?: unknown } | undefined,
+  action = "la modification de l'équipe",
+): Promise<{ id: string; nom: string }> {
   if (!r || typeof r.id !== "string" || typeof r.pin !== "string" || !PIN_VALIDE.test(r.pin)) {
-    throw new ErreurHttp(403, "RESPONSABLE_REQUIS", "Le code PIN d'un responsable est nécessaire pour modifier l'équipe.");
+    throw new ErreurHttp(403, "RESPONSABLE_REQUIS", `Le code PIN d'un responsable est nécessaire pour ${action}.`);
   }
   const [u] = await env.db.requete<{ id: string; nom: string; role: string; actif: boolean; pin_hash: string; echecs_pin: number; pin_bloque_jusqua: string | null }>(
     "select id, nom, role, actif, pin_hash, echecs_pin, pin_bloque_jusqua from utilisateurs where id = $1 and etablissement_id = $2",
     [r.id, c.etablissement_id],
   );
-  if (!u || u.role !== "responsable" || !u.actif) throw new ErreurHttp(403, "RESPONSABLE_REQUIS", "Seul un responsable actif peut modifier l'équipe.");
+  if (!u || u.role !== "responsable" || !u.actif) throw new ErreurHttp(403, "RESPONSABLE_REQUIS", `Seul un responsable actif peut valider ${action}.`);
   const maintenant = horloge(env);
   if (u.pin_bloque_jusqua && u.pin_bloque_jusqua > maintenant.toISOString()) {
     throw new ErreurHttp(429, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux : ${u.nom} est bloqué jusqu'à ${heureParis(u.pin_bloque_jusqua)}.`);
@@ -801,7 +808,7 @@ async function verifierPinResponsable(env: Environnement, c: LigneCaisse, r: { i
       const jusqua = new Date(maintenant.getTime() + BLOCAGE_PIN_MS).toISOString();
       await env.db.lot([
         { texte: "update utilisateurs set echecs_pin = 0, pin_bloque_jusqua = $2 where id = $1", params: [u.id, jusqua] },
-        requeteAlerte(c.etablissement_id, c.id, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux pour ${u.nom} (modification de l'équipe) : bloqué 5 minutes.`, { utilisateur: u.id, contexte: "equipe" }, null, maintenant),
+        requeteAlerte(c.etablissement_id, c.id, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux pour ${u.nom} (${action}) : bloqué 5 minutes.`, { utilisateur: u.id, contexte: action }, null, maintenant),
       ]);
       throw new ErreurHttp(429, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux : ${u.nom} est bloqué jusqu'à ${heureParis(jusqua)}.`);
     }
@@ -893,6 +900,63 @@ function alertesEvenements(c: LigneCaisse, evenements: Evenement[], maintenant: 
         maintenant,
       ),
     );
+}
+
+/**
+ * Statistiques de l'établissement entre deux journées comptables incluses
+ * (au plus 366 jours), comparées à la période précédente de même durée.
+ */
+async function statistiques(env: Environnement, etablissementId: string, requete: Request): Promise<Response> {
+  const params = new URL(requete.url).searchParams;
+  const du = params.get("du") ?? "";
+  const au = params.get("au") ?? "";
+  if (!DATE_VALIDE.test(du) || !DATE_VALIDE.test(au) || au < du || joursEntre(du, au) > JOURS_MAX_STATISTIQUES) {
+    throw new ErreurHttp(400, "PERIODE_INVALIDE", `Période invalide (du ≤ au, ${JOURS_MAX_STATISTIQUES} jours au plus).`);
+  }
+  const debut = ajouterJours(du, -joursEntre(du, au));
+  const tickets = (
+    await env.db.requete<{ contenu: Ticket }>(
+      `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+       where c.etablissement_id = $1 and e.chaine = 'tickets' and e.contenu->>'dateComptable' between $2 and $3`,
+      [etablissementId, debut, au],
+    )
+  ).map((l) => l.contenu);
+  const [e] = await env.db.requete<{ carte_id: string; tables: Table[] }>("select carte_id, tables from etablissements where id = $1", [etablissementId]);
+  const [carte] = e ? await env.db.requete<{ contenu: Catalogue }>("select contenu from cartes where id = $1", [e.carte_id]) : [];
+  const equipe = await env.db.requete<{ id: string; nom: string }>("select id, nom from utilisateurs where etablissement_id = $1", [etablissementId]);
+  const caisses = await env.db.requete<{ id: string; nom: string; derniere_synchro: string | null; revoquee_le: string | null }>(
+    "select id, nom, derniere_synchro, revoquee_le from caisses where etablissement_id = $1 order by id",
+    [etablissementId],
+  );
+  const alertes = (await (await listeAlertes(env, etablissementId, false)).json()) as { alertes: AlerteApi[] };
+  const reponse: ReponseStatistiques = {
+    ...calculerStatistiques({
+      du,
+      au,
+      tickets,
+      carte: carte?.contenu ?? null,
+      utilisateurs: equipe,
+      tables: e?.tables ?? [],
+      appareils: Object.fromEntries(caisses.map((x) => [x.id, x.nom])),
+      synchros: Object.fromEntries(caisses.filter((x) => !x.revoquee_le).map((x) => [x.id, x.derniere_synchro])),
+      maintenant: horloge(env),
+    }),
+    alertes: alertes.alertes,
+  };
+  return json(200, reponse);
+}
+
+/** Alerte marquée vue depuis une caisse : code d'un responsable vérifié par le serveur. */
+async function marquerAlerteVueCaisse(env: Environnement, requete: Request, id: string): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const { responsable } = await lireJson<{ responsable?: { id?: unknown; pin?: unknown } }>(requete);
+  const qui = await verifierPinResponsable(env, c, responsable, "la lecture des alertes");
+  const [l] = await env.db.requete<{ id: string }>(
+    "update alertes set vue_le = $2, vue_par = $3 where id = $1 and etablissement_id = $4 and vue_le is null returning id",
+    [id, horloge(env).toISOString(), `${qui.nom} (${c.nom})`, c.etablissement_id],
+  );
+  if (!l) throw new ErreurHttp(404, "ALERTE_INCONNUE", "Alerte introuvable ou déjà vue.");
+  return json(200, { ok: true });
 }
 
 async function listeAlertes(env: Environnement, etablissementId: string, toutes: boolean): Promise<Response> {
@@ -1595,6 +1659,14 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       return await ticketsEtablissement(env, c.etablissement_id, limite);
     }
     if (chemin === "/api/caisse/journee" && m === "GET") return await journeeCaisse(env, requete);
+    if (chemin === "/api/caisse/statistiques" && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      return await statistiques(env, c.etablissement_id, requete);
+    }
+    {
+      const a = /^\/api\/caisse\/alertes\/(\d{1,15})\/vue$/.exec(chemin);
+      if (a && m === "POST") return await marquerAlerteVueCaisse(env, requete, a[1]!);
+    }
     if (chemin === "/api/caisse/journee/verrou" && m === "POST") return await prendreVerrouCloture(env, requete);
     if (chemin === "/api/caisse/journee/verrou" && m === "DELETE") return await rendreVerrouCloture(env, requete);
     {
@@ -1660,6 +1732,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         await journaliserAdmin(env, admin.id, "client_enregistre", { etablissement: e.id, client: client.id, nom: client.nom, actif: client.actif });
         return json(200, { client });
       }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/statistiques$/.exec(chemin);
+      if (p && m === "GET") return await statistiques(env, (await etablissement(env.db, p[1]!)).id, requete);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/alertes$/.exec(chemin);
       if (p && m === "GET") return await listeAlertes(env, (await etablissement(env.db, p[1]!)).id, new URL(requete.url).searchParams.get("toutes") === "1");
       p = /^\/api\/admin\/alertes\/(\d{1,15})\/vue$/.exec(chemin);

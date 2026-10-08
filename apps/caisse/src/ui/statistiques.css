@@ -1,0 +1,401 @@
+/*
+ * Statistiques. Une seule couleur de donnée (cuivre) validée sur la carte
+ * espresso (#3a2a22) : bande de luminance, saturation et contraste ≥ 3:1.
+ * Le texte garde les teintes de texte (mousse, sable), jamais la couleur des barres.
+ */
+.statistiques {
+  --donnee: #d9733a;
+  --donnee-active: #ea8a52;
+  --grille: #4a382e;
+  --carte-stat: var(--espresso-2);
+}
+
+.stat-filtres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 18px;
+}
+
+.stat-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stat-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sable);
+}
+
+.stat-date input {
+  background: var(--espresso-2);
+  color: var(--mousse);
+  border: 1px solid var(--espresso-3);
+  border-radius: var(--rayon-petit);
+  padding: 8px 10px;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.stat-contenu {
+  display: grid;
+  gap: 16px;
+  transition: opacity 0.15s;
+}
+
+/* Rechargement : le cadre reste, atténué. */
+.stat-contenu.recharge {
+  opacity: 0.55;
+}
+
+/* Indicateurs */
+.stat-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.stat-tuile {
+  background: var(--carte-stat);
+  border-radius: var(--rayon);
+  padding: 14px 16px;
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.stat-tuile.heros {
+  grid-column: span 2;
+}
+
+.stat-libelle {
+  color: var(--sable);
+  font-size: 0.88rem;
+}
+
+.stat-valeur {
+  font-family: var(--police-chiffres);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.stat-tuile.heros .stat-valeur {
+  font-size: 3rem;
+}
+
+.stat-pied {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.stat-sous {
+  color: var(--sable);
+}
+
+.stat-variation {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+}
+
+.stat-variation.bon {
+  color: #9cc78a;
+}
+
+.stat-variation.mauvais {
+  color: #f0a08f;
+}
+
+.stat-variation.neutre {
+  color: var(--sable);
+  font-weight: 400;
+}
+
+/* Cartes */
+.stat-grille-cartes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.stat-carte {
+  background: var(--carte-stat);
+  border-radius: var(--rayon);
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.stat-carte h2 {
+  font-size: 1.05rem;
+  margin: 0 0 4px;
+}
+
+.stat-carte-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.stat-resume {
+  color: var(--sable);
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+}
+
+/* Colonnes */
+.stat-colonnes {
+  position: relative;
+  height: 210px;
+  padding: 18px 0 0 54px;
+}
+
+.stat-grille {
+  position: absolute;
+  inset: 18px 0 26px 54px;
+  pointer-events: none;
+}
+
+.stat-ligne {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--grille);
+}
+
+.stat-ligne span {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: -0.6em;
+  color: var(--sable);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-barres {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  gap: 2px;
+}
+
+.stat-col {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-rows: 1fr 26px;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.stat-col-zone {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-bottom: 1px solid var(--sable);
+}
+
+.stat-col-barre {
+  width: 100%;
+  max-width: 24px;
+  background: var(--donnee);
+  border-radius: 4px 4px 0 0;
+  min-height: 0;
+}
+
+.stat-col.active .stat-col-barre,
+.stat-col:focus-visible .stat-col-barre {
+  background: var(--donnee-active);
+}
+
+.stat-col:focus-visible {
+  outline: 2px solid var(--mousse);
+  outline-offset: 2px;
+}
+
+.stat-col-valeur {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--mousse);
+  pointer-events: none;
+}
+
+.stat-col-axe {
+  font-size: 0.72rem;
+  color: var(--sable);
+  padding-top: 6px;
+  white-space: nowrap;
+  text-align: center;
+  overflow: visible;
+}
+
+.stat-bulle {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: var(--espresso);
+  border: 1px solid var(--espresso-3);
+  border-radius: var(--rayon-petit);
+  padding: 6px 10px;
+  display: grid;
+  gap: 1px;
+  font-size: 0.82rem;
+  color: var(--sable);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.stat-bulle strong {
+  color: var(--mousse);
+  font-size: 0.95rem;
+}
+
+/* Barres horizontales */
+.stat-barresh {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.stat-barresh li {
+  display: grid;
+  grid-template-columns: minmax(90px, 34%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.stat-barresh-libelle {
+  display: grid;
+  overflow: hidden;
+}
+
+.stat-barresh-libelle small,
+.stat-barresh-valeur small,
+.stat-detail {
+  color: var(--sable);
+  font-size: 0.78rem;
+}
+
+.stat-detail {
+  display: block;
+}
+
+.stat-barresh-piste {
+  height: 14px;
+  display: flex;
+}
+
+.stat-barresh-piste span {
+  background: var(--donnee);
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+}
+
+.stat-barresh-valeur {
+  display: grid;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Tableaux */
+.stat-large {
+  grid-column: 1 / -1;
+}
+
+.stat-defile {
+  overflow-x: auto;
+}
+
+.stat-tableau td {
+  padding: 10px 12px;
+}
+
+/* Alertes */
+.stat-alertes {
+  border: 1px solid #8e3f22;
+}
+
+.stat-alertes ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.stat-alertes li {
+  display: grid;
+  grid-template-columns: minmax(150px, 22%) 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--espresso-3);
+}
+
+.stat-alertes li > span:first-child {
+  display: grid;
+}
+
+.stat-alertes small {
+  color: var(--sable);
+}
+
+.stat-notes {
+  margin: 4px 0 0;
+}
+
+@media (max-width: 700px) {
+  .stat-tuile.heros {
+    grid-column: 1 / -1;
+  }
+  .stat-tuile.heros .stat-valeur {
+    font-size: 2.4rem;
+  }
+  .stat-tuiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat-grille-cartes {
+    grid-template-columns: 1fr;
+  }
+  .stat-alertes li {
+    grid-template-columns: 1fr;
+  }
+  .stat-colonnes {
+    padding-left: 46px;
+  }
+  .stat-grille {
+    left: 46px;
+  }
+}
+
+/* Valeur de la colonne la plus haute : au bord quand la colonne est au bord, jamais coupée. */
+.stat-col:first-child .stat-col-valeur {
+  left: 0;
+}
+.stat-col:last-child .stat-col-valeur {
+  right: 0;
+}

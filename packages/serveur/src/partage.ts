@@ -408,3 +408,88 @@ export function calculerComptes(tickets: Ticket[], clients: ClientApi[]): Omit<R
   comptes.sort((a, b) => b.soldeTTC - a.soldeTTC || a.client.nom.localeCompare(b.client.nom, "fr"));
   return { comptes, anomalies };
 }
+
+// ───────── Statistiques (écran de la caisse et administration) ─────────
+
+/** Indicateurs d'une période, en centimes. */
+export interface IndicateursPeriode {
+  /** CA net (ventes moins annulations), comme les Z. */
+  caTTC: number;
+  caHT: number;
+  tva: number;
+  /** Ventes, comme sur la Z (annulées comprises). */
+  nbVentes: number;
+  /** Ventes non annulées dans la période : base du ticket moyen et des couverts. */
+  ventesConservees: number;
+  nbAnnulations: number;
+  /** Montant annulé (positif). */
+  montantAnnule: number;
+  /** Ventes non annulées / leur nombre. */
+  ticketMoyen: number;
+  /** Couverts des ventes non annulées. */
+  couverts: number;
+  /** Ventes non annulées servies avec couverts / leurs couverts. */
+  parCouvert: number;
+  /** Remises (hors offerts) et offerts (ligne entièrement offerte), nets des annulations. */
+  remises: number;
+  offerts: number;
+  /** Articles vendus (quantité nette). */
+  articles: number;
+  nbCorrections: number;
+  ventesEnCompte: number;
+  reglementsComptes: number;
+}
+
+export interface LigneStat {
+  cle: string;
+  libelle: string;
+  ttc: number;
+  tickets?: number;
+  quantite?: number;
+  couverts?: number;
+  /** Complément (zone d'une table, catégorie d'un article…). */
+  detail?: string;
+}
+
+export interface StatServeur {
+  id: string;
+  nom: string;
+  ttc: number;
+  tickets: number;
+  ticketMoyen: number;
+  couverts: number;
+  remises: number;
+  offerts: number;
+  annulations: number;
+  montantAnnule: number;
+}
+
+export interface ReponseStatistiques {
+  du: string;
+  au: string;
+  jours: number;
+  precedente: { du: string; au: string };
+  calculeLe: string;
+  indicateurs: IndicateursPeriode;
+  indicateursPrecedents: IndicateursPeriode;
+  /** CA net par heure de la journée (heure de Paris, 0 à 23). */
+  parHeure: Array<{ heure: number; ttc: number; tickets: number }>;
+  /** CA net par journée comptable, chaque jour de la période (zéro compris). */
+  parJour: Array<{ jour: string; ttc: number; tickets: number; couverts: number }>;
+  /** Par jour de la semaine (0 = lundi) : CA total et moyenne par jour de la période. */
+  parJourSemaine: Array<{ jour: number; ttc: number; tickets: number; moyenne: number }>;
+  paiements: Array<{ mode: string; montant: number; tickets: number }>;
+  tva: Array<{ tauxTVA: number; baseHT: number; montantTVA: number; montantTTC: number }>;
+  categories: LigneStat[];
+  articles: LigneStat[];
+  serveurs: StatServeur[];
+  appareils: LigneStat[];
+  zones: LigneStat[];
+  tables: LigneStat[];
+  remisesParMotif: LigneStat[];
+  annulationsParMotif: LigneStat[];
+  /** Dernière synchronisation de chaque appareil : ses ventes non reçues manquent ici. */
+  synchros: Record<string, string | null>;
+  nomsAppareils: Record<string, string>;
+  alertes: AlerteApi[];
+}

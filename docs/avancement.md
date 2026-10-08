@@ -24,6 +24,7 @@ Dernière mise à jour : 8 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (à venir) | Écran Statistiques de la caisse (responsables, iPad et iPhone) : toutes les caisses, période au choix comparée à la précédente, indicateurs, CA par heure, jour et jour de semaine, paiements, catégories, salle, appareils, articles, équipe, tables, TVA, remises et annulations par motif ; alertes à lire en tête, marquées vues avec le code d'un responsable |
 | 3ac1619 | Sécurité et alertes : 5 codes PIN faux bloquent 5 minutes (caisse et serveur) ; l'équipe ne se modifie depuis une caisse qu'avec le code d'un responsable vérifié par le serveur ; alertes dans l'administration (prix ou TVA différents de la carte, article hors carte, code PIN bloqué) ; historique des versions de carte ; test de cloisonnement entre établissements |
 | fefbad6 | Clôtures d'établissement (noyau 0.7.0) : la lecture X, la Z, les clôtures mensuelle et d'exercice couvrent toutes les caisses et se font depuis n'importe quel appareil, en ligne, un seul à la fois (verrou serveur) ; fond de caisse commun ; archive serveur au format 2 (toutes les caisses d'une Z) ; contrôle d'établissement dans l'administration ; un appareil seul clôture encore hors ligne |
 | a3f648c | Tickets et clôtures partagés entre appareils (copie du serveur, lecture seule hors de l'appareil d'origine) ; duplicatas et Z imprimés avec l'appareil et la version de l'enregistrement d'origine |
@@ -56,6 +57,7 @@ Dernière mise à jour : 8 octobre 2026.
 - Code PIN : 5 codes faux de suite bloquent la personne 5 minutes sur l'appareil (état dans le stockage local, événement `ANOMALIE` type `PIN_BLOQUE` au journal, remonté en alerte) ; le serveur applique la même règle au code qu'il vérifie (colonnes `echecs_pin`, `pin_bloque_jusqua`). Limite connue : l'empreinte des PIN est sur chaque appareil (connexion hors ligne), un PIN de 4 chiffres se retrouve donc hors de l'application par qui manipule un appareil rattaché.
 - Équipe modifiée depuis une caisse : `PUT /api/caisse/utilisateurs` exige `responsable: {id, pin}`, vérifié par le serveur (un jeton d'appareil ne suffit plus) ; tracé au journal d'administration.
 - Alertes (table `alertes`, jamais bloquantes, uniques par `cle`) : à la réception des ventes, chaque ligne est comparée à la carte (`prixCarte` : article, variante `a:v`, supplément `a+s`) dans sa version en vigueur à l'heure de la vente, la précédente ou l'actuelle (`cartes_versions`, alimentée par trigger) ; plus les blocages de PIN. Lues et marquées vues dans l'administration.
+- Statistiques : calculées par le serveur (`GET /api/caisse/statistiques?du&au`, aussi en administration) sur les tickets reçus de toutes les caisses, par journée comptable, 366 jours au plus, avec la période précédente de même durée. CA, TVA et encaissements = ceux des Z ; ticket moyen et couverts sur les ventes non annulées dans la période ; heures en heure de Paris ; catégorie lue sur la carte actuelle. Une seule couleur de donnée (#d9733a, validée sur la carte espresso). Écran réservé aux responsables.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -66,7 +68,6 @@ Dernière mise à jour : 8 octobre 2026.
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
 - [ ] Tag `noyau-fiscal-v0.7.0` sur fefbad6 (clôtures d'établissement).
-- [ ] Dire où doivent vivre les statistiques (et les alertes à terme) : écran de l'administration ou Matalon Vision. Rien n'est prévu au cahier des charges.
 - [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
 - [ ] Geler le noyau en 1.0.0 (au plus tard au go/no-go du 13 octobre) et poser le tag `noyau-fiscal-v1.0.0` : c'est la version citée par l'attestation.
@@ -79,4 +80,4 @@ Dernière mise à jour : 8 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 9 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 10 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

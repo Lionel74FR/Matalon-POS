@@ -6,6 +6,7 @@ import type {
   ReponseTickets,
   ReponseClotures,
   ReponseJournee,
+  ReponseStatistiques,
   EtablissementApi,
   IdentiteEtablissement,
   PostesProduction,
@@ -126,6 +127,16 @@ export class ClientApi {
   /** Archive d'une clôture produite par le serveur (toutes les caisses qu'elle couvre). */
   archive(caisseId: string, numero: number) {
     return this.appel<Record<string, unknown>>("GET", `/api/caisse/clotures/${encodeURIComponent(caisseId)}/${numero}/archive.json`);
+  }
+
+  /** Statistiques de l'établissement entre deux journées comptables (incluses). */
+  statistiques(du: string, au: string) {
+    return this.appel<ReponseStatistiques>("GET", `/api/caisse/statistiques?du=${du}&au=${au}`);
+  }
+
+  /** Alerte lue, validée par le code d'un responsable (vérifié par le serveur). */
+  marquerAlerteVue(id: string, responsable: { id: string; pin: string }) {
+    return this.appel<{ ok: true }>("POST", `/api/caisse/alertes/${encodeURIComponent(id)}/vue`, { responsable });
   }
 
   comptes() {
