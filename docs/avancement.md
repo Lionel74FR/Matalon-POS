@@ -77,7 +77,7 @@ Dernière mise à jour : 8 octobre 2026.
 - [ ] Console Neon : fenêtre de restauration à 7 jours et sauvegarde quotidienne.
 - [ ] Faire un service hors ligne réel sur l'iPad.
 - [ ] Tester l'imprimante du Moka sur l'iPad (Réglages › Imprimante, puis ticket, addition et Z).
-- [ ] App native iPhone/iPad (coque Capacitor), objectif final Tap to Pay (SDK SumUp, autorisation Apple) : à lancer sur feu vert de Lionel, après le test de l'imprimante. Préalables : numéro D-U-N-S de PROIA CONSEIL obtenu le 8 octobre 2026 (286382469) ; reste l'inscription au programme développeur Apple au nom de PROIA CONSEIL.
+- [ ] App native iPhone/iPad (coque Capacitor), objectif final Tap to Pay (SDK SumUp, autorisation Apple) : à lancer sur feu vert de Lionel, après le test de l'imprimante. Préalables : numéro D-U-N-S de PROIA CONSEIL obtenu le 8 octobre 2026 (286382469) ; compte développeur Apple existant (Team ID A3G34UGTY4) mais inscrit en personne physique au nom de Lionel : à faire passer en organisation PROIA CONSEIL auprès du support Apple Developer, avec ce D-U-N-S, pour que l'éditeur de l'app soit celui de l'attestation.
 - [ ] Vérifier avec Audrex les mentions de facturation électronique.
 
 ## Tests
