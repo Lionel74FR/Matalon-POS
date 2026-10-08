@@ -69,14 +69,14 @@ async function adminConnecte(): Promise<string> {
   return conf.cookie!.split(";")[0]!;
 }
 
-async function caisseRattachee(cookie: string, caisseId = "ipad-0a1b2c3d") {
+async function caisseRattachee(cookie: string, caisseId = "ipad-0a1b2c3d", etab = "moka") {
   if (caisseId === "ipad-0a1b2c3d") {
     const sansEquipe = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
     expect(sansEquipe.corps.code).toBe("RESPONSABLE_REQUIS");
     const u = await appel("POST", "/api/admin/etablissements/moka/utilisateurs", { nom: "Léa", role: "responsable", pin: "1234" }, { Cookie: cookie });
     expect(u.statut).toBe(200);
   }
-  const code = await appel("POST", "/api/admin/etablissements/moka/codes", { nomCaisse: "Comptoir" }, { Cookie: cookie });
+  const code = await appel("POST", `/api/admin/etablissements/${etab}/codes`, { nomCaisse: "Comptoir" }, { Cookie: cookie });
   expect(code.statut).toBe(201);
   const paire = await genererPaireCles(`${caisseId}-k1`);
   const r = await appel("POST", "/api/caisse/rattacher", {
@@ -487,6 +487,51 @@ describe("clôtures de l'établissement", () => {
     const verif = await appel("GET", "/api/admin/etablissements/moka/verification", undefined, { Cookie: cookie });
     expect(verif.corps.integre).toBe(false);
     expect(verif.corps.anomalies.map((x: any) => x.code)).toContain("CHAINAGE_CLOTURES");
+  });
+});
+
+describe("cloisonnement entre établissements", () => {
+  it("une caisse ne lit ni ne modifie rien d'un autre établissement, même en forgeant les identifiants", async () => {
+    const cookie = await adminConnecte();
+    const corps = { id: "bao-canteen", identite: { enseigne: "Bao Canteen" }, carteId: "carte-automne-2026", tables: [], seuilNote: 2500 };
+    expect((await appel("POST", "/api/admin/etablissements", corps, { Cookie: cookie })).statut).toBe(201);
+    const chef = await appel("POST", "/api/admin/etablissements/bao-canteen/utilisateurs", { nom: "Chef", role: "responsable", pin: "4321" }, { Cookie: cookie });
+    expect(chef.statut).toBe(200);
+    const moka = await caisseRattachee(cookie);
+    const bao = await caisseRattachee(cookie, "ipad-2222bbbb", "bao-canteen");
+    await bao.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-chef" });
+    const [z] = await bao.registre.cloturerJournee("u-chef");
+    expect((await bao.synchro()).statut).toBe(200);
+    const clientBao = { id: "cli-0000abcd", nom: "Client Bao", telephone: "", email: "", actif: true };
+    expect((await appel("PUT", "/api/caisse/clients", clientBao, bao.bearer)).statut).toBe(200);
+    const userBao = (await appel("GET", "/api/caisse/etat", undefined, bao.bearer)).corps.utilisateurs[0];
+
+    // Lectures : le ticket, l'archive, les listes et la journée de Bao restent invisibles depuis le Moka.
+    expect((await appel("GET", `/api/caisse/tickets/${bao.caisseId}/1`, undefined, moka.bearer)).statut).toBe(404);
+    expect((await appel("GET", `/api/caisse/clotures/${bao.caisseId}/${z!.numero}/archive.json`, undefined, moka.bearer)).statut).toBe(404);
+    const tickets = await appel("GET", "/api/caisse/tickets", undefined, moka.bearer);
+    expect(tickets.corps.tickets).toEqual([]);
+    expect(Object.keys(tickets.corps.appareils)).toEqual([moka.caisseId]);
+    expect((await appel("GET", "/api/caisse/clotures", undefined, moka.bearer)).corps.clotures).toEqual([]);
+    const journee = (await appel("GET", "/api/caisse/journee", undefined, moka.bearer)).corps;
+    expect(journee.contexte.clotures).toEqual([]);
+    expect(journee.contexte.caisses).toEqual([]);
+    const etat = (await appel("GET", "/api/caisse/etat", undefined, moka.bearer)).corps;
+    expect(etat.clients.map((c: any) => c.id)).not.toContain(clientBao.id);
+    expect(etat.utilisateurs.map((u: any) => u.id)).not.toContain(userBao.id);
+
+    // Écritures : client et équipe de Bao refusés ; enregistrement de la caisse Bao poussé par le Moka refusé.
+    expect((await appel("PUT", "/api/caisse/clients", { ...clientBao, nom: "Pirate" }, moka.bearer)).statut).toBe(403);
+    expect((await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...userBao, role: "responsable", pinHash: "0".repeat(64) }] }, moka.bearer)).statut).toBe(403);
+    const ticketBao = (await bao.stockage.lister("tickets"))[0];
+    expect((await appel("POST", "/api/caisse/synchro", { lot: [{ chaine: "tickets", enregistrement: ticketBao }] }, moka.bearer)).statut).toBe(409);
+    expect((await appel("GET", `/api/caisse/tickets/${bao.caisseId}/1`, undefined, bao.bearer)).statut).toBe(200);
+
+    // Sans session : ni API caisse ni administration.
+    expect((await appel("GET", "/api/caisse/journee")).statut).toBe(401);
+    expect((await appel("GET", "/api/admin/etablissements/bao-canteen/verification")).statut).toBe(401);
+    expect((await appel("GET", `/api/admin/caisses/${bao.caisseId}/journal.json`)).statut).toBe(401);
+    expect((await appel("POST", "/api/caisse/journee/verrou", undefined, { Authorization: "Bearer faux" })).statut).toBe(401);
   });
 });
 
