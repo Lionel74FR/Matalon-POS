@@ -3,7 +3,7 @@ import { AvecIcone } from "./icones";
 import { useState } from "react";
 import type { Utilisateur } from "../donnees/configuration";
 import type { Caisse } from "../fiscal/caisse";
-import { SaisiePin } from "./modales/ModalePin";
+import { journaliserBlocagePin, SaisiePin } from "./modales/ModalePin";
 
 export function Connexion(props: { caisse: Caisse; onConnecte: (u: Utilisateur) => void }) {
   const actifs = props.caisse.config.utilisateurs.filter((u) => u.actif);
@@ -38,7 +38,12 @@ export function Connexion(props: { caisse: Caisse; onConnecte: (u: Utilisateur) 
           </div>
         ) : (
           <>
-            <SaisiePin key={choisi.id} utilisateur={choisi} onValide={props.onConnecte} />
+            <SaisiePin
+              key={choisi.id}
+              utilisateur={choisi}
+              onValide={(u) => props.onConnecte(u)}
+              onBloque={(u) => void journaliserBlocagePin(props.caisse, u, "connexion")}
+            />
             <button className="bouton discret" onClick={() => setChoisi(null)}>
               <AvecIcone icone={Users}>Changer de personne</AvecIcone>
             </button>

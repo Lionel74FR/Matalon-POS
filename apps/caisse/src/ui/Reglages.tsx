@@ -42,7 +42,7 @@ export function messageServeur(e: unknown): string {
 }
 
 export function Reglages(props: { onAssistant: () => void }) {
-  const { caisse, config, majConfig, notifier, imprimer, synchro, synchroniser, utilisateur } = useCaisse();
+  const { caisse, config, majConfig, notifier, imprimer, synchro, synchroniser, utilisateur, demanderPinResponsable } = useCaisse();
   const carte = carteDe(config);
   const [envoi, setEnvoi] = useState(false);
   const [etablissement, setEtablissement] = useState(config.etablissement);
@@ -82,8 +82,11 @@ export function Reglages(props: { onAssistant: () => void }) {
 
   /** L'équipe est commune à l'établissement : la modification passe d'abord par le serveur. */
   const enregistrerMembre = async (u: Utilisateur, message: string) => {
+    // Le serveur vérifie lui-même le code d'un responsable : il est demandé à chaque modification.
+    const responsable = await demanderPinResponsable(`Modification de l'équipe : ${u.nom}.`);
+    if (!responsable) return false;
     try {
-      const { utilisateurs } = await caisse.client.enregistrerEquipe([u]);
+      const { utilisateurs } = await caisse.client.enregistrerEquipe([u], responsable);
       await majConfig({ ...config, utilisateurs });
       notifier(message);
       return true;

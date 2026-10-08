@@ -7,11 +7,15 @@ import { postesDeLaCarte } from "@matalon/catalogue";
 import { EditeurPostes } from "../ui/EditeurPostes";
 import { EditeurPlan } from "../ui/EditeurPlan";
 import { nouvelIdClient } from "../donnees/clients";
+import type { AlerteApi } from "@matalon/serveur/partage";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import {
   Archive,
   Ban,
+  Bell,
+  Check,
+  History,
   BookOpen,
   FileJson,
   FileSpreadsheet,
@@ -338,7 +342,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
                 key={e.id}
                 className={`admin-lien${e.id === choisi ? " actif" : ""}`}
                 onClick={() => aller(e.id)}
-                aria-label={`${e.identite.enseigne} : ${pluriel(actives, "caisse")}, ${pluriel(personnes, "personne")}${divergence ? ", divergence" : ""}`}
+                aria-label={`${e.identite.enseigne} : ${pluriel(actives, "caisse")}, ${pluriel(personnes, "personne")}${divergence ? ", divergence" : ""}${e.alertesNonVues ? `, ${pluriel(e.alertesNonVues, "alerte")}` : ""}`}
               >
                 <strong>
                   <AvecIcone icone={Store}>{e.identite.enseigne}</AvecIcone>
@@ -350,6 +354,11 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
                   <span title="Personnes actives">
                     <AvecIcone icone={Users} taille={16}>{personnes}</AvecIcone>
                   </span>
+                  {e.alertesNonVues > 0 && (
+                    <span className="erreur" title="Alertes à lire">
+                      <AvecIcone icone={Bell} taille={16}>{e.alertesNonVues}</AvecIcone>
+                    </span>
+                  )}
                   {divergence && (
                     <span className="erreur" title="Divergence de synchronisation">
                       <AvecIcone icone={TriangleAlert} taille={16} />
@@ -499,6 +508,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
           <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
         </p>
       )}
+      <Alertes e={e} onChange={props.onChange} />
       <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
       <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
       <Equipe e={e} onChange={props.onChange} />
@@ -507,6 +517,81 @@ function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: 
       <ComptesClients etablissementId={e.id} />
       <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
     </>
+  );
+}
+
+const LIBELLES_ALERTE: Record<AlerteApi["type"], string> = {
+  PRIX_DIFFERENT: "Prix différent de la carte",
+  ARTICLE_HORS_CARTE: "Article hors carte",
+  PIN_BLOQUE: "Code PIN bloqué",
+};
+
+/**
+ * Alertes de l'établissement : ventes à un autre prix que la carte, articles
+ * hors carte, codes PIN bloqués. Elles ne bloquent rien ; on les marque vues.
+ */
+function Alertes(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
+  const [toutes, setToutes] = useState(false);
+  const [alertes, setAlertes] = useState<AlerteApi[] | string | null>(null);
+  const charger = useCallback(async () => {
+    try {
+      setAlertes((await api.alertes(props.e.id, toutes)).alertes);
+    } catch (e) {
+      setAlertes(message(e));
+    }
+  }, [props.e.id, toutes]);
+  useEffect(() => void charger(), [charger, props.e.alertesNonVues]);
+  const vue = async (a: AlerteApi) => {
+    try {
+      await api.marquerAlerteVue(a.id);
+      await props.onChange();
+      await charger();
+    } catch (e) {
+      setAlertes(message(e));
+    }
+  };
+  const nom = (id: string | null) => props.e.caisses.find((c) => c.id === id)?.nom ?? id ?? "Serveur";
+  return (
+    <section className="admin-section">
+      <Titre icone={Bell}>Alertes{props.e.alertesNonVues ? ` (${props.e.alertesNonVues})` : ""}</Titre>
+      {typeof alertes === "string" ? (
+        <p className="erreur">{alertes}</p>
+      ) : !alertes ? (
+        <p className="explication">Chargement…</p>
+      ) : alertes.length === 0 ? (
+        <p className="explication">{toutes ? "Aucune alerte." : "Aucune alerte à lire : prix conformes à la carte, aucun code PIN bloqué."}</p>
+      ) : (
+        <table className="tableau admin-tableau admin-alertes">
+          <tbody>
+            {alertes.map((a) => (
+              <tr key={a.id} className={a.vueLe ? "annule" : ""}>
+                <td>
+                  <strong>{LIBELLES_ALERTE[a.type] ?? a.type}</strong>
+                  <br />
+                  <small>
+                    {dateHeure(a.creeLe)} · {nom(a.caisseId)}
+                    {a.vueLe ? ` · vue le ${dateHeure(a.vueLe)} par ${a.vuePar}` : ""}
+                  </small>
+                </td>
+                <td>{a.message}</td>
+                <td className="nombre">
+                  {!a.vueLe && (
+                    <button className="bouton discret" onClick={() => void vue(a)}>
+                      <AvecIcone icone={Check}>Vu</AvecIcone>
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="admin-actions">
+        <button className="bouton discret" aria-pressed={toutes} onClick={() => setToutes((t) => !t)}>
+          <AvecIcone icone={History}>{toutes ? "Seulement les alertes à lire" : "Voir aussi les alertes vues"}</AvecIcone>
+        </button>
+      </div>
+    </section>
   );
 }
 

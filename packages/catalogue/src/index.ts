@@ -18,6 +18,30 @@ export function trouverArticle(c: Catalogue, id: string): Article | undefined {
   return tousLesArticles(c).find((a) => a.id === id);
 }
 
+/**
+ * Prix et taux de la carte pour l'identifiant d'une ligne de ticket : article
+ * (« a »), variante (« a:v ») ou supplément (« a+s »), comme les forment
+ * `ligneDepuisArticle` et `ligneSupplement`. Null si l'article n'y est pas ou
+ * n'a pas de prix.
+ */
+export function prixCarte(c: Catalogue, articleId: string): { prixTTC: number; tauxTVA: number; nom: string } | null {
+  const plus = articleId.indexOf("+");
+  const deux = articleId.indexOf(":");
+  const coupe = plus >= 0 ? plus : deux;
+  const a = trouverArticle(c, coupe >= 0 ? articleId.slice(0, coupe) : articleId);
+  if (!a) return null;
+  if (plus >= 0) {
+    const s = a.supplements?.find((x) => x.id === articleId.slice(plus + 1));
+    return s ? { prixTTC: s.prixTTC, tauxTVA: a.tauxTVA, nom: `${a.nom} + ${s.nom}` } : null;
+  }
+  if (deux >= 0) {
+    const v = a.variantes?.find((x) => x.id === articleId.slice(deux + 1));
+    const prix = v?.prixTTC ?? a.prixTTC;
+    return v && prix != null ? { prixTTC: prix, tauxTVA: a.tauxTVA, nom: v.libelle ?? `${a.nom} ${v.nom}` } : null;
+  }
+  return a.prixTTC == null ? null : { prixTTC: a.prixTTC, tauxTVA: a.tauxTVA, nom: a.nom };
+}
+
 /** Articles qu'on ne peut pas encore encaisser : prix ou information manquants. */
 export function articlesACompleter(c: Catalogue): Array<{ id: string; nom: string; manque: string }> {
   return tousLesArticles(c)

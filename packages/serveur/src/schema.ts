@@ -40,6 +40,9 @@ export const MIGRATIONS: string[] = [
     actif boolean not null default true,
     maj_le text not null
   )`,
+  // Code PIN vérifié par le serveur (modification de l'équipe depuis une caisse) : 5 codes faux bloquent 5 minutes.
+  `alter table utilisateurs add column if not exists echecs_pin integer not null default 0`,
+  `alter table utilisateurs add column if not exists pin_bloque_jusqua text`,
   `create table if not exists caisses (
     id text primary key,
     etablissement_id text not null references etablissements(id),
@@ -143,6 +146,42 @@ export const MIGRATIONS: string[] = [
       for each row execute function interdire_modification_journal();
     end if;
   end $$`,
+  // Historique des cartes : le contrôle des prix accepte la version en vigueur au moment de la vente
+  // et la précédente (un appareil hors ligne n'a pas encore reçu la nouvelle).
+  `create table if not exists cartes_versions (
+    carte_id text not null,
+    version integer not null,
+    contenu jsonb not null,
+    publiee_le text not null,
+    primary key (carte_id, version)
+  )`,
+  `create or replace function archiver_carte() returns trigger as $$
+    begin
+      insert into cartes_versions (carte_id, version, contenu, publiee_le) values (new.id, new.version, new.contenu, new.maj_le)
+      on conflict do nothing;
+      return new;
+    end;
+  $$ language plpgsql`,
+  `do $$ begin
+    if not exists (select 1 from pg_trigger where tgname = 'cartes_historique') then
+      create trigger cartes_historique after insert or update on cartes for each row execute function archiver_carte();
+    end if;
+  end $$`,
+  `insert into cartes_versions (carte_id, version, contenu, publiee_le) select id, version, contenu, maj_le from cartes on conflict do nothing`,
+  // Alertes de l'établissement (prix différent de la carte, code PIN bloqué…), lues dans l'administration.
+  `create table if not exists alertes (
+    id bigserial primary key,
+    etablissement_id text not null references etablissements(id),
+    caisse_id text,
+    type text not null,
+    message text not null,
+    details jsonb not null default '{}'::jsonb,
+    cle text unique,
+    cree_le text not null,
+    vue_le text,
+    vue_par text
+  )`,
+  `create index if not exists alertes_etablissement on alertes (etablissement_id, cree_le)`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

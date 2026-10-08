@@ -225,11 +225,14 @@ describe("rattachement et synchronisation", () => {
     const cookie = await adminConnecte();
     const { rattachement, bearer, caisseId } = await caisseRattachee(cookie);
     const lea = rattachement.utilisateurs[0]!;
-    const maj = await appel("PUT", "/api/caisse/utilisateurs", {
-      utilisateurs: [{ ...lea }, { id: "u-00000002", nom: "Tom", role: "serveur", pinHash: "a".repeat(64), actif: true }],
-    }, bearer);
+    const responsable = { id: lea.id, pin: "1234" };
+    const tom = { id: "u-00000002", nom: "Tom", role: "serveur", pinHash: "a".repeat(64), actif: true };
+    // Le jeton de l'appareil ne suffit pas : le serveur vérifie le code d'un responsable.
+    expect((await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [tom] }, bearer)).corps.code).toBe("RESPONSABLE_REQUIS");
+    const maj = await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...lea }, tom], responsable }, bearer);
     expect(maj.corps.utilisateurs.map((u: any) => u.nom)).toEqual(["Léa", "Tom"]);
-    const sansResponsable = await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...lea, actif: false }] }, bearer);
+    expect((await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...tom, role: "responsable" }], responsable: { id: tom.id, pin: "1234" } }, bearer)).corps.code).toBe("RESPONSABLE_REQUIS");
+    const sansResponsable = await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...lea, actif: false }], responsable }, bearer);
     expect(sansResponsable.statut).toBe(400);
     // Le refus n'a rien écrit : Léa reste responsable active.
     const etat = await appel("GET", "/api/caisse/etat", undefined, bearer);
@@ -490,6 +493,44 @@ describe("clôtures de l'établissement", () => {
   });
 });
 
+describe("alertes", () => {
+  it("bloque 5 minutes un responsable après 5 codes faux sur la modification de l'équipe", async () => {
+    const cookie = await adminConnecte();
+    const { rattachement, bearer } = await caisseRattachee(cookie);
+    const lea = rattachement.utilisateurs[0]!;
+    const essai = (pin: string) => appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [lea], responsable: { id: lea.id, pin } }, bearer);
+    for (let i = 0; i < 4; i++) expect((await essai("0000")).corps.code).toBe("PIN_INCORRECT");
+    const bloque = await essai("0000");
+    expect(bloque.statut).toBe(429);
+    expect((await essai("1234")).corps.code).toBe("PIN_BLOQUE");
+    instant += 5 * 60_000 + 1000;
+    expect((await essai("1234")).statut).toBe(200);
+    const alertes = (await appel("GET", "/api/admin/etablissements/moka/alertes", undefined, { Cookie: cookie })).corps.alertes;
+    expect(alertes.map((a: any) => a.type)).toEqual(["PIN_BLOQUE"]);
+  });
+
+  it("signale une vente à un autre prix que la carte, un article hors carte et un code PIN bloqué sur une caisse", async () => {
+    const cookie = await adminConnecte();
+    const { registre, synchro } = await caisseRattachee(cookie);
+    // Prix de la carte : cappuccino 4,00 € à 10 %.
+    await registre.enregistrerVente({ lignes: [{ ...CAFE, articleId: "cappuccino", prixUnitaireTTC: 400 }], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await registre.enregistrerVente({ lignes: [{ ...CAFE, articleId: "cappuccino", prixUnitaireTTC: 100 }], paiements: [{ mode: "CB", montant: 100 }], operateurId: "u-lea" });
+    await registre.enregistrerVente({ lignes: [{ ...CAFE, articleId: "fantaisie", libelle: "Fantaisie" }], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await registre.journaliser("ANOMALIE", { type: "PIN_BLOQUE", utilisateur: "u-00000002", nom: "Tom", contexte: "connexion", minutes: 5 }, null);
+    expect((await synchro()).statut).toBe(200);
+    expect((await synchro()).statut).toBe(200); // un renvoi ne double rien
+    const r = await appel("GET", "/api/admin/etablissements/moka/alertes", undefined, { Cookie: cookie });
+    expect(r.corps.alertes.map((a: any) => a.type).sort()).toEqual(["ARTICLE_HORS_CARTE", "PIN_BLOQUE", "PRIX_DIFFERENT"]);
+    const prix = r.corps.alertes.find((a: any) => a.type === "PRIX_DIFFERENT");
+    expect(prix.message).toMatch(/Ticket n° 2 : « Cappuccino » vendu 1,00 € au lieu de 4,00 €/);
+    expect((await appel("GET", "/api/admin/etablissements", undefined, { Cookie: cookie })).corps.etablissements[0].alertesNonVues).toBe(3);
+    expect((await appel("POST", `/api/admin/alertes/${prix.id}/vue`, {}, { Cookie: cookie })).statut).toBe(200);
+    expect((await appel("GET", "/api/admin/etablissements/moka/alertes", undefined, { Cookie: cookie })).corps.alertes).toHaveLength(2);
+    expect((await appel("GET", "/api/admin/etablissements/moka/alertes?toutes=1", undefined, { Cookie: cookie })).corps.alertes).toHaveLength(3);
+    expect((await appel("GET", "/api/admin/etablissements/moka/alertes")).statut).toBe(401);
+  });
+});
+
 describe("cloisonnement entre établissements", () => {
   it("une caisse ne lit ni ne modifie rien d'un autre établissement, même en forgeant les identifiants", async () => {
     const cookie = await adminConnecte();
@@ -523,6 +564,8 @@ describe("cloisonnement entre établissements", () => {
     // Écritures : client et équipe de Bao refusés ; enregistrement de la caisse Bao poussé par le Moka refusé.
     expect((await appel("PUT", "/api/caisse/clients", { ...clientBao, nom: "Pirate" }, moka.bearer)).statut).toBe(403);
     expect((await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [{ ...userBao, role: "responsable", pinHash: "0".repeat(64) }] }, moka.bearer)).statut).toBe(403);
+    // Même avec le code du responsable de Bao : il n'est pas de l'établissement de la caisse.
+    expect((await appel("PUT", "/api/caisse/utilisateurs", { utilisateurs: [], responsable: { id: userBao.id, pin: "4321" } }, moka.bearer)).statut).toBe(403);
     const ticketBao = (await bao.stockage.lister("tickets"))[0];
     expect((await appel("POST", "/api/caisse/synchro", { lot: [{ chaine: "tickets", enregistrement: ticketBao }] }, moka.bearer)).statut).toBe(409);
     expect((await appel("GET", `/api/caisse/tickets/${bao.caisseId}/1`, undefined, bao.bearer)).statut).toBe(200);

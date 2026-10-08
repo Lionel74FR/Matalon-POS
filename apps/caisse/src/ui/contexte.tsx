@@ -19,6 +19,8 @@ export interface ContexteCaisse {
    * sinon celui qui saisit son code PIN. `null` si la demande est annulée.
    */
   demanderResponsable(raison: string): Promise<string | null>;
+  /** Code PIN d'un responsable, saisi à chaque fois, pour une action que le serveur contrôle lui-même (équipe). */
+  demanderPinResponsable(raison: string): Promise<{ id: string; pin: string } | null>;
   deconnecter(): void;
   /** État de la réplication vers le serveur du groupe. */
   synchro: EtatSynchro;

@@ -1,5 +1,5 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -29,6 +29,8 @@ export interface EtablissementAdmin extends EtablissementApi {
   caisses: CaisseAdmin[];
   /** Deux clôtures faites depuis la même précédente (noyau 0.7.0). */
   anomalieCloture: string | null;
+  /** Alertes pas encore vues (prix, article hors carte, code PIN bloqué). */
+  alertesNonVues: number;
 }
 
 export interface RapportVerification {
@@ -83,6 +85,8 @@ export const api = {
     appel<{ code: string; expireLe: string; nomCaisse: string }>("POST", `/etablissements/${etablissementId}/codes`, { nomCaisse }),
   revoquer: (caisseId: string) => appel("POST", `/caisses/${caisseId}/revoquer`, {}),
   verifier: (caisseId: string) => appel<RapportVerification>("GET", `/caisses/${caisseId}/verification`),
+  alertes: (etablissementId: string, toutes = false) => appel<{ alertes: AlerteApi[] }>("GET", `/etablissements/${etablissementId}/alertes${toutes ? "?toutes=1" : ""}`),
+  marquerAlerteVue: (id: string) => appel("POST", `/alertes/${id}/vue`, {}),
   verifierEtablissement: (etablissementId: string) => appel<RapportVerification>("GET", `/etablissements/${etablissementId}/verification`),
   cartes: () => appel<{ cartes: ResumeCarte[] }>("GET", "/cartes"),
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),

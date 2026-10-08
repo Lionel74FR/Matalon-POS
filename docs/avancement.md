@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 7 octobre 2026.
+Dernière mise à jour : 8 octobre 2026.
 
 ## Règle de conduite
 
@@ -24,6 +24,7 @@ Dernière mise à jour : 7 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (à venir) | Sécurité et alertes : 5 codes PIN faux bloquent 5 minutes (caisse et serveur) ; l'équipe ne se modifie depuis une caisse qu'avec le code d'un responsable vérifié par le serveur ; alertes dans l'administration (prix ou TVA différents de la carte, article hors carte, code PIN bloqué) ; historique des versions de carte ; test de cloisonnement entre établissements |
 | fefbad6 | Clôtures d'établissement (noyau 0.7.0) : la lecture X, la Z, les clôtures mensuelle et d'exercice couvrent toutes les caisses et se font depuis n'importe quel appareil, en ligne, un seul à la fois (verrou serveur) ; fond de caisse commun ; archive serveur au format 2 (toutes les caisses d'une Z) ; contrôle d'établissement dans l'administration ; un appareil seul clôture encore hors ligne |
 | a3f648c | Tickets et clôtures partagés entre appareils (copie du serveur, lecture seule hors de l'appareil d'origine) ; duplicatas et Z imprimés avec l'appareil et la version de l'enregistrement d'origine |
 | 4118ce8 | « Envoyer » valide toute commande (même sans imprimante de production) : avant envoi, brouillon (retrait sans trace) ; après envoi, retrait barré et tracé. Plan de salle ajusté à la hauteur d'écran restante. Nouvelle icône (M manuscrit Matalon) |
@@ -52,6 +53,9 @@ Dernière mise à jour : 7 octobre 2026.
 - Commande : brouillon jusqu'à « Envoyer » (ou l'encaissement). Avant envoi, un retrait efface sans trace ; après envoi, il est barré, journalisé (`SUPPRESSION_LIGNE`, `apresEnvoi`) et donne un bon d'annulation s'il y a des imprimantes de production. Le CA reste enregistré à l'encaissement uniquement (ticket scellé).
 - Tickets et clôtures des autres appareils : lus sur le serveur (`GET /api/caisse/tickets`, `/api/caisse/clotures`), en lecture seule. Une annulation, une correction ou une facture ne se fait que sur l'appareil qui a encaissé : chaque chaîne fiscale reste propre à son appareil (numérotation, signature). Les commandes ouvertes, elles, restent propres à chaque appareil.
 - Clôtures d'établissement (0.7.0, demande de Lionel : « le Z et la clôture se font pour l'ensemble de l'établissement, peu importe le nombre de caisses », depuis n'importe quel appareil) : la clôture reste un enregistrement de la chaîne de l'appareil qui la scelle, avec un champ `etablissement` = la clôture précédente de l'établissement (`precedente`, où qu'elle soit), la couverture de chaque caisse (`caisses` : plages de tickets et d'événements, grands totaux) et, pour un mois ou un exercice, les sources (`agregees`). Totaux et grand total = ceux de l'établissement. L'appareil reçoit du serveur (`GET /api/caisse/journee`, `POST …/journee/verrou`) les tickets non couverts des autres caisses et les vérifie (signatures, chaînage, ancrage sur la dernière Z) avant de sceller. Un ticket pas encore reçu entre dans la Z suivante (datée au plus tôt du jour de la dernière Z). Verrou de 10 min, rendu à la réception de la clôture ; une Z faite quand même depuis une précédente déjà suivie est acceptée mais signalée (`anomalie_cloture`, `CHAINAGE_CLOTURES`). Z hors ligne refusée dès que l'établissement a deux appareils en service. Correction de paiement : couverture lue sur le serveur (en ligne). Archive d'une clôture multi-caisses : celle du serveur (`matalon-archive-serveur/2`, clés de chaque caisse) ; l'appareil ne signe que celles qui ne couvrent que lui. Fond de caisse et dernier comptage communs à l'établissement.
+- Code PIN : 5 codes faux de suite bloquent la personne 5 minutes sur l'appareil (état dans le stockage local, événement `ANOMALIE` type `PIN_BLOQUE` au journal, remonté en alerte) ; le serveur applique la même règle au code qu'il vérifie (colonnes `echecs_pin`, `pin_bloque_jusqua`). Limite connue : l'empreinte des PIN est sur chaque appareil (connexion hors ligne), un PIN de 4 chiffres se retrouve donc hors de l'application par qui manipule un appareil rattaché.
+- Équipe modifiée depuis une caisse : `PUT /api/caisse/utilisateurs` exige `responsable: {id, pin}`, vérifié par le serveur (un jeton d'appareil ne suffit plus) ; tracé au journal d'administration.
+- Alertes (table `alertes`, jamais bloquantes, uniques par `cle`) : à la réception des ventes, chaque ligne est comparée à la carte (`prixCarte` : article, variante `a:v`, supplément `a+s`) dans sa version en vigueur à l'heure de la vente, la précédente ou l'actuelle (`cartes_versions`, alimentée par trigger) ; plus les blocages de PIN. Lues et marquées vues dans l'administration.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -62,6 +66,7 @@ Dernière mise à jour : 7 octobre 2026.
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
 - [ ] Tag `noyau-fiscal-v0.7.0` sur fefbad6 (clôtures d'établissement).
+- [ ] Dire où doivent vivre les statistiques (et les alertes à terme) : écran de l'administration ou Matalon Vision. Rien n'est prévu au cahier des charges.
 - [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
 - [ ] Geler le noyau en 1.0.0 (au plus tard au go/no-go du 13 octobre) et poser le tag `noyau-fiscal-v1.0.0` : c'est la version citée par l'attestation.
@@ -74,4 +79,4 @@ Dernière mise à jour : 7 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 8 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 9 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

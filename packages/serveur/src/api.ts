@@ -1,4 +1,4 @@
-import { lireCatalogue, nombreArticles, validerCatalogue, type Catalogue } from "@matalon/catalogue";
+import { lireCatalogue, nombreArticles, prixCarte, validerCatalogue, type Catalogue } from "@matalon/catalogue";
 import {
   canonique,
   NOM_LOGICIEL,
@@ -28,6 +28,7 @@ import {
   ALPHABET_CODE,
   hacherPin,
   ID_ETABLISSEMENT_VALIDE,
+  type AlerteApi,
   normaliserCode,
   PIN_VALIDE,
   calculerComptes,
@@ -58,6 +59,7 @@ import {
 import { migrer } from "./schema.js";
 import {
   aleatoire,
+  egaux,
   hacherMotDePasse,
   nouveauJeton,
   nouveauSecretTotp,
@@ -82,6 +84,9 @@ const DUREE_CODE_MS = 48 * 3600_000;
 const ECHECS_MAX = 5;
 const BLOCAGE_MS = 15 * 60_000;
 const COOKIE = "mp_admin";
+/** Code PIN vérifié par le serveur : 5 codes faux de suite bloquent la personne 5 minutes (comme sur les caisses). */
+const ESSAIS_PIN = 5;
+const BLOCAGE_PIN_MS = 5 * 60_000;
 /** Durée du verrou de clôture : le temps du comptage et de la Z sur l'appareil qui clôture. */
 const DUREE_VERROU_MS = 10 * 60_000;
 
@@ -688,6 +693,7 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
   const aInserer: Array<{ texte: string; params: unknown[] }> = [];
   const ticketsNouveaux: Ticket[] = [];
   const cloturesNouvelles: Cloture[] = [];
+  const evenementsNouveaux: Evenement[] = [];
   const maintenant = horloge(env).toISOString();
 
   const divergence = async (message: string): Promise<never> => {
@@ -720,6 +726,7 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
     if (anomalies.length) await divergence(`${chaine} n°${e.numero} : ${anomalies.map((a) => a.code).join(", ")}`);
     if (chaine === "tickets") ticketsNouveaux.push(e as Ticket);
     if (chaine === "clotures") cloturesNouvelles.push(e as Cloture);
+    if (chaine === "evenements") evenementsNouveaux.push(e as Evenement);
 
     aInserer.push({
       texte: `insert into enregistrements (caisse_id, chaine, numero, hash, hash_precedent, horodatage, contenu, recu_le)
@@ -753,18 +760,169 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
   }
 
   aInserer.push(...(await controlerClotures(env, c, cloturesNouvelles, maintenant)));
+  aInserer.push(...(await alertesPrix(env, c, ticketsNouveaux, new Date(maintenant))), ...alertesEvenements(c, evenementsNouveaux, new Date(maintenant)));
   aInserer.push({ texte: "update caisses set derniere_synchro = $2 where id = $1", params: [c.id, maintenant] });
   await env.db.lot(aInserer);
   const reponse: ReponseSynchro = { acceptes: aInserer.filter((x) => x.texte.includes("insert into enregistrements")).length, derniers: queues };
   return json(200, reponse);
 }
 
+/**
+ * Équipe modifiée depuis une caisse : le serveur exige le code PIN d'un
+ * responsable actif et le vérifie lui-même (le jeton de l'appareil ne suffit
+ * pas). Cinq codes faux de suite bloquent ce responsable 5 minutes.
+ */
 async function majUtilisateursCaisse(env: Environnement, requete: Request): Promise<Response> {
   const c = await caisseAuthentifiee(env, requete);
-  const { utilisateurs: liste } = await lireJson<{ utilisateurs?: UtilisateurApi[] }>(requete);
+  const { utilisateurs: liste, responsable } = await lireJson<{ utilisateurs?: UtilisateurApi[]; responsable?: { id?: unknown; pin?: unknown } }>(requete);
   if (!Array.isArray(liste) || liste.length > 200) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Équipe invalide.");
+  const qui = await verifierPinResponsable(env, c, responsable);
   await enregistrerUtilisateurs(env, c.etablissement_id, liste);
+  await journaliserAdmin(env, null, "equipe_modifiee_caisse", { caisse: c.id, responsable: qui.id, utilisateurs: liste.map((u) => String(u?.id)) });
   return json(200, { utilisateurs: await utilisateurs(env.db, c.etablissement_id) });
+}
+
+async function verifierPinResponsable(env: Environnement, c: LigneCaisse, r: { id?: unknown; pin?: unknown } | undefined): Promise<{ id: string; nom: string }> {
+  if (!r || typeof r.id !== "string" || typeof r.pin !== "string" || !PIN_VALIDE.test(r.pin)) {
+    throw new ErreurHttp(403, "RESPONSABLE_REQUIS", "Le code PIN d'un responsable est nécessaire pour modifier l'équipe.");
+  }
+  const [u] = await env.db.requete<{ id: string; nom: string; role: string; actif: boolean; pin_hash: string; echecs_pin: number; pin_bloque_jusqua: string | null }>(
+    "select id, nom, role, actif, pin_hash, echecs_pin, pin_bloque_jusqua from utilisateurs where id = $1 and etablissement_id = $2",
+    [r.id, c.etablissement_id],
+  );
+  if (!u || u.role !== "responsable" || !u.actif) throw new ErreurHttp(403, "RESPONSABLE_REQUIS", "Seul un responsable actif peut modifier l'équipe.");
+  const maintenant = horloge(env);
+  if (u.pin_bloque_jusqua && u.pin_bloque_jusqua > maintenant.toISOString()) {
+    throw new ErreurHttp(429, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux : ${u.nom} est bloqué jusqu'à ${heureParis(u.pin_bloque_jusqua)}.`);
+  }
+  if (!egaux(await hacherPin(u.id, r.pin), u.pin_hash)) {
+    const echecs = (Number(u.echecs_pin) || 0) + 1;
+    if (echecs >= ESSAIS_PIN) {
+      const jusqua = new Date(maintenant.getTime() + BLOCAGE_PIN_MS).toISOString();
+      await env.db.lot([
+        { texte: "update utilisateurs set echecs_pin = 0, pin_bloque_jusqua = $2 where id = $1", params: [u.id, jusqua] },
+        requeteAlerte(c.etablissement_id, c.id, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux pour ${u.nom} (modification de l'équipe) : bloqué 5 minutes.`, { utilisateur: u.id, contexte: "equipe" }, null, maintenant),
+      ]);
+      throw new ErreurHttp(429, "PIN_BLOQUE", `${ESSAIS_PIN} codes faux : ${u.nom} est bloqué jusqu'à ${heureParis(jusqua)}.`);
+    }
+    await env.db.requete("update utilisateurs set echecs_pin = $2 where id = $1", [u.id, echecs]);
+    throw new ErreurHttp(403, "PIN_INCORRECT", `Code incorrect. ${ESSAIS_PIN - echecs} essai${ESSAIS_PIN - echecs > 1 ? "s" : ""} avant blocage.`);
+  }
+  if (u.echecs_pin || u.pin_bloque_jusqua) await env.db.requete("update utilisateurs set echecs_pin = 0, pin_bloque_jusqua = null where id = $1", [u.id]);
+  return { id: u.id, nom: u.nom };
+}
+
+const heureParis = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+const enEuros = (centimes: number) => `${(centimes / 100).toFixed(2).replace(".", ",")} €`;
+
+/** Insertion d'une alerte ; `cle` la rend unique (un renvoi ne la double pas). */
+function requeteAlerte(
+  etablissementId: string,
+  caisseId: string | null,
+  type: AlerteApi["type"],
+  message: string,
+  details: Record<string, unknown>,
+  cle: string | null,
+  maintenant: Date,
+) {
+  return {
+    texte: `insert into alertes (etablissement_id, caisse_id, type, message, details, cle, cree_le) values ($1, $2, $3, $4, $5::jsonb, $6, $7)
+            on conflict (cle) do nothing`,
+    params: [etablissementId, caisseId, type, message, JSON.stringify(details), cle, maintenant.toISOString()],
+  };
+}
+
+/**
+ * Contrôle des prix à la réception des ventes : chaque ligne doit avoir le
+ * prix et le taux de la carte, dans la version en vigueur au moment de la
+ * vente, la précédente (appareil pas encore à jour) ou l'actuelle. Sinon une
+ * alerte, jamais un refus : le ticket est scellé sur l'appareil.
+ */
+async function alertesPrix(env: Environnement, c: LigneCaisse, tickets: Ticket[], maintenant: Date) {
+  const ventes = tickets.filter((t) => t.type === "VENTE");
+  if (!ventes.length) return [];
+  const [e] = await env.db.requete<{ carte_id: string }>("select carte_id from etablissements where id = $1", [c.etablissement_id]);
+  if (!e) return [];
+  const versions = await env.db.requete<{ version: number; contenu: Catalogue; publiee_le: string }>(
+    "select version, contenu, publiee_le from cartes_versions where carte_id = $1 order by version desc limit 30",
+    [e.carte_id],
+  );
+  if (!versions.length) return [];
+  const requetes = [];
+  for (const t of ventes) {
+    const anterieures = versions.filter((v) => v.publiee_le <= t.horodatage);
+    const candidates = [...new Set([versions[0]!, ...anterieures.slice(0, 2)])];
+    for (const [i, l] of t.lignes.entries()) {
+      const attendus = candidates.map((v) => prixCarte(v.contenu, l.articleId)).filter((x) => x !== null);
+      const cle = `prix:${c.id}#${t.numero}#${i}`;
+      const base = { ticket: t.numero, ligne: i, articleId: l.articleId, libelle: l.libelle, prixVendu: l.prixUnitaireTTC, tauxVendu: l.tauxTVA, operateurId: t.operateurId };
+      if (!attendus.length) {
+        requetes.push(requeteAlerte(c.etablissement_id, c.id, "ARTICLE_HORS_CARTE", `Ticket n° ${t.numero} : « ${l.libelle} » vendu ${enEuros(l.prixUnitaireTTC)} n'est pas à la carte.`, base, cle, maintenant));
+      } else if (!attendus.some((a) => a.prixTTC === l.prixUnitaireTTC && a.tauxTVA === l.tauxTVA)) {
+        const a = attendus[0]!;
+        const taux = a.tauxTVA !== l.tauxTVA ? `, TVA ${l.tauxTVA / 100} % au lieu de ${a.tauxTVA / 100} %` : "";
+        requetes.push(
+          requeteAlerte(
+            c.etablissement_id,
+            c.id,
+            "PRIX_DIFFERENT",
+            `Ticket n° ${t.numero} : « ${l.libelle} » vendu ${enEuros(l.prixUnitaireTTC)} au lieu de ${enEuros(a.prixTTC)} (carte)${taux}.`,
+            { ...base, prixCarte: a.prixTTC, tauxCarte: a.tauxTVA },
+            cle,
+            maintenant,
+          ),
+        );
+      }
+    }
+  }
+  return requetes;
+}
+
+/** Blocages de code PIN survenus sur une caisse (événements ANOMALIE reçus) : une alerte chacun. */
+function alertesEvenements(c: LigneCaisse, evenements: Evenement[], maintenant: Date) {
+  return evenements
+    .filter((e) => e.code === "ANOMALIE" && e.details.type === "PIN_BLOQUE")
+    .map((e) =>
+      requeteAlerte(
+        c.etablissement_id,
+        c.id,
+        "PIN_BLOQUE",
+        `${ESSAIS_PIN} codes faux pour ${String(e.details.nom ?? e.details.utilisateur)} (${e.details.contexte === "validation" ? "validation responsable" : "connexion"}) à ${heureParis(e.horodatage)} : bloqué 5 minutes.`,
+        { utilisateur: e.details.utilisateur, evenement: e.numero },
+        `pin:${c.id}#${e.numero}`,
+        maintenant,
+      ),
+    );
+}
+
+async function listeAlertes(env: Environnement, etablissementId: string, toutes: boolean): Promise<Response> {
+  const lignes = await env.db.requete<{ id: string; caisse_id: string | null; type: AlerteApi["type"]; message: string; details: Record<string, unknown>; cree_le: string; vue_le: string | null; vue_par: string | null }>(
+    `select id, caisse_id, type, message, details, cree_le, vue_le, vue_par from alertes
+     where etablissement_id = $1 ${toutes ? "" : "and vue_le is null"} order by cree_le desc, id desc limit 200`,
+    [etablissementId],
+  );
+  const alertes: AlerteApi[] = lignes.map((l) => ({
+    id: String(l.id),
+    caisseId: l.caisse_id,
+    type: l.type,
+    message: l.message,
+    details: l.details,
+    creeLe: l.cree_le,
+    vueLe: l.vue_le,
+    vuePar: l.vue_par,
+  }));
+  return json(200, { alertes });
+}
+
+async function marquerAlerteVue(env: Environnement, admin: { id: string; identifiant: string }, id: string): Promise<Response> {
+  const [l] = await env.db.requete<{ id: string }>("update alertes set vue_le = $2, vue_par = $3 where id = $1 and vue_le is null returning id", [
+    id,
+    horloge(env).toISOString(),
+    admin.identifiant,
+  ]);
+  if (!l) throw new ErreurHttp(404, "ALERTE_INCONNUE", "Alerte introuvable ou déjà vue.");
+  await journaliserAdmin(env, admin.id, "alerte_vue", { alerte: id });
+  return json(200, { ok: true });
 }
 
 async function enregistrerUtilisateurs(env: Environnement, etablissementId: string, liste: UtilisateurApi[]) {
@@ -1106,11 +1264,15 @@ async function listeEtablissements(env: Environnement): Promise<Response> {
     [horloge(env).toISOString()],
   );
   const anomalies = await env.db.requete<{ id: string; anomalie_cloture: string | null }>("select id, anomalie_cloture from etablissements");
+  const nonVues = await env.db.requete<{ etablissement_id: string; n: number }>(
+    "select etablissement_id, count(*)::int as n from alertes where vue_le is null group by etablissement_id",
+  );
   const resultat = [];
   for (const e of etabs) {
     resultat.push({
       ...versEtablissement(e),
       anomalieCloture: anomalies.find((a) => a.id === e.id)?.anomalie_cloture ?? null,
+      alertesNonVues: Number(nonVues.find((a) => a.etablissement_id === e.id)?.n ?? 0),
       utilisateurs: await utilisateurs(env.db, e.id),
       codes: codes.filter((c) => c.etablissement_id === e.id).map((c) => ({ code: c.code, nomCaisse: c.nom_caisse, expireLe: c.expire_le })),
       caisses: await Promise.all(
@@ -1498,6 +1660,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         await journaliserAdmin(env, admin.id, "client_enregistre", { etablissement: e.id, client: client.id, nom: client.nom, actif: client.actif });
         return json(200, { client });
       }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/alertes$/.exec(chemin);
+      if (p && m === "GET") return await listeAlertes(env, (await etablissement(env.db, p[1]!)).id, new URL(requete.url).searchParams.get("toutes") === "1");
+      p = /^\/api\/admin\/alertes\/(\d{1,15})\/vue$/.exec(chemin);
+      if (p && m === "POST") return await marquerAlerteVue(env, admin, p[1]!);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/verification$/.exec(chemin);
       if (p && m === "GET") return await verifierEtablissementAdmin(env, admin, (await etablissement(env.db, p[1]!)).id);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/codes$/.exec(chemin);

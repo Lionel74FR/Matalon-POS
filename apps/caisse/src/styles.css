@@ -2516,3 +2516,9 @@ a.bouton {
   vertical-align: -3px;
   color: var(--encre-douce);
 }
+
+/* Code PIN bloqué (5 codes faux) : pavé grisé jusqu'à la fin du blocage. */
+.saisie-pin.bloquee .pave {
+  opacity: 0.35;
+  pointer-events: none;
+}

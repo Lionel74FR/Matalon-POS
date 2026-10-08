@@ -312,6 +312,18 @@ export interface ReponseJournee {
   anomalie: string | null;
 }
 
+/** Alerte de l'établissement, à lire dans l'administration. */
+export interface AlerteApi {
+  id: string;
+  caisseId: string | null;
+  type: "PRIX_DIFFERENT" | "ARTICLE_HORS_CARTE" | "PIN_BLOQUE";
+  message: string;
+  details: Record<string, unknown>;
+  creeLe: string;
+  vueLe: string | null;
+  vuePar: string | null;
+}
+
 export interface ReponseComptes {
   comptes: CompteClient[];
   /** Incohérences relevées entre caisses (sur-règlement, vente inconnue…) : signalées, jamais bloquantes. */

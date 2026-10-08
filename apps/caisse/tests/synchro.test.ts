@@ -156,6 +156,6 @@ describe("rattachement et synchronisation de la caisse", () => {
 
     // Modification depuis la caisse : refusée hors ligne, avec un message clair.
     horsLigne = true;
-    await expect(caisse.client.enregistrerEquipe([])).rejects.toBeInstanceOf(ErreurApi);
+    await expect(caisse.client.enregistrerEquipe([], { id: "u-00000001", pin: "1234" })).rejects.toBeInstanceOf(ErreurApi);
   });
 });

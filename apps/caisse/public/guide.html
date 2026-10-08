@@ -328,6 +328,16 @@
     <p class="attendu"><b>Attendu :</b> la lecture X et le comptage comptent les deux ventes et nomment les deux appareils ; l'attendu en espèces part du fond déclaré sur l'iPad ; l'iPad refuse de clôturer (« Une clôture est en cours sur… ») ; la Z, scellée par l'iPhone, montre la plage de tickets de chaque appareil ; l'archive contient les tickets des deux. Une nouvelle Z sur l'iPad ne compte plus rien. Sans connexion, la Z est refusée dès que l'établissement a deux appareils.</p>
   </section>
 
+  <section class="scenario" data-id="s6i">
+    <label><input type="checkbox">Code PIN bloqué et alertes</label>
+    <ol>
+      <li>Touchez l'icône Quitter, choisissez votre nom et tapez 5 fois un code faux.</li>
+      <li>Réglages › Équipe : ajoutez un serveur de test avec un code PIN.</li>
+      <li>Dans l'administration (ordinateur), ouvrez l'établissement : section <b>Alertes</b>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> au 4e code faux, « 1 essai avant blocage » ; au 5e, le pavé se grise jusqu'à l'heure affichée (5 minutes), même le bon code ne passe plus. L'ajout à l'équipe demande le code d'un responsable, même si vous êtes responsable. L'administration affiche l'alerte « Code PIN bloqué » ; « Vu » la retire de la liste.</p>
+  </section>
+
   <section class="scenario" data-id="s7">
     <label><input type="checkbox">Imprimante en défaut (si imprimante connectée)</label>
     <ol>

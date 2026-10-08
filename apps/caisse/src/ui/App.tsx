@@ -24,7 +24,7 @@ import { Coque } from "./Coque";
 import { blocageEncaissement, Synchroniseur, type EtatSynchro } from "../serveur/synchro";
 import { Rattachement } from "./Rattachement";
 import { ModaleApercu } from "./modales/ModaleApercu";
-import { ModalePin } from "./modales/ModalePin";
+import { journaliserBlocagePin, ModalePin } from "./modales/ModalePin";
 
 type Phase =
   | { nom: "chargement" }
@@ -55,7 +55,7 @@ export function App() {
   const [phase, setPhase] = useState<Phase>({ nom: "chargement" });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [apercu, setApercu] = useState<{ recu: Recu; titre: string; erreur?: string } | null>(null);
-  const [demandePin, setDemandePin] = useState<{ raison: string; resoudre: (id: string | null) => void } | null>(null);
+  const [demandePin, setDemandePin] = useState<{ raison: string; resoudre: (r: { id: string; pin: string } | null) => void } | null>(null);
   const [synchro, setSynchro] = useState<EtatSynchro | null>(null);
   const synchroniseur = useRef<Synchroniseur | null>(null);
   const caisseCourante = useRef<Caisse | null>(null);
@@ -185,6 +185,10 @@ export function App() {
       },
       demanderResponsable(raison: string) {
         if (utilisateur.role === "responsable") return Promise.resolve(utilisateur.id);
+        return new Promise((resoudre) => setDemandePin({ raison, resoudre: (r) => resoudre(r?.id ?? null) }));
+      },
+      demanderPinResponsable(raison: string) {
+        // Toujours saisi, même par un responsable connecté : le serveur vérifie lui-même ce code.
         return new Promise((resoudre) => setDemandePin({ raison, resoudre }));
       },
       deconnecter() {
@@ -316,10 +320,11 @@ export function App() {
           titre="Validation responsable"
           raison={demandePin.raison}
           utilisateurs={phase.caisse.config.utilisateurs.filter((u) => u.role === "responsable")}
-          onValide={(u) => {
-            demandePin.resoudre(u.id);
+          onValide={(u, pin) => {
+            demandePin.resoudre({ id: u.id, pin });
             setDemandePin(null);
           }}
+          onBloque={(u) => void journaliserBlocagePin(phase.caisse, u, "validation")}
           onAnnuler={() => {
             demandePin.resoudre(null);
             setDemandePin(null);

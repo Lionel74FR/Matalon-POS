@@ -8,6 +8,7 @@ import {
   CARTE_AUTOMNE_2026,
   ligneDepuisArticle,
   ligneSupplement,
+  prixCarte,
   tousLesArticles,
   trouverArticle,
   validerCatalogue,
@@ -60,6 +61,21 @@ describe("carte automne 2026", () => {
     expect(ligneDepuisArticle(eau, { varianteId: "100cl" })).toMatchObject({ libelle: "Eau minérale 100 cl", prixUnitaireTTC: 550 });
     const coca = trouverArticle(CARTE_AUTOMNE_2026, "coca")!;
     expect(ligneDepuisArticle(coca, { varianteId: "zero" }).libelle).toBe("Coca zero");
+  });
+
+  it("retrouve le prix de la carte de chaque ligne produite (contrôle des prix vendus)", () => {
+    const bubble = trouverArticle(CARTE_AUTOMNE_2026, "bubble-tea")!;
+    const lignes = [
+      ligneDepuisArticle(bubble, { varianteId: "taro" }),
+      ligneSupplement(bubble, bubble.supplements![1]!),
+      ...tousLesArticles(CARTE_AUTOMNE_2026)
+        .filter((a) => a.prixTTC != null && !a.variantes?.length)
+        .map((a) => ligneDepuisArticle(a)),
+    ];
+    for (const l of lignes) expect(prixCarte(CARTE_AUTOMNE_2026, l.articleId)).toMatchObject({ prixTTC: l.prixUnitaireTTC, tauxTVA: l.tauxTVA });
+    expect(prixCarte(CARTE_AUTOMNE_2026, "inconnu")).toBeNull();
+    expect(prixCarte(CARTE_AUTOMNE_2026, "bubble-tea:inconnue")).toBeNull();
+    expect(prixCarte(CARTE_AUTOMNE_2026, "bubble-tea+inconnu")).toBeNull();
   });
 
   it("compte les articles de la carte (variantes regroupées)", () => {

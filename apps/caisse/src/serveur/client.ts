@@ -144,8 +144,9 @@ export class ClientApi {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/postes", { postes });
   }
 
-  enregistrerEquipe(utilisateurs: UtilisateurApi[]) {
-    return this.appel<{ utilisateurs: UtilisateurApi[] }>("PUT", "/api/caisse/utilisateurs", { utilisateurs });
+  /** Équipe : le serveur exige le code PIN d'un responsable, qu'il vérifie lui-même. */
+  enregistrerEquipe(utilisateurs: UtilisateurApi[], responsable: { id: string; pin: string }) {
+    return this.appel<{ utilisateurs: UtilisateurApi[] }>("PUT", "/api/caisse/utilisateurs", { utilisateurs, responsable });
   }
 
   enregistrerEtablissement(corps: { identite: IdentiteEtablissement; seuilNote: number }) {
