@@ -173,6 +173,12 @@ export function PlanSalle(props: Proprietes) {
         ].join(" ");
         const lignes = etat?.lignes ?? [];
         const taille = Math.min(1.3, d.largeur / 2.6);
+        // Nom et lignes centrés ensemble ; à trois lignes (suite à réclamer), tout se resserre pour tenir sur le plateau.
+        const serre = lignes.length >= 3;
+        const info = serre ? Math.min(0.56, taille * 0.5) : Math.min(0.68, taille * 0.6);
+        const nom = serre ? taille * 0.82 : taille;
+        const interligne = info * 1.1;
+        const bloc = { nom, info, interligne, haut: d.hauteur / 2 - (nom + lignes.length * interligne) / 2 };
         return (
           <g
             key={t.id}
@@ -199,11 +205,11 @@ export function PlanSalle(props: Proprietes) {
             ) : (
               <rect className="plan-plateau" width={d.largeur} height={d.hauteur} rx={0.3} />
             )}
-            <text className="plan-nom" x={d.largeur / 2} y={d.hauteur / 2 - (lignes.length ? 0.45 * lignes.length : 0)} fontSize={taille}>
+            <text className="plan-nom" x={d.largeur / 2} y={bloc.haut + bloc.nom / 2} fontSize={bloc.nom}>
               {t.nom}
             </text>
             {lignes.map((l, i) => (
-              <text key={i} className="plan-info" x={d.largeur / 2} y={d.hauteur / 2 + 0.35 + i * 0.75} fontSize={Math.min(0.68, taille * 0.6)}>
+              <text key={i} className="plan-info" x={d.largeur / 2} y={bloc.haut + bloc.nom + bloc.interligne * (i + 0.5)} fontSize={bloc.info}>
                 {l}
               </text>
             ))}

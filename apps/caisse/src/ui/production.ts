@@ -3,8 +3,8 @@ import { useCallback, useRef } from "react";
 import type { Configuration } from "../donnees/configuration";
 import { envoyerEpson } from "../impression/epson";
 import { gabaritBon } from "../impression/gabarits";
-import type { Commande } from "../metier/commande";
-import { aEnvoyerDans, bonsAEnvoyer, validerEnvoi, type Bon } from "../metier/production";
+import { nomSuite, reclamer, type Commande, type SuiteAttente } from "../metier/commande";
+import { aEnvoyerDans, bonsAEnvoyer, bonsReclame, validerEnvoi, type Bon } from "../metier/production";
 import { useCaisse } from "./contexte";
 
 /** Imprimantes de production en service : au moins un poste relié à une imprimante. */
@@ -61,5 +61,44 @@ export function useEnvoiProduction() {
       return (derniere) => validerEnvoi(derniere, prevu, echecs, utilisateur.id);
     },
     [config, utilisateur.id, notifier],
+  );
+}
+
+/**
+ * « Réclamer » une suite : ce qui reste à envoyer part d'abord (la suite
+ * réclamée y est marquée « réclamé »), puis chaque poste qui en tient déjà des
+ * articles reçoit un bon de réclame. La réclame est notée sur la commande
+ * (heure, qui) ; si un bon de réclame n'a pas pu s'imprimer, elle ne l'est pas
+ * et le bouton reste là pour réessayer.
+ */
+export function useReclame() {
+  const { config, utilisateur, notifier } = useCaisse();
+  const envoyer = useEnvoiProduction();
+  return useCallback(
+    async (c: Commande, carte: Catalogue, suite: SuiteAttente): Promise<(c: Commande) => Commande> => {
+      const par = utilisateur.id;
+      const majEnvoi = await envoyer(reclamer(c, suite, par), carte);
+      const echecs: string[] = [];
+      const imprimes: string[] = [];
+      if (productionActive(config)) {
+        for (const bon of bonsReclame(c, carte, suite)) {
+          const p = config.postesProduction?.[bon.poste];
+          if (!p?.adresse.trim()) continue;
+          try {
+            await envoyerEpson(p.adresse.trim(), gabaritBon(bon, reclamer(c, suite, par), config, par), { sansAccents: p.sansAccents });
+            imprimes.push(bon.poste);
+          } catch (e) {
+            echecs.push(bon.poste);
+            notifier(`${bon.poste} : réclame non imprimée (${e instanceof Error ? e.message : String(e)}). Réclamez à nouveau.`, "erreur");
+          }
+        }
+      }
+      if (!echecs.length) notifier(`${nomSuite(suite)} réclamée${imprimes.length ? ` : ${imprimes.join(", ")}` : ""}.`);
+      return (derniere) => {
+        const envoyee = majEnvoi ? majEnvoi(derniere) : derniere;
+        return echecs.length ? envoyee : reclamer(envoyee, suite, par);
+      };
+    },
+    [config, utilisateur.id, notifier, envoyer],
   );
 }

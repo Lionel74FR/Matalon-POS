@@ -63,6 +63,7 @@ URL=… node scripts/note-et-iphone.mjs captures     # note client et écrans iP
 URL=… node scripts/comptes.mjs captures            # vente en compte hors ligne, règlement sur iPhone, annulation du règlement
 URL=… node scripts/production.mjs captures         # bons bar et cuisine : Envoyer, annulation, envoi à l'encaissement (imprimantes simulées)
 URL=… node scripts/plan.mjs captures               # plan de salle dessiné dans l'administration, tables assemblées, retouche sur l'iPad, conflit de version
+URL=… node scripts/suites.mjs captures             # suites En direct / À suivre 1 à 3 : bons rangés par suite, réclames en cuisine, suivi sur le plan, iPhone
 URL=… node scripts/statistiques.mjs captures      # écran Statistiques : indicateurs, graphiques, articles, alerte lue avec le code d'un responsable, iPhone
 URL=… node scripts/securite.mjs captures          # 5 codes PIN faux = blocage 5 min, équipe modifiée avec le code d'un responsable, alerte de prix
 URL=… node scripts/clotures-etablissement.mjs captures # iPad + iPhone : fond commun, lecture X et Z de l'établissement depuis l'iPhone, verrou, archive des deux caisses

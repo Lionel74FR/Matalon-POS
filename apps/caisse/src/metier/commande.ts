@@ -33,6 +33,28 @@ export interface LigneCommande {
   envoyee?: { le: string; par: string };
   /** Ligne retirée après envoi : bon d'annulation imprimé. */
   annulationEnvoyee?: boolean;
+  /** Suite (« course ») : absente pour « En direct », 1 à 3 pour « À suivre » ; préparée quand elle est réclamée. */
+  suite?: SuiteAttente;
+}
+
+/** « À suivre 1 » à « À suivre 3 » ; « En direct » est l'absence de suite. */
+export type SuiteAttente = 1 | 2 | 3;
+/** 0 : En direct. */
+export type Suite = 0 | SuiteAttente;
+export const SUITES: readonly Suite[] = [0, 1, 2, 3];
+
+export const suiteDe = (l: Pick<LigneCommande, "suite">): Suite => l.suite ?? 0;
+
+/** « En direct », « À suivre 1 »… */
+export const nomSuite = (s: Suite): string => (s === 0 ? "En direct" : `À suivre ${s}`);
+/** « Direct », « AS1 »… pour les boutons et le plan. */
+export const nomCourtSuite = (s: Suite): string => (s === 0 ? "Direct" : `AS${s}`);
+
+/** Une suite réclamée : la cuisine lance sa préparation. */
+export interface Reclame {
+  suite: SuiteAttente;
+  le: string;
+  par: string;
 }
 
 export interface Commande {
@@ -46,6 +68,8 @@ export interface Commande {
   note?: string;
   /** Tables assemblées à celle de la commande pour un groupe : occupées avec elle, libérées avec elle. */
   jointes?: string[];
+  /** Suites réclamées, dans l'ordre. */
+  reclames?: Reclame[];
 }
 
 /** Tables qu'occupe une commande : la sienne, puis celles qui lui sont assemblées. */
@@ -175,7 +199,8 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
       !l.remise &&
       !x.note &&
       x.details.length === 0 &&
-      l.details.length === 0,
+      l.details.length === 0 &&
+      suiteDe(x) === suiteDe(l),
   );
   if (identique) {
     return {
@@ -199,16 +224,74 @@ export function transfererCommande(c: Commande, versTableId: string): Commande {
  */
 export function fusionnerCommandes(cible: Commande, source: Commande): Commande {
   const notes = [cible.note, source.note].filter(Boolean);
+  const { reclames: _, ...base } = cible;
   return {
-    ...cible,
+    ...base,
     couverts: cible.couverts == null && source.couverts == null ? null : (cible.couverts ?? 0) + (source.couverts ?? 0),
     ouverteLe: cible.ouverteLe < source.ouverteLe ? cible.ouverteLe : source.ouverteLe,
     lignes: [...cible.lignes, ...source.lignes],
     additionsImprimees: Math.max(cible.additionsImprimees, source.additionsImprimees),
     ...(notes.length ? { note: notes.join(" · ") } : {}),
     ...(jointesFusion(cible, source).length ? { jointes: jointesFusion(cible, source) } : {}),
+    ...(reclamesFusion(cible, source).length ? { reclames: reclamesFusion(cible, source) } : {}),
   };
+}
+
+/**
+ * Une suite reste réclamée après regroupement si elle l'était sur chaque
+ * table qui en avait : sinon, des articles de l'autre table attendent encore.
+ */
+function reclamesFusion(cible: Commande, source: Commande): Reclame[] {
+  const reclames: Reclame[] = [];
+  for (const s of [1, 2, 3] as const) {
+    const cotes = [cible, source].filter((c) => lignesActives(c).some((l) => suiteDe(l) === s));
+    const r = cotes.map((c) => reclameDe(c, s));
+    if (cotes.length && r.every(Boolean)) reclames.push(r.reduce((a, b) => (a!.le > b!.le ? a : b))!);
+  }
+  return reclames.sort((a, b) => a.le.localeCompare(b.le));
 }
 
 const jointesFusion = (cible: Commande, source: Commande) =>
   [...new Set([...(cible.jointes ?? []), ...(source.jointes ?? [])])].filter((id) => id !== cible.tableId);
+
+// ───────── Suites (« courses ») ─────────
+
+export function reclameDe(c: Commande, s: Suite): Reclame | null {
+  return s === 0 ? null : (c.reclames?.find((r) => r.suite === s) ?? null);
+}
+
+/** Suites présentes dans la commande (articles non retirés), dans l'ordre de service. */
+export function suitesDe(c: Commande): Suite[] {
+  const presentes = new Set(lignesActives(c).map(suiteDe));
+  return SUITES.filter((s) => presentes.has(s));
+}
+
+/** Suites qui attendent d'être réclamées, dans l'ordre. */
+export function suitesAReclamer(c: Commande): SuiteAttente[] {
+  return suitesDe(c).filter((s): s is SuiteAttente => s !== 0 && !reclameDe(c, s));
+}
+
+/** Réclame une suite (sans effet si elle l'est déjà). */
+export function reclamer(c: Commande, suite: SuiteAttente, par: string, le = new Date().toISOString()): Commande {
+  if (reclameDe(c, suite)) return c;
+  return { ...c, reclames: [...(c.reclames ?? []), { suite, le, par }] };
+}
+
+/** Lignes regroupées par suite, dans l'ordre de service ; l'ordre de saisie est gardé dans chaque suite. */
+export function lignesParSuite(c: Commande): Array<{ suite: Suite; lignes: LigneCommande[] }> {
+  return SUITES.map((suite) => ({ suite, lignes: c.lignes.filter((l) => suiteDe(l) === suite) })).filter((g) => g.lignes.length > 0);
+}
+
+/**
+ * Suivi de la table pour la salle : prochaine suite à réclamer et dernier
+ * mouvement vers la production (envoi ou réclame), d'où l'on compte le temps.
+ */
+export function suiviSuites(c: Commande): { prochaine: SuiteAttente | null; derniereReclame: Reclame | null; dernierMouvement: string | null } {
+  const dates = [...c.lignes.flatMap((l) => (l.envoyee ? [l.envoyee.le] : [])), ...(c.reclames ?? []).map((r) => r.le)];
+  const reclames = [...(c.reclames ?? [])].sort((a, b) => a.le.localeCompare(b.le));
+  return {
+    prochaine: suitesAReclamer(c)[0] ?? null,
+    derniereReclame: reclames.at(-1) ?? null,
+    dernierMouvement: dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null,
+  };
+}

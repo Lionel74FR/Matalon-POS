@@ -11,7 +11,7 @@ import {
 } from "@matalon/noyau-fiscal";
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
-import { lignesActives, totauxCommande, versSaisie, type Commande } from "../metier/commande";
+import { lignesActives, nomSuite, reclameDe, totauxCommande, versSaisie, type Commande, type Suite } from "../metier/commande";
 import type { Bon } from "../metier/production";
 import { mentionsPaiement, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
@@ -170,7 +170,11 @@ export function gabaritAddition(commande: Commande, config: Configuration, opera
 export function gabaritBon(bon: Bon, commande: Commande, config: Configuration, operateurId: string): Recu {
   const r = new Recu();
   if (bon.annulation) r.texte("*** ANNULATION ***", { align: "centre", gras: true, grand: true });
-  r.texte(bon.poste.toUpperCase(), { align: "centre", gras: true, grand: !bon.annulation });
+  if (bon.reclame) {
+    r.texte("*** RÉCLAME ***", { align: "centre", gras: true, grand: true });
+    r.texte(nomSuite(bon.reclame).toUpperCase(), { align: "centre", gras: true, grand: true });
+  }
+  r.texte(bon.poste.toUpperCase(), { align: "centre", gras: true, grand: !bon.annulation && !bon.reclame });
   r.colonnes(nomCommande(config, commande), new Date().toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" }), {
     gras: true,
     grand: true,
@@ -178,12 +182,20 @@ export function gabaritBon(bon: Bon, commande: Commande, config: Configuration, 
   const qui = `Par ${nomUtilisateur(config, operateurId)}`;
   r.texte(commande.couverts ? `${commande.couverts} couvert(s) · ${qui}` : qui);
   r.filet();
+  if (bon.reclame) r.texte("Pour mémoire :");
+  // Suites marquées dès qu'il y en a une « À suivre » : la cuisine sait quoi lancer et quoi attendre.
+  const marquer = !bon.reclame && bon.articles.some((a) => a.suite !== 0);
+  let suite: Suite | null = null;
   for (const a of bon.articles) {
-    r.texte(`${a.quantite} x ${a.libelle}`, { gras: true, grand: true });
-    for (const d of a.details) r.texte(`    ${d}`, { grand: true });
+    if (marquer && a.suite !== suite) {
+      suite = a.suite;
+      r.texte(`-- ${nomSuite(a.suite).toUpperCase()}${reclameDe(commande, a.suite) ? " · RÉCLAMÉ" : ""} --`, { gras: true });
+    }
+    r.texte(`${a.quantite} x ${a.libelle}`, { gras: !bon.reclame, grand: !bon.reclame });
+    for (const d of a.details) r.texte(`    ${d}`, { grand: !bon.reclame });
     if (a.note) r.texte(`    ! ${a.note}`, { gras: true });
   }
-  if (commande.note && !bon.annulation) r.filet().texte(`Note : ${commande.note}`, { gras: true });
+  if (commande.note && !bon.annulation && !bon.reclame) r.filet().texte(`Note : ${commande.note}`, { gras: true });
   if (MODE_TEST) r.filet().texte("Caisse de test", { align: "centre" });
   return r;
 }

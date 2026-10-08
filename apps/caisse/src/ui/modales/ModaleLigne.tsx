@@ -1,7 +1,7 @@
 import { Check, Minus, Plus, Trash2 } from "lucide-react";
 import { AvecIcone } from "../icones";
 import { useState } from "react";
-import { avecQuantite, montantLigne, montantRemise, type LigneCommande } from "../../metier/commande";
+import { avecQuantite, montantLigne, montantRemise, nomCourtSuite, SUITES, suiteDe, type LigneCommande, type Suite } from "../../metier/commande";
 import { Modale } from "../communs";
 import { euros, useCaisse } from "../contexte";
 
@@ -17,6 +17,8 @@ const NOTES_RAPIDES = ["Sans sucre", "Lait végétal", "Sans glace", "Allergie",
 export function ModaleLigne(props: {
   ligne: LigneCommande;
   tableId: string;
+  /** Table (pas le comptoir) : la suite d'un article pas encore envoyé se change ici. */
+  avecSuites?: boolean;
   /** `unitesRetirees` : quantité retirée, qui restera affichée barrée. */
   onChange: (l: LigneCommande | null, unitesRetirees: number) => void;
   onFermer: () => void;
@@ -28,6 +30,7 @@ export function ModaleLigne(props: {
   const [motif, setMotif] = useState(l.remise?.motif ?? "");
   const [erreur, setErreur] = useState("");
   const [note, setNote] = useState(l.note ?? "");
+  const [suite, setSuite] = useState<Suite>(suiteDe(l));
 
   const tracerRetrait = async (unites: number) => {
     if (!l.envoyee) return;
@@ -57,11 +60,12 @@ export function ModaleLigne(props: {
     }
     const retrait = Math.max(0, l.quantite - quantite);
     if (retrait > 0) await tracerRetrait(retrait);
-    const suite = avecQuantite({ ...l, remise: undefined, note: note.trim() || undefined }, quantite);
+    const { suite: _, ...sansSuite } = l;
+    const maj = avecQuantite({ ...sansSuite, ...(suite ? { suite } : {}), remise: undefined, note: note.trim() || undefined }, quantite);
     if (pourcentage > 0) {
-      suite.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, pourcentage) };
+      maj.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, pourcentage) };
     }
-    props.onChange(suite, retrait);
+    props.onChange(maj, retrait);
   };
 
   const supprimer = async () => {
@@ -102,6 +106,18 @@ export function ModaleLigne(props: {
           </button>
         </div>
       </section>
+      {props.avecSuites && !l.envoyee && (
+        <section className="groupe-choix">
+          <h3>Suite</h3>
+          <div className="options compactes">
+            {SUITES.map((x) => (
+              <button key={x} className={`option${suite === x ? " active" : ""}`} onClick={() => setSuite(x)}>
+                {nomCourtSuite(x)}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="groupe-choix">
         <h3>Note pour le service</h3>
         <div className="options">

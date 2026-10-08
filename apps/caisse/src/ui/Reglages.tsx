@@ -134,7 +134,7 @@ export function Reglages(props: { onAssistant: () => void }) {
   };
 
   const testerPoste = async (poste: string, adresse: string, sansAccents: boolean) => {
-    const bon = { poste, annulation: false, articles: [{ quantite: 1, libelle: "Bon d'essai", details: ["Imprimante de production"] }], ligneUids: [] };
+    const bon = { poste, annulation: false, articles: [{ quantite: 1, libelle: "Bon d'essai", details: ["Imprimante de production"], suite: 0 as const }], ligneUids: [] };
     try {
       await envoyerEpson(adresse, gabaritBon(bon, nouvelleCommande("comptoir", utilisateur.id), config, utilisateur.id), { sansAccents });
       notifier(`Bon d'essai envoyé à ${poste}.`);

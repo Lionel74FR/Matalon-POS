@@ -1,11 +1,27 @@
-import { ArrowLeft, ArrowRightLeft, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, StickyNote, Users } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
-import { ajouterLigne, commandeAGarder, lignesActives, modifierLigne, montantLigne, totauxCommande, type Commande, type LigneCommande } from "../metier/commande";
+import {
+  ajouterLigne,
+  commandeAGarder,
+  lignesActives,
+  lignesParSuite,
+  modifierLigne,
+  montantLigne,
+  nomCourtSuite,
+  nomSuite,
+  reclameDe,
+  SUITES,
+  suitesAReclamer,
+  totauxCommande,
+  type Commande,
+  type LigneCommande,
+  type Suite,
+} from "../metier/commande";
 import { nbLignesAEnvoyer } from "../metier/production";
 import { Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
@@ -14,7 +30,9 @@ import { ModaleCouverts } from "./modales/ModaleCouverts";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
 import { ModaleLigne } from "./modales/ModaleLigne";
 import { ModaleAssembler, ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
-import { productionActive, useEnvoiProduction } from "./production";
+import { productionActive, useEnvoiProduction, useReclame } from "./production";
+
+const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" });
 
 const TEINTES: Record<string, string> = {
   Boissons: "cafe",
@@ -87,6 +105,23 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const envoyerProduction = useEnvoiProduction();
   const nbAEnvoyer = nbLignesAEnvoyer(c, production);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  /** Suite des articles ajoutés (« En direct » par défaut) ; pas de suites au comptoir. */
+  const [suite, setSuite] = useState<Suite>(0);
+  const suiteAjout = estComptoir ? 0 : suite;
+  const reclamerSuite = useReclame();
+  const groupes = lignesParSuite(c);
+  /** En-têtes de suite dès qu'un article est « À suivre ». */
+  const avecSuites = groupes.some((g) => g.suite !== 0);
+  const aReclamer = new Set(suitesAReclamer(c));
+
+  const reclamer = async (s: Exclude<Suite, 0>) => {
+    setEnvoiEnCours(true);
+    try {
+      props.onMaj(await reclamerSuite(c, CARTE, s));
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  };
 
   const envoyer = async (commande: Commande, o: { annulationsSeules?: boolean } = {}) => {
     setEnvoiEnCours(true);
@@ -99,7 +134,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   };
 
   const ajouter = (l: Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">) =>
-    props.onChange(ajouterLigne(c, { ...l, ajouteePar: utilisateur.id }));
+    props.onChange(ajouterLigne(c, { ...l, ajouteePar: utilisateur.id, ...(suiteAjout ? { suite: suiteAjout } : {}) }));
 
   const toucherArticle = (a: Article) => {
     if (!articleVendable(CARTE, a)) return notifier(`${a.nom} est indisponible pour le moment.`, "erreur");
@@ -151,33 +186,60 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             {c.note}
           </button>
         )}
+        {!estComptoir && (
+          <div className="selecteur-suite" role="radiogroup" aria-label="Suite des articles ajoutés">
+            {SUITES.map((x) => (
+              <button key={x} role="radio" aria-checked={x === suite} className={`option${x === suite ? " active" : ""}`} onClick={() => setSuite(x)}>
+                {nomCourtSuite(x)}
+              </button>
+            ))}
+          </div>
+        )}
         <ol className="ticket-lignes">
           {c.lignes.length === 0 && <Vide>Touchez un article pour l'ajouter.</Vide>}
-          {c.lignes.map((l) => (
-            <li key={l.uid}>
-              <button
-                className={`ticket-ligne${l.retiree ? " retiree" : ""}`}
-                disabled={!!l.retiree}
-                aria-label={l.retiree ? `${l.quantite} ${l.libelle}, retiré de la commande` : undefined}
-                onClick={() => setLigneOuverte(l)}
-              >
-                <span className="qte">{l.quantite}</span>
-                <span className="libelle">
-                  <span className="libelle-texte">{l.libelle}</span>
-                  {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
-                  {l.note && <small className="note-ligne">{l.note}</small>}
-                  {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
-                  {l.envoyee && !l.retiree && <small className="mention-envoyee">Envoyé</small>}
-                  {production && l.envoyee && l.retiree && !l.annulationEnvoyee && <small className="mention-envoyee">Annulation à envoyer</small>}
-                  {l.remise && (
-                    <small className="remise">
-                      {l.remise.montantTTC === l.quantite * l.prixUnitaireTTC ? "Offert" : `Remise ${euros(l.remise.montantTTC)}`} ·{" "}
-                      {l.remise.motif}
-                    </small>
-                  )}
-                </span>
-                <span className="montant">{euros(montantLigne(l))}</span>
-              </button>
+          {groupes.map((g) => (
+            <li key={g.suite} className="groupe-suite">
+              {avecSuites && (
+                <div className={`entete-suite${reclameDe(c, g.suite) ? " reclamee" : ""}`}>
+                  <span className="nom-suite">{nomSuite(g.suite)}</span>
+                  {reclameDe(c, g.suite) ? (
+                    <span className="etat-suite">Réclamée à {heure(reclameDe(c, g.suite)!.le)}</span>
+                  ) : g.suite !== 0 && aReclamer.has(g.suite) ? (
+                    <button className="bouton reclamer" disabled={envoiEnCours} onClick={() => void reclamer(g.suite as Exclude<Suite, 0>)}>
+                      <AvecIcone icone={BellRing} taille={16}>{`Réclamer ${nomCourtSuite(g.suite)}`}</AvecIcone>
+                    </button>
+                  ) : null}
+                </div>
+              )}
+              <ol>
+                {g.lignes.map((l) => (
+                  <li key={l.uid}>
+                    <button
+                      className={`ticket-ligne${l.retiree ? " retiree" : ""}`}
+                      disabled={!!l.retiree}
+                      aria-label={l.retiree ? `${l.quantite} ${l.libelle}, retiré de la commande` : undefined}
+                      onClick={() => setLigneOuverte(l)}
+                    >
+                      <span className="qte">{l.quantite}</span>
+                      <span className="libelle">
+                        <span className="libelle-texte">{l.libelle}</span>
+                        {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
+                        {l.note && <small className="note-ligne">{l.note}</small>}
+                        {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
+                        {l.envoyee && !l.retiree && <small className="mention-envoyee">Envoyé</small>}
+                        {production && l.envoyee && l.retiree && !l.annulationEnvoyee && <small className="mention-envoyee">Annulation à envoyer</small>}
+                        {l.remise && (
+                          <small className="remise">
+                            {l.remise.montantTTC === l.quantite * l.prixUnitaireTTC ? "Offert" : `Remise ${euros(l.remise.montantTTC)}`} ·{" "}
+                            {l.remise.motif}
+                          </small>
+                        )}
+                      </span>
+                      <span className="montant">{euros(montantLigne(l))}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
             </li>
           ))}
         </ol>
@@ -267,9 +329,9 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           article={articleOuvert}
           carte={CARTE}
           onAjouter={(lignes) => {
-            let suite = c;
-            for (const l of lignes) suite = ajouterLigne(suite, { ...l, ajouteePar: utilisateur.id });
-            props.onChange(suite);
+            let maj = c;
+            for (const l of lignes) maj = ajouterLigne(maj, { ...l, ajouteePar: utilisateur.id, ...(suiteAjout ? { suite: suiteAjout } : {}) });
+            props.onChange(maj);
             setArticleOuvert(null);
           }}
           onFermer={() => setArticleOuvert(null)}
@@ -279,6 +341,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         <ModaleLigne
           ligne={ligneOuverte}
           tableId={c.tableId}
+          avecSuites={!estComptoir}
           onChange={(nouvelle, unitesRetirees) => {
             const suite = modifierLigne(c, ligneOuverte.uid, nouvelle, unitesRetirees, utilisateur.id);
             props.onChange(suite);

@@ -286,6 +286,17 @@
     <p class="attendu"><b>Attendu :</b> un bon au bar et un en cuisine, les lignes marquées « Envoyé » ; le retrait du plat imprime « ANNULATION » en cuisine ; à l'encaissement, le deuxième café part seul au bar. Un poste sans imprimante est signalé : il se prépare d'après l'écran.</p>
   </section>
 
+  <section class="scenario" data-id="s6k">
+    <label><input type="checkbox">Suites : En direct, À suivre, réclames</label>
+    <ol>
+      <li>Ouvrez une table. En haut de la commande, le sélecteur est sur <b>Direct</b> : ajoutez deux cafés.</li>
+      <li>Touchez <b>AS1</b>, ajoutez deux plats ; touchez <b>AS2</b>, ajoutez un dessert. Touchez une ligne pas encore envoyée : sa suite se change aussi depuis là.</li>
+      <li><span class="bouton">Envoyer</span>, puis revenez à la salle : regardez la table (plan et liste).</li>
+      <li>Rouvrez la table, <span class="bouton">Réclamer AS1</span>. Ajoutez un plat en AS1, <span class="bouton">Envoyer</span>, puis <span class="bouton">Réclamer AS2</span>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la commande se range en « En direct », « À suivre 1 », « À suivre 2 ». Tout part à l'envoi : le bon cuisine porte « -- À SUIVRE 1 -- » puis « -- À SUIVRE 2 -- ». La table affiche « AS1 · n min » (prochaine suite à réclamer, temps depuis le dernier envoi). La réclame imprime « RÉCLAME — À SUIVRE 1 » en cuisine avec les plats pour mémoire, et la suite passe « Réclamée à hh:mm » ; le plat ajouté ensuite part marqué « À SUIVRE 1 · RÉCLAMÉ ». Sans imprimante de production, la réclame est seulement notée. Au comptoir, pas de sélecteur.</p>
+  </section>
+
   <section class="scenario" data-id="s6e">
     <label><input type="checkbox">Plan de salle et tables assemblées</label>
     <ol>

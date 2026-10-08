@@ -1,7 +1,7 @@
-import { Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
+import { BellRing, Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ID_COMPTOIR, type Table } from "../donnees/configuration";
-import { tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
+import { nomCourtSuite, nomSuite, suitesDe, suiviSuites, tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
 import { chaisesDe, placerTables, zonesDuPlan } from "../metier/plan";
 import { euros, useCaisse } from "./contexte";
 import { EditeurPlan, type PlanEditable } from "./EditeurPlan";
@@ -12,6 +12,20 @@ import { messageServeur } from "./Reglages";
 function depuis(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
+}
+
+/**
+ * Suites de la table : prochaine à réclamer (« AS1 · 12 min » depuis le
+ * dernier envoi ou la dernière réclame), ou dernière réclamée une fois tout
+ * réclamé. Rien si la table n'a que de l'« En direct ».
+ */
+function suiviTable(c: Commande): { court: string; long: string; aReclamer: boolean } | null {
+  if (!suitesDe(c).some((s) => s !== 0)) return null;
+  const { prochaine, derniereReclame, dernierMouvement } = suiviSuites(c);
+  const temps = depuis(dernierMouvement ?? c.ouverteLe);
+  if (prochaine) return { court: `${nomCourtSuite(prochaine)} · ${temps}`, long: `${nomSuite(prochaine)} à réclamer, dernier envoi il y a ${temps}`, aReclamer: true };
+  if (derniereReclame) return { court: `${nomCourtSuite(derniereReclame.suite)} ✓ ${temps}`, long: `${nomSuite(derniereReclame.suite)} réclamée il y a ${temps}`, aReclamer: false };
+  return null;
 }
 
 const CLE_VUE = "matalon.salle.vue";
@@ -61,11 +75,12 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
       const chaises = tablesDeCommande(c).reduce((s, id) => s + (tableParId.has(id) ? chaisesDe(tableParId.get(id)!) : 0), 0);
       const total = euros(totauxCommande(c).totalTTC);
       const couverts = c.couverts ? `${c.couverts}/${chaises}` : null;
+      const suivi = suiviTable(c);
       m.set(t.id, {
         statut: c.additionsImprimees > 0 ? "addition" : "occupee",
-        lignes: [total, [depuis(c.ouverteLe), couverts].filter(Boolean).join(" · ")],
+        lignes: [total, [depuis(c.ouverteLe), couverts].filter(Boolean).join(" · "), ...(suivi ? [suivi.court] : [])],
         alerte: !!c.couverts && chaises > 0 && c.couverts > chaises,
-        description: `Table ${t.nom}, ${c.additionsImprimees > 0 ? "addition imprimée" : "occupée"}, ${total}`,
+        description: `Table ${t.nom}, ${c.additionsImprimees > 0 ? "addition imprimée" : "occupée"}, ${total}${suivi ? `, ${suivi.long}` : ""}`,
       });
     }
     return m;
@@ -235,6 +250,11 @@ function ListeTables(props: { tables: Table[]; commandeDe: Map<string, Commande>
                           <span title="Ouverte depuis">
                             <AvecIcone icone={Clock} taille={14}>{depuis(c.ouverteLe)}</AvecIcone>
                           </span>
+                          {suiviTable(c) && (
+                            <span className={`suivi-suite${suiviTable(c)!.aReclamer ? " a-reclamer" : ""}`} title={suiviTable(c)!.long}>
+                              <AvecIcone icone={BellRing} taille={14}>{suiviTable(c)!.court}</AvecIcone>
+                            </span>
+                          )}
                           {c.additionsImprimees > 0 && (
                             <span title="Addition imprimée">
                               <AvecIcone icone={Printer} taille={14} />

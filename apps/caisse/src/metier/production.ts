@@ -1,5 +1,5 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { Commande, LigneCommande } from "./commande";
+import { lignesActives, suiteDe, type Commande, type LigneCommande, type Suite, type SuiteAttente } from "./commande";
 
 /**
  * Bons de production : chaque catégorie de la carte peut désigner un poste
@@ -13,11 +13,15 @@ export interface ArticleBon {
   libelle: string;
   details: string[];
   note?: string;
+  /** Suite de l'article : le bon regroupe ses articles par suite (« En direct », « À suivre 1 »…). */
+  suite: Suite;
 }
 
 export interface Bon {
   poste: string;
   annulation: boolean;
+  /** Bon de réclame : la suite à lancer, les articles rappelés pour mémoire. */
+  reclame?: SuiteAttente;
   articles: ArticleBon[];
   /** Lignes de la commande que ce bon couvre (une formule peut en couvrir plusieurs postes). */
   ligneUids: string[];
@@ -34,7 +38,7 @@ const posteCategorie = (carte: Catalogue, id: string) => carte.categories.find((
 /** Ce qu'une ligne donne à chaque poste : une formule répartit ses choix entre les postes. */
 function repartir(l: LigneCommande, carte: Catalogue): Array<{ poste: string; article: ArticleBon }> {
   const posteLigne = posteArticle(carte, l.articleId);
-  const note = l.note ? { note: l.note } : {};
+  const note = { ...(l.note ? { note: l.note } : {}), suite: suiteDe(l) };
   if (l.composants?.length) {
     const parPoste = new Map<string, string[]>();
     for (const c of l.composants) {
@@ -64,6 +68,29 @@ export function bonsAEnvoyer(c: Commande, carte: Catalogue, o: { annulationsSeul
         if (!bon.ligneUids.includes(l.uid)) bon.ligneUids.push(l.uid);
         bons.set(cle, bon);
       }
+    }
+  }
+  return [...bons.values()].map(parSuite);
+}
+
+/** Articles dans l'ordre de service : En direct, puis À suivre 1, 2, 3 (ordre de saisie gardé dans chaque suite). */
+function parSuite(b: Bon): Bon {
+  return { ...b, articles: b.articles.map((a, i) => [a, i] as const).sort((x, y) => x[0].suite - y[0].suite || x[1] - y[1]).map(([a]) => a) };
+}
+
+/**
+ * Bons de réclame d'une suite : un par poste qui en a déjà reçu des articles
+ * (ceux pas encore envoyés partent avec l'envoi, déjà marqués réclamés).
+ */
+export function bonsReclame(c: Commande, carte: Catalogue, suite: SuiteAttente): Bon[] {
+  const bons = new Map<string, Bon>();
+  for (const l of lignesActives(c)) {
+    if (!l.envoyee || suiteDe(l) !== suite) continue;
+    for (const { poste, article } of repartir(l, carte)) {
+      const bon = bons.get(poste) ?? { poste, annulation: false, reclame: suite, articles: [], ligneUids: [] };
+      bon.articles.push(article);
+      if (!bon.ligneUids.includes(l.uid)) bon.ligneUids.push(l.uid);
+      bons.set(poste, bon);
     }
   }
   return [...bons.values()];
