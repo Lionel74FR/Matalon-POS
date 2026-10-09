@@ -106,6 +106,20 @@ export function Stock() {
           à {nomEtab}, le coût reprend le dernier prix payé ailleurs, signalé « emprunté ». Les fiches techniques se relient à la carte
           dans l'éditeur de carte.
         </p>
+        <label className="champ stock-onglets-mobile">
+          <span>Rubrique</span>
+          <select value={onglet} onChange={(e) => setOnglet(e.target.value as Onglet)}>
+            {ONGLETS.map(([groupe, liste]) => (
+              <optgroup key={groupe} label={groupe}>
+                {liste.map(([id, libelle]) => (
+                  <option key={id} value={id}>
+                    {libelle}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
         <div className="stock-onglets" role="tablist">
           {ONGLETS.map(([groupe, liste]) => (
             <div key={groupe} className="stock-groupe-onglets">

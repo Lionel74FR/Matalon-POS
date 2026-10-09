@@ -458,6 +458,22 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
             <p className="explication">Créez une première catégorie pour y ajouter des articles.</p>
           ) : (
             <>
+              <label className="champ editeur-cat-mobile">
+                <span>Catégorie à modifier</span>
+                <select value={categorie.id} onChange={(e) => setCatId(e.target.value)}>
+                  {rayons.map((rayon) => (
+                    <optgroup key={rayon} label={rayon}>
+                      {carte.categories
+                        .filter((c) => c.rayon === rayon)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nom} ({c.articles.length})
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
               <div className="editeur-cat-entete">
                 <label className="champ">
                   <span>Catégorie</span>

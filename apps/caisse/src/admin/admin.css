@@ -846,7 +846,7 @@ select {
 
 .foodcost-cartes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr));
   gap: 20px;
 }
 
@@ -858,4 +858,228 @@ code.cle-api {
   user-select: all;
   word-break: break-all;
   font-size: 1rem;
+}
+
+/* Rubriques du stock et catégories de l'éditeur : listes déroulantes sur iPhone. */
+.stock-onglets-mobile,
+.editeur-cat-mobile {
+  display: none;
+}
+
+/* ───────── iPhone ───────── */
+@media (max-width: 700px) {
+  /* Rien ne doit élargir la page : chaque bloc tient dans l'écran. */
+  .admin-corps,
+  .admin-contenu,
+  .admin-section,
+  .editeur-colonnes > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .admin-corps {
+    padding: 12px 10px 48px;
+    gap: 14px;
+  }
+  .admin-section {
+    padding: 14px;
+    border-radius: var(--rayon);
+  }
+  .admin-section h1 {
+    font-size: 1.4rem;
+  }
+
+  /* Navigation : pastilles qui passent à la ligne, rien de caché à gauche. */
+  .admin-liste {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    overflow: visible;
+  }
+  .admin-liste-titre {
+    display: none;
+  }
+  .admin-lien {
+    padding: 8px 12px;
+    background: var(--espresso-2);
+  }
+  .admin-lien small:not(.admin-compteurs) {
+    display: none;
+  }
+
+  /* Tableaux en fiches : une ligne = un bloc, chaque valeur sous le titre de sa colonne. */
+  .admin-tableau,
+  .admin-tableau tbody {
+    display: block;
+    width: 100%;
+  }
+  .admin-tableau thead {
+    display: none;
+  }
+  .admin-tableau tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--espresso-3);
+  }
+  .admin-tableau td {
+    display: block;
+    padding: 0 !important;
+    border: 0;
+    text-align: left !important;
+    min-width: 0;
+  }
+  .admin-tableau td:first-child {
+    flex: 1 1 100%;
+  }
+  .admin-tableau td[data-l]::before {
+    content: attr(data-l);
+    display: block;
+    color: var(--sable);
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+  .admin-tableau td:last-child:not(:first-child) {
+    margin-left: auto;
+  }
+  .admin-tableau td:empty {
+    display: none;
+  }
+  .admin-tableau .editeur-ordre,
+  .admin-tableau .stock-actions {
+    display: flex;
+    gap: 4px;
+  }
+  /* Composition d'une recette : le composant sur toute la largeur, puis quantité, perte, coût. */
+  .stock-lignes td:first-child {
+    width: 100%;
+  }
+  .stock-lignes td:nth-child(2) {
+    flex: 1 1 120px;
+  }
+  .stock-lignes .champ-perte {
+    width: 80px;
+  }
+
+  /* Rubriques du stock et catégories de l'éditeur. */
+  .stock-onglets {
+    display: none;
+  }
+  .stock-onglets-mobile,
+  .editeur-cat-mobile {
+    display: grid;
+    margin-bottom: 8px;
+  }
+  .stock-onglets-mobile select,
+  .editeur-cat-mobile select {
+    width: 100%;
+    min-height: 48px;
+  }
+  .stock-tete {
+    align-items: stretch;
+  }
+  .stock-etab {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+  .stock-etab select {
+    width: 100%;
+  }
+
+  /* Éditeur de carte : la catégorie se choisit en haut, la liste complète passe sous les articles. */
+  .editeur-categories .editeur-rayon {
+    display: none;
+  }
+  .editeur-colonnes {
+    display: flex;
+    flex-direction: column;
+  }
+  .editeur-articles {
+    order: -1;
+  }
+  .editeur-tete {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .editeur-actions {
+    flex-wrap: wrap;
+  }
+  .editeur-actions .bouton {
+    flex: 1 1 auto;
+  }
+  .editeur-ajout-article,
+  .admin-ligne {
+    flex-wrap: wrap;
+  }
+  .editeur-ajout-article > *,
+  .stock-ajout-article > * {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  .editeur-fiches {
+    font-size: 0.9rem;
+  }
+
+  /* Formulaires : champs pleine largeur. */
+  .admin-ligne input,
+  .admin-ligne select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .admin-ligne .bouton {
+    flex: 1 1 auto;
+  }
+  .stock-filtres > * {
+    flex: 1 1 100%;
+  }
+  .stock-filtres .case {
+    flex: 0 0 auto;
+  }
+  .stock-filtres .bouton {
+    flex: 1 1 auto;
+  }
+  /* Food cost : périodes et dates deux par ligne. */
+  .stock-filtres > .option,
+  .stock-filtres > input[type="date"] {
+    flex: 1 1 calc(50% - 8px);
+  }
+
+  /* Réglages de la catégorie : deux colonnes, la fusion sur toute la largeur. */
+  .editeur-cat-entete {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .editeur-cat-entete .champ:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+  .editeur-cat-entete .bouton.danger {
+    order: 1;
+    justify-self: start;
+  }
+
+  /* Articles de l'éditeur : le nom et les flèches sur la première ligne, les valeurs dessous. */
+  .editeur-table td:first-child {
+    flex: 1 1 calc(100% - 120px);
+  }
+  .editeur-table td.editeur-ordre {
+    order: -1;
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
+  .editeur-table td:first-child {
+    order: -2;
+  }
+  .foodcost-tuiles {
+    grid-template-columns: 1fr 1fr;
+  }
+  .foodcost-tuiles strong {
+    font-size: 1.4rem;
+  }
+  .fiche-editeur .sous-ligne {
+    grid-template-columns: 1fr;
+  }
+  .admin-section code {
+    word-break: break-word;
+  }
 }

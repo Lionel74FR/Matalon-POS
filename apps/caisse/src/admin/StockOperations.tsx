@@ -278,8 +278,9 @@ export function OngletFoodCost(props: Proprietes) {
           </div>
           {(!r.inventaireAvant || !r.inventaireApres) && (
             <p className="admin-alerte">
-              Le food cost réel suppose un inventaire au début et à la fin de la période{!r.inventaireAvant ? " (aucun avant)" : ""}
-              {!r.inventaireApres ? " (aucun à la fin)" : ""} : sans eux, il ne compte que les pertes et les écarts déjà constatés.
+              Le food cost réel suppose un inventaire au début et à la fin de la période. Il manque celui{" "}
+              {!r.inventaireAvant && !r.inventaireApres ? "du début et celui de la fin" : !r.inventaireAvant ? "du début" : "de la fin"} : sans
+              eux, il ne compte que les pertes et les écarts déjà constatés.
             </p>
           )}
           {r.sansFiche.caHT > 0 && (

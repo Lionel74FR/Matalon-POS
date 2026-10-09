@@ -537,6 +537,11 @@ legend + * {
   display: grid;
 }
 
+/* Libellé précédé d'une icône : l'icône reste sur la ligne du texte. */
+.champ > span:has(> .icone.en-ligne) {
+  display: block;
+}
+
 .champ small {
   color: var(--sable);
   font-size: 0.8rem;
@@ -1864,8 +1869,27 @@ a.bouton {
     flex: 1;
   }
   .barre-onglets {
-    order: 3;
+    order: 10;
     flex: 1 1 100%;
+  }
+  /* Première ligne : marque, puis prénom, synchronisation, menu et sortie, à droite. */
+  .barre-etat {
+    display: contents;
+  }
+  .barre-etat .nom-utilisateur {
+    order: 1;
+  }
+  .barre-etat .badge-test {
+    order: 2;
+  }
+  .barre-etat .puce-synchro {
+    order: 3;
+  }
+  .menu-onglets {
+    order: 4;
+  }
+  .barre-etat > .bouton {
+    order: 5;
   }
   /* Le comptoir reste accessible depuis la salle. */
   .onglet.comptoir {

@@ -7,9 +7,11 @@ import { createRoot } from "react-dom/client";
 import "../styles.css";
 import "./admin.css";
 import { Administration } from "./Administration";
+import { etiqueterTableaux } from "./etiquettes";
 
 createRoot(document.getElementById("racine")!).render(
   <StrictMode>
     <Administration />
   </StrictMode>,
 );
+etiqueterTableaux();
