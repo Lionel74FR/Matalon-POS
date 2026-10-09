@@ -70,14 +70,14 @@ await iphone.locator(".puce-synchro").click();
 await synchronise(iphone);
 
 // ── Lecture X sur l'iPad : les deux appareils ──
-await ipad.getByRole("tab", { name: "Clôtures" }).click();
+await ipad.getByRole("button", { name: /^Menu/ }).click().then(() => ipad.getByRole("menuitem", { name: "Clôtures" }).click());
 await clic(ipad, "Lecture X");
 await ipad.locator(".carte-lecture").waitFor();
 const lectureX = (await ipad.locator(".carte-lecture").textContent()).replace(/\s+/g, " ");
 await ipad.screenshot({ path: `${sortie}/e01-lecture-x.png` });
 
 // ── Z sur l'iPhone ; pendant son comptage, l'iPad ne peut pas clôturer ──
-await iphone.getByRole("tab", { name: "Clôtures" }).click();
+await iphone.getByRole("button", { name: /^Menu/ }).click().then(() => iphone.getByRole("menuitem", { name: "Clôtures" }).click());
 await clic(iphone, "Clôturer la journée (Z)");
 await iphone.locator(".comptage-lignes").first().waitFor();
 const comptageIphone = (await iphone.locator(".modale").textContent()).replace(/\s+/g, " ");
@@ -97,7 +97,7 @@ await synchronise(iphone);
 // ── L'iPad voit la Z de l'iPhone (deux appareils), télécharge son archive, puis peut clôturer à son tour ──
 await ipad.getByRole("button", { name: "Fermer" }).last().click().catch(() => undefined);
 await ipad.getByRole("tab", { name: "Tickets" }).click();
-await ipad.getByRole("tab", { name: "Clôtures" }).click();
+await ipad.getByRole("button", { name: /^Menu/ }).click().then(() => ipad.getByRole("menuitem", { name: "Clôtures" }).click());
 const ligneZ = ipad.locator(".tableau-clotures tbody tr", { hasText: "Salle" }).first();
 await ligneZ.waitFor();
 const ligne = (await ligneZ.textContent()).replace(/\s+/g, " ");

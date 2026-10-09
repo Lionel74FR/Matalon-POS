@@ -72,7 +72,7 @@ await clic("Terminé");
 await p.getByRole("tab", { name: "Tickets" }).click();
 await capture("m08-tickets");
 largeurs.tickets = await debordement();
-await p.getByRole("tab", { name: "Clôtures" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Clôtures" }).click());
 await capture("m09-clotures");
 largeurs.clotures = await debordement();
 

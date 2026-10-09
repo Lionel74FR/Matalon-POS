@@ -56,7 +56,7 @@ await ipad.ctx.setOffline(false);
 await ipad.p.locator(".puce-synchro").click();
 await ipad.p.locator(".puce-synchro.synchronise").waitFor({ timeout: 20000 });
 const venteZ = await (async () => {
-  await ipad.p.getByRole("tab", { name: "Clôtures" }).click();
+  await ipad.p.getByRole("button", { name: /^Menu/ }).click().then(() => ipad.p.getByRole("menuitem", { name: "Clôtures" }).click());
   await ipad.p.getByRole("button", { name: "Lecture X", exact: true }).click();
   await ipad.p.getByText("Porté en compte").waitFor();
   return ipad.p.locator(".resume-totaux, dl").first().textContent();

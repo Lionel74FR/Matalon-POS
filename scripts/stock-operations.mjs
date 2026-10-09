@@ -59,7 +59,7 @@ const apresVente = await appel("GET", "/stock/etat?etab=moka");
 const q = (etat, id) => etat.produits.find((x) => x.produitId === id)?.quantite;
 
 // ── 4c sur l'iPad : inventaire de la réserve (1 sac + 0,5 kg de café, 4 kg de sucre) ──
-await p.getByRole("tab", { name: "Stock" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Stock" }).click());
 await p.getByRole("tab", { name: "Réserve" }).click();
 const theoriqueAffiche = (await p.locator(".inventaire-liste li", { hasText: "Café en grains" }).locator("small").first().textContent()).trim();
 await p.getByLabel("Café en grains : nombre de Sac 1 kg").fill("1");

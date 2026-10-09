@@ -190,7 +190,7 @@ await p.getByRole("button", { name: "Fermer" }).last().click();
 await corriger("Espèces");
 await p.waitForFunction(() => document.querySelectorAll(".tableau-tickets tbody tr.correction").length === 2, null, { timeout: 10000 }).catch(() => {});
 const corrections = await p.locator(".tableau-tickets tbody tr.correction").count();
-await p.getByRole("tab", { name: "Clôtures" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Clôtures" }).click());
 await clic("Lecture X");
 await clic("Clôturer la journée (Z)");
 // Comptage : espèces au centime près, rien sur le TPE.

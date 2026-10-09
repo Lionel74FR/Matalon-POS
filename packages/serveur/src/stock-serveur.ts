@@ -211,7 +211,13 @@ const lignesDe = (v: unknown, max = 500): Record<string, unknown>[] => {
 };
 
 /** Horodatage d'une pièce datée (réception d'hier) : maintenant si c'est aujourd'hui, sinon midi ce jour-là. */
-const horodatageDe = (date: string, maintenant: string) => (journeeParis(maintenant) === date ? maintenant : `${date}T12:00:00.000Z`);
+function horodatageDe(date: string, maintenant: string): string {
+  const calendrier = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(new Date(maintenant));
+  if (date === journeeParis(maintenant) || date === calendrier) return maintenant;
+  // Jamais dans le futur : une date à venir prend l'heure réelle.
+  const midi = `${date}T12:00:00.000Z`;
+  return midi < maintenant ? midi : maintenant;
+}
 
 async function enregistrerDocument(db: Db, doc: DocumentStock, mouvements: Mouvement[], autres: Requete[] = []): Promise<void> {
   await db.lot([

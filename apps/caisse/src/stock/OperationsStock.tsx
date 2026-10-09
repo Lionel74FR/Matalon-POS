@@ -1,6 +1,7 @@
 import {
   Couts,
   formaterEnUnite,
+  journeeParis,
   lireDecimal,
   MOTIFS_PERTE,
   normaliserNom,
@@ -158,7 +159,8 @@ export function FormulaireReception(props: { referentiel: Referentiel; prix: Pri
   const fournisseurs = [...new Set(ref.articles.filter((a) => a.actif).map((a) => a.fournisseur))].sort((a, b) => a.localeCompare(b, "fr"));
   const [fournisseur, setFournisseur] = useState(fournisseurs[0] ?? "");
   const [numero, setNumero] = useState("");
-  const [date, setDate] = useState(() => new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(new Date()));
+  // Journée du service (bascule à 5 h) : une livraison saisie à 0 h 30 compte pour la veille.
+  const [date, setDate] = useState(() => journeeParis(new Date().toISOString()));
   const [saisies, setSaisies] = useState<Record<string, { nombre: string; prix: string }>>({});
   const { enCours, erreur, ok, envoyer } = useEnvoi(props.onEnregistrer);
   const produit = (id: string) => ref.produits.find((p) => p.id === id);

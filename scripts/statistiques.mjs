@@ -70,7 +70,7 @@ await p.locator(".puce-synchro").click();
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 20000 });
 
 // ── Écran Statistiques ──
-await p.getByRole("tab", { name: "Stats" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Stats" }).click());
 await p.locator(".stat-tuile.heros").waitFor();
 await p.waitForTimeout(500);
 const tuiles = (await p.locator(".stat-tuiles").textContent()).replace(/\s+/g, " ");

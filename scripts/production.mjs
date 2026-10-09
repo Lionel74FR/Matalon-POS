@@ -62,7 +62,7 @@ const envoyerAvant = await p.locator(".ticket-ligne").count();
 await p.getByRole("button", { name: "Retour à la salle" }).click();
 
 // ── Réglages : une imprimante par poste, bon d'essai ──
-await p.getByRole("tab", { name: "Réglages" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Réglages" }).click());
 await p.getByLabel("Adresse IP de l'imprimante Bar").fill(BAR);
 await p.getByLabel("Adresse IP de l'imprimante Cuisine").fill(CUISINE);
 await clic("Enregistrer les imprimantes");

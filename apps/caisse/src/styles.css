@@ -636,10 +636,6 @@ code {
   .barre-onglets > .onglet {
     padding: 0 10px;
   }
-  /* iPad : le mot suffit, les icônes tiennent la place d'un onglet. */
-  .barre-onglets > .onglet:not(.comptoir) .icone {
-    display: none;
-  }
 }
 
 .onglet {
@@ -653,6 +649,52 @@ code {
 .onglet[aria-selected="true"] {
   background: var(--espresso-3);
   color: var(--mousse);
+}
+
+/* Menu des écrans hors service. */
+.menu-onglets {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.menu-onglets-bouton {
+  color: var(--mousse);
+}
+
+.menu-onglets-bouton.actif,
+.menu-onglets-bouton[aria-expanded="true"] {
+  background: var(--espresso-3);
+}
+
+.menu-onglets-liste {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 220px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--rayon);
+  background: var(--espresso-2);
+  box-shadow: 0 0 0 1px var(--espresso-3), 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.menu-onglets-entree {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: var(--rayon-petit);
+  color: var(--mousse);
+  font-weight: 700;
+  text-align: left;
+}
+
+.menu-onglets-entree:hover,
+.menu-onglets-entree.actif {
+  background: var(--espresso-3);
 }
 
 .onglet.comptoir {

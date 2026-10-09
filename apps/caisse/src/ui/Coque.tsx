@@ -7,6 +7,7 @@ import {
   Coffee,
   LayoutGrid,
   LogOut,
+  Menu,
   ChartColumn,
   NotebookPen,
   Package,
@@ -199,15 +200,17 @@ export function Coque() {
     setVue({ nom: "commande", tableId: vers });
   };
 
-  const onglets: Array<{ vue: Vue["nom"]; libelle: string; icone: LucideIcon; responsable?: boolean }> = [
+  // Onglets du service dans la barre ; le reste (fin de journée, gestion) dans le menu.
+  type Onglet = { vue: Vue["nom"]; libelle: string; icone: LucideIcon; responsable?: boolean; menu?: boolean };
+  const onglets = ([
     { vue: "salle", libelle: "Salle", icone: LayoutGrid },
     { vue: "tickets", libelle: "Tickets", icone: Receipt },
     { vue: "comptes", libelle: "Comptes", icone: NotebookPen },
-    { vue: "clotures", libelle: "Clôtures", icone: Archive },
-    { vue: "statistiques", libelle: "Stats", icone: ChartColumn, responsable: true },
-    { vue: "stock", libelle: "Stock", icone: Package, responsable: true },
-    { vue: "reglages", libelle: "Réglages", icone: Settings, responsable: true },
-  ];
+    { vue: "clotures", libelle: "Clôtures", icone: Archive, menu: true },
+    { vue: "statistiques", libelle: "Stats", icone: ChartColumn, responsable: true, menu: true },
+    { vue: "stock", libelle: "Stock", icone: Package, responsable: true, menu: true },
+    { vue: "reglages", libelle: "Réglages", icone: Settings, responsable: true, menu: true },
+  ] satisfies Onglet[] as Onglet[]).filter((o) => !o.responsable || utilisateur.role === "responsable");
 
   return (
     <div className="coque">
@@ -218,7 +221,7 @@ export function Coque() {
         </div>
         <div className="barre-onglets" role="tablist">
           {onglets
-            .filter((o) => !o.responsable || utilisateur.role === "responsable")
+            .filter((o) => !o.menu)
             .map((o) => (
               <button
                 key={o.vue}
@@ -234,6 +237,7 @@ export function Coque() {
             <AvecIcone icone={Coffee}>Vente comptoir</AvecIcone>
           </button>
         </div>
+        <MenuOnglets entrees={onglets.filter((o) => o.menu)} active={vue.nom} onChoisir={(v) => setVue({ nom: v } as Vue)} />
         <div className="barre-etat">
           <PuceSynchro etat={synchro} onToucher={() => void synchroniser()} />
           <time>{maintenant.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>
@@ -341,6 +345,59 @@ export function Coque() {
             }}
             onPlusTard={() => setAssistant(false)}
           />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Menu des écrans hors service (clôtures, statistiques, stock, réglages) :
+ * un bouton dans la barre, qui montre l'écran ouvert quand c'en est un.
+ * Se ferme au choix, en touchant ailleurs ou avec Échap.
+ */
+function MenuOnglets(props: { entrees: Array<{ vue: Vue["nom"]; libelle: string; icone: LucideIcon }>; active: Vue["nom"]; onChoisir: (v: Vue["nom"]) => void }) {
+  const [ouvert, setOuvert] = useState(false);
+  const zone = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!ouvert) return;
+    const dehors = (e: PointerEvent) => !zone.current?.contains(e.target as Node) && setOuvert(false);
+    const echap = (e: KeyboardEvent) => e.key === "Escape" && setOuvert(false);
+    document.addEventListener("pointerdown", dehors);
+    document.addEventListener("keydown", echap);
+    return () => {
+      document.removeEventListener("pointerdown", dehors);
+      document.removeEventListener("keydown", echap);
+    };
+  }, [ouvert]);
+  if (!props.entrees.length) return null;
+  const courante = props.entrees.find((e) => e.vue === props.active);
+  return (
+    <div className="menu-onglets" ref={zone}>
+      <button
+        className={`onglet menu-onglets-bouton${courante ? " actif" : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={ouvert}
+        aria-label={courante ? `Menu (${courante.libelle})` : "Menu"}
+        onClick={() => setOuvert((x) => !x)}
+      >
+        <AvecIcone icone={Menu}>{courante?.libelle}</AvecIcone>
+      </button>
+      {ouvert && (
+        <div className="menu-onglets-liste" role="menu">
+          {props.entrees.map((e) => (
+            <button
+              key={e.vue}
+              role="menuitem"
+              className={`menu-onglets-entree${e.vue === props.active ? " actif" : ""}`}
+              onClick={() => {
+                setOuvert(false);
+                props.onChoisir(e.vue);
+              }}
+            >
+              <AvecIcone icone={e.icone}>{e.libelle}</AvecIcone>
+            </button>
+          ))}
         </div>
       )}
     </div>

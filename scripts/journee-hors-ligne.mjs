@@ -60,7 +60,7 @@ await p.locator(".modale").getByRole("button", { name: /^Annuler \d/ }).click();
 await p.waitForTimeout(500);
 
 // Comptage et Z.
-await p.getByRole("tab", { name: "Clôtures" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Clôtures" }).click());
 await clic("Clôturer la journée (Z)");
 const attendu = (await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
 await clic("Saisir le total directement");

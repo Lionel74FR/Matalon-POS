@@ -55,7 +55,7 @@ for (const x of "1234") await p.locator(".pave .touche", { hasText: new RegExp(`
 await clic("Plus tard");
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 
-await p.getByRole("tab", { name: "Réglages" }).click();
+await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Réglages" }).click());
 await p.getByLabel("Adresse IP de l'imprimante Bar").fill(BAR);
 await p.getByLabel("Adresse IP de l'imprimante Cuisine").fill(CUISINE);
 await clic("Enregistrer les imprimantes");
