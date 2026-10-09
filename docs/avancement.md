@@ -24,6 +24,7 @@ Dernière mise à jour : 8 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Liste des clôtures : la date de la période (08/10/2026, « octobre 2026 », l'année) remplace le numéro, qui reste dans le détail |
 | 391a6c7 | Suites (« courses ») : sélecteur En direct / AS1 / AS2 / AS3 dans la commande à table, suite modifiable sur une ligne pas encore envoyée ; « Envoyer » fait tout partir, bons rangés et marqués par suite ; « Réclamer AS n » envoie le reste puis imprime un bon de réclame aux postes concernés ; heure de réclame sur la commande ; prochaine suite et temps écoulé sur le plan et la liste des tables |
 | ce09d7a | Écran Statistiques de la caisse (responsables, iPad et iPhone) : toutes les caisses, période au choix comparée à la précédente, indicateurs, CA par heure, jour et jour de semaine, paiements, catégories, salle, appareils, articles, équipe, tables, TVA, remises et annulations par motif ; alertes à lire en tête, marquées vues avec le code d'un responsable |
 | 3ac1619 | Sécurité et alertes : 5 codes PIN faux bloquent 5 minutes (caisse et serveur) ; l'équipe ne se modifie depuis une caisse qu'avec le code d'un responsable vérifié par le serveur ; alertes dans l'administration (prix ou TVA différents de la carte, article hors carte, code PIN bloqué) ; historique des versions de carte ; test de cloisonnement entre établissements |

@@ -2018,10 +2018,6 @@ a.bouton {
   .tableau-tickets td:nth-child(4),
   .tableau-tickets th:nth-child(5),
   .tableau-tickets td:nth-child(5),
-  .tableau-clotures th:nth-child(4),
-  .tableau-clotures td:nth-child(4) {
-    display: none;
-  }
   .actions-clotures .bouton {
     flex: 1 1 100%;
   }
@@ -2597,4 +2593,9 @@ a.bouton {
 .table-meta .suivi-suite.a-reclamer {
   color: var(--terre-fonce);
   font-weight: 700;
+}
+
+.tableau-clotures .date-cloture {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }

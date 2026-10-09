@@ -131,6 +131,15 @@ function ResumeComptage({ e }: { e: Evenement }) {
   );
 }
 
+/** Date de la période close : « 08/10/2026 » pour une Z, « octobre 2026 » pour un mois, l'année pour un exercice. */
+export function datePeriode(identifiant: string): string {
+  const jour = /^(\d{4})-(\d{2})-(\d{2})$/.exec(identifiant);
+  if (jour) return `${jour[3]}/${jour[2]}/${jour[1]}`;
+  const mois = /^(\d{4})-(\d{2})$/.exec(identifiant);
+  if (mois) return new Date(Date.UTC(+mois[1]!, +mois[2]! - 1, 15)).toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
+  return identifiant;
+}
+
 /** Lecture X, clôtures, export comptable, archives et contrôle d'intégrité. */
 export function Clotures(props: { commandesOuvertes: number }) {
   const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree, synchroniser } = useCaisse();
@@ -368,10 +377,9 @@ export function Clotures(props: { commandesOuvertes: number }) {
         <table className="tableau tableau-clotures">
           <thead>
             <tr>
-              <th>N°</th>
+              <th>Date</th>
               {plusieursAppareils && <th>Appareil</th>}
               <th>Type</th>
-              <th>Période</th>
               <th>Tickets</th>
               <th className="nombre">Total TTC</th>
             </tr>
@@ -379,10 +387,9 @@ export function Clotures(props: { commandesOuvertes: number }) {
           <tbody>
             {toutes.map((c) => (
               <tr key={`${c.caisseId}#${c.numero}`} onClick={() => setChoisie(c)}>
-                <td>{c.numero}</td>
+                <td className="date-cloture">{datePeriode(c.identifiantPeriode)}</td>
                 {plusieursAppareils && <td>{appareil(c)}</td>}
                 <td>{LIBELLES[c.periode]}</td>
-                <td>{c.identifiantPeriode}</td>
                 <td>{nbTickets(c) ?? "—"}</td>
                 <td className="nombre">{euros(c.totalTTC)}</td>
               </tr>
@@ -403,7 +410,7 @@ export function Clotures(props: { commandesOuvertes: number }) {
 
       {choisie && (
         <Modale
-          titre={`${LIBELLES[choisie.periode]} ${choisie.identifiantPeriode} · n° ${choisie.numero}${plusieursAppareils ? ` · ${appareil(choisie)}` : ""}`}
+          titre={`${LIBELLES[choisie.periode]} ${datePeriode(choisie.identifiantPeriode)} · n° ${choisie.numero}${plusieursAppareils ? ` · ${appareil(choisie)}` : ""}`}
           onFermer={() => setChoisie(null)}
           pied={
             <>
