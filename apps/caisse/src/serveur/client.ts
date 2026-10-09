@@ -99,6 +99,11 @@ export class ClientApi {
     return this.appel<ReponseTickets>("GET", `/api/caisse/tickets?limite=${limite}`);
   }
 
+  /** Tickets de toutes les caisses sur des journées comptables (du ≤ au, AAAA-MM-JJ), depuis la copie du serveur. */
+  ticketsPeriode(du: string, au: string) {
+    return this.appel<ReponseTickets>("GET", `/api/caisse/tickets?du=${du}&au=${au}`);
+  }
+
   /** Dernières clôtures de toutes les caisses de l'établissement, depuis la copie du serveur. */
   cloturesEtablissement(limite = 120) {
     return this.appel<ReponseClotures>("GET", `/api/caisse/clotures?limite=${limite}`);

@@ -409,6 +409,34 @@ describe("tickets partagés", () => {
     const z = await appel("GET", "/api/caisse/clotures", undefined, a.bearer);
     expect(z.corps.clotures.map((c: any) => [c.caisseId, c.periode, c.totalTTC])).toEqual([["ipad-1111aaaa", "JOUR", 1100]]);
   });
+
+  it("donne les tickets d'une période, avec les annulations faites après qui en visent un", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    const cafe = await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    instant += 60_000;
+    await b.registre.enregistrerVente({ lignes: [SPRITZ], paiements: [{ mode: "ESPECES", montant: 1100 }], operateurId: "u-lea" });
+    instant = Date.parse("2026-10-16T10:00:00Z");
+    await b.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await a.registre.enregistrerAnnulation({ numeroTicket: cafe.numero, motif: "Erreur de saisie", operateurId: "u-lea" });
+    expect((await a.synchro()).statut).toBe(200);
+    expect((await b.synchro()).statut).toBe(200);
+    const r = await appel("GET", "/api/caisse/tickets?du=2026-10-15&au=2026-10-15", undefined, a.bearer);
+    expect(r.statut).toBe(200);
+    expect(r.corps.tickets.map((t: any) => [t.caisseId, t.numero, t.dateComptable])).toEqual([
+      ["ipad-1111aaaa", 1, "2026-10-15"],
+      ["ipad-0a1b2c3d", 1, "2026-10-15"],
+    ]);
+    // L'annulation du 16 vise le café du 15 : elle vient en contexte ; la vente du 16 non.
+    expect(r.corps.contexte.map((t: any) => [t.caisseId, t.type, t.ticketOrigine.numero])).toEqual([["ipad-0a1b2c3d", "ANNULATION", 1]]);
+    expect(r.corps.tronque).toBe(false);
+    const deux = await appel("GET", "/api/caisse/tickets?du=2026-10-15&au=2026-10-16", undefined, a.bearer);
+    expect(deux.corps.tickets).toHaveLength(4);
+    expect(deux.corps.contexte).toEqual([]);
+    expect((await appel("GET", "/api/caisse/tickets?du=2026-10-16&au=2026-10-15", undefined, a.bearer)).statut).toBe(400);
+    expect((await appel("GET", "/api/caisse/tickets?du=2026-10-15", undefined, a.bearer)).statut).toBe(400);
+  });
 });
 
 describe("clôtures de l'établissement", () => {

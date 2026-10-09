@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 42, copiée le 9 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 43, copiée le 9 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -31,6 +31,7 @@ La V1 couvre le cycle complet d'une vente, de la prise de commande à la clôtur
 | Remises et offerts | Motif obligatoire, autorisés selon le rôle, tracés au journal des événements |
 | Annulations et remboursements | Jamais de suppression : ticket d'annulation négatif lié au ticket d'origine, motif obligatoire, tracé |
 | Correction du paiement | Le détail d'un ticket montre ses moyens de paiement. Un mode erroné se corrige avant la Z de la journée, par un responsable, avec un motif : le ticket reste intact et un ticket de correction signé, de total nul, porte l'écart entre modes ; la Z et une annulation ultérieure tiennent compte des modes corrigés. Exclu pour les ventes en compte. Ajouté le 6 octobre 2026, noyau fiscal 0.6.0. |
+| Recherche des tickets | Écran Tickets : 150 derniers tickets ou une période (aujourd'hui, hier, 7 et 30 jours, dates libres), tous les appareils de l'établissement (hors ligne : ceux de l'appareil). Recherche par n°, montant, table, client, serveur ou motif ; filtres par montant (de… à…), moyen de paiement (après correction), nature (ventes, ventes annulées, annulations, règlements de compte, corrections), comptoir ou table, personne et appareil. Totaux de la sélection : nombre de tickets, ventes et encaissé par moyen de paiement (rapprochement du TPE). Consultation seule. Ajouté le 9 octobre 2026. |
 | Ticket et note | Mentions légales (raison sociale, SIRET, adresse, n° TVA, date et heure, numéro séquentiel, lignes, TVA par taux, totaux HT et TTC, version du logiciel), impression à la demande, envoi par e-mail en option |
 | Facture | Facture client sur demande, générée depuis le ticket, numérotation propre |
 | Clôtures | Lecture X à tout moment, clôture Z journalière, clôtures mensuelle et annuelle, fond de caisse, comptage espèces et écart. Les tickets et les clôtures de tous les appareils de l'établissement se consultent depuis chacun ; annulation, correction et facture restent sur l'appareil qui a encaissé (7 octobre 2026). La lecture X, la Z et les clôtures mensuelle et annuelle portent sur tout l'établissement, quel que soit le nombre de caisses, et se font depuis n'importe quel appareil, en ligne : un seul appareil clôture à la fois ; un ticket pas encore reçu d'un appareil hors ligne entre dans la Z suivante ; le fond de caisse déclaré sur un appareil vaut pour tous ; un appareil seul de son établissement peut encore clôturer hors ligne (7 octobre 2026, noyau fiscal 0.7.0) |

@@ -72,6 +72,7 @@ URL=… node scripts/stock-operations.mjs captures   # stock en service : ventes
 URL=… node scripts/statistiques.mjs captures      # écran Statistiques : indicateurs, graphiques, articles, alerte lue avec le code d'un responsable, iPhone
 URL=… node scripts/securite.mjs captures          # 5 codes PIN faux = blocage 5 min, équipe modifiée avec le code d'un responsable, alerte de prix
 URL=… node scripts/clotures-etablissement.mjs captures # iPad + iPhone : fond commun, lecture X et Z de l'établissement depuis l'iPhone, verrou, archive des deux caisses
+URL=… node scripts/tickets.mjs captures            # écran Tickets : recherche, filtres (paiement, nature, lieu, montant), périodes, totaux par moyen de paiement, iPhone
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

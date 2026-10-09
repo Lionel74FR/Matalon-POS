@@ -389,9 +389,42 @@ async function derniersEtablissement<T>(env: Environnement, etablissementId: str
   return { liste: lignes.map((l) => l.contenu), appareils: Object.fromEntries(caisses.map((c) => [c.id, c.nom])) };
 }
 
-async function ticketsEtablissement(env: Environnement, etablissementId: string, limite: number): Promise<Response> {
-  const { liste, appareils } = await derniersEtablissement<Ticket>(env, etablissementId, "tickets", limite);
-  const reponse: ReponseTickets = { tickets: liste, appareils };
+/** Tickets d'une période (journées comptables) : au plus ce nombre, les plus récents d'abord. */
+export const TICKETS_MAX_PERIODE = 3000;
+
+async function ticketsEtablissement(
+  env: Environnement,
+  etablissementId: string,
+  limite: number,
+  periode?: { du: string; au: string },
+): Promise<Response> {
+  if (!periode) {
+    const { liste, appareils } = await derniersEtablissement<Ticket>(env, etablissementId, "tickets", limite);
+    const reponse: ReponseTickets = { tickets: liste, appareils };
+    return json(200, reponse);
+  }
+  const lignes = await env.db.requete<{ contenu: Ticket }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.chaine = 'tickets' and e.contenu->>'dateComptable' between $2 and $3
+     order by e.horodatage desc, e.numero desc limit $4`,
+    [etablissementId, periode.du, periode.au, TICKETS_MAX_PERIODE + 1],
+  );
+  // Annulations et corrections faites après la période : elles disent qu'un ticket de la période a été annulé ou corrigé.
+  const apres = await env.db.requete<{ contenu: Ticket }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.chaine = 'tickets' and e.contenu->>'dateComptable' > $2
+       and e.contenu->>'type' in ('ANNULATION', 'CORRECTION')
+       and exists (select 1 from enregistrements o where o.caisse_id = e.caisse_id and o.chaine = 'tickets'
+                   and o.numero = (e.contenu->'ticketOrigine'->>'numero')::bigint and o.contenu->>'dateComptable' between $3 and $2)`,
+    [etablissementId, periode.au, periode.du],
+  );
+  const caisses = await env.db.requete<{ id: string; nom: string }>("select id, nom from caisses where etablissement_id = $1", [etablissementId]);
+  const reponse: ReponseTickets = {
+    tickets: lignes.slice(0, TICKETS_MAX_PERIODE).map((l) => l.contenu),
+    appareils: Object.fromEntries(caisses.map((c) => [c.id, c.nom])),
+    contexte: apres.map((l) => l.contenu),
+    tronque: lignes.length > TICKETS_MAX_PERIODE,
+  };
   return json(200, reponse);
 }
 
@@ -2019,7 +2052,13 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/tickets" && m === "GET") {
       const c = await caisseAuthentifiee(env, requete);
       const limite = Math.min(500, Math.max(1, Number(url.searchParams.get("limite") ?? 150) || 150));
-      return await ticketsEtablissement(env, c.etablissement_id, limite);
+      const du = url.searchParams.get("du");
+      const au = url.searchParams.get("au");
+      if (du === null && au === null) return await ticketsEtablissement(env, c.etablissement_id, limite);
+      if (!DATE_VALIDE.test(du ?? "") || !DATE_VALIDE.test(au ?? "") || au! < du! || joursEntre(du!, au!) > JOURS_MAX_STATISTIQUES) {
+        throw new ErreurHttp(400, "PERIODE_INVALIDE", `Période invalide (du ≤ au, ${JOURS_MAX_STATISTIQUES} jours au plus).`);
+      }
+      return await ticketsEtablissement(env, c.etablissement_id, limite, { du: du!, au: au! });
     }
     if (chemin === "/api/caisse/journee" && m === "GET") return await journeeCaisse(env, requete);
     if (chemin === "/api/caisse/statistiques" && m === "GET") {

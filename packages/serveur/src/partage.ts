@@ -286,6 +286,10 @@ export interface CompteClient {
 export interface ReponseTickets {
   tickets: Ticket[];
   appareils: Record<string, string>;
+  /** Période demandée : annulations et corrections postérieures qui visent un ticket de la période (non affichées). */
+  contexte?: Ticket[];
+  /** Période demandée : plus de tickets que la limite, les plus anciens manquent. */
+  tronque?: boolean;
 }
 
 /** Dernières clôtures de toutes les caisses de l'établissement (copie du serveur). */
