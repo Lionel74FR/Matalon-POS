@@ -116,6 +116,9 @@ export function lireArticleFournisseur(v: unknown): { article: ArticleFournisseu
     actif: o.actif !== false,
   });
   article.conditionnement ??= "";
+  if (Array.isArray(o.designations) && o.designations.length) {
+    article.designations = o.designations.slice(0, 20).map((d, i) => l.texte(d, `${ou} : libellé de facture ${i + 1}`, 200));
+  }
   return { article: l.erreurs.length ? null : article, erreurs: l.erreurs };
 }
 

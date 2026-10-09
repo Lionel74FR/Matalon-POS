@@ -1,5 +1,8 @@
 import type { Ticket } from "@matalon/noyau-fiscal";
 import type {
+  DocumentStock,
+  EtatStock,
+  ReponseStockCaisse,
   ClientApi as FicheClient,
   EntreeSynchro,
   ReponseComptes,
@@ -132,6 +135,16 @@ export class ClientApi {
   /** Statistiques de l'établissement entre deux journées comptables (incluses). */
   statistiques(du: string, au: string) {
     return this.appel<ReponseStatistiques>("GET", `/api/caisse/statistiques?du=${du}&au=${au}`);
+  }
+
+  /** Stock de l'établissement : référentiel, derniers prix, stock théorique, dernières pièces. */
+  stock() {
+    return this.appel<ReponseStockCaisse>("GET", "/api/caisse/stock");
+  }
+
+  /** Réception, inventaire ou perte saisi sur l'appareil par un responsable. */
+  operationStock(type: "receptions" | "inventaires" | "pertes", corps: Record<string, unknown>) {
+    return this.appel<{ document: DocumentStock; etat: EtatStock }>("POST", `/api/caisse/stock/${type}`, corps);
   }
 
   /** Alerte lue, validée par le code d'un responsable (vérifié par le serveur). */

@@ -3,7 +3,7 @@
  * Ce module ne dépend d'aucune bibliothèque serveur : la caisse l'importe.
  */
 import type { Catalogue } from "@matalon/catalogue";
-import type { PrixAchat, RapportImport, Referentiel } from "@matalon/stock";
+import type { PrixAchat, RapportImport, Referentiel, TypeMouvement } from "@matalon/stock";
 import {
   canonique,
   montantEnCompte,
@@ -521,4 +521,91 @@ export interface ReponseVentesCarte {
   jours: number;
   parCle: Record<string, number>;
   total: number;
+}
+
+/** Pièce du stock : réception, inventaire, perte ou transfert. */
+export interface DocumentStock {
+  id: string;
+  type: "reception" | "inventaire" | "perte" | "transfert";
+  etablissementId: string;
+  contenu: Record<string, unknown>;
+  le: string;
+  creeLe: string;
+  /** Administrateur, ou caisse et responsable (« caisse:… · Léa »). */
+  par: string | null;
+  annuleLe: string | null;
+}
+
+export interface EtatStock {
+  etablissementId: string;
+  dernierInventaire: string | null;
+  produits: Array<{ produitId: string; quantite: number; valeurMicro: number | null; dernierInventaire: string | null }>;
+}
+
+export interface MouvementApi {
+  id: number;
+  produitId: string;
+  quantite: number;
+  valeurMicro: number | null;
+  type: TypeMouvement;
+  le: string;
+  dateComptable: string;
+  origine: Record<string, unknown>;
+  par: string | null;
+}
+
+export interface RapportFoodCost {
+  du: string;
+  au: string;
+  /** Centimes HT, ventes nettes des annulations. */
+  caHT: number;
+  /** Micro-euros HT, positifs pour une consommation. */
+  theoriqueMicro: number;
+  pertesMicro: number;
+  ecartsMicro: number;
+  achatsMicro: number;
+  /** Net des transferts : positif = reçu plus qu'envoyé. */
+  transfertsMicro: number;
+  /** Stock d'ouverture constaté par le premier inventaire de chaque produit (hors food cost). */
+  ouvertureMicro: number;
+  /** Points de base. */
+  foodCostTheorique: number | null;
+  foodCostReel: number | null;
+  mouvementsSansValeur: number;
+  inventaireAvant: string | null;
+  inventaireApres: string | null;
+  parFamille: Array<{ famille: string; theorique: number; pertes: number; ecarts: number }>;
+  parArticle: Array<{ cle: string; libelle: string; quantite: number; caHT: number; coutMicro: number; foodCost: number | null }>;
+  sansFiche: { caHT: number; articles: Array<{ cle: string; libelle: string; caHT: number }> };
+  ecartsProduits: Array<{ produitId: string; nom: string; quantite: number; valeurMicro: number }>;
+}
+
+export interface LigneFactureApi {
+  id: number;
+  fournisseur: string;
+  reference: string;
+  designation: string;
+  /** Centimes HT par unité facturée. */
+  prixHT: number;
+  numero: string;
+  date: string;
+  articleId: string | null;
+  statut: "rapprochee" | "a_rapprocher" | "ignoree";
+  recuLe: string;
+}
+
+export interface CleApi {
+  id: string;
+  nom: string;
+  creeLe: string;
+  utiliseeLe: string | null;
+  revoqueeLe: string | null;
+}
+
+/** Ce que reçoit une caisse pour les opérations de stock (responsables, en ligne). */
+export interface ReponseStockCaisse {
+  referentiel: Referentiel;
+  prix: PrixAchat[];
+  etat: EtatStock;
+  documents: DocumentStock[];
 }

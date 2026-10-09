@@ -1,6 +1,6 @@
 import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
-import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -109,6 +109,21 @@ export const api = {
   enregistrerPrix: (articleId: string, etablissementId: string, prixHT: number) => appel<ReponseStock>("POST", "/stock/prix", { articleId, etablissementId, prixHT }),
   historiquePrix: (articleId: string) => appel<{ prix: Array<PrixAchat & { par: string | null }> }>("GET", `/stock/prix/${articleId}`),
   importerStock: (etablissementId: string, tableau: string[][], simuler: boolean) => appel<ReponseImport>("POST", "/stock/import", { etablissementId, tableau, simuler }),
+  etatStock: (etab: string) => appel<EtatStock>("GET", `/stock/etat?etab=${etab}`),
+  mouvementsStock: (etab: string, f: { du?: string; au?: string; produit?: string; type?: string } = {}) =>
+    appel<{ mouvements: MouvementApi[] }>("GET", `/stock/mouvements?${new URLSearchParams({ etab, ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)) })}`),
+  documentsStock: (etab: string, type?: string) => appel<{ documents: DocumentStock[] }>("GET", `/stock/documents?etab=${etab}${type ? `&type=${type}` : ""}`),
+  operationStock: (type: "receptions" | "inventaires" | "pertes" | "transferts", corps: Record<string, unknown>) =>
+    appel<{ document: DocumentStock; etat: EtatStock }>("POST", `/stock/${type}`, corps),
+  annulerReception: (etablissementId: string, id: string) => appel<{ etat: EtatStock }>("POST", `/stock/receptions/${id}/annuler`, { etablissementId }),
+  recalculerConsommation: (etablissementId: string, du: string, au: string) => appel<{ mouvements: number }>("POST", "/stock/consommation", { etablissementId, du, au }),
+  foodCost: (etab: string, du: string, au: string) => appel<RapportFoodCost>("GET", `/stock/food-cost?etab=${etab}&du=${du}&au=${au}`),
+  clesApi: () => appel<{ cles: CleApi[] }>("GET", "/stock/cles"),
+  creerCleApi: (nom: string) => appel<{ id: string; cle: string }>("POST", "/stock/cles", { nom }),
+  revoquerCleApi: (id: string) => appel("POST", `/stock/cles/${id}/revoquer`, {}),
+  lignesFacture: (etab: string, toutes = false) => appel<{ lignes: LigneFactureApi[] }>("GET", `/stock/factures?etab=${etab}${toutes ? "&toutes=1" : ""}`),
+  rapprocherLigne: (id: number, articleId: string | null) =>
+    appel<{ stock: ReponseStock }>("POST", `/stock/factures/${id}/${articleId ? "rapprocher" : "ignorer"}`, articleId ? { articleId } : {}),
   urlArchive: (caisseId: string, numero: number) => `/api/admin/caisses/${caisseId}/clotures/${numero}/archive.json`,
   urlCsv: (caisseId: string) => `/api/admin/caisses/${caisseId}/clotures.csv`,
   urlJournal: (caisseId: string) => `/api/admin/caisses/${caisseId}/journal.json`,

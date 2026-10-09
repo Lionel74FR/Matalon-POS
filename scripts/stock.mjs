@@ -70,7 +70,7 @@ await a.getByRole("button", { name: /Stock et recettes/ }).click();
 await a.getByText("Aucun produit pour l'instant").waitFor();
 
 // ── Import CSV : aperçu, vérification sans écriture, puis import ──
-await a.getByRole("tab", { name: "Importer des produits" }).click();
+await a.getByRole("tab", { name: "Importer", exact: true }).click();
 await a.locator("input[type=file]").setInputFiles(csv);
 await a.getByText("5 lignes lisibles, 1 à corriger").waitFor();
 const apercuErreur = await a.locator(".stock ul.erreur li").first().textContent();

@@ -12,6 +12,11 @@ import {
   prixHT,
   validerReferentiel,
   versBase,
+  consommationFiche,
+  ecartsInventaire,
+  journeeParis,
+  mouvementsDeSortie,
+  stockTheorique,
   type PrixAchat,
   type Referentiel,
 } from "../src/index.js";
@@ -200,5 +205,36 @@ describe("import", () => {
     const c = planifierImport(a.referentiel, a.prix, [{ ligne: 2, produit: "creme liquide 35%", unite: "kg" }], "moka", "2026-10-10T10:00:00Z");
     expect(c.referentiel.produits).toHaveLength(3);
     expect(c.rapport.erreurs[0]!.message).toMatch(/existe déjà, compté en L/);
+  });
+});
+
+describe("mouvements", () => {
+  it("décompose une fiche en produits, sous-recettes et pertes comprises", () => {
+    const { produits, erreurs } = consommationFiche(ref, { type: "recette", id: "burger", quantite: { valeur: 1000, unite: "piece" } }, 3);
+    expect(erreurs).toEqual([]);
+    // Sauce : 30 g par burger sur un lot de 1 200 g (1 kg de mayo, 200 g de cornichons) → 25 g et 5 g par burger.
+    expect(Object.fromEntries(produits)).toEqual({ steak: 540, pain: 3000, cheddar: 6000, mayo: 75, cornichon: 15, frites: 750 });
+    // Annulation : le même en négatif.
+    expect(consommationFiche(ref, { type: "recette", id: "burger", quantite: { valeur: 1000, unite: "piece" } }, -1).produits.get("steak")).toBe(-180);
+    // Produit vendu tel quel : 2 tranches de cheddar au supplément.
+    expect(Object.fromEntries(consommationFiche(ref, { type: "produit", id: "cheddar", quantite: { valeur: 2000, unite: "piece" } }, 1).produits)).toEqual({ cheddar: 2000 });
+  });
+
+  it("valorise au coût de l'établissement, signale l'absence de prix, calcule théorique et écarts", () => {
+    const c = new Couts(ref, prix, "moka");
+    const sorties = mouvementsDeSortie(c, new Map([["steak", 180], ["frites", 250]]), { type: "vente", le: "2026-10-15T12:00:00Z", dateComptable: "2026-10-15", origine: { ticket: 1 } }, "t:1:0");
+    expect(sorties).toEqual([
+      { type: "vente", le: "2026-10-15T12:00:00Z", dateComptable: "2026-10-15", origine: { ticket: 1 }, produitId: "steak", quantite: -180, valeurMicro: -3_060_000, cle: "t:1:0:steak" },
+      { type: "vente", le: "2026-10-15T12:00:00Z", dateComptable: "2026-10-15", origine: { ticket: 1 }, produitId: "frites", quantite: -250, valeurMicro: null, cle: "t:1:0:frites" },
+    ]);
+    const theorique = stockTheorique([{ produitId: "steak", quantite: 5000 }, ...sorties]);
+    expect(theorique.get("steak")).toBe(4820);
+    expect(Object.fromEntries(ecartsInventaire(new Map([["steak", 4700], ["frites", 0]]), theorique))).toEqual({ steak: -120, frites: 250 });
+  });
+
+  it("journée comptable à Paris, bascule à 5 h", () => {
+    expect(journeeParis("2026-10-15T22:30:00Z")).toBe("2026-10-15");
+    expect(journeeParis("2026-10-16T02:30:00Z")).toBe("2026-10-15");
+    expect(journeeParis("2026-10-16T03:30:00Z")).toBe("2026-10-16");
   });
 });

@@ -53,6 +53,53 @@ export function emplacementsFiches(c: Catalogue): EmplacementFiche[] {
   return liste;
 }
 
+/**
+ * Fiche technique d'une clé de vente (ligne de ticket) : article, variante
+ * (sa fiche, sinon celle de l'article) ou supplément.
+ */
+export function ficheDeCle(c: Catalogue, cle: string): Fiche | undefined {
+  const [base, suite] = cle.split(/([:+].*)/);
+  const a = tousLesArticles(c).find((x) => x.id === base);
+  if (!a) return undefined;
+  if (!suite) return a.fiche;
+  if (suite.startsWith(":")) return a.variantes?.find((v) => v.id === suite.slice(1))?.fiche ?? a.fiche;
+  return a.supplements?.find((s) => s.id === suite.slice(1))?.fiche;
+}
+
+/** Libellés proposés pour un choix de formule (article, ou chaque variante) et leur clé de vente. */
+export function optionsLibellees(c: Catalogue, choix: ChoixFormule): Array<{ libelle: string; cle: string; categorieId: string }> {
+  // Indisponibles compris : une vente passée a pu choisir un article retiré depuis.
+  const proposes = tousLesArticles(c).filter((a) => !a.formule?.length && (choix.articles?.includes(a.id) || choix.categories?.includes(a.categorieId)));
+  return proposes.flatMap((a) =>
+    a.variantes?.length
+      ? a.variantes.map((v) => ({ libelle: v.libelle ?? `${a.nom} ${v.nom}`, cle: `${a.id}:${v.id}`, categorieId: a.categorieId }))
+      : [{ libelle: a.nom, cle: a.id, categorieId: a.categorieId }],
+  );
+}
+
+/**
+ * Choix d'une formule retrouvés dans le libellé de la ligne de ticket
+ * (« Formule midi (Croque, Espresso) ») : la clé de vente de chacun, dans
+ * l'ordre des choix. Null si le libellé ne se relit pas avec cette carte.
+ */
+export function clesDeFormule(c: Catalogue, articleId: string, libelleLigne: string): string[] | null {
+  const a = tousLesArticles(c).find((x) => x.id === articleId);
+  if (!a?.formule?.length) return null;
+  const debut = `${a.nom} (`;
+  if (!libelleLigne.startsWith(debut) || !libelleLigne.endsWith(")")) return null;
+  let reste = libelleLigne.slice(debut.length, -1);
+  const cles: string[] = [];
+  for (const [i, choix] of a.formule.entries()) {
+    const dernier = i === a.formule.length - 1;
+    const options = optionsLibellees(c, choix).sort((x, y) => y.libelle.length - x.libelle.length);
+    const o = options.find((x) => (dernier ? reste === x.libelle : reste.startsWith(`${x.libelle}, `)));
+    if (!o) return null;
+    cles.push(o.cle);
+    reste = reste.slice(o.libelle.length + (dernier ? 0 : 2));
+  }
+  return cles;
+}
+
 export function trouverArticle(c: Catalogue, id: string): Article | undefined {
   return tousLesArticles(c).find((a) => a.id === id);
 }

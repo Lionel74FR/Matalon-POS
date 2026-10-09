@@ -308,6 +308,18 @@
     <p class="attendu"><b>Attendu :</b> la vérification annonce ce qui sera créé sans rien enregistrer ; une ligne fautive est signalée avec son numéro. Un nom déjà connu (même avec d'autres accents ou majuscules) est refusé. Le coût de la recette s'affiche en direct ; un produit sans prix est signalé « coût partiel ». Dans la carte, l'article affiche son food cost, et l'en-tête le nombre de fiches et la part du CA couverte.</p>
   </section>
 
+  <section class="scenario" data-id="s6m">
+    <label><input type="checkbox">Stock en service : vente, inventaire, réception, perte, food cost</label>
+    <ol>
+      <li>Avec un article relié à sa fiche (scénario précédent), vendez-le deux fois, puis touchez la pastille de synchronisation.</li>
+      <li>Onglet <span class="bouton">Stock</span> (responsable) › Inventaire : choisissez une zone, comptez quelques produits (colis et détail), puis validez.</li>
+      <li>Réception : choisissez le fournisseur, indiquez le nombre de colis reçus (le dernier prix est proposé), puis <span class="bouton">Réceptionner</span>.</li>
+      <li>Perte : un motif, un produit et sa quantité, puis enregistrez. Ouvrez « Stock et pièces ».</li>
+      <li>Dans l'administration, Stock et recettes › Food cost, puis Stock et pièces : touchez un produit pour voir ses mouvements.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> après la vente, le stock théorique des ingrédients baisse ; l'inventaire remplace le théorique des produits comptés (le premier fait le stock d'ouverture) ; la réception augmente le stock et son prix devient le dernier prix ; la perte sort du stock avec sa valeur. Le food cost montre le théorique (fiches des ventes), le réel (pertes et écarts en plus) et les ventes sans fiche. Sur iPhone, l'écran tient en une colonne.</p>
+  </section>
+
   <section class="scenario" data-id="s6e">
     <label><input type="checkbox">Plan de salle et tables assemblées</label>
     <ol>

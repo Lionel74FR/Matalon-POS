@@ -822,3 +822,135 @@ describe("stock et fiches techniques", () => {
     expect(ventes.corps).toEqual({ jours: 30, parCle: { cappuccino: 800, "spritz-aperol": 1100 }, total: 1900 });
   });
 });
+
+describe("stock : consommation, pièces, food cost, factures", () => {
+  it("décompte les ventes, reçoit, inventorie, perd, transfère, chiffre le food cost et prend les prix des factures", async () => {
+    const cookie = await adminConnecte();
+    const admin = { Cookie: cookie };
+    const a = await caisseRattachee(cookie);
+    const lea = a.rattachement.utilisateurs[0]!.id;
+    expect((await appel("POST", "/api/admin/etablissements", { id: "chardon", identite: { enseigne: "Chardon" }, carteId: "carte-automne-2026", tables: [], seuilNote: 2500 }, admin)).statut).toBe(201);
+    const tableau = [
+      ["produit", "unite", "famille", "zone", "fournisseur", "reference", "conditionnement", "quantite", "prix_ht"],
+      ["Lait entier", "L", "Crèmerie", "Froid", "Metro", "42", "Pack 6 x 1 L", "6", "7,20"],
+      ["Café en grains", "kg", "Épicerie", "Réserve", "Torréfacteur", "C1", "Sac 1 kg", "1", "24,00"],
+    ];
+    expect((await appel("POST", "/api/admin/stock/import", { etablissementId: "moka", tableau }, admin)).statut).toBe(200);
+    // Cappuccino : 18 g de café, 150 mL de lait.
+    const recette = { id: "cappuccino", nom: "Cappuccino", unite: "piece", rendement: 1000, lignes: [{ type: "produit", id: "cafe-en-grains", quantite: { valeur: 18, unite: "g" } }, { type: "produit", id: "lait-entier", quantite: { valeur: 150, unite: "mL" } }] };
+    expect((await appel("PUT", "/api/admin/stock/recettes/cappuccino", { recette }, admin)).statut).toBe(200);
+    const lue = (await appel("GET", "/api/admin/cartes/carte-automne-2026", undefined, admin)).corps;
+    lue.carte.categories.flatMap((c: any) => c.articles).find((x: any) => x.id === "cappuccino").fiche = { type: "recette", id: "cappuccino", quantite: { valeur: 1000, unite: "piece" } };
+    expect((await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte: lue.carte, version: lue.version }, admin)).statut).toBe(200);
+
+    // ── 4b : 3 cappuccinos vendus, une vente d'un annulée ; le spritz n'a pas de fiche ──
+    instant = Date.parse("2026-10-15T09:00:00Z");
+    await a.registre.enregistrerVente({ lignes: [{ ...CAFE, quantite: 2 }, SPRITZ], paiements: [{ mode: "CB", montant: 1900 }], operateurId: lea });
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: lea });
+    await a.registre.enregistrerAnnulation({ numeroTicket: 2, motif: "Erreur de saisie", operateurId: lea });
+    expect((await a.synchro()).statut).toBe(200);
+    let etat = (await appel("GET", "/api/admin/stock/etat?etab=moka", undefined, admin)).corps;
+    const q = (pid: string) => etat.produits.find((p: any) => p.produitId === pid);
+    expect(q("cafe-en-grains").quantite).toBe(-36);
+    expect(q("lait-entier").quantite).toBe(-300);
+    // 36 g de café à 24 €/kg = 0,864 € ; 300 mL de lait à 1,20 €/L = 0,36 €.
+    expect(q("cafe-en-grains").valeurMicro).toBe(-864_000);
+    // Recalcul : idempotent.
+    expect((await appel("POST", "/api/admin/stock/consommation", { etablissementId: "moka", du: "2026-10-15", au: "2026-10-15" }, admin)).corps.mouvements).toBe(0);
+
+    // ── 4c : réception sur la caisse par un responsable (2 sacs de café à 23,50 €), refusée à un inconnu ──
+    const cafe = (await appel("GET", "/api/caisse/stock", undefined, a.bearer)).corps;
+    expect(cafe.referentiel.produits).toHaveLength(2);
+    const sac = cafe.referentiel.articles.find((x: any) => x.produitId === "cafe-en-grains").id;
+    expect((await appel("POST", "/api/caisse/stock/receptions", { utilisateurId: "personne", fournisseur: "Torréfacteur", lignes: [{ articleId: sac, nombre: 2000, prixHT: 2350 }] }, a.bearer)).statut).toBe(403);
+    instant += 60_000;
+    const rx = await appel("POST", "/api/caisse/stock/receptions", { utilisateurId: lea, fournisseur: "Torréfacteur", numero: "BL-1", lignes: [{ articleId: sac, nombre: 2000, prixHT: 2350 }] }, a.bearer);
+    expect(rx.statut).toBe(201);
+    expect(rx.corps.document).toMatchObject({ type: "reception", par: "Comptoir · Léa", contenu: { totalHT: 4700 } });
+    etat = rx.corps.etat;
+    expect(q("cafe-en-grains").quantite).toBe(2000 - 36);
+    // Le prix reçu devient le dernier prix payé.
+    expect((await appel("GET", "/api/admin/stock", undefined, admin)).corps.prix.find((p: any) => p.articleId === sac).prixHT).toBe(2350);
+
+    // Inventaire de la réserve : 1,9 kg de café comptés (théorique 1 964 g) → écart de −64 g.
+    instant += 60_000;
+    const inv = await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, zone: "Réserve", lignes: [{ produitId: "cafe-en-grains", compte: 1900 }] }, a.bearer);
+    expect(inv.statut).toBe(201);
+    // Premier inventaire du produit : l'écart est le stock d'ouverture, hors food cost.
+    expect(inv.corps.document.contenu.lignes[0]).toMatchObject({ compte: 1900, theorique: 1964, ecart: -64, ouverture: true });
+    etat = inv.corps.etat;
+    expect(q("cafe-en-grains").quantite).toBe(1900);
+    // Second inventaire : 1 850 g comptés, l'écart de −50 g est une vraie perte inexpliquée.
+    instant += 60_000;
+    const inv2 = await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, zone: "Réserve", lignes: [{ produitId: "cafe-en-grains", compte: 1850 }] }, a.bearer);
+    expect(inv2.corps.document.contenu.lignes[0]).toMatchObject({ ecart: -50 });
+    expect(inv2.corps.document.contenu.lignes[0].ouverture).toBeUndefined();
+    etat = inv2.corps.etat;
+    expect(q("lait-entier").quantite).toBe(-300);
+
+    // Perte (administration) : un cappuccino raté, décomposé ; motif obligatoire et connu.
+    expect((await appel("POST", "/api/admin/stock/pertes", { etablissementId: "moka", motif: "N'importe", lignes: [{ type: "recette", id: "cappuccino", quantite: { valeur: 1000, unite: "piece" } }] }, admin)).statut).toBe(400);
+    const pe = await appel("POST", "/api/admin/stock/pertes", { etablissementId: "moka", motif: "Erreur de préparation", lignes: [{ type: "recette", id: "cappuccino", quantite: { valeur: 1000, unite: "piece" } }] }, admin);
+    expect(pe.statut).toBe(201);
+    etat = pe.corps.etat;
+    expect(q("cafe-en-grains").quantite).toBe(1832);
+
+    // Transfert de 500 g de café au Chardon.
+    const tr = await appel("POST", "/api/admin/stock/transferts", { etablissementId: "moka", vers: "chardon", lignes: [{ produitId: "cafe-en-grains", quantite: 500 }] }, admin);
+    expect(tr.statut).toBe(201);
+    expect((await appel("GET", "/api/admin/stock/etat?etab=chardon", undefined, admin)).corps.produits.find((p: any) => p.produitId === "cafe-en-grains").quantite).toBe(500);
+
+    // Annulation de la réception : les 2 kg ressortent ; une seconde annulation est refusée.
+    const id = rx.corps.document.id;
+    expect((await appel("POST", `/api/admin/stock/receptions/${id}/annuler`, { etablissementId: "moka" }, admin)).statut).toBe(200);
+    expect((await appel("POST", `/api/admin/stock/receptions/${id}/annuler`, { etablissementId: "moka" }, admin)).statut).toBe(409);
+    await expect(db.requete("update stock_mouvements set quantite = 0")).rejects.toThrow(/ajout seul/);
+
+    // ── 4d : food cost du 15 octobre ──
+    const fc = (await appel("GET", "/api/admin/stock/food-cost?etab=moka&du=2026-10-15&au=2026-10-15", undefined, admin)).corps;
+    // CA HT : 2 cappuccinos (8,00 € TTC → 7,27 € HT) + spritz (11,00 € à 20 % → 9,17 € HT) ; la vente annulée se compense.
+    expect(fc.caHT).toBe(727 + 917);
+    // Théorique : 2 cappuccinos = 36 g de café (0,864 €) + 300 mL de lait (0,36 €).
+    expect(fc.theoriqueMicro).toBe(864_000 + 360_000);
+    expect(fc.foodCostTheorique).toBe(Math.round(1_224_000 / 1644));
+    expect(fc.ecartsMicro).toBeGreaterThan(0);
+    expect(fc.pertesMicro).toBeGreaterThan(0);
+    expect(fc.foodCostReel).toBeGreaterThan(fc.foodCostTheorique);
+    expect(fc.parArticle.map((x: any) => [x.cle, x.quantite])).toEqual([["cappuccino", 2]]);
+    expect(fc.sansFiche.articles.map((x: any) => x.cle)).toEqual(["spritz-aperol"]);
+    expect(fc.ecartsProduits[0]).toMatchObject({ produitId: "cafe-en-grains", quantite: -50 });
+    expect(fc.ouvertureMicro).toBeLessThan(0);
+
+    // ── 4d : agent de factures ──
+    expect((await appel("POST", "/api/stock/factures", { etablissementId: "moka" })).statut).toBe(401);
+    const cle = (await appel("POST", "/api/admin/stock/cles", { nom: "Agent de factures" }, admin)).corps;
+    expect(cle.cle).toMatch(/^mpk_[a-z0-9]{40}$/);
+    const agent = { Authorization: `Bearer ${cle.cle}` };
+    const facture = {
+      etablissementId: "moka",
+      fournisseur: "METRO",
+      numero: "F-2026-118",
+      date: "2026-10-16",
+      lignes: [
+        { reference: "42", designation: "LAIT ENTIER UHT 6X1L", prixUnitaireHT: 744 },
+        { designation: "CREME LIQ 35% 1L", prixUnitaireHT: 395 },
+      ],
+    };
+    expect((await appel("POST", "/api/stock/factures", facture, agent)).corps).toEqual({ rapprochees: 1, aRapprocher: 1, dejaRecues: 0 });
+    expect((await appel("POST", "/api/stock/factures", facture, agent)).corps).toEqual({ rapprochees: 0, aRapprocher: 0, dejaRecues: 2 });
+    const stock = (await appel("GET", "/api/admin/stock", undefined, admin)).corps;
+    const pack = stock.referentiel.articles.find((x: any) => x.produitId === "lait-entier").id;
+    expect(stock.prix.find((p: any) => p.articleId === pack)).toMatchObject({ prixHT: 744, source: "facture" });
+    // La crème n'est pas encore un article : on le crée, on rapproche ; la facture suivante est reconnue seule.
+    await appel("PUT", "/api/admin/stock/produits/creme", { produit: { id: "creme", nom: "Crème 35 %", unite: "L" } }, admin);
+    await appel("PUT", "/api/admin/stock/articles/creme-metro", { article: { id: "creme-metro", produitId: "creme", fournisseur: "Metro", conditionnement: "Brique 1 L", quantite: 1000 } }, admin);
+    const attente = (await appel("GET", "/api/admin/stock/factures?etab=moka", undefined, admin)).corps.lignes;
+    expect(attente.map((l: any) => l.designation)).toEqual(["CREME LIQ 35% 1L"]);
+    expect((await appel("POST", `/api/admin/stock/factures/${attente[0].id}/rapprocher`, { articleId: "creme-metro" }, admin)).statut).toBe(200);
+    const suivante = await appel("POST", "/api/stock/factures", { ...facture, numero: "F-2026-131", lignes: [{ designation: "Crème liq 35 % 1 L".toUpperCase().replace(/ /g, " "), prixUnitaireHT: 405 }, { designation: "CREME LIQ 35% 1L", prixUnitaireHT: 410 }] }, agent);
+    expect(suivante.corps.rapprochees).toBeGreaterThanOrEqual(1);
+    expect((await appel("GET", "/api/admin/stock", undefined, admin)).corps.prix.find((p: any) => p.articleId === "creme-metro").prixHT).toBe(410);
+    await appel("POST", `/api/admin/stock/cles/${cle.id}/revoquer`, {}, admin);
+    expect((await appel("POST", "/api/stock/factures", facture, agent)).statut).toBe(401);
+  });
+});

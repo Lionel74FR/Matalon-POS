@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   articlesACompleter,
   emplacementsFiches,
+  ficheDeCle,
+  clesDeFormule,
   lireCatalogue,
   postesDeLaCarte,
   fusionImpossible,
@@ -231,5 +233,29 @@ describe("postes de production", () => {
       ["biere:25", 250, true, 450],
     ]);
     expect(lireCatalogue({ id: "c", nom: "C", categories: [{ id: "p", nom: "P", rayon: "R", articles: [{ id: "a", nom: "A", prixTTC: 100, tauxTVA: 1000, fiche: { type: "plat", id: "x", quantite: { valeur: 1, unite: "g" } } }] }] }).erreurs[0]).toMatch(/fiche technique : produit ou recette/);
+  });
+
+  it("retrouve la fiche d'une clé de vente et les choix d'une formule", () => {
+    const fiche = (id: string) => ({ type: "recette" as const, id, quantite: { valeur: 1000, unite: "piece" as const } });
+    const carte = {
+      id: "c",
+      nom: "C",
+      source: "",
+      etablissementId: "",
+      categories: [
+        { id: "cafes", nom: "Cafés", rayon: "Boissons", articles: [{ id: "latte", nom: "Latte", prixTTC: 500, tauxTVA: 1000, fiche: fiche("latte"), variantes: [{ id: "xl", nom: "XL", prixTTC: 600, fiche: fiche("latte-xl") }, { id: "s", nom: "S", prixTTC: 450 }], supplements: [{ id: "sirop", nom: "Sirop", prixTTC: 50, fiche: fiche("sirop") }] }] },
+        { id: "plats", nom: "Plats", rayon: "Cuisine", articles: [{ id: "croque", nom: "Croque, maison", prixTTC: 900, tauxTVA: 1000, fiche: fiche("croque") }] },
+        { id: "formules", nom: "Formules", rayon: "Formules", articles: [{ id: "midi", nom: "Midi", prixTTC: 1400, tauxTVA: 1000, formule: [{ id: "p", nom: "Plat", categories: ["plats"] }, { id: "b", nom: "Boisson", categories: ["cafes"] }] }] },
+      ],
+    };
+    expect(ficheDeCle(carte, "latte")?.id).toBe("latte");
+    expect(ficheDeCle(carte, "latte:xl")?.id).toBe("latte-xl");
+    expect(ficheDeCle(carte, "latte:s")?.id).toBe("latte");
+    expect(ficheDeCle(carte, "latte+sirop")?.id).toBe("sirop");
+    expect(ficheDeCle(carte, "inconnu")).toBeUndefined();
+    // Un nom de choix peut contenir une virgule : on retrouve quand même le découpage.
+    expect(clesDeFormule(carte, "midi", "Midi (Croque, maison, Latte XL)")).toEqual(["croque", "latte:xl"]);
+    expect(clesDeFormule(carte, "midi", "Midi (Pizza, Latte XL)")).toBeNull();
+    expect(clesDeFormule(carte, "latte", "Latte")).toBeNull();
   });
 });

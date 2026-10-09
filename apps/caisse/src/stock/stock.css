@@ -1,0 +1,190 @@
+/* Pièces du stock (caisse et administration) : listes à saisir au doigt. */
+.operation-stock {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.operation-stock h2 {
+  margin: 0;
+}
+
+.operation-filtres,
+.operation-entete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.operation-entete .champ {
+  flex: 1 1 180px;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.operation-recherche {
+  position: relative;
+  display: flex;
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.operation-recherche .icone {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--sable);
+}
+
+.operation-recherche input,
+.inventaire-saisie input,
+.perte-lignes input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+}
+
+.operation-recherche input {
+  padding-left: 38px;
+}
+
+.inventaire-liste,
+.perte-lignes,
+.pieces-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.inventaire-liste li {
+  display: grid;
+  grid-template-columns: 1fr minmax(90px, 140px) minmax(90px, 140px) minmax(80px, 110px);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+}
+
+.inventaire-liste li.compte {
+  box-shadow: inset 4px 0 0 var(--terre);
+}
+
+.inventaire-nom {
+  display: grid;
+  min-width: 0;
+}
+
+.inventaire-nom small,
+.inventaire-saisie small,
+.pieces-liste small {
+  color: var(--sable);
+  font-size: 0.82rem;
+}
+
+.inventaire-saisie {
+  display: grid;
+  gap: 2px;
+}
+
+.inventaire-saisie input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.inventaire-total {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.perte-lignes li {
+  display: grid;
+  grid-template-columns: 1fr 160px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.pieces-liste li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+}
+
+.pieces-liste li > span {
+  display: grid;
+}
+
+.pieces-liste li.annulee {
+  opacity: 0.6;
+}
+
+.tableau-stock td small {
+  display: block;
+  color: var(--sable);
+  font-size: 0.8rem;
+}
+
+.tableau-stock tr.negatif td.nombre {
+  color: #f0a08f;
+}
+
+.operation-stock .succes {
+  color: #a9cf96;
+  font-weight: 700;
+}
+
+/* Écran Stock de la caisse */
+.page.stock-caisse {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.stock-caisse-onglets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  .inventaire-liste li {
+    grid-template-columns: 1fr 1fr;
+  }
+  .inventaire-nom {
+    grid-column: 1 / -1;
+  }
+  .inventaire-total {
+    grid-column: 1 / -1;
+  }
+  .perte-lignes li {
+    grid-template-columns: 1fr auto;
+  }
+  .perte-lignes li > :first-child {
+    grid-column: 1 / -1;
+  }
+  .tableau-stock th:nth-child(2),
+  .tableau-stock td:nth-child(2) {
+    display: none;
+  }
+}
+
+.stock-caisse .titre-icone,
+.operation-stock .titre-icone {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}

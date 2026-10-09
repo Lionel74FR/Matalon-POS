@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 40, copiée le 9 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 42, copiée le 9 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -147,6 +147,18 @@ Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors 
 | 4c | Réceptions fournisseurs, inventaires sur iPad et iPhone par zone, écarts théorique / réel |
 | 4d | Food cost réel, transferts entre établissements, prix alimentés par l'agent de factures |
 
+### Mise en œuvre des sous-lots 4b à 4d (9 octobre 2026)
+
+- **Consommation à la vente** : à la réception des tickets par le serveur, chaque ligne sort du stock les produits de sa fiche, sous-recettes et pertes matière comprises. Fiche de la carte en vigueur à l'heure de la vente, sinon celle d'aujourd'hui (une fiche ajoutée après coup vaut pour les ventes passées, après « Recalculer la consommation »). Une formule consomme la fiche de chaque article choisi. Une annulation remet en stock ; un offert est consommé. Les ventes sans fiche sont signalées dans le food cost.
+- **Mouvements** : quantité signée et valeur au coût du moment, en ajout seul ; le stock théorique en est la somme. Un même ticket ne se décompte qu'une fois.
+- **Inventaire** (iPad, iPhone ou administration) : par zone ou par produit, en conditionnements et au détail ; seuls les produits saisis sont inventoriés. L'écart compté − théorique devient un mouvement. Le premier inventaire d'un produit donne son stock d'ouverture, hors food cost.
+- **Réception** (iPad, iPhone ou administration) : fournisseur, date, bon de livraison, nombre de colis et prix payé, qui devient le dernier prix. Une réception se corrige par annulation, jamais par effacement.
+- **Perte** : produit ou préparation, motif obligatoire (casse, péremption, erreur de préparation, repas du personnel, dégustation, vol ou disparition, autre).
+- **Transfert** (administration) : d'un établissement à un autre, au coût de l'expéditeur.
+- **Food cost** (administration), sur une période : théorique = coût des fiches des articles vendus / CA HT ; réel = théorique + pertes + écarts d'inventaire / CA HT, qui suppose un inventaire en début et en fin de période ; détail par article et par famille, plus gros écarts.
+- **Agent de factures** : dépose les lignes d'une facture par une clé d'accès créée dans l'administration (empreinte seule gardée, révocable). Une ligne reconnue (fournisseur et référence, ou libellé déjà rapproché) devient un prix d'achat ; les autres attendent un rapprochement, retenu pour la fois suivante.
+- **En caisse** : onglet Stock réservé aux responsables, en ligne (inventaire, réception, perte, stock théorique et dernières pièces).
+
 ## Intégration Matalon Vision
 
 Matalon Vision reçoit deux événements de la caisse et ne lui renvoie rien ; le CA du jour fait foi une fois la clôture Z reçue.
@@ -202,7 +214,7 @@ Le Moka ouvre le 15 octobre 2026 avec la caisse maison : lots 1 et 2 réduits au
 | 1. Noyau fiscal et caisse minimale | Commande, encaissement, ticket, clôtures, archives, mode hors ligne | Tests de chaînage verts, attestation rédigée |
 | 2. Back-office et synchronisation | Carte, utilisateurs, rôles, vérification de chaîne, exports | Données serveur identiques aux iPad après une journée hors ligne simulée |
 | 3. Connecteur Matalon Vision | Webhooks, file d'attente, réception côté Replit | CA de Matalon Vision égal aux Z sur 7 jours de test |
-| 4. Stock et fiches techniques | Ingrédients, fiches, consommation théorique, inventaires, food cost ; commencé le 9 octobre 2026 (sous-lots 4a à 4d) | Écarts calculés sur un inventaire réel |
+| 4. Stock et fiches techniques | Ingrédients, fiches, consommation théorique, inventaires, food cost ; sous-lots 4a à 4d livrés le 9 octobre 2026 | Écarts calculés sur un inventaire réel |
 | 5. Mise en service | Services à blanc avec l'équipe, puis bascule depuis la caisse de transition | Une semaine d'exploitation sans incident bloquant |
 
 Après la V1 : prix fournisseurs via l'agent de factures, déploiement sur une deuxième enseigne, facturation électronique B2B.

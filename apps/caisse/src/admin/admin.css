@@ -794,3 +794,68 @@ select {
   grid-template-columns: 1fr;
   gap: 6px;
 }
+
+.stock-onglets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+}
+
+.stock-groupe-onglets {
+  display: grid;
+  gap: 6px;
+}
+
+.stock-groupe-onglets > span {
+  color: var(--sable);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stock .operation-stock select,
+.stock .perte-lignes select {
+  min-height: 48px;
+}
+
+.foodcost-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.foodcost-tuiles > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.foodcost-tuiles span,
+.foodcost-tuiles small {
+  color: var(--sable);
+  font-size: 0.88rem;
+}
+
+.foodcost-tuiles strong {
+  font-family: var(--police-chiffres);
+  font-size: 1.8rem;
+}
+
+.foodcost-cartes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 20px;
+}
+
+.foodcost-cartes h3 {
+  margin: 10px 0 4px;
+}
+
+code.cle-api {
+  user-select: all;
+  word-break: break-all;
+  font-size: 1rem;
+}

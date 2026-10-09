@@ -46,6 +46,8 @@ export interface ArticleFournisseur {
   conditionnement: string;
   /** Quantité du conditionnement, dans l'unité de base du produit (6 L = 6 000 mL). */
   quantite: number;
+  /** Libellés de facture déjà rapprochés de cet article (agent de factures), pour les reconnaître la fois suivante. */
+  designations?: string[];
   actif: boolean;
 }
 
@@ -56,7 +58,7 @@ export interface PrixAchat {
   /** Centimes HT, pour un conditionnement. */
   prixHT: number;
   le: string;
-  source: "saisie" | "import" | "reception";
+  source: "saisie" | "import" | "reception" | "facture";
 }
 
 export type TypeComposant = "produit" | "recette";

@@ -37,6 +37,7 @@ import {
   LIBELLES_UNITE,
   type Composant,
 } from "./stock-commun";
+import { OngletEtat, OngletFactures, OngletFoodCost, OngletPiece, OngletTransfert } from "./StockOperations";
 import { lireFichierTableau } from "./tableur";
 
 /** « 1 produit créé », « 5 produits créés », « 2 prix à enregistrer ». */
@@ -45,6 +46,13 @@ function nombre(n: number, nom: string, participe: string): string {
   const accord = pluriel && !participe.startsWith("à ") ? `${participe}s` : participe;
   return `${n} ${pluriel && !nom.endsWith("x") ? `${nom}s` : nom} ${accord}`;
 }
+
+type Onglet = "produits" | "recettes" | "import" | "etat" | "reception" | "inventaire" | "perte" | "transfert" | "foodcost" | "factures";
+const ONGLETS: Array<[string, Array<[Onglet, string]>]> = [
+  ["Référentiel", [["produits", "Produits"], ["recettes", "Recettes"], ["import", "Importer"]]],
+  ["Opérations", [["etat", "Stock et pièces"], ["reception", "Réception"], ["inventaire", "Inventaire"], ["perte", "Perte"], ["transfert", "Transfert"]]],
+  ["Analyse", [["foodcost", "Food cost"], ["factures", "Factures"]]],
+];
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const UNITES: UniteStock[] = ["kg", "L", "piece"];
@@ -59,7 +67,7 @@ const parUnite = (u: UniteStock) => (u === "piece" ? "pièce" : u);
 export function Stock() {
   const [stock, setStock] = useState<ReponseStock | null>(null);
   const [erreur, setErreur] = useState("");
-  const [onglet, setOnglet] = useState<"produits" | "recettes" | "import">("produits");
+  const [onglet, setOnglet] = useState<Onglet>("produits");
   const [etab, setEtab] = useState("");
   useEffect(() => {
     api
@@ -98,23 +106,31 @@ export function Stock() {
           à {nomEtab}, le coût reprend le dernier prix payé ailleurs, signalé « emprunté ». Les fiches techniques se relient à la carte
           dans l'éditeur de carte.
         </p>
-        <div className="options" role="tablist">
-          {(
-            [
-              ["produits", `Produits (${ref.produits.filter((p) => p.actif).length})`],
-              ["recettes", `Recettes (${ref.recettes.filter((r) => r.actif).length})`],
-              ["import", "Importer des produits"],
-            ] as const
-          ).map(([id, libelle]) => (
-            <button key={id} role="tab" aria-selected={onglet === id} className={`option${onglet === id ? " active" : ""}`} onClick={() => setOnglet(id)}>
-              {libelle}
-            </button>
+        <div className="stock-onglets" role="tablist">
+          {ONGLETS.map(([groupe, liste]) => (
+            <div key={groupe} className="stock-groupe-onglets">
+              <span>{groupe}</span>
+              <div className="options">
+                {liste.map(([id, libelle]) => (
+                  <button key={id} role="tab" aria-selected={onglet === id} className={`option${onglet === id ? " active" : ""}`} onClick={() => setOnglet(id)}>
+                    {id === "produits" ? `${libelle} (${ref.produits.filter((p) => p.actif).length})` : id === "recettes" ? `${libelle} (${ref.recettes.filter((r) => r.actif).length})` : libelle}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </section>
       {onglet === "produits" && <Produits stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "recettes" && <Recettes stock={stock} couts={couts} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "import" && <Import etab={etab} nomEtab={nomEtab} onStock={setStock} onTermine={() => setOnglet("produits")} />}
+      {onglet === "etat" && <OngletEtat key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
+      {(onglet === "reception" || onglet === "inventaire" || onglet === "perte") && (
+        <OngletPiece key={`${onglet}-${etab}`} type={onglet} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />
+      )}
+      {onglet === "transfert" && <OngletTransfert key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
+      {onglet === "foodcost" && <OngletFoodCost key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
+      {onglet === "factures" && <OngletFactures key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
     </div>
   );
 }

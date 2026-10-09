@@ -217,6 +217,82 @@ export const MIGRATIONS: string[] = [
       for each row execute function interdire_modification_prix();
     end if;
   end $$`,
+  // Prix fournis par l'agent de factures (4d) ; une ligne de facture ne s'enregistre qu'une fois.
+  `alter table prix_achats add column if not exists cle text`,
+  `create unique index if not exists prix_achats_cle on prix_achats (cle) where cle is not null`,
+  `do $$ begin
+    if exists (select 1 from pg_constraint where conname = 'prix_achats_source_check') then
+      alter table prix_achats drop constraint prix_achats_source_check;
+    end if;
+    if not exists (select 1 from pg_constraint where conname = 'prix_achats_source_v2') then
+      alter table prix_achats add constraint prix_achats_source_v2 check (source in ('saisie', 'import', 'reception', 'facture'));
+    end if;
+  end $$`,
+  // Mouvements de stock (4b à 4d) : quantités signées en unité de base, valeur au coût du moment, en ajout seul.
+  `create table if not exists stock_mouvements (
+    id bigserial primary key,
+    etablissement_id text not null references etablissements(id),
+    produit_id text not null,
+    quantite bigint not null,
+    valeur_micro bigint,
+    type text not null check (type in ('vente', 'annulation', 'perte', 'reception', 'inventaire', 'transfert')),
+    le text not null,
+    date_comptable text not null,
+    origine jsonb not null default '{}'::jsonb,
+    cle text unique,
+    par text,
+    cree_le text not null
+  )`,
+  `create index if not exists stock_mouvements_produit on stock_mouvements (etablissement_id, produit_id)`,
+  `create index if not exists stock_mouvements_jour on stock_mouvements (etablissement_id, date_comptable)`,
+  `create or replace function interdire_modification_mouvements() returns trigger as $$
+    begin
+      raise exception 'Les mouvements de stock sont en ajout seul';
+    end;
+  $$ language plpgsql`,
+  `do $$ begin
+    if not exists (select 1 from pg_trigger where tgname = 'stock_mouvements_ajout_seul') then
+      create trigger stock_mouvements_ajout_seul before update or delete on stock_mouvements
+      for each row execute function interdire_modification_mouvements();
+    end if;
+  end $$`,
+  // Pièces du stock : réceptions, inventaires, pertes, transferts. Une réception s'annule (mouvements inverses), jamais ne s'efface.
+  `create table if not exists stock_documents (
+    id text primary key,
+    type text not null check (type in ('reception', 'inventaire', 'perte', 'transfert')),
+    etablissement_id text not null references etablissements(id),
+    contenu jsonb not null,
+    le text not null,
+    cree_le text not null,
+    par text,
+    annule_le text,
+    annule_par text
+  )`,
+  `create index if not exists stock_documents_etablissement on stock_documents (etablissement_id, type, le)`,
+  // Agent de factures : clés d'accès (empreinte seule) et lignes de facture à rapprocher d'un article fournisseur.
+  `create table if not exists cles_api (
+    id text primary key,
+    nom text not null,
+    empreinte text not null unique,
+    cree_le text not null,
+    utilisee_le text,
+    revoquee_le text
+  )`,
+  `create table if not exists factures_lignes (
+    id bigserial primary key,
+    etablissement_id text not null references etablissements(id),
+    fournisseur text not null,
+    reference text not null default '',
+    designation text not null,
+    prix_ht integer not null,
+    facture jsonb not null,
+    cle text not null unique,
+    article_id text,
+    statut text not null check (statut in ('rapprochee', 'a_rapprocher', 'ignoree')),
+    recu_le text not null,
+    traite_le text,
+    traite_par text
+  )`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

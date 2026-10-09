@@ -67,6 +67,8 @@ import {
   type ReponseCarte,
   type ReponseImport,
   type ReponseStock,
+  type ReponseStockCaisse,
+  type CleApi,
   type ReponseVentesCarte,
   type ReponseRattachement,
   type ResumeCarte,
@@ -88,6 +90,26 @@ import {
 } from "./securite.js";
 import { empreinteCle, FORMAT_ARCHIVE_SERVEUR, type ContenuArchiveServeur, type PartieCaisse } from "./archive.js";
 import { StockageServeur } from "./stockage-db.js";
+import {
+  annulerReception,
+  authentifierCleApi,
+  consommationDesTickets,
+  creerCleApi,
+  declarerPerte,
+  derniersPrix,
+  documents,
+  etatStock,
+  inventorier,
+  lignesFacture,
+  lireReferentiel,
+  listeMouvements,
+  rapportFoodCost,
+  rapprocherLigne,
+  recalculerConsommation,
+  receptionner,
+  recevoirFacture,
+  transferer,
+} from "./stock-serveur.js";
 import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre } from "./statistiques.js";
 
 export interface Environnement {
@@ -778,6 +800,12 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
     }
   }
 
+  // Stock (4b) : consommation des ventes reçues, dans le même lot ; une erreur ici ne bloque jamais la synchronisation.
+  try {
+    aInserer.push(...(await consommationDesTickets(env.db, c.etablissement_id, c.id, ticketsNouveaux, maintenant)));
+  } catch (e) {
+    console.error("consommation du stock", e);
+  }
   aInserer.push(...(await controlerClotures(env, c, cloturesNouvelles, maintenant)));
   aInserer.push(...(await alertesPrix(env, c, ticketsNouveaux, new Date(maintenant))), ...alertesEvenements(c, evenementsNouveaux, new Date(maintenant)));
   aInserer.push({ texte: "update caisses set derniere_synchro = $2 where id = $1", params: [c.id, maintenant] });
@@ -1214,24 +1242,13 @@ async function controlerFiches(env: Environnement, carte: Catalogue): Promise<vo
   }
 }
 
-async function lireReferentiel(db: Db): Promise<{ referentiel: Referentiel; version: number; majLe: string; majPar: string | null }> {
-  const [r] = await db.requete<{ contenu: Referentiel; version: number; maj_le: string; maj_par: string | null }>(
-    "select contenu, version, maj_le, maj_par from stock_referentiel where id = 'groupe'",
-  );
-  if (!r) return { referentiel: REFERENTIEL_VIDE, version: 0, majLe: "", majPar: null };
-  return { referentiel: { ...REFERENTIEL_VIDE, ...r.contenu }, version: r.version, majLe: r.maj_le, majPar: r.maj_par };
-}
-
 async function reponseStock(env: Environnement): Promise<ReponseStock> {
   const r = await lireReferentiel(env.db);
-  const prix = await env.db.requete<{ article_id: string; etablissement_id: string; prix_ht: number; le: string; source: PrixAchat["source"] }>(
-    `select distinct on (article_id, etablissement_id) article_id, etablissement_id, prix_ht, le, source
-     from prix_achats order by article_id, etablissement_id, le desc, id desc`,
-  );
+  const prix = await derniersPrix(env.db);
   const etabs = await env.db.requete<{ id: string; enseigne: string; carte_id: string }>("select id, enseigne, carte_id from etablissements order by enseigne");
   return {
     ...r,
-    prix: prix.map((p) => ({ articleId: p.article_id, etablissementId: p.etablissement_id, prixHT: p.prix_ht, le: p.le, source: p.source })),
+    prix,
     etablissements: etabs.map((e) => ({ id: e.id, enseigne: e.enseigne, carteId: e.carte_id })),
   };
 }
@@ -1390,6 +1407,140 @@ async function ventesCarte(env: Environnement, carteId: string): Promise<Respons
   const parCle = Object.fromEntries(lignes.map((l) => [l.cle, Number(l.montant)]));
   const reponse: ReponseVentesCarte = { jours, parCle, total: Object.values(parCle).reduce((s, x) => s + x, 0) };
   return json(200, reponse);
+}
+
+// ───────── Stock : opérations (4b à 4d) ─────────
+
+const PERIODE_STOCK = (params: URLSearchParams) => {
+  const du = params.get("du") ?? "";
+  const au = params.get("au") ?? "";
+  if (!DATE_VALIDE.test(du) || !DATE_VALIDE.test(au) || au < du || joursEntre(du, au) > JOURS_MAX_STATISTIQUES) {
+    throw new ErreurHttp(400, "PERIODE_INVALIDE", `Période invalide (du ≤ au, ${JOURS_MAX_STATISTIQUES} jours au plus).`);
+  }
+  return { du, au };
+};
+
+/** Opération de stock d'un établissement, depuis l'administration ou une caisse. */
+async function operationStock(env: Environnement, etablissementId: string, type: string, corps: Record<string, unknown>, par: string): Promise<Response> {
+  const maintenant = horloge(env).toISOString();
+  const doc =
+    type === "receptions"
+      ? await receptionner(env.db, etablissementId, corps, par, maintenant)
+      : type === "inventaires"
+        ? await inventorier(env.db, etablissementId, corps, par, maintenant)
+        : type === "pertes"
+          ? await declarerPerte(env.db, etablissementId, corps, par, maintenant)
+          : await transferer(env.db, etablissementId, corps, par, maintenant);
+  return json(201, { document: doc, etat: await etatStock(env.db, etablissementId) });
+}
+
+/** Responsable actif de l'établissement de la caisse, pour les opérations de stock faites sur l'appareil. */
+async function responsableCaisse(env: Environnement, c: LigneCaisse, id: unknown): Promise<string> {
+  const [u] = await env.db.requete<{ nom: string; role: string; actif: boolean }>("select nom, role, actif from utilisateurs where id = $1 and etablissement_id = $2", [
+    String(id ?? ""),
+    c.etablissement_id,
+  ]);
+  if (!u || u.role !== "responsable" || !u.actif) throw new ErreurHttp(403, "RESPONSABLE_REQUIS", "Le stock se gère par un responsable.");
+  return `${c.nom} · ${u.nom}`;
+}
+
+async function stockCaisse(env: Environnement, requete: Request, chemin: string, m: string): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  if (chemin === "/api/caisse/stock" && m === "GET") {
+    const { referentiel } = await lireReferentiel(env.db);
+    const reponse: ReponseStockCaisse = {
+      referentiel,
+      prix: (await derniersPrix(env.db)).filter((p) => p.etablissementId === c.etablissement_id),
+      etat: await etatStock(env.db, c.etablissement_id),
+      documents: await documents(env.db, c.etablissement_id, null, 30),
+    };
+    return json(200, reponse);
+  }
+  const p = /^\/api\/caisse\/stock\/(receptions|inventaires|pertes)$/.exec(chemin);
+  if (p && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const par = await responsableCaisse(env, c, corps.utilisateurId);
+    return await operationStock(env, c.etablissement_id, p[1]!, corps, par);
+  }
+  return json(404, { code: "INTROUVABLE", message: "Route inconnue." });
+}
+
+async function stockAdmin(env: Environnement, requete: Request, admin: { id: string; identifiant: string }, chemin: string, m: string): Promise<Response | null> {
+  const params = new URL(requete.url).searchParams;
+  const etab = async () => (await etablissement(env.db, params.get("etab") ?? "")).id;
+  const maintenant = horloge(env).toISOString();
+  if (chemin === "/api/admin/stock/etat" && m === "GET") return json(200, await etatStock(env.db, await etab()));
+  if (chemin === "/api/admin/stock/mouvements" && m === "GET") {
+    const f = { du: params.get("du") ?? undefined, au: params.get("au") ?? undefined, produit: params.get("produit") ?? undefined, type: params.get("type") ?? undefined };
+    return json(200, { mouvements: await listeMouvements(env.db, await etab(), f) });
+  }
+  if (chemin === "/api/admin/stock/documents" && m === "GET") return json(200, { documents: await documents(env.db, await etab(), params.get("type")) });
+  if (chemin === "/api/admin/stock/food-cost" && m === "GET") {
+    const { du, au } = PERIODE_STOCK(params);
+    return json(200, await rapportFoodCost(env.db, await etab(), du, au));
+  }
+  let p = /^\/api\/admin\/stock\/(receptions|inventaires|pertes|transferts)$/.exec(chemin);
+  if (p && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const e = await etablissement(env.db, String(corps.etablissementId ?? ""));
+    const r = await operationStock(env, e.id, p[1]!, corps, admin.identifiant);
+    await journaliserAdmin(env, admin.id, `stock_${p[1]}`, { etablissement: e.id });
+    return r;
+  }
+  p = /^\/api\/admin\/stock\/receptions\/(rx-[0-9a-f]{8})\/annuler$/.exec(chemin);
+  if (p && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const e = await etablissement(env.db, String(corps.etablissementId ?? ""));
+    await annulerReception(env.db, e.id, p[1]!, admin.identifiant, maintenant);
+    await journaliserAdmin(env, admin.id, "stock_reception_annulee", { etablissement: e.id, reception: p[1] });
+    return json(200, { etat: await etatStock(env.db, e.id) });
+  }
+  if (chemin === "/api/admin/stock/consommation" && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const e = await etablissement(env.db, String(corps.etablissementId ?? ""));
+    const { du, au } = PERIODE_STOCK(new URLSearchParams({ du: String(corps.du ?? ""), au: String(corps.au ?? "") }));
+    const crees = await recalculerConsommation(env.db, e.id, du, au, maintenant);
+    await journaliserAdmin(env, admin.id, "stock_consommation_recalculee", { etablissement: e.id, du, au, mouvements: crees });
+    return json(200, { mouvements: crees });
+  }
+  if (chemin === "/api/admin/stock/cles" && m === "GET") {
+    const lignes = await env.db.requete<{ id: string; nom: string; cree_le: string; utilisee_le: string | null; revoquee_le: string | null }>("select id, nom, cree_le, utilisee_le, revoquee_le from cles_api order by cree_le desc");
+    const cles: CleApi[] = lignes.map((l) => ({ id: l.id, nom: l.nom, creeLe: l.cree_le, utiliseeLe: l.utilisee_le, revoqueeLe: l.revoquee_le }));
+    return json(200, { cles });
+  }
+  if (chemin === "/api/admin/stock/cles" && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const nom = texte(corps.nom, "nom", 80);
+    if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Nommez la clé (ex. Agent de factures).");
+    const cree = await creerCleApi(env.db, nom, maintenant);
+    await journaliserAdmin(env, admin.id, "cle_api_creee", { cle: cree.id, nom });
+    return json(201, cree);
+  }
+  p = /^\/api\/admin\/stock\/cles\/(cle-[0-9a-f]{8})\/revoquer$/.exec(chemin);
+  if (p && m === "POST") {
+    await env.db.requete("update cles_api set revoquee_le = $2 where id = $1 and revoquee_le is null", [p[1], maintenant]);
+    await journaliserAdmin(env, admin.id, "cle_api_revoquee", { cle: p[1] });
+    return json(200, {});
+  }
+  if (chemin === "/api/admin/stock/factures" && m === "GET") return json(200, { lignes: await lignesFacture(env.db, await etab(), params.get("toutes") === "1") });
+  p = /^\/api\/admin\/stock\/factures\/(\d{1,15})\/(rapprocher|ignorer)$/.exec(chemin);
+  if (p && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const articleId = p[2] === "ignorer" ? null : texte(corps.articleId, "articleId", 80);
+    await rapprocherLigne(env.db, Number(p[1]), articleId, admin.identifiant, maintenant, (f) =>
+      modifierReferentiel(env, admin, f, "stock_facture_rapprochee", { ligne: Number(p![1]), article: articleId }),
+    );
+    return json(200, { stock: await reponseStock(env) });
+  }
+  return null;
+}
+
+/** Agent de factures : dépose les lignes d'une facture fournisseur (clé d'accès créée dans l'administration). */
+async function factureAgent(env: Environnement, requete: Request): Promise<Response> {
+  const maintenant = horloge(env).toISOString();
+  const agent = await authentifierCleApi(env.db, requete, maintenant);
+  const bilan = await recevoirFacture(env.db, await lireJson<Record<string, unknown>>(requete), `agent:${agent.nom}`, maintenant);
+  return json(200, bilan);
 }
 
 // ───────── Administration ─────────
@@ -1858,6 +2009,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/rattacher" && m === "POST") return await rattacher(env, requete);
     if (chemin === "/api/caisse/etat" && m === "GET") return await etatCaisse(env, requete);
     if (chemin === "/api/caisse/synchro" && m === "POST") return await synchroniser(env, requete);
+    if (chemin === "/api/caisse/stock" || chemin.startsWith("/api/caisse/stock/")) return await stockCaisse(env, requete, chemin, m);
+    if (chemin === "/api/stock/factures" && m === "POST") return await factureAgent(env, requete);
     if (chemin === "/api/caisse/utilisateurs" && m === "PUT") return await majUtilisateursCaisse(env, requete);
     if (chemin === "/api/caisse/etablissement" && m === "PUT") return await majEtablissementCaisse(env, requete);
     if (chemin === "/api/caisse/carte" && m === "GET") return await carteCaisse(env, requete);
@@ -1919,6 +2072,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const pv = /^\/api\/admin\/cartes\/([a-z0-9-]+)\/ventes$/.exec(chemin);
       if (pv && m === "GET") return await ventesCarte(env, pv[1]!);
       if (chemin === "/api/admin/stock" && m === "GET") return json(200, await reponseStock(env));
+      if (chemin.startsWith("/api/admin/stock/")) {
+        const r = await stockAdmin(env, requete, admin, chemin, m);
+        if (r) return r;
+      }
       if (chemin === "/api/admin/stock/import" && m === "POST") return await importerStock(env, requete, admin);
       if (chemin === "/api/admin/stock/prix" && m === "POST") return await enregistrerPrix(env, requete, admin);
       const ps = /^\/api\/admin\/stock\/(produits|articles|recettes)\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
