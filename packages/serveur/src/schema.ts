@@ -184,6 +184,39 @@ export const MIGRATIONS: string[] = [
     vue_par text
   )`,
   `create index if not exists alertes_etablissement on alertes (etablissement_id, cree_le)`,
+  // Stock et fiches techniques (lot 4) : référentiel commun au groupe (produits, articles fournisseurs,
+  // recettes), enregistré d'un bloc et versionné ; prix d'achat par établissement, en ajout seul.
+  `create table if not exists stock_referentiel (
+    id text primary key,
+    contenu jsonb not null,
+    version integer not null default 1,
+    maj_le text not null,
+    maj_par text
+  )`,
+  `insert into stock_referentiel (id, contenu, version, maj_le)
+   values ('groupe', '{"produits":[],"articles":[],"recettes":[]}'::jsonb, 1, to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))
+   on conflict (id) do nothing`,
+  `create table if not exists prix_achats (
+    id bigserial primary key,
+    article_id text not null,
+    etablissement_id text not null references etablissements(id),
+    prix_ht integer not null check (prix_ht >= 0),
+    le text not null,
+    source text not null check (source in ('saisie', 'import', 'reception')),
+    par text
+  )`,
+  `create index if not exists prix_achats_article on prix_achats (article_id, etablissement_id, le)`,
+  `create or replace function interdire_modification_prix() returns trigger as $$
+    begin
+      raise exception 'L''historique des prix d''achat est en ajout seul';
+    end;
+  $$ language plpgsql`,
+  `do $$ begin
+    if not exists (select 1 from pg_trigger where tgname = 'prix_achats_ajout_seul') then
+      create trigger prix_achats_ajout_seul before update or delete on prix_achats
+      for each row execute function interdire_modification_prix();
+    end if;
+  end $$`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

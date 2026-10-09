@@ -3,6 +3,7 @@
  * Ce module ne dépend d'aucune bibliothèque serveur : la caisse l'importe.
  */
 import type { Catalogue } from "@matalon/catalogue";
+import type { PrixAchat, RapportImport, Referentiel } from "@matalon/stock";
 import {
   canonique,
   montantEnCompte,
@@ -492,4 +493,32 @@ export interface ReponseStatistiques {
   synchros: Record<string, string | null>;
   nomsAppareils: Record<string, string>;
   alertes: AlerteApi[];
+}
+
+// ───────── Stock et fiches techniques ─────────
+
+export type { ArticleFournisseur, PrixAchat, Produit, Recette, Referentiel, RapportImport } from "@matalon/stock";
+
+/** Référentiel du stock et derniers prix d'achat de chaque article, par établissement. */
+export interface ReponseStock {
+  referentiel: Referentiel;
+  version: number;
+  majLe: string;
+  majPar: string | null;
+  /** Dernier prix de chaque article fournisseur dans chaque établissement. */
+  prix: PrixAchat[];
+  etablissements: Array<{ id: string; enseigne: string; carteId: string }>;
+}
+
+export interface ReponseImport {
+  rapport: RapportImport;
+  /** Absent en simulation : rien n'a été enregistré. */
+  stock?: ReponseStock;
+}
+
+/** Chiffre d'affaires TTC des 30 derniers jours par clé de vente (article, article:variante, article+supplément). */
+export interface ReponseVentesCarte {
+  jours: number;
+  parCle: Record<string, number>;
+  total: number;
 }

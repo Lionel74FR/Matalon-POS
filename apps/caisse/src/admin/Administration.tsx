@@ -10,6 +10,7 @@ import { nouvelIdClient } from "../donnees/clients";
 import type { AlerteApi } from "@matalon/serveur/partage";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
+import { Stock } from "./Stock";
 import {
   Archive,
   Ban,
@@ -22,6 +23,7 @@ import {
   KeyRound,
   LayoutGrid,
   NotebookPen,
+  Package,
   Pencil,
   LogIn,
   LogOut,
@@ -384,11 +386,19 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
             </strong>
             <small aria-hidden="true">{pluriel(cartes.length, "carte")}</small>
           </button>
+          <button className={`admin-lien${choisi === "stock" ? " actif" : ""}`} onClick={() => aller("stock")}>
+            <strong>
+              <AvecIcone icone={Package}>Stock et recettes</AvecIcone>
+            </strong>
+            <small aria-hidden="true">Produits, fournisseurs, fiches</small>
+          </button>
         </nav>
         <main className="admin-contenu">
           {erreur && <p className="erreur">{erreur}</p>}
           {!donnees ? (
             <p>Chargement…</p>
+          ) : choisi === "stock" ? (
+            <Stock />
           ) : choisi === "cartes" ? (
             carteOuverte ? (
               <EditeurCarte

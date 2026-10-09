@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 38, copiée le 8 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 40, copiée le 9 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -117,6 +117,36 @@ Lot ultérieur : alimentation automatique des prix d'achat par l'agent de routag
 
 Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors du périmètre de l'attestation.
 
+### Décisions du 9 octobre 2026
+
+- **Démarrage immédiat** du lot 4, sur décision de Lionel, avant la fin des lots 1 à 3.
+- **Pas de reprise de Yokitup** : on repart de zéro. Lionel fournit les premiers produits à importer (tableur : produit, unité, famille, zone, fournisseur, référence, conditionnement, quantité, prix HT, poids unitaire).
+- **Périmètre** : le module sert tous les établissements, présents et futurs ; le Moka est mis en place le premier.
+
+### Modèle
+
+- **Produit** : ingrédient générique, compté dans une unité (kg, L ou pièce), avec famille, zone de stockage et statut (actif ou archivé). Un nom ne peut exister qu'une fois : un doublon couperait le stock et le coût en deux.
+- **Article fournisseur** : un produit chez un fournisseur, avec sa référence, son conditionnement d'achat (carton de 6 × 1 L), son prix HT et l'historique des prix. Un produit peut en avoir plusieurs.
+- **Recette (fiche technique)** : lignes de produits ou de sous-recettes, quantité et perte matière par ligne, rendement par lot (une sauce se fait par 1,2 L, un plat à la pièce). Une recette qui se contient elle-même est refusée.
+- **Liaison avec la carte** : chaque article de la carte, et chaque variante, supplément ou choix de formule, pointe vers une recette ou vers un produit vendu tel quel, avec une quantité.
+- **Deux niveaux** : produits et recettes communs au groupe ; stocks, coûts et inventaires propres à chaque établissement.
+
+### Règles
+
+- **Coût** : dernier prix payé par l'établissement, à défaut celui du groupe, affiché « prix emprunté » ; jamais un coût à zéro faute d'achat.
+- **Unités** : une quantité en pièce dans une recette en grammes demande un poids unitaire déclaré ; sans conversion possible, la ligne est refusée.
+- **Articles sans fiche** : signalés dans l'éditeur de carte, avec la part du CA couverte par des fiches.
+- **Montants** en centimes entiers, quantités en entiers (g, mL ou millièmes de pièce).
+
+### Découpage
+
+| Sous-lot | Contenu |
+| --- | --- |
+| 4a | Produits, articles fournisseurs, recettes, import des produits, liaison carte, coût des fiches et food cost théorique dans l'éditeur de carte |
+| 4b | Consommation théorique à chaque vente (annulation = mouvement inverse, offert consommé), pertes et casse |
+| 4c | Réceptions fournisseurs, inventaires sur iPad et iPhone par zone, écarts théorique / réel |
+| 4d | Food cost réel, transferts entre établissements, prix alimentés par l'agent de factures |
+
 ## Intégration Matalon Vision
 
 Matalon Vision reçoit deux événements de la caisse et ne lui renvoie rien ; le CA du jour fait foi une fois la clôture Z reçue.
@@ -172,7 +202,7 @@ Le Moka ouvre le 15 octobre 2026 avec la caisse maison : lots 1 et 2 réduits au
 | 1. Noyau fiscal et caisse minimale | Commande, encaissement, ticket, clôtures, archives, mode hors ligne | Tests de chaînage verts, attestation rédigée |
 | 2. Back-office et synchronisation | Carte, utilisateurs, rôles, vérification de chaîne, exports | Données serveur identiques aux iPad après une journée hors ligne simulée |
 | 3. Connecteur Matalon Vision | Webhooks, file d'attente, réception côté Replit | CA de Matalon Vision égal aux Z sur 7 jours de test |
-| 4. Stock et fiches techniques | Ingrédients, fiches, consommation théorique, inventaires, food cost | Écarts calculés sur un inventaire réel |
+| 4. Stock et fiches techniques | Ingrédients, fiches, consommation théorique, inventaires, food cost ; commencé le 9 octobre 2026 (sous-lots 4a à 4d) | Écarts calculés sur un inventaire réel |
 | 5. Mise en service | Services à blanc avec l'équipe, puis bascule depuis la caisse de transition | Une semaine d'exploitation sans incident bloquant |
 
 Après la V1 : prix fournisseurs via l'agent de factures, déploiement sur une deuxième enseigne, facturation électronique B2B.

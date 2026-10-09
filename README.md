@@ -9,6 +9,7 @@ Caisse tactile iPad multi-établissements du groupe Matalon, conforme à l'artic
 | Dossier | Contenu | Périmètre fiscal |
 | --- | --- | --- |
 | `packages/noyau-fiscal` | Tickets chaînés et signés, journal des événements, clôtures Z / mois / exercice, vérification, archives, export CSV | **Oui**, couvert par l'attestation |
+| `packages/stock` | Stock et fiches techniques : produits, articles fournisseurs, recettes et sous-recettes, unités, coût des fiches par établissement (prix emprunté signalé), food cost, import de tableur | Non, lit les ventes sans écrire dans le noyau |
 | `packages/catalogue` | Format des cartes (prix, TVA, variantes, suppléments, formules), lecture stricte et contrôles, carte d'origine du Moka | Non |
 | `packages/serveur` | API (fonction Edge Vercel, Postgres Neon) : établissements, équipes, rattachement des iPad, réplication vérifiée des chaînes, administration 2FA | Non, vérifie avec le noyau |
 | `apps/caisse` | PWA iPad (`/`), note client (`/n`), administration (`/admin`), guide de test (`/guide`) | Non, consomme le noyau |
@@ -37,6 +38,8 @@ Caisse tactile iPad multi-établissements du groupe Matalon, conforme à l'artic
 
 Les cartes se modifient dans l'administration (Cartes et prix) : catégories et rayons, articles, prix, TVA, disponibilité, variantes, suppléments, formules. Chaque enregistrement crée une nouvelle version (contrôle de version : deux personnes ne peuvent pas s'écraser), que les iPad téléchargent à la synchronisation suivante et gardent pour le hors ligne. La carte livrée avec le code ne sert qu'à amorcer la base.
 
+Stock et recettes (administration) : produits communs au groupe, chacun compté en kg, L ou pièce, avec ses fournisseurs et leurs prix d'achat HT propres à chaque établissement (historique en ajout seul) ; recettes avec sous-recettes, perte matière et rendement par lot. Les premiers produits s'importent depuis Excel (.xlsx), un CSV ou un copier-coller ; un nom déjà connu (accents et casse ignorés) n'est jamais recréé. Dans l'éditeur de carte, chaque article, variante ou supplément pointe vers sa recette ou le produit vendu tel quel : coût et food cost s'affichent, avec la part des articles et du CA des 30 derniers jours couverte par des fiches. Coûts calculés en millionièmes d'euro entiers, affichés au centime ; sans achat dans l'établissement, le dernier prix payé ailleurs est repris et signalé « emprunté ».
+
 Archives : l'iPad produit l'archive signée de chaque clôture (Clôtures › Télécharger l'archive). L'administration produit aussi, sans l'iPad, l'archive d'une clôture depuis la copie du serveur : même contenu, chaque enregistrement signé par l'iPad, empreinte de la clé de l'iPad à comparer avec celle affichée dans l'administration ; `verifierArchiveServeur` (packages/serveur) la contrôle seule.
 
 Comptes clients (ardoises) : Encaisser › En compte porte tout ou partie d'une vente au compte d'un client (accord d'un responsable). La vente compte dans le chiffre du jour ; la TVA n'est exigible qu'au règlement (restauration sur place = prestation de services). Le règlement se fait depuis l'onglet Comptes, sur n'importe quel appareil connecté : ticket `REGLEMENT` sans vente, TVA répartie par tranches exactes de la vente. Les soldes sont recalculés par le serveur sur toutes les caisses.
@@ -64,6 +67,7 @@ URL=… node scripts/comptes.mjs captures            # vente en compte hors lign
 URL=… node scripts/production.mjs captures         # bons bar et cuisine : Envoyer, annulation, envoi à l'encaissement (imprimantes simulées)
 URL=… node scripts/plan.mjs captures               # plan de salle dessiné dans l'administration, tables assemblées, retouche sur l'iPad, conflit de version
 URL=… node scripts/suites.mjs captures             # suites En direct / À suivre 1 à 3 : bons rangés par suite, réclames en cuisine, suivi sur le plan, iPhone
+URL=… node scripts/stock.mjs captures              # stock (administration) : import CSV puis Excel, fournisseur, doublon refusé, recettes et sous-recette, fiche reliée à la carte, food cost
 URL=… node scripts/statistiques.mjs captures      # écran Statistiques : indicateurs, graphiques, articles, alerte lue avec le code d'un responsable, iPhone
 URL=… node scripts/securite.mjs captures          # 5 codes PIN faux = blocage 5 min, équipe modifiée avec le code d'un responsable, alerte de prix
 URL=… node scripts/clotures-etablissement.mjs captures # iPad + iPhone : fond commun, lecture X et Z de l'établissement depuis l'iPhone, verrou, archive des deux caisses

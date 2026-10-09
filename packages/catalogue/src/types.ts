@@ -1,3 +1,5 @@
+import type { Fiche } from "@matalon/stock";
+
 /** Taux de TVA en points de base, sur place (pas de vente à emporter au Moka). */
 export const TVA = {
   /** Restauration sur place : plats, boissons sans alcool. */
@@ -14,6 +16,8 @@ export interface Variante {
   libelle?: string;
   /** Prix TTC en centimes ; à défaut, celui de l'article. */
   prixTTC?: number;
+  /** Ce que consomme la variante (remplace la fiche de l'article : 25 cl, 50 cl). */
+  fiche?: Fiche;
 }
 
 /** Supplément facturé en plus de l'article, sur une ligne distincte du ticket. */
@@ -21,6 +25,8 @@ export interface Supplement {
   id: string;
   nom: string;
   prixTTC: number;
+  /** Ce que consomme le supplément, en plus de l'article. */
+  fiche?: Fiche;
 }
 
 /** Un choix à faire dans une formule (« une boisson chaude au choix »). */
@@ -48,6 +54,8 @@ export interface Article {
   aCompleter?: string;
   /** Article retiré temporairement (rupture, hors saison) : grisé en caisse, non vendable. */
   indisponible?: boolean;
+  /** Fiche technique : la recette ou le produit vendu tel quel, et la quantité (module stock). */
+  fiche?: Fiche;
 }
 
 export interface Categorie {

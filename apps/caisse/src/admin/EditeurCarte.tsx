@@ -1,4 +1,5 @@
 import {
+  emplacementsFiches,
   postesDeLaCarte,
   fusionImpossible,
   fusionnerCategories,
@@ -13,9 +14,11 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, ChefHat, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
-import type { ResumeCarte } from "@matalon/serveur/partage";
+import type { ReponseStock, ReponseVentesCarte, ResumeCarte } from "@matalon/serveur/partage";
+import { Couts, foodCost } from "@matalon/stock";
+import { EditeurFiche, pourcent } from "./stock-commun";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { centimesDepuisSaisie, saisieDepuisCentimes } from "../ui/communs";
 import { api, ErreurAdmin } from "./api";
@@ -148,6 +151,22 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [etat, setEtat] = useState<"" | "envoi" | "enregistre" | "conflit">("");
   const [erreurAjout, setErreurAjout] = useState("");
+  /** Stock et ventes : fiches techniques, coûts et part du CA couverte (facultatifs : l'éditeur marche sans). */
+  const [stock, setStock] = useState<ReponseStock | null>(null);
+  const [ventes, setVentes] = useState<ReponseVentesCarte | null>(null);
+  const [etab, setEtab] = useState("");
+  useEffect(() => {
+    api
+      .stock()
+      .then((s) => {
+        setStock(s);
+        setEtab(s.etablissements.find((e) => e.carteId === props.id)?.id ?? s.etablissements[0]?.id ?? "");
+      })
+      .catch(() => setStock(null));
+    api.ventesCarte(props.id).then(setVentes, () => setVentes(null));
+  }, [props.id]);
+  const couts = useMemo(() => (stock ? new Couts(stock.referentiel, stock.prix, etab) : null), [stock, etab]);
+  const nomEtab = stock?.etablissements.find((e) => e.id === etab)?.enseigne ?? "";
 
   const charger = async () => {
     const r = await api.carte(props.id);
@@ -178,6 +197,23 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
   if (!carte || !origine) return <p>{erreurs[0] ?? "Chargement de la carte…"}</p>;
 
   const categorie = carte.categories.find((c) => c.id === catId) ?? null;
+  // Fiches techniques : emplacements (articles, variantes, suppléments) hors formules, qui consomment les fiches des choix.
+  const emplacements = emplacementsFiches(carte).filter((e) => !e.formule);
+  const avecFiche = emplacements.filter((e) => e.fiche);
+  const caCarte = ventes ? emplacements.reduce((s, e) => s + (ventes.parCle[e.cle] ?? 0), 0) : 0;
+  const caCouvert = ventes && caCarte > 0 ? emplacements.reduce((s, e) => s + (e.fiche ? (ventes.parCle[e.cle] ?? 0) : 0), 0) / caCarte : null;
+  const resumeFiche = (a: Article): string => {
+    const siens = emplacements.filter((e) => e.articleId === a.id && !e.cle.includes("+"));
+    if (a.formule?.length) return "formule";
+    if (!couts || !siens.length) return "";
+    const fichees = siens.filter((e) => e.fiche);
+    if (fichees.length < siens.length) return fichees.length ? `${fichees.length}/${siens.length} fiches` : "sans fiche";
+    const fcs = fichees.map((e) => foodCost(couts.coutFiche(e.fiche!).micro, e.prixTTC, e.tauxTVA)).filter((x): x is number => x != null);
+    if (!fcs.length) return "fiche";
+    const min = Math.min(...fcs);
+    const max = Math.max(...fcs);
+    return min === max ? pourcent(min) : `${pourcent(min)} – ${pourcent(max)}`;
+  };
   const idsArticles = () => [...tousLesArticles(carte).map((a) => a.id), ...tousLesArticles(origine.carte).map((a) => a.id)];
   const majCategories = (f: (cats: Categorie[]) => Categorie[]) => {
     setCarte({ ...carte, categories: f(carte.categories) });
@@ -360,6 +396,29 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
         </div>
       )}
 
+      {stock && (
+        <p className="editeur-fiches">
+          <ChefHat className="icone en-ligne" size={18} aria-hidden="true" /> Fiches techniques : <strong>{avecFiche.length}</strong> / {emplacements.length}{" "}
+          {caCouvert != null && (
+            <>
+              · <strong>{Math.round(caCouvert * 100)} %</strong> du CA des {ventes!.jours} derniers jours
+            </>
+          )}
+          {stock.etablissements.length > 1 && (
+            <label className="editeur-fiches-etab">
+              · coûts de{" "}
+              <select value={etab} onChange={(e) => setEtab(e.target.value)} aria-label="Établissement des coûts">
+                {stock.etablissements.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.enseigne}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </p>
+      )}
+
       <div className="editeur-colonnes">
         <aside className="admin-section editeur-categories">
           <h2>Catégories</h2>
@@ -469,6 +528,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                     <th>Article</th>
                     <th className="nombre">Prix TTC</th>
                     <th>TVA</th>
+                    {stock && <th>Food cost</th>}
                     <th>En caisse</th>
                     <th />
                   </tr>
@@ -493,6 +553,9 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                       </td>
                       <td className="nombre">{euros(a.prixTTC)}</td>
                       <td>{(a.tauxTVA / 100).toLocaleString("fr-FR")} %</td>
+                      {stock && (
+                        <td className={resumeFiche(a) === "sans fiche" || resumeFiche(a).includes("/") ? "cout-manquant" : ""}>{resumeFiche(a)}</td>
+                      )}
                       <td>
                         <label className="case">
                           <input
@@ -545,6 +608,9 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
           carte={carte}
           catId={articleOuvert.catId}
           article={articleOuvert.article}
+          stock={stock}
+          couts={couts}
+          nomEtab={nomEtab}
           onValider={enregistrerArticle}
           onSupprimer={() => {
             if (supprimer([], [articleOuvert.article.id], `« ${articleOuvert.article.nom} » de la carte`)) setArticleOuvert(null);
@@ -562,6 +628,9 @@ function FicheArticle(props: {
   carte: Catalogue;
   catId: string;
   article: Article;
+  stock: ReponseStock | null;
+  couts: Couts | null;
+  nomEtab: string;
   onValider: (catId: string, a: Article) => void;
   onSupprimer: () => void;
   onFermer: () => void;
@@ -731,6 +800,77 @@ function FicheArticle(props: {
           <button className="bouton discret" onClick={() => setA({ ...a, formule: [...(a.formule ?? []), { id: sousId(`choix-${(a.formule?.length ?? 0) + 1}`, a.formule), nom: "", categories: [] }] })}>
             <AvecIcone icone={Plus}>Choix de formule</AvecIcone>
           </button>
+
+          {props.stock && props.couts && (
+            <section className="fiches-article">
+              <h3 className="titre-icone">
+                <AvecIcone icone={ChefHat} taille={20}>Fiche technique</AvecIcone>
+              </h3>
+              {a.formule?.length ? (
+                <p className="explication">Formule : chaque choix consomme la fiche de l'article choisi. Une fiche ici s'ajouterait (emballage, pain…).</p>
+              ) : (
+                <p className="explication">Recette, ou produit vendu tel quel (une canette, 12 cl d'une bouteille), et la quantité servie. Coûts de {props.nomEtab}.</p>
+              )}
+              <EditeurFiche
+                libelle={a.variantes?.length ? "Par défaut" : a.nom || "Article"}
+                fiche={a.fiche}
+                onChange={(fiche) => {
+                  const { fiche: _, ...reste } = a;
+                  setA(fiche ? { ...reste, fiche } : reste);
+                }}
+                stock={props.stock}
+                couts={props.couts}
+                etablissement={props.nomEtab}
+                prixTTC={prix.trim() ? centimesDepuisSaisie(prix) : null}
+                tauxTVA={a.tauxTVA}
+              />
+              {(a.variantes ?? []).map((v, i) => (
+                <EditeurFiche
+                  key={v.id}
+                  libelle={v.nom || `Variante ${i + 1}`}
+                  fiche={v.fiche}
+                  heritee={a.fiche}
+                  onChange={(fiche) =>
+                    setA({
+                      ...a,
+                      variantes: a.variantes!.map((x, j) => {
+                        if (j !== i) return x;
+                        const { fiche: _, ...reste } = x;
+                        return fiche ? { ...reste, fiche } : reste;
+                      }),
+                    })
+                  }
+                  stock={props.stock!}
+                  couts={props.couts!}
+                  etablissement={props.nomEtab}
+                  prixTTC={(prixOptions[`v:${v.id}`] ?? "").trim() ? centimesDepuisSaisie(prixOptions[`v:${v.id}`]!) : prix.trim() ? centimesDepuisSaisie(prix) : null}
+                  tauxTVA={a.tauxTVA}
+                />
+              ))}
+              {(a.supplements ?? []).map((x, i) => (
+                <EditeurFiche
+                  key={x.id}
+                  libelle={`+ ${x.nom || `supplément ${i + 1}`}`}
+                  fiche={x.fiche}
+                  onChange={(fiche) =>
+                    setA({
+                      ...a,
+                      supplements: a.supplements!.map((y, j) => {
+                        if (j !== i) return y;
+                        const { fiche: _, ...reste } = y;
+                        return fiche ? { ...reste, fiche } : reste;
+                      }),
+                    })
+                  }
+                  stock={props.stock!}
+                  couts={props.couts!}
+                  etablissement={props.nomEtab}
+                  prixTTC={centimesDepuisSaisie(prixOptions[`s:${x.id}`] ?? "")}
+                  tauxTVA={a.tauxTVA}
+                />
+              ))}
+            </section>
+          )}
           {erreur && <p className="erreur">{erreur}</p>}
         </div>
         <footer className="modale-pied">

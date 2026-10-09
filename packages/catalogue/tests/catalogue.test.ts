@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   articlesACompleter,
+  emplacementsFiches,
   lireCatalogue,
   postesDeLaCarte,
   fusionImpossible,
@@ -202,5 +203,33 @@ describe("postes de production", () => {
     expect(lu.catalogue!.categories[3]).not.toHaveProperty("poste");
     expect(postesDeLaCarte(lu.catalogue!)).toEqual(["Bar", "Cuisine"]);
     expect(lireCatalogue({ ...carte, categories: [{ ...carte.categories[0], poste: "x".repeat(31) }] }).erreurs.length).toBe(1);
+  });
+
+  it("lit les fiches techniques et liste leurs emplacements", () => {
+    const fiche = { type: "recette", id: "burger", quantite: { valeur: 1000, unite: "piece" } };
+    const { catalogue, erreurs } = lireCatalogue({
+      id: "c",
+      nom: "C",
+      categories: [
+        {
+          id: "plats",
+          nom: "Plats",
+          rayon: "Cuisine",
+          articles: [
+            { id: "burger", nom: "Burger", prixTTC: 1650, tauxTVA: 1000, fiche, supplements: [{ id: "cheddar", nom: "Cheddar", prixTTC: 150, fiche: { type: "produit", id: "cheddar", quantite: { valeur: 1000, unite: "piece" } } }] },
+            { id: "biere", nom: "Bière", prixTTC: null, tauxTVA: 2000, fiche: { type: "produit", id: "biere", quantite: { valeur: 250, unite: "mL" } }, variantes: [{ id: "50", nom: "50 cl", prixTTC: 800, fiche: { type: "produit", id: "biere", quantite: { valeur: 500, unite: "mL" } } }, { id: "25", nom: "25 cl", prixTTC: 450 }] },
+          ],
+        },
+      ],
+    });
+    expect(erreurs).toEqual([]);
+    expect(catalogue!.categories[0]!.articles[0]!.fiche).toEqual(fiche);
+    expect(emplacementsFiches(catalogue!).map((e) => [e.cle, e.fiche?.quantite.valeur, e.heritee ?? false, e.prixTTC])).toEqual([
+      ["burger", 1000, false, 1650],
+      ["burger+cheddar", 1000, false, 150],
+      ["biere:50", 500, false, 800],
+      ["biere:25", 250, true, 450],
+    ]);
+    expect(lireCatalogue({ id: "c", nom: "C", categories: [{ id: "p", nom: "P", rayon: "R", articles: [{ id: "a", nom: "A", prixTTC: 100, tauxTVA: 1000, fiche: { type: "plat", id: "x", quantite: { valeur: 1, unite: "g" } } }] }] }).erreurs[0]).toMatch(/fiche technique : produit ou recette/);
   });
 });

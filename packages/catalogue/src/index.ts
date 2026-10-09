@@ -1,3 +1,4 @@
+import type { Fiche } from "@matalon/stock";
 import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type Supplement, type Variante } from "./types.js";
 
 export * from "./types.js";
@@ -12,6 +13,44 @@ export const CARTES: Record<string, Catalogue> = {
 
 export function tousLesArticles(c: Catalogue): Array<Article & { categorieId: string }> {
   return c.categories.flatMap((cat) => cat.articles.map((a) => ({ ...a, categorieId: cat.id })));
+}
+
+/** Un emplacement de fiche technique de la carte : article, variante ou supplément, avec son prix de vente. */
+export interface EmplacementFiche {
+  /** Clé de vente : « article », « article:variante », « article+supplément » (comme les lignes de ticket). */
+  cle: string;
+  articleId: string;
+  libelle: string;
+  categorie: string;
+  fiche?: Fiche;
+  /** Fiche héritée de l'article (variante sans fiche propre). */
+  heritee?: boolean;
+  prixTTC: number | null;
+  tauxTVA: number;
+  /** Formule : ses choix consomment la fiche des articles choisis. */
+  formule?: boolean;
+}
+
+/** Tous les emplacements de fiche d'une carte, pour la liaison avec le stock et le food cost. */
+export function emplacementsFiches(c: Catalogue): EmplacementFiche[] {
+  const liste: EmplacementFiche[] = [];
+  for (const cat of c.categories) {
+    for (const a of cat.articles) {
+      const base = { articleId: a.id, categorie: cat.nom, tauxTVA: a.tauxTVA };
+      if (a.variantes?.length) {
+        for (const v of a.variantes) {
+          const fiche = v.fiche ?? a.fiche;
+          liste.push({ ...base, cle: `${a.id}:${v.id}`, libelle: v.libelle ?? `${a.nom} ${v.nom}`, prixTTC: v.prixTTC ?? a.prixTTC, ...(fiche ? { fiche } : {}), ...(!v.fiche && a.fiche ? { heritee: true } : {}) });
+        }
+      } else {
+        liste.push({ ...base, cle: a.id, libelle: a.nom, prixTTC: a.prixTTC, ...(a.fiche ? { fiche: a.fiche } : {}), ...(a.formule?.length ? { formule: true } : {}) });
+      }
+      for (const s of a.supplements ?? []) {
+        liste.push({ ...base, cle: `${a.id}+${s.id}`, libelle: `${a.nom} + ${s.nom}`, prixTTC: s.prixTTC, ...(s.fiche ? { fiche: s.fiche } : {}) });
+      }
+    }
+  }
+  return liste;
 }
 
 export function trouverArticle(c: Catalogue, id: string): Article | undefined {

@@ -1,3 +1,4 @@
+import { lireFiche } from "@matalon/stock";
 import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type Supplement, type Variante } from "./types.js";
 
 /**
@@ -54,6 +55,12 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
     return x;
   };
   const optionnel = <T>(x: unknown, f: () => T): T | undefined => (x === undefined || x === null || x === "" ? undefined : f());
+  const fiche = (x: unknown, ou: string) =>
+    optionnel(x, () => {
+      const r = lireFiche(x, `${ou} : fiche technique`);
+      erreurs.push(...r.erreurs);
+      return r.fiche ?? undefined;
+    });
 
   const o = objet(v, "carte");
   const categories: Categorie[] = liste(o.categories, "catégories", LIMITES_CARTE.categories).map((c, i) => {
@@ -87,16 +94,21 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
           if (libelle) variante.libelle = libelle;
           const p = optionnel(vo.prixTTC, () => prix(vo.prixTTC, `${ou}, variante « ${variante.nom} » : prix`, false));
           if (p != null) variante.prixTTC = p;
+          const fv = fiche(vo.fiche, `${ou}, variante « ${variante.nom} »`);
+          if (fv) variante.fiche = fv;
           return variante;
         });
         if (variantes.length) article.variantes = variantes;
         const supplements = liste(ao.supplements, `${ou} : suppléments`).map((x, k): Supplement => {
           const so = objet(x, `${ou}, supplément ${k + 1}`);
-          return {
+          const supplement: Supplement = {
             id: ident(so.id, `${ou}, supplément ${k + 1} : identifiant`),
             nom: texte(so.nom, `${ou}, supplément ${k + 1} : nom`, 60),
             prixTTC: prix(so.prixTTC, `${ou}, supplément ${k + 1} : prix`, false)!,
           };
+          const fs = fiche(so.fiche, `${ou}, supplément « ${supplement.nom} »`);
+          if (fs) supplement.fiche = fs;
+          return supplement;
         });
         if (supplements.length) article.supplements = supplements;
         const formule = liste(ao.formule, `${ou} : formule`, LIMITES_CARTE.choixFormule).map((x, k): ChoixFormule => {
@@ -118,6 +130,8 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
         const aCompleter = optionnel(ao.aCompleter, () => texte(ao.aCompleter, `${ou} : à compléter`, 200));
         if (aCompleter) article.aCompleter = aCompleter;
         if (ao.indisponible === true) article.indisponible = true;
+        const fa = fiche(ao.fiche, ou);
+        if (fa) article.fiche = fa;
         return article;
       }),
     };

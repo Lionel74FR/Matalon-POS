@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 8 octobre 2026.
+Dernière mise à jour : 9 octobre 2026.
 
 ## Règle de conduite
 
@@ -17,13 +17,14 @@ Dernière mise à jour : 8 octobre 2026.
 | 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients) | Attestation éditeur rédigée (7 octobre), à compléter, valider par Audrex et signer ; noyau à geler en 1.0.0. Ticket envoyé par e-mail (optionnel) : non fait |
 | 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
-| 4. Stock et fiches techniques | Pas commencé | Attend les fiches techniques et le feu vert |
+| 4. Stock et fiches techniques | En cours depuis le 9 octobre 2026 (feu vert de Lionel avant la fin des lots 1 à 3) : 4a livré (référentiel, import, recettes, liaison carte, food cost théorique) | Import des premiers produits fournis par Lionel (pas de reprise Yokitup), puis les fiches du Moka ; 4b consommation à la vente, 4c réceptions et inventaires, 4d food cost réel |
 | 5. Mise en service | Pas commencé | Services à blanc avec l'équipe |
 
 ## Livré
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Lot 4a, stock et fiches techniques : package `stock` (produits, articles fournisseurs, recettes et sous-recettes, unités et conversions, coût par établissement avec prix emprunté, food cost, import de tableur) ; serveur (référentiel versionné, prix d'achat en ajout seul, import, fiches de la carte contrôlées, ventes 30 jours par article) ; administration « Stock et recettes » (produits, fournisseurs et prix, recettes avec coût en direct, import .xlsx / CSV / collage) ; fiche technique par article, variante et supplément dans l'éditeur de carte, colonne food cost et part couverte |
 | 8af9806 | Liste des clôtures : la date de la période (08/10/2026, « octobre 2026 », l'année) remplace le numéro, qui reste dans le détail |
 | 391a6c7 | Suites (« courses ») : sélecteur En direct / AS1 / AS2 / AS3 dans la commande à table, suite modifiable sur une ligne pas encore envoyée ; « Envoyer » fait tout partir, bons rangés et marqués par suite ; « Réclamer AS n » envoie le reste puis imprime un bon de réclame aux postes concernés ; heure de réclame sur la commande ; prochaine suite et temps écoulé sur le plan et la liste des tables |
 | ce09d7a | Écran Statistiques de la caisse (responsables, iPad et iPhone) : toutes les caisses, période au choix comparée à la précédente, indicateurs, CA par heure, jour et jour de semaine, paiements, catégories, salle, appareils, articles, équipe, tables, TVA, remises et annulations par motif ; alertes à lire en tête, marquées vues avec le code d'un responsable |
@@ -61,6 +62,7 @@ Dernière mise à jour : 8 octobre 2026.
 - Équipe modifiée depuis une caisse : `PUT /api/caisse/utilisateurs` exige `responsable: {id, pin}`, vérifié par le serveur (un jeton d'appareil ne suffit plus) ; tracé au journal d'administration.
 - Alertes (table `alertes`, jamais bloquantes, uniques par `cle`) : à la réception des ventes, chaque ligne est comparée à la carte (`prixCarte` : article, variante `a:v`, supplément `a+s`) dans sa version en vigueur à l'heure de la vente, la précédente ou l'actuelle (`cartes_versions`, alimentée par trigger) ; plus les blocages de PIN. Lues et marquées vues dans l'administration.
 - Statistiques : calculées par le serveur (`GET /api/caisse/statistiques?du&au`, aussi en administration) sur les tickets reçus de toutes les caisses, par journée comptable, 366 jours au plus, avec la période précédente de même durée. CA, TVA et encaissements = ceux des Z ; ticket moyen et couverts sur les ventes non annulées dans la période ; heures en heure de Paris ; catégorie lue sur la carte actuelle. Une seule couleur de donnée (#d9733a, validée sur la carte espresso). Écran réservé aux responsables.
+- Stock (lot 4, décisions de Lionel du 9 octobre : pas de reprise de Yokitup, module pour tous les établissements, Moka d'abord) : référentiel commun au groupe en un document versionné (`stock_referentiel`, ligne `groupe`), revérifié en entier à chaque modification (noms uniques sans accents ni casse, références, unités convertibles, pas de recette circulaire) ; rien ne se supprime, on archive. Prix d'achat par établissement dans `prix_achats`, en ajout seul (trigger). Coût retenu : dernier prix payé par l'établissement, tous fournisseurs du produit confondus, sinon dernier prix payé ailleurs, signalé « emprunté » ; sans aucun prix, « sans prix » (coût partiel), jamais zéro. Quantités entières en g, mL ou millièmes de pièce ; pièce ↔ poids ou volume seulement par le poids d'une pièce déclaré ; poids ↔ volume jamais. Coûts en micro-euros entiers (non fiscaux), affichés au centime. Fiche technique dans la carte (`fiche` sur article, variante, supplément) : versionnée avec la carte, donc connue à l'heure de chaque vente pour le 4b ; une variante sans fiche hérite de celle de l'article ; une formule consomme les fiches des articles choisis (le 4b devra noter l'article choisi dans `composants`). Import : le serveur relit lui-même le tableau brut ; un article fournisseur se reconnaît par fournisseur et référence, ou à défaut fournisseur et quantité du conditionnement.
 - Vercel : Build Output API (`apps/caisse/scripts/vercel-build.mjs`), fonction Edge en `cdg1`, Postgres Neon.
 
 ## Actions en attente côté Lionel
@@ -85,4 +87,4 @@ Dernière mise à jour : 8 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 11 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 12 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

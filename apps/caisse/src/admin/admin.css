@@ -587,3 +587,210 @@ select {
     width: 100%;
   }
 }
+
+/* ───────── Stock et fiches techniques ───────── */
+
+.stock-tete {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px;
+}
+
+.stock-etab {
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.stock-filtres {
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.stock-recherche {
+  position: relative;
+  flex: 1 1 260px;
+  display: flex;
+}
+
+.stock-recherche .icone {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--sable);
+}
+
+.stock-recherche input {
+  width: 100%;
+  padding-left: 38px;
+}
+
+.stock-table td small,
+.stock-lignes td small {
+  display: block;
+  color: var(--sable);
+}
+
+.stock-actions {
+  white-space: nowrap;
+}
+
+.stock .cout-manquant,
+.editeur-carte .cout-manquant,
+.fiche-editeur .cout-manquant {
+  color: #f0a08f;
+}
+
+.stock .cout-emprunte,
+.fiche-editeur .cout-emprunte {
+  color: #e8c48a;
+}
+
+.alertes-cout {
+  display: grid;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.stock-lignes input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+}
+
+.stock-lignes td:first-child {
+  width: 46%;
+}
+
+.stock-lignes .champ-perte {
+  width: 70px;
+  text-align: right;
+}
+
+.champ-quantite.invalide {
+  border-color: #c2412d !important;
+}
+
+.stock-total {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+}
+
+.stock-total p {
+  margin: 0;
+}
+
+.stock-rapport,
+.stock-historique {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+}
+
+.stock-rapport ul,
+.stock-historique ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.stock-ajout-article {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.prix-modifiable input {
+  width: 100px;
+  min-height: 38px;
+  text-align: right;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--terre);
+  background: var(--espresso);
+  color: var(--mousse);
+}
+
+/* Fiches techniques dans l'éditeur de carte */
+.editeur-fiches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 14px;
+  color: var(--sable);
+}
+
+.editeur-fiches strong {
+  color: var(--mousse);
+}
+
+.editeur-fiches select {
+  min-height: 34px;
+}
+
+.fiches-article {
+  margin-top: 8px;
+}
+
+.fiche-editeur {
+  padding: 8px 0;
+  border-top: 1px solid var(--espresso-3);
+}
+
+.fiche-editeur .sous-ligne {
+  display: grid;
+  grid-template-columns: minmax(110px, 22%) 1fr 130px;
+  gap: 8px;
+  align-items: center;
+}
+
+.fiche-libelle {
+  font-weight: 700;
+}
+
+.fiche-resultat {
+  margin: 4px 0 0;
+  color: var(--sable);
+  font-size: 0.9rem;
+}
+
+.fiche-resultat strong {
+  color: var(--mousse);
+}
+
+.fiche-heritee {
+  font-style: italic;
+}
+
+@media (max-width: 700px) {
+  .fiche-editeur .sous-ligne {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stock textarea,
+.modale textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+  resize: vertical;
+}
+
+.stock .champ:has(textarea),
+.modale .champ:has(textarea) {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}

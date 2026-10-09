@@ -1,4 +1,18 @@
-import { lireCatalogue, nombreArticles, prixCarte, validerCatalogue, type Catalogue } from "@matalon/catalogue";
+import { emplacementsFiches, lireCatalogue, nombreArticles, prixCarte, validerCatalogue, type Catalogue } from "@matalon/catalogue";
+import {
+  lireArticleFournisseur,
+  lireLignesImport,
+  lireProduit,
+  lireRecette,
+  planifierImport,
+  REFERENTIEL_VIDE,
+  validerReferentiel,
+  type ArticleFournisseur,
+  type PrixAchat,
+  type Produit,
+  type Recette,
+  type Referentiel,
+} from "@matalon/stock";
 import {
   canonique,
   NOM_LOGICIEL,
@@ -51,6 +65,9 @@ import {
   type IdentiteEtablissement,
   type ReponseEtat,
   type ReponseCarte,
+  type ReponseImport,
+  type ReponseStock,
+  type ReponseVentesCarte,
   type ReponseRattachement,
   type ResumeCarte,
   type ReponseSynchro,
@@ -1140,6 +1157,7 @@ async function enregistrerCarte(env: Environnement, requete: Request, admin: { i
     throw new ErreurHttp(400, "CHAMP_INVALIDE", "Version de la carte manquante : rechargez la carte.");
   }
   const carte = carteValide(corps.carte, id);
+  await controlerFiches(env, carte);
   const [maj] = await env.db.requete<{ version: number }>(
     `update cartes set nom = $2, contenu = $3::jsonb, version = version + 1, maj_le = $4, maj_par = $5
      where id = $1 and version = $6 returning version`,
@@ -1180,6 +1198,198 @@ async function creerCarte(env: Environnement, requete: Request, admin: { id: str
   await journaliserAdmin(env, admin.id, "carte_creee", { carte: id, depuis: depuis?.id ?? null });
   const reponse: ReponseCarte = { carte, version: 1 };
   return json(201, reponse);
+}
+
+// ───────── Stock et fiches techniques ─────────
+
+/** Les fiches de la carte doivent citer des produits ou recettes du référentiel (archivés compris). */
+async function controlerFiches(env: Environnement, carte: Catalogue): Promise<void> {
+  const avecFiche = emplacementsFiches(carte).filter((e) => e.fiche && !e.heritee);
+  if (!avecFiche.length) return;
+  const { referentiel } = await lireReferentiel(env.db);
+  const ids = { produit: new Set(referentiel.produits.map((p) => p.id)), recette: new Set(referentiel.recettes.map((r) => r.id)) };
+  const inconnues = avecFiche.filter((e) => !ids[e.fiche!.type].has(e.fiche!.id)).map((e) => e.libelle);
+  if (inconnues.length) {
+    throw new ErreurHttp(400, "CARTE_INVALIDE", `Carte refusée : fiche technique introuvable pour ${inconnues.slice(0, 6).join(", ")}${inconnues.length > 6 ? "…" : ""}.`);
+  }
+}
+
+async function lireReferentiel(db: Db): Promise<{ referentiel: Referentiel; version: number; majLe: string; majPar: string | null }> {
+  const [r] = await db.requete<{ contenu: Referentiel; version: number; maj_le: string; maj_par: string | null }>(
+    "select contenu, version, maj_le, maj_par from stock_referentiel where id = 'groupe'",
+  );
+  if (!r) return { referentiel: REFERENTIEL_VIDE, version: 0, majLe: "", majPar: null };
+  return { referentiel: { ...REFERENTIEL_VIDE, ...r.contenu }, version: r.version, majLe: r.maj_le, majPar: r.maj_par };
+}
+
+async function reponseStock(env: Environnement): Promise<ReponseStock> {
+  const r = await lireReferentiel(env.db);
+  const prix = await env.db.requete<{ article_id: string; etablissement_id: string; prix_ht: number; le: string; source: PrixAchat["source"] }>(
+    `select distinct on (article_id, etablissement_id) article_id, etablissement_id, prix_ht, le, source
+     from prix_achats order by article_id, etablissement_id, le desc, id desc`,
+  );
+  const etabs = await env.db.requete<{ id: string; enseigne: string; carte_id: string }>("select id, enseigne, carte_id from etablissements order by enseigne");
+  return {
+    ...r,
+    prix: prix.map((p) => ({ articleId: p.article_id, etablissementId: p.etablissement_id, prixHT: p.prix_ht, le: p.le, source: p.source })),
+    etablissements: etabs.map((e) => ({ id: e.id, enseigne: e.enseigne, carteId: e.carte_id })),
+  };
+}
+
+/**
+ * Modifie le référentiel : la modification s'applique à la dernière version
+ * (rejouée si quelqu'un a enregistré entre-temps), puis le référentiel
+ * entier est revérifié — doublons, références, unités, recettes circulaires.
+ */
+async function modifierReferentiel(
+  env: Environnement,
+  admin: { id: string; identifiant: string },
+  f: (ref: Referentiel) => Referentiel,
+  action: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  for (let essai = 0; essai < 3; essai++) {
+    const { referentiel, version } = await lireReferentiel(env.db);
+    const suivant = f(referentiel);
+    const erreurs = validerReferentiel(suivant);
+    if (erreurs.length) throw new ErreurHttp(400, "STOCK_INVALIDE", `${erreurs.slice(0, 6).join(" ; ")}${erreurs.length > 6 ? ` (et ${erreurs.length - 6} autres)` : ""}.`);
+    const [maj] = await env.db.requete<{ version: number }>(
+      `update stock_referentiel set contenu = $1::jsonb, version = version + 1, maj_le = $2, maj_par = $3 where id = 'groupe' and version = $4 returning version`,
+      [JSON.stringify(suivant), horloge(env).toISOString(), admin.identifiant, version],
+    );
+    if (maj) {
+      await journaliserAdmin(env, admin.id, action, { ...details, version: maj.version });
+      return;
+    }
+  }
+  throw new ErreurHttp(409, "VERSION_DEPASSEE", "Le référentiel change trop vite : réessayez.");
+}
+
+/** Remplace un élément par identifiant, ou l'ajoute. */
+const remplacer = <T extends { id: string }>(liste: T[], x: T): T[] => (liste.some((y) => y.id === x.id) ? liste.map((y) => (y.id === x.id ? x : y)) : [...liste, x]);
+
+function lu<T>(r: { erreurs: string[] } & Record<string, unknown>, cle: string, id: string): T {
+  const v = r[cle] as (T & { id: string }) | null;
+  if (!v) throw new ErreurHttp(400, "CHAMP_INVALIDE", `${r.erreurs.slice(0, 6).join(" ; ")}.`);
+  if (v.id !== id) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Identifiant incohérent avec l'adresse.");
+  return v;
+}
+
+async function enregistrerStock(
+  env: Environnement,
+  requete: Request,
+  admin: { id: string; identifiant: string },
+  genre: "produits" | "articles" | "recettes",
+  id: string,
+): Promise<Response> {
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  if (genre === "produits") {
+    const produit = lu<Produit>(lireProduit(corps.produit), "produit", id);
+    await modifierReferentiel(env, admin, (r) => ({ ...r, produits: remplacer(r.produits, produit) }), "stock_produit", { produit: id, nom: produit.nom, actif: produit.actif });
+  } else if (genre === "articles") {
+    const article = lu<ArticleFournisseur>(lireArticleFournisseur(corps.article), "article", id);
+    await modifierReferentiel(env, admin, (r) => ({ ...r, articles: remplacer(r.articles, article) }), "stock_article", { article: id, produit: article.produitId, fournisseur: article.fournisseur });
+  } else {
+    const recette = lu<Recette>(lireRecette(corps.recette), "recette", id);
+    await modifierReferentiel(env, admin, (r) => ({ ...r, recettes: remplacer(r.recettes, recette) }), "stock_recette", { recette: id, nom: recette.nom, lignes: recette.lignes.length });
+  }
+  return json(200, await reponseStock(env));
+}
+
+/** Nouveau prix d'achat d'un article dans un établissement (l'historique ne se modifie jamais). */
+async function enregistrerPrix(env: Environnement, requete: Request, admin: { id: string; identifiant: string }): Promise<Response> {
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const articleId = texte(corps.articleId, "articleId", 80);
+  const e = await etablissement(env.db, texte(corps.etablissementId, "etablissementId", 60));
+  const prix = corps.prixHT;
+  if (typeof prix !== "number" || !Number.isSafeInteger(prix) || prix < 0 || prix > 10_000_000) {
+    throw new ErreurHttp(400, "CHAMP_INVALIDE", "Prix HT en centimes entier, 100 000 € au plus.");
+  }
+  const { referentiel } = await lireReferentiel(env.db);
+  if (!referentiel.articles.some((a) => a.id === articleId)) throw new ErreurHttp(404, "INTROUVABLE", "Article fournisseur inconnu.");
+  await env.db.requete("insert into prix_achats (article_id, etablissement_id, prix_ht, le, source, par) values ($1, $2, $3, $4, 'saisie', $5)", [
+    articleId,
+    e.id,
+    prix,
+    horloge(env).toISOString(),
+    admin.identifiant,
+  ]);
+  await journaliserAdmin(env, admin.id, "stock_prix", { article: articleId, etablissement: e.id, prixHT: prix });
+  return json(200, await reponseStock(env));
+}
+
+async function historiquePrix(env: Environnement, articleId: string): Promise<Response> {
+  const lignes = await env.db.requete<{ etablissement_id: string; prix_ht: number; le: string; source: PrixAchat["source"]; par: string | null }>(
+    "select etablissement_id, prix_ht, le, source, par from prix_achats where article_id = $1 order by le desc, id desc limit 200",
+    [articleId],
+  );
+  return json(200, { prix: lignes.map((l) => ({ articleId, etablissementId: l.etablissement_id, prixHT: l.prix_ht, le: l.le, source: l.source, par: l.par })) });
+}
+
+/**
+ * Import des produits depuis un tableur (lignes brutes, en-tête compris),
+ * lu par le serveur lui-même. En simulation, rend le rapport sans rien
+ * écrire. Les prix vont à l'établissement choisi.
+ */
+async function importerStock(env: Environnement, requete: Request, admin: { id: string; identifiant: string }): Promise<Response> {
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const e = await etablissement(env.db, texte(corps.etablissementId, "etablissementId", 60));
+  const tableau = corps.tableau;
+  if (!Array.isArray(tableau) || tableau.length > 5001 || !tableau.every((l) => Array.isArray(l) && l.length <= 40 && l.every((c) => typeof c === "string" && c.length <= 400))) {
+    throw new ErreurHttp(400, "CHAMP_INVALIDE", "Tableau illisible (5 000 lignes et 40 colonnes au plus).");
+  }
+  const { lignes, erreurs } = lireLignesImport(tableau as string[][]);
+  const le = horloge(env).toISOString();
+  const existants = (await reponseStock(env)).prix;
+  if (corps.simuler === true) {
+    const { referentiel } = await lireReferentiel(env.db);
+    const plan = planifierImport(referentiel, existants, lignes, e.id, le);
+    const reponse: ReponseImport = { rapport: { ...plan.rapport, erreurs: [...erreurs, ...plan.rapport.erreurs].sort((a, b) => a.ligne - b.ligne) } };
+    return json(200, reponse);
+  }
+  let rapport: ReponseImport["rapport"] | null = null;
+  let prix: PrixAchat[] = [];
+  await modifierReferentiel(
+    env,
+    admin,
+    (r) => {
+      const plan = planifierImport(r, existants, lignes, e.id, le);
+      rapport = plan.rapport;
+      prix = plan.prix;
+      return plan.referentiel;
+    },
+    "stock_import",
+    { etablissement: e.id, lignes: lignes.length },
+  );
+  for (const p of prix) {
+    await env.db.requete("insert into prix_achats (article_id, etablissement_id, prix_ht, le, source, par) values ($1, $2, $3, $4, 'import', $5)", [
+      p.articleId,
+      p.etablissementId,
+      p.prixHT,
+      p.le,
+      admin.identifiant,
+    ]);
+  }
+  const final = rapport as unknown as ReponseImport["rapport"];
+  const reponse: ReponseImport = { rapport: { ...final, erreurs: [...erreurs, ...final.erreurs].sort((a, b) => a.ligne - b.ligne) }, stock: await reponseStock(env) };
+  return json(200, reponse);
+}
+
+/** Ventes des 30 derniers jours d'une carte (tous les établissements qui l'utilisent), pour la part du CA couverte par des fiches. */
+async function ventesCarte(env: Environnement, carteId: string): Promise<Response> {
+  const jours = 30;
+  const depuis = ajouterJours(horloge(env).toISOString().slice(0, 10), -jours);
+  const lignes = await env.db.requete<{ cle: string; montant: string }>(
+    `select l->>'articleId' as cle, sum((l->>'montantTTC')::bigint) as montant
+     from enregistrements e join caisses c on c.id = e.caisse_id join etablissements et on et.id = c.etablissement_id
+     cross join jsonb_array_elements(e.contenu->'lignes') l
+     where et.carte_id = $1 and e.chaine = 'tickets' and e.contenu->>'type' in ('VENTE', 'ANNULATION') and e.contenu->>'dateComptable' >= $2
+     group by 1`,
+    [carteId, depuis],
+  );
+  const parCle = Object.fromEntries(lignes.map((l) => [l.cle, Number(l.montant)]));
+  const reponse: ReponseVentesCarte = { jours, parCle, total: Object.values(parCle).reduce((s, x) => s + x, 0) };
+  return json(200, reponse);
 }
 
 // ───────── Administration ─────────
@@ -1706,6 +1916,15 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const pc = /^\/api\/admin\/cartes\/([a-z0-9-]+)$/.exec(chemin);
       if (pc && m === "GET") return await lireCarteAdmin(env, pc[1]!);
       if (pc && m === "PUT") return await enregistrerCarte(env, requete, admin, pc[1]!);
+      const pv = /^\/api\/admin\/cartes\/([a-z0-9-]+)\/ventes$/.exec(chemin);
+      if (pv && m === "GET") return await ventesCarte(env, pv[1]!);
+      if (chemin === "/api/admin/stock" && m === "GET") return json(200, await reponseStock(env));
+      if (chemin === "/api/admin/stock/import" && m === "POST") return await importerStock(env, requete, admin);
+      if (chemin === "/api/admin/stock/prix" && m === "POST") return await enregistrerPrix(env, requete, admin);
+      const ps = /^\/api\/admin\/stock\/(produits|articles|recettes)\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
+      if (ps && m === "PUT") return await enregistrerStock(env, requete, admin, ps[1] as "produits" | "articles" | "recettes", ps[2]!);
+      const ph = /^\/api\/admin\/stock\/prix\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
+      if (ph && m === "GET") return await historiquePrix(env, ph[1]!);
       if (chemin === "/api/admin/etablissements" && m === "POST") return await creerOuModifierEtablissement(env, requete, admin);
       let p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)$/.exec(chemin);
       if (p && m === "PUT") return await creerOuModifierEtablissement(env, requete, admin, p[1]);

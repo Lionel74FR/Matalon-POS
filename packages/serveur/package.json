@@ -16,6 +16,7 @@
   "dependencies": {
     "@matalon/catalogue": "workspace:*",
     "@matalon/noyau-fiscal": "workspace:*",
+    "@matalon/stock": "workspace:*",
     "@neondatabase/serverless": "^1.0.2"
   },
   "devDependencies": {

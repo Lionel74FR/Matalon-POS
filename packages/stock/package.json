@@ -1,8 +1,8 @@
 {
-  "name": "@matalon/catalogue",
+  "name": "@matalon/stock",
   "version": "0.1.0",
   "private": true,
-  "description": "Cartes des établissements : catégories, articles, prix TTC, TVA, variantes, suppléments, formules. Hors périmètre fiscal.",
+  "description": "Stock et fiches techniques : produits, articles fournisseurs, recettes, coût des fiches et food cost. Hors périmètre fiscal : lit les ventes, n'écrit jamais dans le noyau.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -14,8 +14,5 @@
   "devDependencies": {
     "typescript": "^5.6.3",
     "vitest": "^2.1.4"
-  },
-  "dependencies": {
-    "@matalon/stock": "workspace:*"
   }
 }

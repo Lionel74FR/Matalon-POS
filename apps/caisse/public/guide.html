@@ -297,6 +297,17 @@
     <p class="attendu"><b>Attendu :</b> la commande se range en « En direct », « À suivre 1 », « À suivre 2 ». Tout part à l'envoi : le bon cuisine porte « -- À SUIVRE 1 -- » puis « -- À SUIVRE 2 -- ». La table affiche « AS1 · n min » (prochaine suite à réclamer, temps depuis le dernier envoi). La réclame imprime « RÉCLAME — À SUIVRE 1 » en cuisine avec les plats pour mémoire, et la suite passe « Réclamée à hh:mm » ; le plat ajouté ensuite part marqué « À SUIVRE 1 · RÉCLAMÉ ». Sans imprimante de production, la réclame est seulement notée. Au comptoir, pas de sélecteur.</p>
   </section>
 
+  <section class="scenario" data-id="s6l">
+    <label><input type="checkbox">Stock, recettes et food cost (administration, sur ordinateur)</label>
+    <ol>
+      <li>Administration › <b>Stock et recettes</b> › Importer des produits : choisissez votre tableur (Excel ou CSV), <span class="bouton">Vérifier</span>, puis <span class="bouton">Importer</span>.</li>
+      <li>Onglet Produits : ouvrez un produit, ajoutez un second fournisseur avec son prix. Essayez de créer un produit portant le même nom qu'un existant.</li>
+      <li>Onglet Recettes : <b>Nouvelle recette</b>, une sauce produite au kilo (rendement 1 kg), puis un plat à la pièce qui utilise la sauce ; mettez une perte sur une ligne.</li>
+      <li>Cartes et prix › Modifier : ouvrez l'article du plat, section <b>Fiche technique</b>, choisissez la recette, puis Valider et Enregistrer.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la vérification annonce ce qui sera créé sans rien enregistrer ; une ligne fautive est signalée avec son numéro. Un nom déjà connu (même avec d'autres accents ou majuscules) est refusé. Le coût de la recette s'affiche en direct ; un produit sans prix est signalé « coût partiel ». Dans la carte, l'article affiche son food cost, et l'en-tête le nombre de fiches et la part du CA couverte.</p>
+  </section>
+
   <section class="scenario" data-id="s6e">
     <label><input type="checkbox">Plan de salle et tables assemblées</label>
     <ol>

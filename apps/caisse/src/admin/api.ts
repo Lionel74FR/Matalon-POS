@@ -1,5 +1,6 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type { ArticleFournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
+import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -100,6 +101,14 @@ export const api = {
   enregistrerClient: (etablissementId: string, client: ClientApi) =>
     appel<{ client: ClientApi }>("PUT", `/etablissements/${etablissementId}/clients`, client),
   clotures: (caisseId: string) => appel<{ clotures: ResumeCloture[] }>("GET", `/caisses/${caisseId}/clotures`),
+  ventesCarte: (id: string) => appel<ReponseVentesCarte>("GET", `/cartes/${id}/ventes`),
+  stock: () => appel<ReponseStock>("GET", "/stock"),
+  enregistrerProduit: (produit: Produit) => appel<ReponseStock>("PUT", `/stock/produits/${produit.id}`, { produit }),
+  enregistrerArticleFournisseur: (article: ArticleFournisseur) => appel<ReponseStock>("PUT", `/stock/articles/${article.id}`, { article }),
+  enregistrerRecette: (recette: Recette) => appel<ReponseStock>("PUT", `/stock/recettes/${recette.id}`, { recette }),
+  enregistrerPrix: (articleId: string, etablissementId: string, prixHT: number) => appel<ReponseStock>("POST", "/stock/prix", { articleId, etablissementId, prixHT }),
+  historiquePrix: (articleId: string) => appel<{ prix: Array<PrixAchat & { par: string | null }> }>("GET", `/stock/prix/${articleId}`),
+  importerStock: (etablissementId: string, tableau: string[][], simuler: boolean) => appel<ReponseImport>("POST", "/stock/import", { etablissementId, tableau, simuler }),
   urlArchive: (caisseId: string, numero: number) => `/api/admin/caisses/${caisseId}/clotures/${numero}/archive.json`,
   urlCsv: (caisseId: string) => `/api/admin/caisses/${caisseId}/clotures.csv`,
   urlJournal: (caisseId: string) => `/api/admin/caisses/${caisseId}/journal.json`,

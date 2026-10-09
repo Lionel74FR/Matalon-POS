@@ -723,3 +723,102 @@ describe("archives côté serveur", () => {
     expect((await appel("GET", `/api/admin/caisses/${caisseId}/clotures/9/archive.json`, undefined, { Cookie: cookie })).statut).toBe(404);
   });
 });
+
+describe("stock et fiches techniques", () => {
+  const tableur = [
+    ["Produit", "Unité", "Famille", "Zone", "Fournisseur", "Référence", "Conditionnement", "Quantité", "Prix HT"],
+    ["Lait entier", "L", "Crèmerie", "Chambre froide", "Metro", "42", "Pack 6 x 1 L", "6", "7,20"],
+    ["Café en grains", "kg", "Épicerie", "Réserve", "Torréfacteur", "", "Sac 1 kg", "1", "24,00"],
+    ["Farine", "sac", "", "", "", "", "", "", ""],
+  ];
+
+  it("importe des produits, chiffre une recette, relie la carte et calcule les ventes par article", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const vide = await appel("GET", "/api/admin/stock", undefined, { Cookie: cookie });
+    expect(vide.corps.referentiel).toEqual({ produits: [], articles: [], recettes: [] });
+    expect(vide.corps.etablissements).toEqual([{ id: "moka", enseigne: "Moka", carteId: "carte-automne-2026" }]);
+    // Sans session administrateur : refusé ; une caisse non plus.
+    expect((await appel("GET", "/api/admin/stock")).statut).toBe(401);
+
+    // Simulation : rapport sans écriture.
+    const sim = await appel("POST", "/api/admin/stock/import", { etablissementId: "moka", tableau: tableur, simuler: true }, { Cookie: cookie });
+    expect(sim.corps.rapport).toMatchObject({ produitsCrees: ["Lait entier", "Café en grains"], articlesCrees: 2, prixEnregistres: 2 });
+    expect(sim.corps.rapport.erreurs).toEqual([{ ligne: 4, message: "« Farine » : unité « sac » inconnue (kg, L ou pièce)" }]);
+    expect(sim.corps.stock).toBeUndefined();
+    expect((await appel("GET", "/api/admin/stock", undefined, { Cookie: cookie })).corps.version).toBe(1);
+
+    const imp = await appel("POST", "/api/admin/stock/import", { etablissementId: "moka", tableau: tableur }, { Cookie: cookie });
+    expect(imp.statut).toBe(200);
+    const stock = imp.corps.stock;
+    expect(stock.version).toBe(2);
+    expect(stock.referentiel.produits.map((p: any) => [p.id, p.unite])).toEqual([
+      ["lait-entier", "L"],
+      ["cafe-en-grains", "kg"],
+    ]);
+    expect(stock.prix).toHaveLength(2);
+    // Réimport identique : rien de nouveau, aucun doublon.
+    const re = await appel("POST", "/api/admin/stock/import", { etablissementId: "moka", tableau: tableur }, { Cookie: cookie });
+    expect(re.corps.rapport).toMatchObject({ produitsCrees: [], articlesCrees: 0, prixEnregistres: 0 });
+    expect(re.corps.stock.referentiel.produits).toHaveLength(2);
+
+    // Un doublon saisi à la main est refusé (accents et casse ignorés).
+    const doublon = await appel("PUT", "/api/admin/stock/produits/lait", { produit: { id: "lait", nom: "LAIT ENTIER", unite: "L" } }, { Cookie: cookie });
+    expect(doublon.statut).toBe(400);
+    expect(doublon.corps.message).toMatch(/existe déjà/);
+    expect((await appel("PUT", "/api/admin/stock/produits/autre", { produit: { id: "lait-entier", nom: "Lait", unite: "L" } }, { Cookie: cookie })).statut).toBe(400);
+
+    // Recette : cappuccino = 18 g de café, 150 mL de lait (10 % de perte à la mousse).
+    const recette = {
+      id: "cappuccino",
+      nom: "Cappuccino",
+      unite: "piece",
+      rendement: 1000,
+      lignes: [
+        { type: "produit", id: "cafe-en-grains", quantite: { valeur: 18, unite: "g" } },
+        { type: "produit", id: "lait-entier", quantite: { valeur: 150, unite: "mL" }, perte: 1000 },
+      ],
+    };
+    const r = await appel("PUT", "/api/admin/stock/recettes/cappuccino", { recette }, { Cookie: cookie });
+    expect(r.statut).toBe(200);
+    // Une recette qui se contient elle-même est refusée.
+    const cycle = await appel("PUT", "/api/admin/stock/recettes/cappuccino", { recette: { ...recette, lignes: [...recette.lignes, { type: "recette", id: "cappuccino", quantite: { valeur: 1000, unite: "piece" } }] } }, { Cookie: cookie });
+    expect(cycle.statut).toBe(400);
+    expect(cycle.corps.message).toMatch(/se contient elle-même/);
+    // Lait en grammes : inconvertible.
+    const unite = await appel("PUT", "/api/admin/stock/recettes/latte", { recette: { ...recette, id: "latte", nom: "Latte", lignes: [{ type: "produit", id: "lait-entier", quantite: { valeur: 200, unite: "g" } }] } }, { Cookie: cookie });
+    expect(unite.corps.message).toMatch(/Lait entier/);
+
+    // Nouveau prix saisi : l'historique garde l'ancien, le dernier fait foi.
+    instant += 60_000;
+    const lait = stock.referentiel.articles.find((x: any) => x.produitId === "lait-entier").id;
+    const p = await appel("POST", "/api/admin/stock/prix", { articleId: lait, etablissementId: "moka", prixHT: 750 }, { Cookie: cookie });
+    expect(p.corps.prix.find((x: any) => x.articleId === lait).prixHT).toBe(750);
+    const hist = await appel("GET", `/api/admin/stock/prix/${lait}`, undefined, { Cookie: cookie });
+    expect(hist.corps.prix.map((x: any) => [x.prixHT, x.source])).toEqual([
+      [750, "saisie"],
+      [720, "import"],
+    ]);
+    await expect(db.requete("delete from prix_achats")).rejects.toThrow(/ajout seul/);
+
+    // Carte : le cappuccino pointe vers sa fiche ; une fiche inconnue est refusée.
+    const lue = (await appel("GET", "/api/admin/cartes/carte-automne-2026", undefined, { Cookie: cookie })).corps;
+    const article = lue.carte.categories.flatMap((c: any) => c.articles).find((x: any) => x.id === "cappuccino");
+    article.fiche = { type: "recette", id: "inconnue", quantite: { valeur: 1000, unite: "piece" } };
+    const refus = await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte: lue.carte, version: lue.version }, { Cookie: cookie });
+    expect(refus.statut).toBe(400);
+    expect(refus.corps.message).toMatch(/fiche technique introuvable pour Cappuccino/);
+    article.fiche.id = "cappuccino";
+    const ok = await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte: lue.carte, version: lue.version }, { Cookie: cookie });
+    expect(ok.statut).toBe(200);
+    // La caisse reçoit la carte avec sa fiche, sans en dépendre.
+    expect((await appel("GET", "/api/caisse/carte", undefined, a.bearer)).corps.carte.categories.flatMap((c: any) => c.articles).find((x: any) => x.id === "cappuccino").fiche.id).toBe("cappuccino");
+
+    // Ventes des 30 derniers jours par article : pondèrent la part du CA couverte par des fiches.
+    const lea = a.rattachement.utilisateurs[0]!.id;
+    await a.registre.enregistrerVente({ lignes: [{ ...CAFE, quantite: 2 }, SPRITZ], paiements: [{ mode: "CB", montant: 1900 }], operateurId: lea });
+    expect((await a.synchro()).statut).toBe(200);
+    const ventes = await appel("GET", "/api/admin/cartes/carte-automne-2026/ventes", undefined, { Cookie: cookie });
+    expect(ventes.corps).toEqual({ jours: 30, parCle: { cappuccino: 800, "spritz-aperol": 1100 }, total: 1900 });
+  });
+});
