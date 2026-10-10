@@ -42,7 +42,8 @@ import { Clotures } from "./Clotures";
 import { Comptes } from "./Comptes";
 import { useCaisse } from "./contexte";
 import { PriseCommande } from "./PriseCommande";
-import { Reglages } from "./Reglages";
+import { messageServeur, Reglages } from "./Reglages";
+import type { Reservation } from "@matalon/reservations";
 import { Salle } from "./Salle";
 import { Tickets } from "./Tickets";
 
@@ -172,6 +173,28 @@ export function Coque() {
 
   const ouvrirTable = (tableId: string) => setVue({ nom: "commande", tableId: occupation.get(tableId) ?? tableId });
 
+  /**
+   * Installe une réservation : la table (et les tables assemblées) s'ouvre avec
+   * ses couverts et une note au nom du client, la réservation passe « installée ».
+   */
+  const installerReservation = async (r: Reservation) => {
+    const [tableId, ...jointes] = r.tables;
+    if (!tableId) return;
+    if (!commandes.has(tableId)) {
+      const c = nouvelleCommande(tableId, utilisateur.id, r.couverts);
+      const libres = jointes.filter((id) => !occupation.has(id));
+      if (libres.length) c.jointes = libres;
+      c.note = [`Réservation ${r.prenom} ${r.nom}`.trim(), r.commentaire].filter(Boolean).join(" · ");
+      await enregistrerCommande(c, tableId);
+    }
+    try {
+      await caisse.client.modifierReservation(r.id, { statut: "arrivee", par: utilisateur.id });
+    } catch (e) {
+      notifier(`Table ouverte, mais la réservation n'a pas pu être marquée installée : ${messageServeur(e)}`, "erreur");
+    }
+    ouvrirTable(tableId);
+  };
+
   /** Déplace une commande ouverte vers une autre table, ou la regroupe avec celle qui s'y trouve. */
   const transferer = async (de: string, versChoisie: string) => {
     const source = commandes.get(de);
@@ -300,7 +323,7 @@ export function Coque() {
         </div>
       )}
       <main className="contenu">
-        {vue.nom === "salle" && <Salle commandes={commandes} onOuvrir={ouvrirTable} />}
+        {vue.nom === "salle" && <Salle commandes={commandes} onOuvrir={ouvrirTable} onInstaller={installerReservation} />}
         {vue.nom === "commande" && (
           <PriseCommande
             key={vue.tableId}

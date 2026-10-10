@@ -17,6 +17,7 @@
     "@matalon/catalogue": "workspace:*",
     "@matalon/noyau-fiscal": "workspace:*",
     "@matalon/serveur": "workspace:*",
+    "@matalon/reservations": "workspace:*",
     "@matalon/stock": "workspace:*",
     "fflate": "^0.8.3",
     "idb": "^8.0.0",

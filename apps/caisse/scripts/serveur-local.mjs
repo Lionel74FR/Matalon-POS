@@ -35,8 +35,11 @@ const db = {
   },
 };
 
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2", ".woff": "font/woff", ".json": "application/json" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json", ".woff2": "font/woff2", ".woff": "font/woff", ".json": "application/json" };
 const REECRITURES = { "/admin": "/admin.html", "/n": "/n.html", "/guide": "/guide.html" };
+// E-mails des réservations : gardés en mémoire, lisibles sur /__courriels (essais de bout en bout).
+const courriels = [];
+const envoyerCourriel = async (c) => void courriels.push(c);
 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -46,14 +49,19 @@ createServer(async (req, res) => {
     const corps = morceaux.length ? Buffer.concat(morceaux) : undefined;
     // Le cookie d'administration est « Secure » : en local (http) on le laisse passer quand même.
     const requete = new Request(url, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : corps });
-    const reponse = await traiter(requete, { db });
+    const reponse = await traiter(requete, { db, envoyerCourriel });
     const entetes = Object.fromEntries(reponse.headers);
     if (entetes["set-cookie"]) entetes["set-cookie"] = entetes["set-cookie"].replace("; Secure", "");
     res.writeHead(reponse.status, entetes);
     res.end(Buffer.from(await reponse.arrayBuffer()));
     return;
   }
-  const chemin = REECRITURES[url.pathname] ?? url.pathname;
+  if (url.pathname === "/__courriels") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(courriels));
+    return;
+  }
+  const chemin = REECRITURES[url.pathname] ?? (url.pathname.startsWith("/reserver") ? "/reserver.html" : url.pathname);
   let fichier = join(racine, chemin);
   if (!fichier.startsWith(racine) || !existsSync(fichier) || statSync(fichier).isDirectory()) fichier = join(racine, "index.html");
   res.writeHead(200, { "Content-Type": TYPES[extname(fichier)] ?? "application/octet-stream", "Cache-Control": "no-cache" });

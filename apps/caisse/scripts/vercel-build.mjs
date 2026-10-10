@@ -36,7 +36,7 @@ await build({
 });
 writeFileSync(
   resolve(fonction, ".vc-config.json"),
-  JSON.stringify({ runtime: "edge", entrypoint: "index.js", regions: ["cdg1"], envVarsInUse: ["DATABASE_URL", "POSTGRES_URL"] }, null, 2),
+  JSON.stringify({ runtime: "edge", entrypoint: "index.js", regions: ["cdg1"], envVarsInUse: ["DATABASE_URL", "POSTGRES_URL", "BREVO_CLE", "EMAIL_EXPEDITEUR"] }, null, 2),
 );
 
 const sansCache = { "Cache-Control": "no-cache" };
@@ -55,12 +55,16 @@ writeFileSync(
         { src: "/(index|admin|n)?(\\.html)?", headers: sansCache, continue: true },
         { src: "/assets/(.*)", headers: { "Cache-Control": "public, max-age=31536000, immutable" }, continue: true },
         { src: "/admin(\\.html)?", headers: { "X-Frame-Options": "DENY", "X-Robots-Tag": "noindex" }, continue: true },
+        // Module de réservation : affiché dans un cadre sur le site de l'établissement.
+        { src: "/reservation\\.js", headers: { "Cache-Control": "public, max-age=300" }, continue: true },
+        { src: "/reserver(/.*)?", headers: { ...sansCache, "Content-Security-Policy": "frame-ancestors *" }, continue: true },
         { src: "/(.*)", headers: securite, continue: true },
         { src: "/api/(.*)", dest: "/api" },
         { handle: "filesystem" },
         { src: "/admin", dest: "/admin.html" },
         { src: "/n", dest: "/n.html" },
         { src: "/guide", dest: "/guide.html" },
+        { src: "/reserver(/.*)?", dest: "/reserver.html" },
         { src: "/(.*)", dest: "/index.html" },
       ],
     },

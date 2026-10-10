@@ -2795,3 +2795,135 @@ a.bouton {
     flex: 1 1 100%;
   }
 }
+
+/* ───────── Réservations (salle) ───────── */
+
+.bouton-resa {
+  min-height: 44px;
+}
+
+.table-resa {
+  display: grid;
+  gap: 2px;
+  color: #9ec9dc;
+}
+
+.table-resa small {
+  color: var(--sable);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resa-caisse-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 12px;
+}
+
+.resa-caisse-tete p {
+  margin: 0 auto 0 0;
+  color: var(--sable);
+}
+
+.resa-caisse-saisie {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 4px 16px;
+  align-items: end;
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.resa-caisse-saisie .champ {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.resa-caisse-liste {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resa-caisse-ligne {
+  display: grid;
+  grid-template-columns: 76px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.resa-caisse-ligne.arrivee {
+  opacity: 0.7;
+}
+
+.resa-caisse-ligne.annulee,
+.resa-caisse-ligne.absente {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.resa-caisse-heure {
+  display: grid;
+  font-variant-numeric: tabular-nums;
+}
+
+.resa-caisse-heure strong {
+  font-family: var(--police-chiffres);
+  font-size: 1.3rem;
+}
+
+.resa-caisse-heure span,
+.resa-caisse-client span {
+  color: var(--sable);
+  font-size: 0.9rem;
+}
+
+.resa-caisse-client {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.resa-caisse-client a {
+  color: inherit;
+}
+
+.resa-caisse-client em {
+  color: var(--mousse);
+  font-size: 0.9rem;
+}
+
+.resa-caisse-table select {
+  min-height: 44px;
+  max-width: 170px;
+}
+
+.resa-caisse-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 700px) {
+  .resa-caisse-ligne {
+    grid-template-columns: 64px 1fr;
+  }
+  .resa-caisse-table,
+  .resa-caisse-actions {
+    grid-column: 2;
+  }
+  .resa-caisse-table select {
+    max-width: none;
+    width: 100%;
+  }
+}

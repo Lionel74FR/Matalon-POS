@@ -3,7 +3,7 @@ import { useRef, useState, type PointerEvent as PointerEventReact } from "react"
 import { chaises, dimensions, formeDe, hauteurUtile, type TablePlacee } from "../metier/plan";
 import "./plan.css";
 
-export type StatutTable = "libre" | "occupee" | "addition" | "jointe";
+export type StatutTable = "libre" | "reservee" | "occupee" | "addition" | "jointe";
 
 /** Ce que la salle affiche sur une table en service. */
 export interface EtatTable {
@@ -12,6 +12,8 @@ export interface EtatTable {
   lignes: string[];
   /** Plus de couverts que de chaises. */
   alerte?: boolean;
+  /** Réservation qui arrive bientôt (libre : à garder ; occupée : à libérer). */
+  imminente?: boolean;
   /** Libellé pour le lecteur d'écran (« Table 5, occupée, 24 € »). */
   description: string;
 }
@@ -170,6 +172,7 @@ export function PlanSalle(props: Proprietes) {
           choisi(e) ? "choisi" : "",
           edition?.enConflit.has(t.id) ? "conflit" : "",
           etat?.alerte ? "alerte" : "",
+          etat?.imminente ? "imminente" : "",
         ].join(" ");
         const lignes = etat?.lignes ?? [];
         const taille = Math.min(1.3, d.largeur / 2.6);

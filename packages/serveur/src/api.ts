@@ -111,11 +111,24 @@ import {
   transferer,
 } from "./stock-serveur.js";
 import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre } from "./statistiques.js";
+import {
+  enregistrerReglages,
+  lireReglages,
+  listeReservations,
+  modifierReservation,
+  routePublique,
+  saisieEquipe,
+  type ContexteResa,
+  type EnvoiCourriel,
+} from "./reservations-serveur.js";
+import { maintenantParis } from "@matalon/reservations";
 
 export interface Environnement {
   db: Db;
   /** Horloge injectable (tests). */
   maintenant?: () => Date;
+  /** Envoi d'e-mails (réservations) ; absent : rien n'est envoyé. */
+  envoyerCourriel?: EnvoiCourriel;
 }
 
 const CHAINES: Chaine[] = ["tickets", "evenements", "clotures"];
@@ -2031,6 +2044,77 @@ async function archiveClotureCaisse(env: Environnement, requete: Request, caisse
 
 // ───────── Routage ─────────
 
+// ───────── Réservations ─────────
+
+function contexteResa(env: Environnement, requete: Request): ContexteResa {
+  return {
+    db: env.db,
+    maintenant: horloge(env),
+    etablissement: (id) => etablissement(env.db, id),
+    ...(env.envoyerCourriel ? { envoyer: env.envoyerCourriel } : {}),
+    origine: new URL(requete.url).origin,
+  };
+}
+
+async function reservationsAdmin(env: Environnement, requete: Request, admin: { id: string; identifiant: string }, etabId: string, suite: string | undefined): Promise<Response | null> {
+  const m = requete.method;
+  const ctx = contexteResa(env, requete);
+  const etab = await etablissement(env.db, etabId);
+  const par = `administration · ${admin.identifiant}`;
+  if (suite === "/reglages") {
+    if (m === "GET") return json(200, await lireReglages(env.db, etab.id));
+    if (m === "PUT") {
+      const r = await enregistrerReglages(env.db, etab.id, await lireJson<Record<string, unknown>>(requete), par, ctx.maintenant);
+      await journaliserAdmin(env, admin.id, "reservations_reglages", { etablissement: etab.id, version: r.version, actif: r.reglages.actif });
+      return json(200, r);
+    }
+    return null;
+  }
+  if (!suite) {
+    const url = new URL(requete.url);
+    if (m === "GET") {
+      const du = url.searchParams.get("du") ?? maintenantParis(ctx.maintenant).jour;
+      return json(200, { reservations: await listeReservations(ctx, etab.id, du, url.searchParams.get("au") ?? du) });
+    }
+    if (m === "POST") {
+      const r = await saisieEquipe(ctx, etab, await lireJson<Record<string, unknown>>(requete), par);
+      return json(201, { reservation: r.reservation, conflits: r.conflits });
+    }
+    return null;
+  }
+  if (m === "PATCH") return json(200, await modifierReservation(ctx, etab, suite.slice(1), await lireJson<Record<string, unknown>>(requete), par));
+  return null;
+}
+
+/** Caisse : réservations du jour (ou d'une date), saisie, statut et table. Tracé au nom de la personne connectée. */
+async function reservationsCaisse(env: Environnement, requete: Request, chemin: string, m: string): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const ctx = contexteResa(env, requete);
+  const etab = await etablissement(env.db, c.etablissement_id);
+  const qui = async (corps: Record<string, unknown>) => {
+    const [u] = await env.db.requete<{ nom: string }>("select nom from utilisateurs where etablissement_id = $1 and id = $2 and actif", [etab.id, String(corps.par ?? "")]);
+    if (!u) throw new ErreurHttp(403, "UTILISATEUR_INCONNU", "Personne connectée inconnue de l'établissement.");
+    return `${c.nom} · ${u.nom}`;
+  };
+  if (chemin === "/api/caisse/reservations" && m === "GET") {
+    const url = new URL(requete.url);
+    const date = url.searchParams.get("date") ?? maintenantParis(ctx.maintenant).jour;
+    const { reglages } = await lireReglages(env.db, etab.id);
+    return json(200, { date, reservations: await listeReservations(ctx, etab.id, date, url.searchParams.get("au") ?? date), dureeMinutes: reglages.dureeMinutes, actif: reglages.actif });
+  }
+  if (chemin === "/api/caisse/reservations" && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const r = await saisieEquipe(ctx, etab, corps, await qui(corps));
+    return json(201, { reservation: r.reservation, conflits: r.conflits });
+  }
+  const p = /^\/api\/caisse\/reservations\/([a-z0-9-]{3,40})$/.exec(chemin);
+  if (p && m === "PATCH") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    return json(200, await modifierReservation(ctx, etab, p[1]!, corps, await qui(corps)));
+  }
+  throw new ErreurHttp(404, "INCONNU", "Route inconnue.");
+}
+
 export async function traiter(requete: Request, env: Environnement): Promise<Response> {
   const url = new URL(requete.url);
   const chemin = url.pathname.replace(/\/+$/, "");
@@ -2038,6 +2122,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
   try {
     await migrer(env.db);
     if (chemin === "/api/sante" && m === "GET") return json(200, { ok: true, heure: horloge(env).toISOString() });
+
+    if (chemin.startsWith("/api/public/reservation/")) {
+      const r = await routePublique(contexteResa(env, requete), requete, chemin);
+      if (r) return r;
+    }
+    if (chemin === "/api/caisse/reservations" || chemin.startsWith("/api/caisse/reservations/")) return await reservationsCaisse(env, requete, chemin, m);
 
     if (chemin === "/api/caisse/rattacher" && m === "POST") return await rattacher(env, requete);
     if (chemin === "/api/caisse/etat" && m === "GET") return await etatCaisse(env, requete);
@@ -2126,6 +2216,11 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "PUT") return await creerOuModifierEtablissement(env, requete, admin, p[1]);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/utilisateurs$/.exec(chemin);
       if (p && m === "POST") return await enregistrerUtilisateurAdmin(env, requete, admin, p[1]!);
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/reservations(\/reglages|\/[a-z0-9-]{3,40})?$/.exec(chemin);
+      if (p) {
+        const r = await reservationsAdmin(env, requete, admin, p[1]!, p[2]);
+        if (r) return r;
+      }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/comptes$/.exec(chemin);
       if (p && m === "GET") return json(200, await comptes(env, (await etablissement(env.db, p[1]!)).id));
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/plan$/.exec(chemin);

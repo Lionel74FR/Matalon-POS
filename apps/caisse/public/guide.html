@@ -361,6 +361,18 @@
     <p class="attendu"><b>Attendu :</b> la liste ne garde que les tickets qui correspondent ; la ligne de totaux donne leur nombre, les ventes et l'encaissé par moyen de paiement (à rapprocher du TPE en filtrant sur la carte bancaire). Une vente dont le paiement a été corrigé se range sous le bon moyen. « Effacer » remet tout. Une période montre aussi les tickets des autres appareils ; hors ligne, seulement ceux de l'appareil.</p>
   </section>
 
+  <section class="scenario" data-id="s6o">
+    <label><input type="checkbox">Réservation depuis le site, jusqu'à la table</label>
+    <ol>
+      <li>Administration › <span class="bouton">Réservations</span> › Services et réglages : ajoutez un Déjeuner et un Dîner (jours, heures d'arrivée, plafonds), la durée par défaut, cochez « Réservation en ligne ouverte », enregistrez.</li>
+      <li>Onglet « Sur votre site » : copiez la balise et collez-la dans une page de test du site (ou ouvrez « Voir le module »).</li>
+      <li>Sur un iPhone : « Réserver une table » › 4 couverts › une date › un horaire › Réserver › coordonnées (avec votre e-mail) › Réserver.</li>
+      <li>Sur l'iPad, Salle : repérez la table réservée (heure et nom), puis <span class="bouton">Réservations</span> › <span class="bouton">Installer</span>.</li>
+      <li>Ouvrez le lien « Annuler ma réservation » de l'e-mail sur une seconde réservation.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> les créneaux complets sont barrés « Complet » ; la réservation arrive confirmée, avec un e-mail au client et une copie à l'établissement ; la plus petite table libre lui est donnée ; « Installer » ouvre la table avec 4 couverts et une note au nom du client ; l'annulation libère le créneau et la table. Au-delà du groupe maximum, le module invite à appeler.</p>
+  </section>
+
   <section class="scenario" data-id="s6h">
     <label><input type="checkbox">Z de l'établissement depuis l'iPhone</label>
     <ol>

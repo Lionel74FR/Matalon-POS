@@ -15,8 +15,9 @@ function versionBuild(): string {
 export default defineConfig({
   build: {
     rollupOptions: {
-      // Trois pages : la caisse, la note numérique ouverte par le client (QR code) et l'administration.
-      input: { caisse: "index.html", note: "n.html", admin: "admin.html" },
+      // Quatre pages : la caisse, la note numérique ouverte par le client (QR code), l'administration
+      // et le module de réservation du site (/reserver/<établissement>, ouvert par /reservation.js).
+      input: { caisse: "index.html", note: "n.html", admin: "admin.html", reserver: "reserver.html" },
     },
   },
   define: {
@@ -45,9 +46,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff,woff2}"],
         // L'administration se consulte en ligne, sur ordinateur : rien à garder sur l'iPad.
-        globIgnores: ["admin.html", "assets/admin-*"],
+        globIgnores: ["admin.html", "assets/admin-*", "reserver.html", "assets/reserver-*", "reservation.js"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/guide/, /^\/n(\.html)?$/, /^\/api\//, /^\/admin/],
+        navigateFallbackDenylist: [/^\/guide/, /^\/n(\.html)?$/, /^\/api\//, /^\/admin/, /^\/reserver/],
       },
     }),
   ],

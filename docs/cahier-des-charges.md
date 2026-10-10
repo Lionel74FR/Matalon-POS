@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 43, copiée le 9 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 45, copiée le 10 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -160,6 +160,44 @@ Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors 
 - **Agent de factures** : dépose les lignes d'une facture par une clé d'accès créée dans l'administration (empreinte seule gardée, révocable). Une ligne reconnue (fournisseur et référence, ou libellé déjà rapproché) devient un prix d'achat ; les autres attendent un rapprochement, retenu pour la fois suivante.
 - **En caisse** : onglet Stock réservé aux responsables, en ligne (inventaire, réception, perte, stock théorique et dernières pièces).
 
+## Réservations en ligne
+
+Le client réserve depuis le site de l'établissement dans un panneau semblable à Zenchef ; la réservation est confirmée d'office, reçoit une table et apparaît sur le plan de salle de la caisse. Module commun à tous les établissements, réglé et testé au Moka d'abord. Demandé par Lionel le 9 octobre 2026, lancé le jour même (lot 6), hors périmètre fiscal.
+
+### Décisions du 9 octobre 2026
+
+| Question | Décision |
+| --- | --- |
+| Premier établissement | Moka (le plan de table n'existe que là où Matalon POS est la caisse) |
+| Capacité | Les trois plafonds par service : couverts du service, personnes à table en même temps (avec la durée), arrivées par créneau |
+| Confirmation | D'office, avec un e-mail au client (lien d'annulation) et une copie à l'établissement ; service d'envoi Brevo |
+| Plan de table | Plus petite table libre qui convient attribuée d'office, modifiable par l'équipe |
+
+### Module du site
+
+- Une balise `<script src="…/reservation.js" data-etablissement="moka" async>` ajoute un bouton flottant « Réserver une table » ; les boutons du site marqués `data-matalon-reserver` ou pointant vers `#reserver` ouvrent le même panneau. Lien direct en page entière pour Google, Instagram ou un QR code.
+- Parcours : nombre de couverts, date (prochaines disponibilités ou calendrier), préférence de salle s'il y a plusieurs zones, horaire par service (complet signalé), puis civilité, prénom, nom, téléphone avec indicatif, e-mail, commentaire, conditions à accepter, offres par e-mail ou SMS (consentement facultatif), mémorisation sur l'appareil. Confirmation avec ajout à l'agenda et lien d'annulation.
+- Au-delà du groupe maximum en ligne, le module invite à appeler ou écrire. Une même personne (téléphone) ne réserve qu'une fois par jour en ligne ; un champ piège écarte les robots.
+
+### Administration
+
+- Services : nom, jours, première et dernière heure d'arrivée, couverts du service, personnes en même temps, arrivées par créneau, durée propre (facultatif). Deux services ne se chevauchent pas un même jour.
+- Règles : durée par défaut d'une réservation, écart entre créneaux (15 ou 30 min), délai minimum avant l'arrivée, réservation jusqu'à N jours à l'avance, groupe maximum en ligne, fermetures exceptionnelles, message d'accueil, téléphone, e-mail de l'établissement, liens des conditions et de la politique de confidentialité.
+- Liste du jour par service (couverts réservés sur le plafond), table et statut modifiables, saisie d'une réservation prise au téléphone ou sur place ; la balise à copier.
+
+### Caisse
+
+- Plan de salle : table réservée (heure et nom), bord plein dans la demi-heure ; une table occupée affiche « Résa 20:00 » dans l'heure qui précède. Même indication dans la vue en liste.
+- Réservations du jour : installer (la table s'ouvre avec les couverts et une note au nom du client, tables assemblées comprises), placer sur une table, absent, annuler, remettre à venir, saisir au téléphone. Liste relue chaque minute ; hors ligne, la dernière copie du jour.
+- L'équipe peut dépasser un plafond après confirmation (« Enregistrer quand même »), tracé dans l'historique de la réservation ; le client en ligne jamais.
+
+### Règles
+
+- Une réservation compte (capacité et tables) tant qu'elle est confirmée ou installée ; annulée ou absente, elle libère sa place.
+- Deux demandes simultanées : chacune est revérifiée après son écriture contre celles écrites avant elle, la seconde est refusée si elle dépasse.
+- Coordonnées gardées un an après la date de la réservation, puis effacées ; le lien d'annulation cesse alors de valoir.
+- Une réservation n'est ni un ticket ni une commande : rien n'entre au registre fiscal. Le CA reste celui des tickets.
+
 ## Intégration Matalon Vision
 
 Matalon Vision reçoit deux événements de la caisse et ne lui renvoie rien ; le CA du jour fait foi une fois la clôture Z reçue.
@@ -203,7 +241,7 @@ Chaque action est rattachée à un utilisateur nommé, chaque iPad à une clé r
 - **Appareils** : rattachement par code à usage unique ; clé de signature propre à chaque iPad, non exportable (trousseau iOS en V2) ; un iPad perdu ou volé est révoqué depuis l'administration et ne peut plus encaisser.
 - **Secrets** : variables d'environnement Vercel et Secrets Replit, jamais dans le dépôt Git.
 - **Sauvegardes** : base serveur sauvegardée quotidiennement ; archives fiscales conservées 6 ans.
-- **RGPD** : aucune donnée client par défaut ; l'e-mail saisi pour un ticket dématérialisé sert uniquement à cet envoi.
+- **RGPD** : aucune donnée client par défaut ; l'e-mail saisi pour un ticket dématérialisé sert uniquement à cet envoi. Les réservations gardent nom, téléphone, e-mail et commentaire un an après leur date, puis les effacent ; les offres commerciales ne partent qu'avec le consentement coché par le client.
 
 ## Lots de livraison
 
@@ -217,6 +255,7 @@ Le Moka ouvre le 15 octobre 2026 avec la caisse maison : lots 1 et 2 réduits au
 | 3. Connecteur Matalon Vision | Webhooks, file d'attente, réception côté Replit | CA de Matalon Vision égal aux Z sur 7 jours de test |
 | 4. Stock et fiches techniques | Ingrédients, fiches, consommation théorique, inventaires, food cost ; sous-lots 4a à 4d livrés le 9 octobre 2026 | Écarts calculés sur un inventaire réel |
 | 5. Mise en service | Services à blanc avec l'équipe, puis bascule depuis la caisse de transition | Une semaine d'exploitation sans incident bloquant |
+| 6. Réservations en ligne | Module du site, services et capacités, e-mails, tables attribuées et affichées au plan ; lancé le 9 octobre 2026 sur décision de Lionel | Premières réservations réelles du Moka reçues par le site, confirmées par e-mail et installées depuis le plan |
 
 Après la V1 : prix fournisseurs via l'agent de factures, déploiement sur une deuxième enseigne, facturation électronique B2B.
 

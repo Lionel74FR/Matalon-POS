@@ -1,3 +1,4 @@
+import type { Reservation } from "@matalon/reservations";
 import type { Ticket } from "@matalon/noyau-fiscal";
 import type {
   DocumentStock,
@@ -163,6 +164,19 @@ export class ClientApi {
 
   enregistrerClient(client: Omit<FicheClient, "actif"> & { actif?: boolean }) {
     return this.appel<{ client: FicheClient; clients: FicheClient[] }>("PUT", "/api/caisse/clients", client);
+  }
+
+  /** Réservations d'un jour (Paris), avec la durée par défaut. */
+  reservations(date?: string) {
+    return this.appel<{ date: string; reservations: Reservation[]; dureeMinutes: number; actif: boolean }>("GET", `/api/caisse/reservations${date ? `?date=${date}` : ""}`);
+  }
+
+  creerReservation(corps: Record<string, unknown>) {
+    return this.appel<{ reservation: Reservation; conflits: Reservation[] }>("POST", "/api/caisse/reservations", corps);
+  }
+
+  modifierReservation(id: string, corps: Record<string, unknown>) {
+    return this.appel<{ reservation: Reservation; conflits: Reservation[] }>("PATCH", `/api/caisse/reservations/${id}`, corps);
   }
 
   enregistrerPlan(plan: { zones: ZonePlan[]; tables: Table[]; version: number }) {

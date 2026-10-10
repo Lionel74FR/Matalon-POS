@@ -613,3 +613,31 @@ export interface ReponseStockCaisse {
   etat: EtatStock;
   documents: DocumentStock[];
 }
+
+// ───────── Réservations (module public du site) ─────────
+
+export interface ResumePublic {
+  id: string;
+  date: string;
+  heure: string;
+  couverts: number;
+  prenom: string;
+  nom: string;
+  statut: "confirmee" | "arrivee" | "absente" | "annulee";
+  etablissement: { id: string; nom: string; adresse: string; codePostalVille: string; telephone: string };
+  /** Le client peut encore annuler en ligne (réservation à venir, confirmée). */
+  annulable: boolean;
+}
+
+export interface ConfigPublique {
+  etablissement: ResumePublic["etablissement"];
+  accueil: string;
+  groupeMax: number;
+  horizonJours: number;
+  telephone?: string;
+  email?: string;
+  conditions?: string;
+  confidentialite?: string;
+  zones: string[];
+  aujourdhui: string;
+}

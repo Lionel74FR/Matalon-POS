@@ -240,3 +240,26 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Table réservée (libre pour l'instant) : plateau bleu lac, bord en tirets ; imminente : bord plein et épais. */
+.plan-table.reservee .plan-plateau {
+  fill: #dce6ea;
+  stroke: var(--t-lac, #3f5560);
+  stroke-width: 0.16;
+  stroke-dasharray: 0.45 0.25;
+}
+
+.plan-table.reservee .plan-info {
+  fill: var(--t-lac, #3f5560);
+  font-weight: 700;
+}
+
+.plan-table.reservee.imminente .plan-plateau {
+  stroke-width: 0.3;
+  stroke-dasharray: none;
+}
+
+.plan-table.occupee.imminente .plan-plateau {
+  stroke: #9ec9dc;
+  stroke-width: 0.3;
+}

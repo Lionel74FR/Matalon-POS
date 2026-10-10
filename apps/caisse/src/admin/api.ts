@@ -1,5 +1,6 @@
 import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
+import type { ReglagesReservation, Reservation } from "@matalon/reservations";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
@@ -124,6 +125,14 @@ export const api = {
   lignesFacture: (etab: string, toutes = false) => appel<{ lignes: LigneFactureApi[] }>("GET", `/stock/factures?etab=${etab}${toutes ? "&toutes=1" : ""}`),
   rapprocherLigne: (id: number, articleId: string | null) =>
     appel<{ stock: ReponseStock }>("POST", `/stock/factures/${id}/${articleId ? "rapprocher" : "ignorer"}`, articleId ? { articleId } : {}),
+  reglagesReservation: (etab: string) => appel<{ reglages: ReglagesReservation; version: number }>("GET", `/etablissements/${etab}/reservations/reglages`),
+  enregistrerReglagesReservation: (etab: string, reglages: ReglagesReservation, version: number) =>
+    appel<{ reglages: ReglagesReservation; version: number }>("PUT", `/etablissements/${etab}/reservations/reglages`, { reglages, version }),
+  reservations: (etab: string, du: string, au = du) => appel<{ reservations: Reservation[] }>("GET", `/etablissements/${etab}/reservations?du=${du}&au=${au}`),
+  creerReservation: (etab: string, corps: Record<string, unknown>) =>
+    appel<{ reservation: Reservation; conflits: Reservation[] }>("POST", `/etablissements/${etab}/reservations`, corps),
+  modifierReservation: (etab: string, id: string, corps: Record<string, unknown>) =>
+    appel<{ reservation: Reservation; conflits: Reservation[] }>("PATCH", `/etablissements/${etab}/reservations/${id}`, corps),
   urlArchive: (caisseId: string, numero: number) => `/api/admin/caisses/${caisseId}/clotures/${numero}/archive.json`,
   urlCsv: (caisseId: string) => `/api/admin/caisses/${caisseId}/clotures.csv`,
   urlJournal: (caisseId: string) => `/api/admin/caisses/${caisseId}/journal.json`,

@@ -11,6 +11,7 @@ import type { AlerteApi } from "@matalon/serveur/partage";
 import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
+import { Reservations } from "./Reservations";
 import {
   Archive,
   Ban,
@@ -18,6 +19,7 @@ import {
   Check,
   History,
   BookOpen,
+  CalendarCheck,
   FileJson,
   FileSpreadsheet,
   KeyRound,
@@ -392,6 +394,12 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
             </strong>
             <small aria-hidden="true">Produits, fournisseurs, fiches</small>
           </button>
+          <button className={`admin-lien${choisi === "reservations" ? " actif" : ""}`} onClick={() => aller("reservations")}>
+            <strong>
+              <AvecIcone icone={CalendarCheck}>Réservations</AvecIcone>
+            </strong>
+            <small aria-hidden="true">Services, tables, module du site</small>
+          </button>
         </nav>
         <main className="admin-contenu">
           {erreur && <p className="erreur">{erreur}</p>}
@@ -399,6 +407,8 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
             <p>Chargement…</p>
           ) : choisi === "stock" ? (
             <Stock />
+          ) : choisi === "reservations" ? (
+            <Reservations etablissements={donnees.etablissements} />
           ) : choisi === "cartes" ? (
             carteOuverte ? (
               <EditeurCarte

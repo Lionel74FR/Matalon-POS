@@ -860,6 +860,150 @@ code.cle-api {
   font-size: 1rem;
 }
 
+/* ───────── Réservations ───────── */
+
+.resa {
+  display: grid;
+  gap: 16px;
+}
+
+.resa h2 {
+  margin: 22px 0 8px;
+  font-size: 1.1rem;
+}
+
+.resa-jour input[type="date"] {
+  flex: 0 0 190px;
+  min-height: 44px;
+}
+
+.resa-jour .case {
+  white-space: nowrap;
+}
+
+.resa-date {
+  margin-right: auto;
+}
+
+.resa-date::first-letter,
+.resa-fermetures .pastille::first-letter {
+  text-transform: uppercase;
+}
+
+.resa-service h2 {
+  margin-top: 18px;
+}
+
+.resa-table td small {
+  display: block;
+  color: var(--sable);
+  font-size: 0.85rem;
+}
+
+.resa-table select {
+  min-height: 40px;
+  max-width: 220px;
+}
+
+.resa-saisie,
+.resa-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 18px;
+  margin-top: 12px;
+}
+
+.resa-saisie .champ,
+.resa-grille .champ {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.resa-saisie {
+  padding: 14px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.resa-large {
+  grid-column: 1 / -1;
+}
+
+.resa-ouverture {
+  font-size: 1.1rem;
+}
+
+.resa-services {
+  display: grid;
+  gap: 12px;
+}
+
+.resa-service-carte {
+  padding: 14px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.resa-service-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.resa-nom {
+  flex: 1;
+  min-height: 44px;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.resa-jours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.resa-jours .pastille {
+  min-height: 42px;
+  min-width: 42px;
+  padding: 0;
+  justify-content: center;
+}
+
+.resa-fermetures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.resa-fermetures .pastille {
+  padding-right: 4px;
+}
+
+.resa-code {
+  overflow-x: auto;
+  padding: 12px 14px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
+}
+
+.resa-reglages textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+  resize: vertical;
+}
+
 /* Rubriques du stock et catégories de l'éditeur : listes déroulantes sur iPhone. */
 .stock-onglets-mobile,
 .editeur-cat-mobile {

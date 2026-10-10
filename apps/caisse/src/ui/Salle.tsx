@@ -1,4 +1,4 @@
-import { BellRing, Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
+import { BellRing, CalendarCheck, Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ID_COMPTOIR, type Table } from "../donnees/configuration";
 import { nomCourtSuite, nomSuite, suitesDe, suiviSuites, tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
@@ -8,6 +8,8 @@ import { EditeurPlan, type PlanEditable } from "./EditeurPlan";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { PlanSalle, type EtatTable } from "./PlanSalle";
 import { messageServeur } from "./Reglages";
+import { minutes, type Reservation } from "@matalon/reservations";
+import { aVenirParTable, minuteParis, nomClient, PanneauReservations, useReservationsDuJour } from "./ReservationsCaisse";
 
 function depuis(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
@@ -39,8 +41,11 @@ const lireVue = (): "plan" | "liste" => {
 const ZOOMS = [1, 1.5, 2, 3];
 
 /** Salle : plan des tables (ou liste), libres et occupées, et le comptoir. */
-export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tableId: string) => void }) {
+export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tableId: string) => void; onInstaller: (r: Reservation) => Promise<void> }) {
   const { caisse, config, majConfig, notifier, demanderResponsable } = useCaisse();
+  const { jour, horsLigne, recharger } = useReservationsDuJour();
+  const [panneauResa, setPanneauResa] = useState(false);
+  const resas = useMemo(() => aVenirParTable(jour?.reservations ?? []), [jour]);
   const [vue, setVue] = useState(lireVue);
   const [edition, setEdition] = useState(false);
   const [zoom, setZoom] = useState(0);
@@ -64,8 +69,18 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
     const m = new Map<string, EtatTable>();
     for (const t of config.tables) {
       const c = commandeDe.get(t.id);
+      const r = resas.get(t.id);
+      const dans = r ? minutes(r.heure) - minuteParis() : null;
       if (!c) {
-        m.set(t.id, { statut: "libre", lignes: [], description: `Table ${t.nom}, libre, ${chaisesDe(t)} chaises` });
+        if (r) {
+          m.set(t.id, {
+            statut: "reservee",
+            // Plateau étroit : l'heure et le nom (abrégé) ; les couverts sont dans la liste et le libellé.
+            lignes: [r.heure, r.nom.length > 9 ? `${r.nom.slice(0, 8)}…` : r.nom],
+            imminente: dans !== null && dans <= 30,
+            description: `Table ${t.nom}, réservée à ${r.heure} pour ${r.couverts} (${nomClient(r)})`,
+          });
+        } else m.set(t.id, { statut: "libre", lignes: [], description: `Table ${t.nom}, libre, ${chaisesDe(t)} chaises` });
         continue;
       }
       if (c.tableId !== t.id) {
@@ -78,14 +93,15 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
       const suivi = suiviTable(c);
       m.set(t.id, {
         statut: c.additionsImprimees > 0 ? "addition" : "occupee",
-        lignes: [total, [depuis(c.ouverteLe), couverts].filter(Boolean).join(" · "), ...(suivi ? [suivi.court] : [])],
+        lignes: [total, [depuis(c.ouverteLe), couverts].filter(Boolean).join(" · "), ...(suivi ? [suivi.court] : r && dans !== null && dans <= 60 ? [`Résa ${r.heure}`] : [])],
         alerte: !!c.couverts && chaises > 0 && c.couverts > chaises,
-        description: `Table ${t.nom}, ${c.additionsImprimees > 0 ? "addition imprimée" : "occupée"}, ${total}${suivi ? `, ${suivi.long}` : ""}`,
+        imminente: !!r && dans !== null && dans <= 15,
+        description: `Table ${t.nom}, ${c.additionsImprimees > 0 ? "addition imprimée" : "occupée"}, ${total}${suivi ? `, ${suivi.long}` : ""}${r && dans !== null && dans <= 60 ? `, réservée à ${r.heure}` : ""}`,
       });
     }
     return m;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.tables, commandeDe, tableParId]);
+  }, [config.tables, commandeDe, tableParId, resas]);
 
   // Commandes qu'aucune table visible ne montre (table masquée depuis) : jamais perdues de vue.
   const visibles = new Set(config.tables.filter((t) => !t.masquee).map((t) => t.id));
@@ -141,6 +157,13 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
             : `${occupees.length} table${occupees.length > 1 ? "s" : ""} ouverte${occupees.length > 1 ? "s" : ""} · ${euros(enCours)} en cours`}
         </p>
         <div className="salle-outils">
+          {(jour?.actif || (jour?.reservations.length ?? 0) > 0) && (
+            <button className="bouton discret bouton-resa" onClick={() => setPanneauResa(true)}>
+              <AvecIcone icone={CalendarCheck}>
+                {`Réservations · ${(jour?.reservations ?? []).filter((x) => x.statut === "confirmee").length}`}
+              </AvecIcone>
+            </button>
+          )}
           {vue === "plan" && (
             <>
               <BoutonIcone icone={ZoomOut} variante="discret" libelle="Dézoomer le plan" disabled={zoom === 0} onClick={() => setZoom((z) => Math.max(0, z - 1))} />
@@ -191,7 +214,22 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
           </div>
         </>
       ) : (
-        <ListeTables tables={config.tables} commandeDe={commandeDe} nom={nom} onOuvrir={props.onOuvrir} />
+        <ListeTables tables={config.tables} commandeDe={commandeDe} resas={resas} nom={nom} onOuvrir={props.onOuvrir} />
+      )}
+
+      {panneauResa && (
+        <PanneauReservations
+          jour={jour}
+          horsLigne={horsLigne}
+          occupees={new Set(commandeDe.keys())}
+          onRecharger={recharger}
+          onInstaller={async (r) => {
+            await props.onInstaller(r);
+            setPanneauResa(false);
+            await recharger();
+          }}
+          onFermer={() => setPanneauResa(false)}
+        />
       )}
 
       {horsPlan.length > 0 && (
@@ -212,7 +250,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
 }
 
 /** Vue en liste, par zone : la plus rapide sur iPhone. */
-function ListeTables(props: { tables: Table[]; commandeDe: Map<string, Commande>; nom: (id: string) => string; onOuvrir: (id: string) => void }) {
+function ListeTables(props: { tables: Table[]; commandeDe: Map<string, Commande>; resas: Map<string, Reservation>; nom: (id: string) => string; onOuvrir: (id: string) => void }) {
   const tables = props.tables.filter((t) => !t.masquee);
   const zones = [...new Set(tables.map((t) => t.zone))];
   return (
@@ -269,6 +307,11 @@ function ListeTables(props: { tables: Table[]; commandeDe: Map<string, Commande>
                           )}
                         </span>
                       </>
+                    ) : props.resas.get(t.id) ? (
+                      <span className="table-libre table-resa">
+                        <AvecIcone icone={CalendarCheck} taille={14}>{`${props.resas.get(t.id)!.heure} · ${props.resas.get(t.id)!.couverts} p.`}</AvecIcone>
+                        <small>{props.resas.get(t.id)!.nom}</small>
+                      </span>
                     ) : (
                       <span className="table-libre">Libre</span>
                     )}

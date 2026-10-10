@@ -293,6 +293,26 @@ export const MIGRATIONS: string[] = [
     traite_le text,
     traite_par text
   )`,
+  // Réservations de tables (hors fiscal) : réglages par établissement, réservations modifiables.
+  `create table if not exists reservations_reglages (
+    etablissement_id text primary key references etablissements(id),
+    contenu jsonb not null,
+    version integer not null,
+    maj_le text not null,
+    maj_par text
+  )`,
+  `create table if not exists reservations (
+    id text primary key,
+    seq bigserial,
+    etablissement_id text not null references etablissements(id),
+    date text not null,
+    contenu jsonb not null,
+    statut text not null check (statut in ('confirmee', 'arrivee', 'absente', 'annulee')),
+    jeton_hash text unique,
+    cree_le text not null,
+    maj_le text not null
+  )`,
+  `create index if not exists reservations_jour on reservations (etablissement_id, date)`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',
