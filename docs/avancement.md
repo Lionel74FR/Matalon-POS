@@ -25,7 +25,7 @@ Dernière mise à jour : 10 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (expediteur) | Réservations : adresse d'expédition réglée par établissement dans l'administration et e-mail d'essai ; seule la clé Resend du groupe reste dans Vercel |
+| 85faffc | Réservations : adresse d'expédition réglée par établissement dans l'administration et e-mail d'essai ; seule la clé Resend du groupe reste dans Vercel |
 | 62ae3bb | E-mails des réservations par Resend au lieu de Brevo (`RESEND_API_KEY`, `EMAIL_EXPEDITEUR`), le domaine moka-annecy.com y étant déjà vérifié |
 | e228631 | Lot 6, réservations en ligne : package `reservations` (créneaux, trois plafonds par service, durée, attribution de table), serveur (tables `reservations` et `reservations_reglages`, routes publiques, administration, caisse, e-mails Brevo, effacement à un an), module du site (`/reservation.js`, `/reserver/<établissement>`, annulation par lien), administration « Réservations » (liste du jour, services et réglages, balise), caisse (tables réservées sur le plan, réservations du jour, installation de la table) |
 | e91b279 | Écran Tickets : période (récents, aujourd'hui, hier, 7 et 30 jours, dates libres) sur tous les appareils, recherche (n°, montant, table, client, serveur, motif), filtres par montant, moyen de paiement corrigé, nature, lieu, personne et appareil ; totaux de la sélection par moyen de paiement ; route `GET /api/caisse/tickets?du&au` |
