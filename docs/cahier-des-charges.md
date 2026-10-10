@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 47, copiée le 10 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 49, copiée le 10 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -170,7 +170,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 | --- | --- |
 | Premier établissement | Moka (le plan de table n'existe que là où Matalon POS est la caisse) |
 | Capacité | Les trois plafonds par service : couverts du service, personnes à table en même temps (avec la durée), arrivées par créneau |
-| Confirmation | D'office, avec un e-mail au client (lien d'annulation) et une copie à l'établissement ; service d'envoi Resend, depuis le domaine de l'établissement (moka-annecy.com, déjà vérifié) |
+| Confirmation | D'office, avec un e-mail au client (lien d'annulation) et une copie à l'établissement ; service d'envoi Resend, un compte par établissement, depuis son domaine (moka-annecy.com, déjà vérifié) |
 | Plan de table | Plus petite table libre qui convient attribuée d'office, modifiable par l'équipe |
 
 ### Module du site
@@ -183,7 +183,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 
 - Services : nom, jours, première et dernière heure d'arrivée, couverts du service, personnes en même temps, arrivées par créneau, durée propre (facultatif). Deux services ne se chevauchent pas un même jour.
 - Règles : durée par défaut d'une réservation, écart entre créneaux (15 ou 30 min), délai minimum avant l'arrivée, réservation jusqu'à N jours à l'avance, groupe maximum en ligne, fermetures exceptionnelles, message d'accueil, téléphone, e-mail de l'établissement, liens des conditions et de la politique de confidentialité.
-- E-mails : adresse d'expédition propre à l'établissement (domaine vérifié dans le compte Resend du groupe), e-mail de l'établissement qui reçoit les réservations et les réponses, e-mail d'essai. La clé d'envoi, secrète, est commune au groupe et reste dans l'hébergement, jamais en base.
+- E-mails : chaque établissement a son compte Resend. Sa clé API se saisit dans l'administration, est chiffrée sur le serveur avec une clé maîtresse gardée hors de la base, et n'est plus jamais affichée (aperçu seulement). Adresse d'expédition propre (domaine vérifié dans ce compte), e-mail de l'établissement qui reçoit les réservations et les réponses, e-mail d'essai.
 - Liste du jour par service (couverts réservés sur le plafond), table et statut modifiables, saisie d'une réservation prise au téléphone ou sur place ; la balise à copier.
 
 ### Caisse

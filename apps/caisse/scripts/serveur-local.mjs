@@ -40,6 +40,8 @@ const REECRITURES = { "/admin": "/admin.html", "/n": "/n.html", "/guide": "/guid
 // E-mails des réservations : gardés en mémoire, lisibles sur /__courriels (essais de bout en bout).
 const courriels = [];
 const envoyerCourriel = async (c) => void courriels.push(c);
+// Clé maîtresse des secrets d'établissement : tirée au hasard à chaque démarrage (base vierge).
+const cleSecrets = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64");
 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -49,7 +51,7 @@ createServer(async (req, res) => {
     const corps = morceaux.length ? Buffer.concat(morceaux) : undefined;
     // Le cookie d'administration est « Secure » : en local (http) on le laisse passer quand même.
     const requete = new Request(url, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : corps });
-    const reponse = await traiter(requete, { db, envoyerCourriel });
+    const reponse = await traiter(requete, { db, envoyerCourriel, envoiGroupe: true, cleSecrets });
     const entetes = Object.fromEntries(reponse.headers);
     if (entetes["set-cookie"]) entetes["set-cookie"] = entetes["set-cookie"].replace("; Secure", "");
     res.writeHead(reponse.status, entetes);

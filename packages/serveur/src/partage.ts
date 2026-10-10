@@ -641,3 +641,15 @@ export interface ConfigPublique {
   zones: string[];
   aujourdhui: string;
 }
+
+/** Envoi des e-mails d'un établissement, vu de l'administration (jamais la clé elle-même). */
+export interface EtatEnvoi {
+  /** Clé Resend propre à l'établissement : aperçu et date ; null : aucune. */
+  cleEtablissement: { apercu: string; majLe: string; majPar: string | null } | null;
+  /** Clé commune au groupe dans l'hébergement (RESEND_API_KEY), utilisée à défaut. */
+  groupe: boolean;
+  /** Clé maîtresse présente (CLE_SECRETS) : les clés d'établissement peuvent être enregistrées. */
+  chiffrement: boolean;
+  /** Service d'envoi branché par l'hébergement. */
+  branche: boolean;
+}

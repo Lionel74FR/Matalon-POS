@@ -122,7 +122,9 @@ import {
   type ContexteResa,
   type EnvoiCourriel,
 } from "./reservations-serveur.js";
+import type { EtatEnvoi } from "./partage.js";
 import { maintenantParis } from "@matalon/reservations";
+import { enregistrerSecret, etatSecret, lireSecret, retirerSecret } from "./secrets.js";
 
 export interface Environnement {
   db: Db;
@@ -130,6 +132,10 @@ export interface Environnement {
   maintenant?: () => Date;
   /** Envoi d'e-mails (réservations) ; absent : rien n'est envoyé. */
   envoyerCourriel?: EnvoiCourriel;
+  /** Une clé d'envoi commune au groupe existe (RESEND_API_KEY). */
+  envoiGroupe?: boolean;
+  /** Clé maîtresse des secrets d'établissement (CLE_SECRETS, 32 octets en base64). */
+  cleSecrets?: string;
 }
 
 const CHAINES: Chaine[] = ["tickets", "evenements", "clotures"];
@@ -2053,6 +2059,8 @@ function contexteResa(env: Environnement, requete: Request): ContexteResa {
     maintenant: horloge(env),
     etablissement: (id) => etablissement(env.db, id),
     ...(env.envoyerCourriel ? { envoyer: env.envoyerCourriel } : {}),
+    cleEtablissement: (id) => lireSecret(env.db, env.cleSecrets, id, "resend"),
+    envoiGroupe: !!env.envoiGroupe,
     origine: new URL(requete.url).origin,
   };
 }
@@ -2063,7 +2071,11 @@ async function reservationsAdmin(env: Environnement, requete: Request, admin: { 
   const etab = await etablissement(env.db, etabId);
   const par = `administration · ${admin.identifiant}`;
   if (suite === "/reglages") {
-    if (m === "GET") return json(200, { ...(await lireReglages(env.db, etab.id)), envoi: !!env.envoyerCourriel });
+    if (m === "GET") {
+      const cle = await etatSecret(env.db, etab.id, "resend");
+      const envoi: EtatEnvoi = { cleEtablissement: cle, groupe: !!env.envoiGroupe, chiffrement: !!env.cleSecrets, branche: !!env.envoyerCourriel };
+      return json(200, { ...(await lireReglages(env.db, etab.id)), envoi });
+    }
     if (m === "PUT") {
       const r = await enregistrerReglages(env.db, etab.id, await lireJson<Record<string, unknown>>(requete), par, ctx.maintenant);
       await journaliserAdmin(env, admin.id, "reservations_reglages", { etablissement: etab.id, version: r.version, actif: r.reglages.actif });
@@ -2082,6 +2094,21 @@ async function reservationsAdmin(env: Environnement, requete: Request, admin: { 
       return json(201, { reservation: r.reservation, conflits: r.conflits });
     }
     return null;
+  }
+  if (suite === "/cle-resend" && m === "PUT") {
+    if (!env.cleSecrets) throw new ErreurHttp(503, "CHIFFREMENT_ABSENT", "Clé maîtresse absente : ajoutez CLE_SECRETS dans Vercel avant d'enregistrer une clé d'établissement.");
+    const corps = await lireJson<{ cle?: unknown }>(requete);
+    const cle = typeof corps.cle === "string" ? corps.cle.trim() : "";
+    if (!/^re_[A-Za-z0-9_-]{16,200}$/.test(cle)) throw new ErreurHttp(400, "CLE_INVALIDE", "Clé API Resend invalide (elle commence par « re_ »).");
+    const r = await enregistrerSecret(env.db, env.cleSecrets, etab.id, "resend", cle, par, ctx.maintenant.toISOString());
+    // Jamais la clé au journal : son aperçu seulement.
+    await journaliserAdmin(env, admin.id, "cle_resend_enregistree", { etablissement: etab.id, apercu: r.apercu });
+    return json(200, { cleEtablissement: await etatSecret(env.db, etab.id, "resend") });
+  }
+  if (suite === "/cle-resend" && m === "DELETE") {
+    await retirerSecret(env.db, etab.id, "resend");
+    await journaliserAdmin(env, admin.id, "cle_resend_retiree", { etablissement: etab.id });
+    return json(200, { cleEtablissement: null });
   }
   if (suite === "/essai-email" && m === "POST") {
     const r = await essaiCourriel(ctx, etab);

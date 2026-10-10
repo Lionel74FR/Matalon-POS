@@ -313,6 +313,17 @@ export const MIGRATIONS: string[] = [
     maj_le text not null
   )`,
   `create index if not exists reservations_jour on reservations (etablissement_id, date)`,
+  // Secrets d'un établissement (clé Resend…), chiffrés avec la clé maîtresse de l'hébergement (CLE_SECRETS).
+  `create table if not exists secrets_etablissement (
+    etablissement_id text not null references etablissements(id),
+    nom text not null,
+    iv text not null,
+    chiffre text not null,
+    apercu text not null,
+    maj_le text not null,
+    maj_par text,
+    primary key (etablissement_id, nom)
+  )`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

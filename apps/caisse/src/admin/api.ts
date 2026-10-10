@@ -1,6 +1,7 @@
 import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
+import type { EtatEnvoi } from "@matalon/serveur/partage";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
@@ -126,7 +127,9 @@ export const api = {
   rapprocherLigne: (id: number, articleId: string | null) =>
     appel<{ stock: ReponseStock }>("POST", `/stock/factures/${id}/${articleId ? "rapprocher" : "ignorer"}`, articleId ? { articleId } : {}),
   reglagesReservation: (etab: string) =>
-    appel<{ reglages: ReglagesReservation; version: number; envoi: boolean }>("GET", `/etablissements/${etab}/reservations/reglages`),
+    appel<{ reglages: ReglagesReservation; version: number; envoi: EtatEnvoi }>("GET", `/etablissements/${etab}/reservations/reglages`),
+  enregistrerCleResend: (etab: string, cle: string) => appel<{ cleEtablissement: EtatEnvoi["cleEtablissement"] }>("PUT", `/etablissements/${etab}/reservations/cle-resend`, { cle }),
+  retirerCleResend: (etab: string) => appel<{ cleEtablissement: null }>("DELETE", `/etablissements/${etab}/reservations/cle-resend`),
   essaiEmailReservation: (etab: string) => appel<{ a: string; de: string | null }>("POST", `/etablissements/${etab}/reservations/essai-email`, {}),
   enregistrerReglagesReservation: (etab: string, reglages: ReglagesReservation, version: number) =>
     appel<{ reglages: ReglagesReservation; version: number }>("PUT", `/etablissements/${etab}/reservations/reglages`, { reglages, version }),

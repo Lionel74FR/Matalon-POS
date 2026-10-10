@@ -1,5 +1,6 @@
 import { maintenantParis, REGLAGES_DEFAUT, validerReglages, type ReglagesReservation, type Reservation, type ServiceReservation, type StatutReservation } from "@matalon/reservations";
-import { CalendarCheck, ChevronLeft, ChevronRight, Code, Copy, ExternalLink, Plus, Save, Send, Settings, Trash2, X } from "lucide-react";
+import type { EtatEnvoi } from "@matalon/serveur/partage";
+import { CalendarCheck, ChevronLeft, ChevronRight, Code, Copy, ExternalLink, KeyRound, Plus, Save, Send, Settings, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
@@ -25,7 +26,7 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
   const [etabId, setEtabId] = useState(props.etablissements[0]?.id ?? "");
   const [onglet, setOnglet] = useState<Onglet>("liste");
   const etab = props.etablissements.find((e) => e.id === etabId);
-  const [reglages, setReglages] = useState<{ reglages: ReglagesReservation; version: number; envoi?: boolean } | null>(null);
+  const [reglages, setReglages] = useState<{ reglages: ReglagesReservation; version: number; envoi?: EtatEnvoi } | null>(null);
   const [erreur, setErreur] = useState("");
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
       ) : onglet === "liste" ? (
         <Liste etab={etab} reglages={reglages.reglages} />
       ) : onglet === "reglages" ? (
-        <Reglages key={etab.id} etabId={etab.id} initial={reglages} onEnregistre={(r) => setReglages((x) => ({ ...r, envoi: x?.envoi ?? false }))} />
+        <Reglages key={etab.id} etabId={etab.id} initial={reglages} onEnregistre={(r) => setReglages((x) => ({ ...r, ...(x?.envoi ? { envoi: x.envoi } : {}) }))} />
       ) : (
         <SurLeSite etab={etab} actif={reglages.reglages.actif} />
       )}
@@ -321,12 +322,13 @@ function nouveauService(existants: ServiceReservation[]): ServiceReservation {
 
 function Reglages(props: {
   etabId: string;
-  initial: { reglages: ReglagesReservation; version: number; envoi?: boolean };
+  initial: { reglages: ReglagesReservation; version: number; envoi?: EtatEnvoi };
   onEnregistre: (r: { reglages: ReglagesReservation; version: number }) => void;
 }) {
   const [r, setR] = useState<ReglagesReservation>({ ...REGLAGES_DEFAUT, ...props.initial.reglages });
   const [version, setVersion] = useState(props.initial.version);
   const [fermeture, setFermeture] = useState("");
+  const [envoi, setEnvoi] = useState(props.initial.envoi);
   const [etat, setEtat] = useState<{ ok?: string; erreur?: string }>({});
   const erreurs = useMemo(() => validerReglages(r), [r]);
   const maj = (m: Partial<ReglagesReservation>) => setR((x) => ({ ...x, ...m }));
@@ -498,11 +500,10 @@ function Reglages(props: {
 
       <h2>E-mails aux clients</h2>
       <p className="explication">
-        Confirmations et annulations partent de l'adresse d'expédition, au nom de l'établissement ; les réponses des clients arrivent
-        sur l'e-mail de l'établissement. Le domaine de l'adresse doit être vérifié dans le compte Resend du groupe (moka-annecy.com
-        l'est). La clé Resend, secrète, reste dans l'hébergement : elle vaut pour tous les établissements.
+        Confirmations et annulations partent de l'adresse d'expédition, au nom de l'établissement, par son propre compte Resend ; les
+        réponses des clients arrivent sur l'e-mail de l'établissement. Le domaine de l'adresse doit être vérifié dans ce compte Resend.
       </p>
-      {props.initial.envoi === false && <p className="erreur">Envoi non branché : la clé Resend (RESEND_API_KEY) manque dans Vercel. Les réservations marchent, sans e-mail.</p>}
+      <CleResend etabId={props.etabId} envoi={envoi} onChange={setEnvoi} />
       <div className="resa-grille">
         <label className="champ">
           <span>Adresse d'expédition</span>
@@ -513,7 +514,7 @@ function Reglages(props: {
           <button
             type="button"
             className="bouton"
-            disabled={!props.initial.envoi}
+            disabled={!envoi?.cleEtablissement && !envoi?.groupe}
             title="Envoie un e-mail d'essai à l'e-mail de l'établissement, avec les réglages enregistrés"
             onClick={async () => {
               try {
@@ -544,6 +545,91 @@ function Reglages(props: {
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * Clé API Resend de l'établissement (son propre compte) : saisie une fois, chiffrée
+ * sur le serveur, jamais réaffichée — seulement son aperçu.
+ */
+function CleResend(props: { etabId: string; envoi: EtatEnvoi | undefined; onChange: (e: EtatEnvoi) => void }) {
+  const [saisie, setSaisie] = useState("");
+  const [ouvert, setOuvert] = useState(false);
+  const [etat, setEtat] = useState<{ ok?: string; erreur?: string }>({});
+  const envoi = props.envoi;
+  if (!envoi) return null;
+  const cle = envoi.cleEtablissement;
+  const enregistrer = async () => {
+    try {
+      const r = await api.enregistrerCleResend(props.etabId, saisie.trim());
+      props.onChange({ ...envoi, cleEtablissement: r.cleEtablissement });
+      setSaisie("");
+      setOuvert(false);
+      setEtat({ ok: "Clé enregistrée, chiffrée sur le serveur." });
+    } catch (e) {
+      setEtat({ erreur: message(e) });
+    }
+  };
+  const retirer = async () => {
+    if (!window.confirm("Retirer la clé Resend de l'établissement ? Les e-mails ne partiront plus (sauf clé commune du groupe).")) return;
+    try {
+      await api.retirerCleResend(props.etabId);
+      props.onChange({ ...envoi, cleEtablissement: null });
+      setEtat({ ok: "Clé retirée." });
+    } catch (e) {
+      setEtat({ erreur: message(e) });
+    }
+  };
+  return (
+    <div className="resa-cle">
+      <p>
+        <strong>Clé API Resend de l'établissement : </strong>
+        {cle
+          ? `${cle.apercu}, enregistrée le ${new Date(cle.majLe).toLocaleDateString("fr-FR")}${cle.majPar ? ` (${cle.majPar.replace(/^administration · /, "")})` : ""}`
+          : envoi.groupe
+            ? "aucune, la clé commune du groupe sert à défaut"
+            : "aucune : aucun e-mail ne part"}
+      </p>
+      {!envoi.chiffrement && (
+        <p className="erreur">Clé maîtresse absente : ajoutez CLE_SECRETS dans Vercel (openssl rand -base64 32), redéployez, puis enregistrez la clé ici.</p>
+      )}
+      {ouvert ? (
+        <div className="admin-ligne">
+          <input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            aria-label="Clé API Resend"
+            placeholder="re_…"
+            value={saisie}
+            onChange={(e) => setSaisie(e.target.value)}
+          />
+          <button className="bouton principal" disabled={!saisie.trim() || !envoi.chiffrement} onClick={() => void enregistrer()}>
+            <AvecIcone icone={KeyRound}>Enregistrer la clé</AvecIcone>
+          </button>
+          <button className="bouton discret" onClick={() => (setOuvert(false), setSaisie(""))}>
+            Annuler
+          </button>
+        </div>
+      ) : (
+        <div className="admin-ligne">
+          <button className="bouton" disabled={!envoi.chiffrement} onClick={() => setOuvert(true)}>
+            <AvecIcone icone={KeyRound}>{cle ? "Remplacer la clé" : "Ajouter la clé"}</AvecIcone>
+          </button>
+          {cle && (
+            <button className="bouton discret" onClick={() => void retirer()}>
+              <AvecIcone icone={Trash2}>Retirer</AvecIcone>
+            </button>
+          )}
+        </div>
+      )}
+      <p className="explication">
+        Dans Resend : API Keys › Create API key, droit « Sending access », domaine de l'établissement. La clé n'est plus affichée après
+        l'enregistrement ; pour la changer, remplacez-la.
+      </p>
+      {etat.erreur && <p className="erreur">{etat.erreur}</p>}
+      {etat.ok && <p className="succes">{etat.ok}</p>}
+    </div>
   );
 }
 

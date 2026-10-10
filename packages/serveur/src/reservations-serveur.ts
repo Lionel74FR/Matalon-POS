@@ -37,6 +37,8 @@ export interface Courriel {
   de?: string;
   deNom: string;
   repondreA?: string;
+  /** Clé d'envoi propre à l'établissement (son compte Resend) ; absente : celle du groupe. */
+  cle?: string;
   sujet: string;
   html: string;
   texte: string;
@@ -48,6 +50,10 @@ export interface ContexteResa {
   maintenant: Date;
   etablissement: (id: string) => Promise<EtablissementApi>;
   envoyer?: EnvoiCourriel;
+  /** Clé d'envoi propre à l'établissement, déchiffrée à la demande (null : aucune). */
+  cleEtablissement?: (etablissementId: string) => Promise<string | null>;
+  /** Une clé d'envoi commune au groupe existe dans l'hébergement. */
+  envoiGroupe?: boolean;
   /** Origine publique (https://…) pour les liens des e-mails. */
   origine: string;
 }
@@ -388,10 +394,12 @@ function expedition(etab: EtablissementApi, reglages: ReglagesReservation): Pick
  */
 export async function essaiCourriel(ctx: ContexteResa, etab: EtablissementApi): Promise<{ a: string; de: string | null }> {
   const { reglages } = await lireReglages(ctx.db, etab.id);
-  if (!ctx.envoyer) throw new ErreurHttp(503, "ENVOI_NON_CONFIGURE", "L'envoi d'e-mails n'est pas branché : la clé Resend (RESEND_API_KEY) manque dans Vercel.");
+  const envoi = await preparerEnvoi(ctx, etab.id);
+  if (!envoi || !ctx.envoyer) throw new ErreurHttp(503, "ENVOI_NON_CONFIGURE", "Aucune clé d'envoi : enregistrez la clé API Resend de l'établissement.");
   if (!reglages.email) throw new ErreurHttp(400, "EMAIL_MANQUANT", "Indiquez d'abord l'e-mail de l'établissement et enregistrez : l'essai lui est envoyé.");
   try {
     await ctx.envoyer({
+      ...envoi,
       a: reglages.email,
       ...expedition(etab, reglages),
       sujet: `E-mail d'essai · réservations ${etab.identite.enseigne}`,
@@ -407,11 +415,23 @@ export async function essaiCourriel(ctx: ContexteResa, etab: EtablissementApi): 
   return { a: reglages.email, de: reglages.expediteur ?? null };
 }
 
+/**
+ * Envoi possible pour cet établissement : sa propre clé (son compte Resend),
+ * sinon celle du groupe ; null : aucun e-mail ne part.
+ */
+export async function preparerEnvoi(ctx: ContexteResa, etablissementId: string): Promise<{ cle?: string } | null> {
+  if (!ctx.envoyer) return null;
+  const cle = (await ctx.cleEtablissement?.(etablissementId).catch(() => null)) ?? null;
+  if (cle) return { cle };
+  return ctx.envoiGroupe ? {} : null;
+}
+
 async function envoyer(ctx: ContexteResa, r: Reservation, c: Courriel, action: string): Promise<void> {
-  if (!ctx.envoyer) return;
+  const envoi = await preparerEnvoi(ctx, r.etablissementId);
+  if (!envoi || !ctx.envoyer) return;
   let resultat = action;
   try {
-    await ctx.envoyer(c);
+    await ctx.envoyer({ ...c, ...envoi });
   } catch (e) {
     resultat = `${action} : échec (${String(e).slice(0, 120)})`;
   }
@@ -471,10 +491,12 @@ async function envoyerAnnulation(ctx: ContexteResa, etab: EtablissementApi, regl
 }
 
 async function prevenirEtablissement(ctx: ContexteResa, etab: EtablissementApi, reglages: ReglagesReservation, r: Reservation, titre: string): Promise<void> {
-  if (!ctx.envoyer || !reglages.email) return;
+  const envoi = await preparerEnvoi(ctx, etab.id);
+  if (!envoi || !ctx.envoyer || !reglages.email) return;
   const quand = `${dateLisible(r.date)} à ${r.heure}`;
   try {
     await ctx.envoyer({
+      ...envoi,
       a: reglages.email,
       ...(reglages.expediteur ? { de: reglages.expediteur } : {}),
       deNom: `Réservations ${etab.identite.enseigne}`,

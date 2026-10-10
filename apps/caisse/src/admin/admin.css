@@ -1227,3 +1227,20 @@ code.cle-api {
     word-break: break-word;
   }
 }
+
+.resa-cle {
+  margin: 8px 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.resa-cle p {
+  margin: 0 0 8px;
+}
+
+.resa-cle input[type="password"] {
+  flex: 1 1 260px;
+  min-height: 44px;
+  font-family: ui-monospace, Menlo, monospace;
+}

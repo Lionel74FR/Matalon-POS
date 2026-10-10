@@ -10,6 +10,10 @@ let pg: PGlite;
 let db: Db;
 let instant: number;
 let courriels: Courriel[];
+/** Clé commune du groupe dans l'hébergement (sinon : seulement les clés d'établissement). */
+let groupe: boolean;
+const CLE_MAITRESSE = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+const CLE_MOKA = "re_Moka_1234567890abcdefXYZ";
 
 async function appel(methode: string, chemin: string, corps?: unknown, entetes: Record<string, string> = {}) {
   const reponse = await traiter(
@@ -18,7 +22,7 @@ async function appel(methode: string, chemin: string, corps?: unknown, entetes: 
       headers: { "Content-Type": "application/json", Origin: "https://pos.test", ...entetes },
       body: corps === undefined ? undefined : JSON.stringify(corps),
     }),
-    { db, maintenant: () => new Date(instant), envoyerCourriel: async (c) => void courriels.push(c) },
+    { db, maintenant: () => new Date(instant), envoyerCourriel: async (c) => void courriels.push(c), envoiGroupe: groupe, cleSecrets: CLE_MAITRESSE },
   );
   return { statut: reponse.status, corps: (await reponse.json()) as any };
 }
@@ -35,6 +39,7 @@ beforeEach(async () => {
     },
   };
   courriels = [];
+  groupe = true;
   // Jeudi 15 octobre 2026, 10 h à Paris.
   instant = Date.parse("2026-10-15T08:00:00Z");
 });
@@ -98,6 +103,18 @@ describe("réservations", () => {
     expect((await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "12:00", couverts: 2, ...CLIENT, conditions: false })).corps.code).toBe("CONDITIONS");
     expect((await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "12:00", couverts: 2, ...CLIENT, site: "spam" })).statut).toBe(400);
     expect((await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "12:00", couverts: 2, ...CLIENT, email: "" })).corps.code).toBe("COORDONNEES_INVALIDES");
+    // Le Moka a son propre compte Resend : sa clé, chiffrée, sert à ses e-mails ; elle n'est jamais réaffichée.
+    groupe = false;
+    expect((await appel("PUT", "/api/admin/etablissements/moka/reservations/cle-resend", { cle: "pas-une-cle" }, cookie)).corps.code).toBe("CLE_INVALIDE");
+    const cle = await appel("PUT", "/api/admin/etablissements/moka/reservations/cle-resend", { cle: CLE_MOKA }, cookie);
+    expect(cle.corps.cleEtablissement).toMatchObject({ apercu: "re_…fXYZ", majPar: "administration · lionel" });
+    const vue = await appel("GET", "/api/admin/etablissements/moka/reservations/reglages", undefined, cookie);
+    expect(vue.corps.envoi).toMatchObject({ cleEtablissement: { apercu: "re_…fXYZ" }, groupe: false, chiffrement: true, branche: true });
+    expect(JSON.stringify(vue.corps)).not.toContain(CLE_MOKA);
+    const [stockee] = await db.requete<{ chiffre: string }>("select chiffre from secrets_etablissement");
+    expect(stockee!.chiffre).not.toContain("Moka_1234");
+    const journal = await db.requete<{ details: unknown }>("select details from journal_admin where action = 'cle_resend_enregistree'");
+    expect(JSON.stringify(journal)).not.toContain(CLE_MOKA);
     const r = await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "12:00", couverts: 2, ...CLIENT, commentaire: "Sans gluten" });
     expect(r.statut).toBe(201);
     expect(r.corps.reservation).toMatchObject({ heure: "12:00", couverts: 2, statut: "confirmee", annulable: true });
@@ -107,11 +124,16 @@ describe("réservations", () => {
     ]);
     expect(courriels[0]!.html).toContain("/reserver/annuler?j=");
     // Expéditeur de l'établissement, réponses vers son e-mail.
-    expect(courriels[0]).toMatchObject({ de: "reservations@moka.test", deNom: "Moka", repondreA: "bonjour@moka.test" });
-    expect((await appel("GET", "/api/admin/etablissements/moka/reservations/reglages", undefined, cookie)).corps).toMatchObject({ envoi: true, reglages: { expediteur: "reservations@moka.test" } });
+    expect(courriels[0]).toMatchObject({ de: "reservations@moka.test", deNom: "Moka", repondreA: "bonjour@moka.test", cle: CLE_MOKA });
+    expect(courriels[1]!.cle).toBe(CLE_MOKA);
+    expect((await appel("GET", "/api/admin/etablissements/moka/reservations/reglages", undefined, cookie)).corps).toMatchObject({ reglages: { expediteur: "reservations@moka.test" } });
     const essai = await appel("POST", "/api/admin/etablissements/moka/reservations/essai-email", {}, cookie);
     expect(essai.corps).toEqual({ a: "bonjour@moka.test", de: "reservations@moka.test" });
     expect(courriels.pop()!.sujet).toMatch(/^E-mail d'essai/);
+    // Clé retirée et pas de clé commune : l'essai est refusé, les réservations marchent sans e-mail.
+    await appel("DELETE", "/api/admin/etablissements/moka/reservations/cle-resend", undefined, cookie);
+    expect((await appel("POST", "/api/admin/etablissements/moka/reservations/essai-email", {}, cookie)).corps.code).toBe("ENVOI_NON_CONFIGURE");
+    await appel("PUT", "/api/admin/etablissements/moka/reservations/cle-resend", { cle: CLE_MOKA }, cookie);
     // Même téléphone le même jour : refusé.
     expect((await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "13:00", couverts: 2, ...CLIENT })).corps.code).toBe("DEJA_RESERVE");
     // Groupe trop grand, créneau plein.
