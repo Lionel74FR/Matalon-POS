@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 45, copiée le 10 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 46, copiée le 10 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -170,7 +170,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 | --- | --- |
 | Premier établissement | Moka (le plan de table n'existe que là où Matalon POS est la caisse) |
 | Capacité | Les trois plafonds par service : couverts du service, personnes à table en même temps (avec la durée), arrivées par créneau |
-| Confirmation | D'office, avec un e-mail au client (lien d'annulation) et une copie à l'établissement ; service d'envoi Brevo |
+| Confirmation | D'office, avec un e-mail au client (lien d'annulation) et une copie à l'établissement ; service d'envoi Resend, depuis le domaine de l'établissement (moka-annecy.com, déjà vérifié) |
 | Plan de table | Plus petite table libre qui convient attribuée d'office, modifiable par l'équipe |
 
 ### Module du site

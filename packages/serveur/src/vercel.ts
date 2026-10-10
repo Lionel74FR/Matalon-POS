@@ -24,29 +24,31 @@ function base(): Db {
 }
 
 /**
- * E-mails des réservations par Brevo (API transactionnelle, données en UE) :
- * BREVO_CLE (clé API) et EMAIL_EXPEDITEUR (adresse d'un domaine vérifié chez Brevo).
- * Sans elles, les réservations marchent sans e-mail.
+ * E-mails des réservations par Resend (domaine moka-annecy.com déjà vérifié chez Resend, région UE) :
+ * RESEND_API_KEY (clé API « re_… ») et EMAIL_EXPEDITEUR (adresse du domaine vérifié,
+ * ex. reservations@moka-annecy.com). Sans elles, les réservations marchent sans e-mail.
  */
 function courriel(): EnvoiCourriel | undefined {
-  const cle = process.env.BREVO_CLE;
+  const cle = process.env.RESEND_API_KEY;
   const expediteur = process.env.EMAIL_EXPEDITEUR;
   if (!cle || !expediteur) return undefined;
   return async (c) => {
-    const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+    // Nom affiché sans caractère qui casserait l'en-tête « Nom <adresse> ».
+    const nom = c.deNom.replace(/[<>"\r\n]/g, "").trim();
+    const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { "api-key": cle, "Content-Type": "application/json", Accept: "application/json" },
+      headers: { Authorization: `Bearer ${cle}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        sender: { email: expediteur, name: c.deNom },
-        to: [{ email: c.a, ...(c.nomA ? { name: c.nomA } : {}) }],
-        ...(c.repondreA ? { replyTo: { email: c.repondreA } } : {}),
+        from: nom ? `"${nom}" <${expediteur}>` : expediteur,
+        to: [c.a],
+        ...(c.repondreA ? { reply_to: c.repondreA } : {}),
         subject: c.sujet,
-        htmlContent: c.html,
-        textContent: c.texte,
+        html: c.html,
+        text: c.texte,
       }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!r.ok) throw new Error(`Brevo ${r.status}`);
+    if (!r.ok) throw new Error(`Resend ${r.status}`);
   };
 }
 

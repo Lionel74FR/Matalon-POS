@@ -36,7 +36,7 @@ await build({
 });
 writeFileSync(
   resolve(fonction, ".vc-config.json"),
-  JSON.stringify({ runtime: "edge", entrypoint: "index.js", regions: ["cdg1"], envVarsInUse: ["DATABASE_URL", "POSTGRES_URL", "BREVO_CLE", "EMAIL_EXPEDITEUR"] }, null, 2),
+  JSON.stringify({ runtime: "edge", entrypoint: "index.js", regions: ["cdg1"], envVarsInUse: ["DATABASE_URL", "POSTGRES_URL", "RESEND_API_KEY", "EMAIL_EXPEDITEUR"] }, null, 2),
 );
 
 const sansCache = { "Cache-Control": "no-cache" };
