@@ -25,7 +25,7 @@ Dernière mise à jour : 10 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (cles) | Réservations : clé API Resend propre à chaque établissement, saisie dans l'administration, chiffrée sur le serveur (clé maîtresse `CLE_SECRETS`), jamais réaffichée ; e-mails envoyés avec la clé de leur établissement |
+| 3de7420 | Réservations : clé API Resend propre à chaque établissement, saisie dans l'administration, chiffrée sur le serveur (clé maîtresse `CLE_SECRETS`), jamais réaffichée ; e-mails envoyés avec la clé de leur établissement |
 | 85faffc | Réservations : adresse d'expédition réglée par établissement dans l'administration et e-mail d'essai ; seule la clé Resend du groupe reste dans Vercel |
 | 62ae3bb | E-mails des réservations par Resend au lieu de Brevo (`RESEND_API_KEY`, `EMAIL_EXPEDITEUR`), le domaine moka-annecy.com y étant déjà vérifié |
 | e228631 | Lot 6, réservations en ligne : package `reservations` (créneaux, trois plafonds par service, durée, attribution de table), serveur (tables `reservations` et `reservations_reglages`, routes publiques, administration, caisse, e-mails Brevo, effacement à un an), module du site (`/reservation.js`, `/reserver/<établissement>`, annulation par lien), administration « Réservations » (liste du jour, services et réglages, balise), caisse (tables réservées sur le plan, réservations du jour, installation de la table) |
