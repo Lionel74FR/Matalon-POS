@@ -62,6 +62,7 @@ const REGLAGES = {
   fermetures: [],
   accueil: "Bienvenue au Moka",
   email: "bonjour@moka.test",
+  expediteur: "reservations@moka.test",
   services: [
     { id: "dej", nom: "Déjeuner", jours: [1, 2, 3, 4, 5, 6, 7], debut: "12:00", fin: "13:30", couvertsMax: 10, simultanesMax: 8, arriveesMax: 6 },
     { id: "din", nom: "Dîner", jours: [4, 5, 6], debut: "19:00", fin: "21:00", couvertsMax: 30, simultanesMax: null, arriveesMax: null, dureeMinutes: 120 },
@@ -105,6 +106,12 @@ describe("réservations", () => {
       ["bonjour@moka.test", "Nouvelle réservation"],
     ]);
     expect(courriels[0]!.html).toContain("/reserver/annuler?j=");
+    // Expéditeur de l'établissement, réponses vers son e-mail.
+    expect(courriels[0]).toMatchObject({ de: "reservations@moka.test", deNom: "Moka", repondreA: "bonjour@moka.test" });
+    expect((await appel("GET", "/api/admin/etablissements/moka/reservations/reglages", undefined, cookie)).corps).toMatchObject({ envoi: true, reglages: { expediteur: "reservations@moka.test" } });
+    const essai = await appel("POST", "/api/admin/etablissements/moka/reservations/essai-email", {}, cookie);
+    expect(essai.corps).toEqual({ a: "bonjour@moka.test", de: "reservations@moka.test" });
+    expect(courriels.pop()!.sujet).toMatch(/^E-mail d'essai/);
     // Même téléphone le même jour : refusé.
     expect((await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "13:00", couverts: 2, ...CLIENT })).corps.code).toBe("DEJA_RESERVE");
     // Groupe trop grand, créneau plein.

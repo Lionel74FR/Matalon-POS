@@ -24,15 +24,17 @@ function base(): Db {
 }
 
 /**
- * E-mails des réservations par Resend (domaine moka-annecy.com déjà vérifié chez Resend, région UE) :
- * RESEND_API_KEY (clé API « re_… ») et EMAIL_EXPEDITEUR (adresse du domaine vérifié,
- * ex. reservations@moka-annecy.com). Sans elles, les réservations marchent sans e-mail.
+ * E-mails par Resend : une seule clé pour le groupe, RESEND_API_KEY (secret, gardé dans Vercel).
+ * Chaque établissement règle son adresse d'expédition dans l'administration (domaine vérifié
+ * chez Resend) ; EMAIL_EXPEDITEUR, facultative, sert seulement d'adresse par défaut.
+ * Sans clé, les réservations marchent sans e-mail.
  */
 function courriel(): EnvoiCourriel | undefined {
   const cle = process.env.RESEND_API_KEY;
-  const expediteur = process.env.EMAIL_EXPEDITEUR;
-  if (!cle || !expediteur) return undefined;
+  if (!cle) return undefined;
   return async (c) => {
+    const expediteur = c.de ?? process.env.EMAIL_EXPEDITEUR;
+    if (!expediteur) throw new Error("aucune adresse d'expédition réglée pour l'établissement");
     // Nom affiché sans caractère qui casserait l'en-tête « Nom <adresse> ».
     const nom = c.deNom.replace(/[<>"\r\n]/g, "").trim();
     const r = await fetch("https://api.resend.com/emails", {
@@ -48,7 +50,10 @@ function courriel(): EnvoiCourriel | undefined {
       }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!r.ok) throw new Error(`Resend ${r.status}`);
+    if (!r.ok) {
+      const detail = ((await r.json().catch(() => null)) as { message?: string } | null)?.message;
+      throw new Error(`Resend ${r.status}${detail ? ` : ${detail}` : ""}`);
+    }
   };
 }
 

@@ -1,5 +1,5 @@
 import { maintenantParis, REGLAGES_DEFAUT, validerReglages, type ReglagesReservation, type Reservation, type ServiceReservation, type StatutReservation } from "@matalon/reservations";
-import { CalendarCheck, ChevronLeft, ChevronRight, Code, Copy, ExternalLink, Plus, Save, Settings, Trash2, X } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ChevronRight, Code, Copy, ExternalLink, Plus, Save, Send, Settings, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
@@ -25,7 +25,7 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
   const [etabId, setEtabId] = useState(props.etablissements[0]?.id ?? "");
   const [onglet, setOnglet] = useState<Onglet>("liste");
   const etab = props.etablissements.find((e) => e.id === etabId);
-  const [reglages, setReglages] = useState<{ reglages: ReglagesReservation; version: number } | null>(null);
+  const [reglages, setReglages] = useState<{ reglages: ReglagesReservation; version: number; envoi?: boolean } | null>(null);
   const [erreur, setErreur] = useState("");
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
       ) : onglet === "liste" ? (
         <Liste etab={etab} reglages={reglages.reglages} />
       ) : onglet === "reglages" ? (
-        <Reglages key={etab.id} etabId={etab.id} initial={reglages} onEnregistre={setReglages} />
+        <Reglages key={etab.id} etabId={etab.id} initial={reglages} onEnregistre={(r) => setReglages((x) => ({ ...r, envoi: x?.envoi ?? false }))} />
       ) : (
         <SurLeSite etab={etab} actif={reglages.reglages.actif} />
       )}
@@ -319,7 +319,11 @@ function nouveauService(existants: ServiceReservation[]): ServiceReservation {
   };
 }
 
-function Reglages(props: { etabId: string; initial: { reglages: ReglagesReservation; version: number }; onEnregistre: (r: { reglages: ReglagesReservation; version: number }) => void }) {
+function Reglages(props: {
+  etabId: string;
+  initial: { reglages: ReglagesReservation; version: number; envoi?: boolean };
+  onEnregistre: (r: { reglages: ReglagesReservation; version: number }) => void;
+}) {
   const [r, setR] = useState<ReglagesReservation>({ ...REGLAGES_DEFAUT, ...props.initial.reglages });
   const [version, setVersion] = useState(props.initial.version);
   const [fermeture, setFermeture] = useState("");
@@ -480,7 +484,7 @@ function Reglages(props: { etabId: string; initial: { reglages: ReglagesReservat
         </label>
         <label className="champ">
           <span>E-mail de l'établissement</span>
-          <input type="email" value={r.email ?? ""} placeholder="reçoit chaque réservation" onChange={(e) => maj({ email: e.target.value })} />
+          <input type="email" value={r.email ?? ""} placeholder="reçoit chaque réservation et les réponses" onChange={(e) => maj({ email: e.target.value })} />
         </label>
         <label className="champ">
           <span>Conditions d'utilisation (lien)</span>
@@ -490,6 +494,39 @@ function Reglages(props: { etabId: string; initial: { reglages: ReglagesReservat
           <span>Confidentialité (lien)</span>
           <input type="url" value={r.confidentialite ?? ""} placeholder="https://…" onChange={(e) => maj({ confidentialite: e.target.value })} />
         </label>
+      </div>
+
+      <h2>E-mails aux clients</h2>
+      <p className="explication">
+        Confirmations et annulations partent de l'adresse d'expédition, au nom de l'établissement ; les réponses des clients arrivent
+        sur l'e-mail de l'établissement. Le domaine de l'adresse doit être vérifié dans le compte Resend du groupe (moka-annecy.com
+        l'est). La clé Resend, secrète, reste dans l'hébergement : elle vaut pour tous les établissements.
+      </p>
+      {props.initial.envoi === false && <p className="erreur">Envoi non branché : la clé Resend (RESEND_API_KEY) manque dans Vercel. Les réservations marchent, sans e-mail.</p>}
+      <div className="resa-grille">
+        <label className="champ">
+          <span>Adresse d'expédition</span>
+          <input type="email" value={r.expediteur ?? ""} placeholder="reservations@moka-annecy.com" onChange={(e) => maj({ expediteur: e.target.value })} />
+        </label>
+        <div className="champ">
+          <span>Vérifier l'envoi</span>
+          <button
+            type="button"
+            className="bouton"
+            disabled={!props.initial.envoi}
+            title="Envoie un e-mail d'essai à l'e-mail de l'établissement, avec les réglages enregistrés"
+            onClick={async () => {
+              try {
+                const e = await api.essaiEmailReservation(props.etabId);
+                setEtat({ ok: `E-mail d'essai envoyé à ${e.a}${e.de ? ` depuis ${e.de}` : ""} : vérifiez sa réception.` });
+              } catch (err) {
+                setEtat({ erreur: message(err) });
+              }
+            }}
+          >
+            <AvecIcone icone={Send}>Envoyer un e-mail d'essai</AvecIcone>
+          </button>
+        </div>
       </div>
 
       {erreurs.length > 0 && (

@@ -45,7 +45,10 @@ export interface ReglagesReservation {
   /** Message d'accueil en tête du module. */
   accueil: string;
   telephone?: string;
+  /** E-mail de l'établissement : reçoit chaque réservation et les réponses des clients. */
   email?: string;
+  /** Adresse d'expédition des e-mails aux clients, sur un domaine vérifié chez Resend (ex. reservations@moka-annecy.com). */
+  expediteur?: string;
   /** Lien vers les conditions d'utilisation et la politique de confidentialité du site. */
   conditions?: string;
   confidentialite?: string;

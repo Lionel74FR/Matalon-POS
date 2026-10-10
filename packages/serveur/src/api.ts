@@ -113,6 +113,7 @@ import {
 import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre } from "./statistiques.js";
 import {
   enregistrerReglages,
+  essaiCourriel,
   lireReglages,
   listeReservations,
   modifierReservation,
@@ -2062,7 +2063,7 @@ async function reservationsAdmin(env: Environnement, requete: Request, admin: { 
   const etab = await etablissement(env.db, etabId);
   const par = `administration · ${admin.identifiant}`;
   if (suite === "/reglages") {
-    if (m === "GET") return json(200, await lireReglages(env.db, etab.id));
+    if (m === "GET") return json(200, { ...(await lireReglages(env.db, etab.id)), envoi: !!env.envoyerCourriel });
     if (m === "PUT") {
       const r = await enregistrerReglages(env.db, etab.id, await lireJson<Record<string, unknown>>(requete), par, ctx.maintenant);
       await journaliserAdmin(env, admin.id, "reservations_reglages", { etablissement: etab.id, version: r.version, actif: r.reglages.actif });
@@ -2081,6 +2082,11 @@ async function reservationsAdmin(env: Environnement, requete: Request, admin: { 
       return json(201, { reservation: r.reservation, conflits: r.conflits });
     }
     return null;
+  }
+  if (suite === "/essai-email" && m === "POST") {
+    const r = await essaiCourriel(ctx, etab);
+    await journaliserAdmin(env, admin.id, "reservations_essai_email", { etablissement: etab.id, de: r.de });
+    return json(200, r);
   }
   if (m === "PATCH") return json(200, await modifierReservation(ctx, etab, suite.slice(1), await lireJson<Record<string, unknown>>(requete), par));
   return null;

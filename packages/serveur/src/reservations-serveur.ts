@@ -33,6 +33,8 @@ import { aleatoire, base32, nouveauJeton, sha256 } from "./securite.js";
 export interface Courriel {
   a: string;
   nomA?: string;
+  /** Adresse d'expédition réglée pour l'établissement ; absente : celle de l'hébergement, s'il y en a une. */
+  de?: string;
   deNom: string;
   repondreA?: string;
   sujet: string;
@@ -371,6 +373,40 @@ ${bouton ? `<p style="margin:24px 0 0"><a href="${echapper(bouton.url)}" style="
 </table></td></tr></table></body></html>`;
 }
 
+/** Expéditeur des e-mails aux clients : l'établissement (nom, adresse réglée), réponses vers son e-mail. */
+function expedition(etab: EtablissementApi, reglages: ReglagesReservation): Pick<Courriel, "de" | "deNom" | "repondreA"> {
+  return {
+    ...(reglages.expediteur ? { de: reglages.expediteur } : {}),
+    deNom: etab.identite.enseigne,
+    ...(reglages.email ? { repondreA: reglages.email } : {}),
+  };
+}
+
+/**
+ * E-mail d'essai à l'établissement, avec l'expéditeur réglé : vérifie la clé
+ * d'envoi, l'adresse d'expédition et son domaine chez Resend.
+ */
+export async function essaiCourriel(ctx: ContexteResa, etab: EtablissementApi): Promise<{ a: string; de: string | null }> {
+  const { reglages } = await lireReglages(ctx.db, etab.id);
+  if (!ctx.envoyer) throw new ErreurHttp(503, "ENVOI_NON_CONFIGURE", "L'envoi d'e-mails n'est pas branché : la clé Resend (RESEND_API_KEY) manque dans Vercel.");
+  if (!reglages.email) throw new ErreurHttp(400, "EMAIL_MANQUANT", "Indiquez d'abord l'e-mail de l'établissement et enregistrez : l'essai lui est envoyé.");
+  try {
+    await ctx.envoyer({
+      a: reglages.email,
+      ...expedition(etab, reglages),
+      sujet: `E-mail d'essai · réservations ${etab.identite.enseigne}`,
+      html: gabarit(etab, "L'envoi des e-mails fonctionne", [
+        "Cet e-mail d'essai part avec les réglages des réservations : les clients recevront leurs confirmations de cette adresse.",
+        `Expéditeur : ${echapper(reglages.expediteur ?? "adresse par défaut de l'hébergement")}`,
+      ]),
+      texte: `E-mail d'essai : les confirmations de réservation de ${etab.identite.enseigne} partiront de ${reglages.expediteur ?? "l'adresse par défaut"}.`,
+    });
+  } catch (e) {
+    throw new ErreurHttp(502, "ENVOI_REFUSE", `L'e-mail d'essai n'est pas parti : ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return { a: reglages.email, de: reglages.expediteur ?? null };
+}
+
 async function envoyer(ctx: ContexteResa, r: Reservation, c: Courriel, action: string): Promise<void> {
   if (!ctx.envoyer) return;
   let resultat = action;
@@ -402,8 +438,7 @@ async function envoyerConfirmation(ctx: ContexteResa, etab: EtablissementApi, re
     {
       a: r.email,
       nomA: `${r.prenom} ${r.nom}`,
-      deNom: etab.identite.enseigne,
-      ...(reglages.email ? { repondreA: reglages.email } : {}),
+      ...expedition(etab, reglages),
       sujet: `Réservation confirmée · ${etab.identite.enseigne} · ${quand}`,
       html: gabarit(etab, "Votre réservation est confirmée", lignes, { texte: "Annuler ma réservation", url }),
       texte: `Bonjour ${r.prenom},\nVotre table est réservée le ${quand} pour ${personnes(r.couverts)}.\nPour annuler : ${url}\n${etab.identite.enseigne}, ${etab.identite.adresse}, ${etab.identite.codePostalVille}`,
@@ -421,8 +456,7 @@ async function envoyerAnnulation(ctx: ContexteResa, etab: EtablissementApi, regl
     {
       a: r.email,
       nomA: `${r.prenom} ${r.nom}`,
-      deNom: etab.identite.enseigne,
-      ...(reglages.email ? { repondreA: reglages.email } : {}),
+      ...expedition(etab, reglages),
       sujet: `Réservation annulée · ${etab.identite.enseigne} · ${quand}`,
       html: gabarit(etab, "Votre réservation est annulée", [
         `Bonjour ${echapper(r.prenom)},`,
@@ -442,7 +476,8 @@ async function prevenirEtablissement(ctx: ContexteResa, etab: EtablissementApi, 
   try {
     await ctx.envoyer({
       a: reglages.email,
-      deNom: "Matalon POS",
+      ...(reglages.expediteur ? { de: reglages.expediteur } : {}),
+      deNom: `Réservations ${etab.identite.enseigne}`,
       ...(r.email ? { repondreA: r.email } : {}),
       sujet: `${titre} · ${quand} · ${r.couverts} pers. · ${r.prenom} ${r.nom}`,
       html: gabarit(etab, titre, [
@@ -593,11 +628,13 @@ export async function enregistrerReglages(db: Db, etablissementId: string, corps
     accueil: String(r.accueil ?? "").trim(),
     ...(r.telephone ? { telephone: String(r.telephone).trim().slice(0, 30) } : {}),
     ...(r.email ? { email: String(r.email).trim().toLowerCase().slice(0, 120) } : {}),
+    ...(r.expediteur ? { expediteur: String(r.expediteur).trim().toLowerCase().slice(0, 120) } : {}),
     ...(r.conditions ? { conditions: String(r.conditions).trim() } : {}),
     ...(r.confidentialite ? { confidentialite: String(r.confidentialite).trim() } : {}),
   };
   const erreurs = validerReglages(propres);
   if (propres.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(propres.email)) erreurs.push("E-mail de l'établissement invalide.");
+  if (propres.expediteur && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(propres.expediteur)) erreurs.push("Adresse d'expédition invalide.");
   if (erreurs.length) throw new ErreurHttp(400, "REGLAGES_INVALIDES", erreurs.join(" "));
   const version = Number(corps.version ?? 0);
   const le = maintenant.toISOString();

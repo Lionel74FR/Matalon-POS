@@ -125,7 +125,9 @@ export const api = {
   lignesFacture: (etab: string, toutes = false) => appel<{ lignes: LigneFactureApi[] }>("GET", `/stock/factures?etab=${etab}${toutes ? "&toutes=1" : ""}`),
   rapprocherLigne: (id: number, articleId: string | null) =>
     appel<{ stock: ReponseStock }>("POST", `/stock/factures/${id}/${articleId ? "rapprocher" : "ignorer"}`, articleId ? { articleId } : {}),
-  reglagesReservation: (etab: string) => appel<{ reglages: ReglagesReservation; version: number }>("GET", `/etablissements/${etab}/reservations/reglages`),
+  reglagesReservation: (etab: string) =>
+    appel<{ reglages: ReglagesReservation; version: number; envoi: boolean }>("GET", `/etablissements/${etab}/reservations/reglages`),
+  essaiEmailReservation: (etab: string) => appel<{ a: string; de: string | null }>("POST", `/etablissements/${etab}/reservations/essai-email`, {}),
   enregistrerReglagesReservation: (etab: string, reglages: ReglagesReservation, version: number) =>
     appel<{ reglages: ReglagesReservation; version: number }>("PUT", `/etablissements/${etab}/reservations/reglages`, { reglages, version }),
   reservations: (etab: string, du: string, au = du) => appel<{ reservations: Reservation[] }>("GET", `/etablissements/${etab}/reservations?du=${du}&au=${au}`),
