@@ -109,7 +109,7 @@ const { alertes } = await appel("GET", "/etablissements/moka/alertes");
 const [nom, valeur] = cookie.split("=");
 await ctx.addCookies([{ name: nom, value: valeur, url: URL }]);
 const admin = await ctx.newPage();
-await admin.goto(`${URL}/admin`);
+await admin.goto(`${URL}/admin#/moka/alertes`);
 await admin.getByRole("heading", { name: /^Alertes/ }).waitFor({ timeout: 15000 });
 await admin.getByRole("heading", { name: /^Alertes/ }).scrollIntoViewIfNeeded();
 await admin.screenshot({ path: `${sortie}/s03-alertes-admin.png` });

@@ -74,6 +74,7 @@ URL=… node scripts/securite.mjs captures          # 5 codes PIN faux = blocage
 URL=… node scripts/clotures-etablissement.mjs captures # iPad + iPhone : fond commun, lecture X et Z de l'établissement depuis l'iPhone, verrou, archive des deux caisses
 URL=… node scripts/tickets.mjs captures            # écran Tickets : recherche, filtres (paiement, nature, lieu, montant), périodes, totaux par moyen de paiement, iPhone
 URL=… node scripts/reservations.mjs captures      # réservations : services réglés dans l'administration, balise sur un site, réservation sur iPhone, e-mails, annulation par lien, table réservée sur le plan de l'iPad, installation
+URL=… node scripts/admin-navigation.mjs captures  # administration : établissement dans l'en-tête, rubriques au menu latéral (liste sur iPhone), aucune rubrique ne déborde sur iPad paysage, portrait et iPhone, adresse et dernier établissement retenus
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

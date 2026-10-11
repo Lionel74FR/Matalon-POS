@@ -283,19 +283,69 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 
 // ───────── Tableau de bord ─────────
 
+/** Rubriques d'un établissement, dans le menu latéral (ordre d'usage). */
+type Rubrique = "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
+const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: string; icone: LucideIcon; aide: string }> }> = [
+  {
+    groupe: "Service",
+    liste: [
+      { id: "appareils", libelle: "Appareils", icone: TabletSmartphone, aide: "iPad et iPhone rattachés, clôtures" },
+      { id: "equipe", libelle: "Équipe", icone: Users, aide: "Personnes, rôles, codes PIN" },
+      { id: "plan", libelle: "Plan de salle", icone: LayoutGrid, aide: "Zones, tables, chaises" },
+      { id: "imprimantes", libelle: "Imprimantes", icone: Printer, aide: "Postes bar et cuisine" },
+      { id: "reservations", libelle: "Réservations", icone: CalendarCheck, aide: "À venir, services, module du site" },
+      { id: "comptes", libelle: "Comptes clients", icone: NotebookPen, aide: "Ventes en compte, règlements" },
+    ],
+  },
+  {
+    groupe: "Carte et stock",
+    liste: [
+      { id: "cartes", libelle: "Cartes et prix", icone: BookOpen, aide: "Communes au groupe" },
+      { id: "stock", libelle: "Stock et recettes", icone: Package, aide: "Produits, fiches, food cost" },
+    ],
+  },
+  {
+    groupe: "Établissement",
+    liste: [
+      { id: "alertes", libelle: "Alertes", icone: Bell, aide: "Prix, articles hors carte, PIN" },
+      { id: "identite", libelle: "Identité et carte", icone: Store, aide: "Mentions légales, carte, note" },
+    ],
+  },
+];
+const TOUTES_RUBRIQUES = RUBRIQUES.flatMap((g) => g.liste);
+
+/** Vue lue et écrite dans l'adresse (#/moka/equipe) : un rechargement ou un lien ramène au même écran. */
+function vueDepuisAdresse(): { etab: string | null; rubrique: Rubrique } {
+  const [etab, rubrique] = location.hash.replace(/^#\/?/, "").split("/");
+  return { etab: etab || dernierEtablissement(), rubrique: TOUTES_RUBRIQUES.some((r) => r.id === rubrique) ? (rubrique as Rubrique) : "appareils" };
+}
+
+/** Dernier établissement ouvert sur ce poste : simple confort, absent en navigation privée. */
+const CLE_DERNIER = "matalon-admin-etablissement";
+function dernierEtablissement(): string | null {
+  try {
+    return localStorage.getItem(CLE_DERNIER);
+  } catch {
+    return null;
+  }
+}
+
 function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const [donnees, setDonnees] = useState<Awaited<ReturnType<typeof api.etablissements>> | null>(null);
   const [cartes, setCartes] = useState<ResumeCarte[]>([]);
-  /** Vue courante : établissement (id ou « nouveau »), liste des cartes, ou une carte en édition. */
-  const [choisi, setChoisi] = useState<string | null>(null);
+  const initiale = useMemo(vueDepuisAdresse, []);
+  /** Établissement choisi dans l'en-tête (ou « nouveau »), puis rubrique du menu latéral. */
+  const [choisi, setChoisi] = useState<string | null>(initiale.etab);
+  const [rubrique, setRubrique] = useState<Rubrique>(initiale.rubrique);
   const [carteOuverte, setCarteOuverte] = useState<string | null>(null);
   const [carteModifiee, setCarteModifiee] = useState(false);
   /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
-  const aller = (vue: string, carte: string | null = null) => {
+  const aller = (vue: { etab?: string; rubrique?: Rubrique; carte?: string | null }) => {
     if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return;
     setCarteModifiee(false);
-    setChoisi(vue);
-    setCarteOuverte(carte);
+    if (vue.etab !== undefined) setChoisi(vue.etab);
+    if (vue.rubrique !== undefined) setRubrique(vue.rubrique);
+    setCarteOuverte(vue.carte ?? null);
   };
   const [erreur, setErreur] = useState("");
 
@@ -304,7 +354,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
       const [d, c] = await Promise.all([api.etablissements(), api.cartes()]);
       setDonnees(d);
       setCartes(c.cartes);
-      setChoisi((x) => x ?? d.etablissements[0]?.id ?? "nouveau");
+      setChoisi((x) => (x && (x === "nouveau" || d.etablissements.some((e) => e.id === x)) ? x : (d.etablissements[0]?.id ?? "nouveau")));
     } catch (e) {
       if (e instanceof ErreurAdmin && e.statut === 401) return props.onDeconnecte();
       setErreur(message(e));
@@ -313,8 +363,25 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   useEffect(() => {
     void recharger();
   }, [recharger]);
+  useEffect(() => {
+    if (!choisi) return;
+    history.replaceState(null, "", `#/${choisi}${choisi === "nouveau" ? "" : `/${rubrique}`}`);
+    try {
+      if (choisi !== "nouveau") localStorage.setItem(CLE_DERNIER, choisi);
+    } catch {
+      /* stockage indisponible : on retombera sur le premier établissement */
+    }
+  }, [choisi, rubrique]);
 
   const etablissement = donnees?.etablissements.find((e) => e.id === choisi);
+  const badge = (id: Rubrique): ReactNode => {
+    if (!etablissement) return null;
+    if (id === "alertes" && etablissement.alertesNonVues > 0) return <span className="admin-badge">{etablissement.alertesNonVues}</span>;
+    if (id === "appareils" && etablissement.caisses.some((c) => c.divergence && !c.revoqueeLe)) return <TriangleAlert className="icone erreur" size={16} aria-label="divergence" />;
+    if (id === "identite" && identiteIncomplete(etablissement)) return <TriangleAlert className="icone erreur" size={16} aria-label="incomplète" />;
+    return null;
+  };
+  const libelleRubrique = TOUTES_RUBRIQUES.find((r) => r.id === rubrique)?.libelle ?? "";
 
   return (
     <div className="admin">
@@ -324,6 +391,23 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           <span>Matalon POS</span>
           <small>Administration</small>
         </div>
+        {donnees && (
+          <label className="admin-etab">
+            <Store className="icone" size={20} aria-hidden="true" />
+            <span className="lecteur-ecran">Établissement</span>
+            <select value={choisi ?? ""} onChange={(e) => aller({ etab: e.target.value })}>
+              {donnees.etablissements.map((e) => {
+                const actives = e.caisses.filter((c) => !c.revoqueeLe).length;
+                return (
+                  <option key={e.id} value={e.id}>
+                    {`${e.identite.enseigne} · ${pluriel(actives, "caisse")}${e.alertesNonVues ? ` · ${pluriel(e.alertesNonVues, "alerte")}` : ""}`}
+                  </option>
+                );
+              })}
+              <option value="nouveau">+ Nouvel établissement</option>
+            </select>
+          </label>
+        )}
         <div className="admin-barre-droite">
           <span className="admin-identifiant">{props.identifiant}</span>
           <BoutonIcone
@@ -334,87 +418,65 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           />
         </div>
       </header>
-      <div className="admin-corps">
-        <nav className="admin-liste" aria-label="Établissements">
-          <h2>Établissements</h2>
-          {donnees?.etablissements.map((e) => {
-            const actives = e.caisses.filter((c) => !c.revoqueeLe).length;
-            const personnes = e.utilisateurs.filter((u) => u.actif).length;
-            const divergence = e.caisses.some((c) => c.divergence && !c.revoqueeLe);
-            return (
-              <button
-                key={e.id}
-                className={`admin-lien${e.id === choisi ? " actif" : ""}`}
-                onClick={() => aller(e.id)}
-                aria-label={`${e.identite.enseigne} : ${pluriel(actives, "caisse")}, ${pluriel(personnes, "personne")}${divergence ? ", divergence" : ""}${e.alertesNonVues ? `, ${pluriel(e.alertesNonVues, "alerte")}` : ""}`}
-              >
-                <strong>
-                  <AvecIcone icone={Store}>{e.identite.enseigne}</AvecIcone>
-                </strong>
-                <small className="admin-compteurs" aria-hidden="true">
-                  <span title="Caisses en service">
-                    <AvecIcone icone={Tablet} taille={16} classe="paysage">{actives}</AvecIcone>
-                  </span>
-                  <span title="Personnes actives">
-                    <AvecIcone icone={Users} taille={16}>{personnes}</AvecIcone>
-                  </span>
-                  {e.alertesNonVues > 0 && (
-                    <span className="erreur" title="Alertes à lire">
-                      <AvecIcone icone={Bell} taille={16}>{e.alertesNonVues}</AvecIcone>
-                    </span>
-                  )}
-                  {divergence && (
-                    <span className="erreur" title="Divergence de synchronisation">
-                      <AvecIcone icone={TriangleAlert} taille={16} />
-                    </span>
-                  )}
-                </small>
-              </button>
-            );
-          })}
-          <button className={`admin-lien${choisi === "nouveau" ? " actif" : ""}`} onClick={() => aller("nouveau")}>
-            <strong>
-              <AvecIcone icone={Plus}>Établissement</AvecIcone>
-            </strong>
-          </button>
-          <h2 className="admin-liste-titre">Cartes</h2>
-          <button
-            className={`admin-lien${choisi === "cartes" ? " actif" : ""}`}
-            onClick={() => aller("cartes")}
-            aria-label={`Cartes et prix : ${pluriel(cartes.length, "carte")}`}
-          >
-            <strong>
-              <AvecIcone icone={BookOpen}>Cartes et prix</AvecIcone>
-            </strong>
-            <small aria-hidden="true">{pluriel(cartes.length, "carte")}</small>
-          </button>
-          <button className={`admin-lien${choisi === "stock" ? " actif" : ""}`} onClick={() => aller("stock")}>
-            <strong>
-              <AvecIcone icone={Package}>Stock et recettes</AvecIcone>
-            </strong>
-            <small aria-hidden="true">Produits, fournisseurs, fiches</small>
-          </button>
-          <button className={`admin-lien${choisi === "reservations" ? " actif" : ""}`} onClick={() => aller("reservations")}>
-            <strong>
-              <AvecIcone icone={CalendarCheck}>Réservations</AvecIcone>
-            </strong>
-            <small aria-hidden="true">Services, tables, module du site</small>
-          </button>
-        </nav>
-        <main className="admin-contenu">
+      <div className={`admin-corps${etablissement ? "" : " sans-menu"}`}>
+        {etablissement && (
+          <>
+            <nav className="admin-liste" aria-label={`Rubriques de ${etablissement.identite.enseigne}`}>
+              {RUBRIQUES.map((g) => (
+                <div key={g.groupe} className="admin-groupe">
+                  <h2>{g.groupe}</h2>
+                  {g.liste.map((r) => (
+                    <button
+                      key={r.id}
+                      className={`admin-lien${rubrique === r.id ? " actif" : ""}`}
+                      aria-current={rubrique === r.id ? "page" : undefined}
+                      onClick={() => aller({ rubrique: r.id })}
+                    >
+                      <strong>
+                        <AvecIcone icone={r.icone}>{r.libelle}</AvecIcone>
+                        {badge(r.id)}
+                      </strong>
+                      <small>{r.aide}</small>
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </nav>
+            <label className="champ admin-rubrique-mobile">
+              <span>Rubrique</span>
+              <select value={rubrique} onChange={(e) => aller({ rubrique: e.target.value as Rubrique })}>
+                {RUBRIQUES.map((g) => (
+                  <optgroup key={g.groupe} label={g.groupe}>
+                    {g.liste.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.libelle}
+                        {r.id === "alertes" && etablissement.alertesNonVues ? ` (${etablissement.alertesNonVues})` : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+        <main className="admin-contenu" aria-label={etablissement ? `${etablissement.identite.enseigne} · ${libelleRubrique}` : "Administration"}>
           {erreur && <p className="erreur">{erreur}</p>}
           {!donnees ? (
             <p>Chargement…</p>
-          ) : choisi === "stock" ? (
-            <Stock />
-          ) : choisi === "reservations" ? (
-            <Reservations etablissements={donnees.etablissements} />
-          ) : choisi === "cartes" ? (
+          ) : choisi === "nouveau" || !etablissement ? (
+            <NouvelEtablissement
+              cartes={donnees.cartes}
+              onCree={(id) => {
+                aller({ etab: id, rubrique: "identite" });
+                void recharger();
+              }}
+            />
+          ) : rubrique === "cartes" ? (
             carteOuverte ? (
               <EditeurCarte
                 key={carteOuverte}
                 id={carteOuverte}
-                onRetour={() => aller("cartes")}
+                onRetour={() => aller({ rubrique: "cartes" })}
                 onEnregistre={() => void recharger()}
                 onModifiee={setCarteModifiee}
               />
@@ -428,22 +490,17 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
                 }}
               />
             )
-          ) : choisi === "nouveau" || !etablissement ? (
-            <NouvelEtablissement
-              cartes={donnees.cartes}
-              onCree={(id) => {
-                setChoisi(id);
-                void recharger();
-              }}
-            />
           ) : (
-            <FicheEtablissement key={etablissement.id} e={etablissement} cartes={donnees.cartes} onChange={recharger} />
+            <FicheEtablissement key={etablissement.id} e={etablissement} rubrique={rubrique} cartes={donnees.cartes} onChange={recharger} />
           )}
         </main>
       </div>
     </div>
   );
 }
+
+const identiteIncomplete = (e: EtablissementAdmin) =>
+  !e.identite.raisonSociale || !e.identite.siret || !e.identite.tvaIntracom || !e.identite.adresse || !e.identite.mentionsLegales;
 
 function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>; onCree: (id: string) => void }) {
   const [enseigne, setEnseigne] = useState("");
@@ -511,31 +568,39 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
 
 // ───────── Fiche établissement ─────────
 
-function FicheEtablissement(props: { e: EtablissementAdmin; cartes: Array<{ id: string; nom: string }>; onChange: () => Promise<void> }) {
-  const { e } = props;
+function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; cartes: Array<{ id: string; nom: string }>; onChange: () => Promise<void> }) {
+  const { e, rubrique } = props;
   const responsable = e.utilisateurs.some((u) => u.role === "responsable" && u.actif);
-  const identiteIncomplete = !e.identite.raisonSociale || !e.identite.siret || !e.identite.tvaIntracom || !e.identite.adresse || !e.identite.mentionsLegales;
   return (
     <>
-      <header className="admin-fiche-tete">
-        <div>
-          <p className="surtitre">{e.id}</p>
-          <h1>{e.identite.enseigne}</h1>
-        </div>
-      </header>
-      {identiteIncomplete && (
+      {identiteIncomplete(e) && rubrique !== "identite" && (
         <p className="admin-alerte">
-          <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
+          <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète (rubrique Identité et carte) : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
         </p>
       )}
-      <Alertes e={e} onChange={props.onChange} />
-      <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
-      <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
-      <Equipe e={e} onChange={props.onChange} />
-      <PlanDeSalle e={e} onChange={props.onChange} />
-      <ImprimantesProduction e={e} onChange={props.onChange} />
-      <ComptesClients etablissementId={e.id} />
-      <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
+      {rubrique === "appareils" && (
+        <>
+          <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
+          <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
+        </>
+      )}
+      {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
+      {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
+      {rubrique === "imprimantes" && <ImprimantesProduction e={e} onChange={props.onChange} />}
+      {rubrique === "reservations" && <Reservations etablissements={[e]} />}
+      {rubrique === "comptes" && <ComptesClients etablissementId={e.id} />}
+      {rubrique === "stock" && <Stock etablissementId={e.id} />}
+      {rubrique === "alertes" && <Alertes e={e} onChange={props.onChange} />}
+      {rubrique === "identite" && (
+        <>
+          {identiteIncomplete(e) && (
+            <p className="admin-alerte">
+              <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
+            </p>
+          )}
+          <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
+        </>
+      )}
     </>
   );
 }

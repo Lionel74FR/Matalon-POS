@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 10 octobre 2026.
+Dernière mise à jour : 11 octobre 2026.
 
 ## Règle de conduite
 
@@ -25,6 +25,7 @@ Dernière mise à jour : 10 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Administration : établissement choisi dans l'en-tête, menu latéral des rubriques (Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix, Stock et recettes, Alertes, Identité et carte) au lieu d'une page unique ; liste « Rubrique » sur iPhone ; adresse `#/<établissement>/<rubrique>` et dernier établissement retenus ; scénario `admin-navigation` (aucun débordement sur iPad paysage, portrait et iPhone) |
 | f2e3ee8 | Réservations : vue « À venir » dans l'administration (toutes les réservations des prochaines semaines par jour, recherche par nom, téléphone, e-mail ou note) et fiche de réservation pour modifier date, heure, personnes, durée, coordonnées et note, annuler ou rétablir, avec l'historique |
 | 3de7420 | Réservations : clé API Resend propre à chaque établissement, saisie dans l'administration, chiffrée sur le serveur (clé maîtresse `CLE_SECRETS`), jamais réaffichée ; e-mails envoyés avec la clé de leur établissement |
 | 85faffc | Réservations : adresse d'expédition réglée par établissement dans l'administration et e-mail d'essai ; seule la clé Resend du groupe reste dans Vercel |
@@ -55,6 +56,7 @@ Dernière mise à jour : 10 octobre 2026.
 
 ## Décisions techniques à ne pas défaire
 
+- Administration (demande de Lionel du 11 octobre) : l'établissement se choisit dans l'en-tête, chaque rubrique a sa page au menu latéral. Stock et Réservations reçoivent l'établissement de l'en-tête (plus de sélecteur interne). Ne pas revenir à une page unique.
 - Montants en centimes entiers ; TVA en points de base.
 - Le noyau fiscal tient une chaîne par caisse, signée par une clé ECDSA propre à l'iPad. Le serveur vérifie et réplique, mais ne signe jamais.
 - Barre de la caisse (demande de Lionel du 9 octobre) : les onglets du service (Salle, Tickets, Comptes) et Vente comptoir dans la barre ; le reste (Clôtures, Stats, Stock, Réglages) dans le menu ☰, qui montre le nom de l'écran ouvert. Sur iPhone, l'en-tête aligne à droite : prénom, synchronisation, menu ☰, déconnexion ; les onglets passent dessous.

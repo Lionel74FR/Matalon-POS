@@ -26,14 +26,17 @@ const secret = await a.locator(".admin-totp code").textContent();
 await a.screenshot({ path: `${sortie}/00a-admin-2fa.png` });
 await champA("Code à 6 chiffres").fill(totp(secret));
 await a.getByRole("button", { name: "Activer et se connecter" }).click();
-await a.getByRole("heading", { name: "Moka" }).waitFor();
+await a.locator(".admin-etab select").waitFor();
+const rubrique = (nom) => a.locator(".admin-lien", { hasText: nom }).click();
 // Équipe : un responsable d'abord.
+await rubrique("Équipe");
 await a.getByPlaceholder("Prénom").fill("Lionel");
 await a.locator(".admin-section", { hasText: "Équipe" }).locator("select").last().selectOption("responsable");
 await a.getByPlaceholder("Code PIN").fill("1234");
 await a.getByRole("button", { name: "Ajouter", exact: true }).click();
 await a.locator(".admin-tableau td", { hasText: "Lionel" }).waitFor();
 // Identité légale.
+await rubrique("Identité et carte");
 await champA("Raison sociale").fill("SAS Moka Annecy");
 await champA("SIRET").fill("123 456 789 00012");
 await champA("TVA intracommunautaire").fill("FR12123456789");
@@ -41,6 +44,7 @@ await champA("Mentions des factures").fill("SAS au capital de 10 000 € · RCS 
 await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistré.").waitFor();
 // Code de rattachement.
+await rubrique("Appareils");
 await a.getByPlaceholder("Nom de l'iPad").fill("Comptoir");
 await a.getByRole("button", { name: "Générer un code" }).click();
 const code = (await a.locator(".admin-code span").textContent()).trim();

@@ -134,22 +134,84 @@ select {
   padding: 24px 20px 64px;
 }
 
+.admin-corps.sans-menu {
+  grid-template-columns: 1fr;
+  max-width: 980px;
+}
+
+/* Établissement choisi dans l'en-tête : tout le reste de l'écran porte sur lui. */
+.admin-etab {
+  flex: 0 1 380px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--sable);
+}
+
+.admin-etab select {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+  font-weight: 600;
+}
+
+/* Menu latéral : les rubriques de l'établissement, collé sous l'en-tête. */
 .admin-liste {
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 14px;
+  position: sticky;
+  top: 88px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.admin-groupe {
+  display: grid;
+  gap: 2px;
 }
 
 .admin-liste h2 {
-  margin-bottom: 6px;
+  margin: 0 0 4px 14px;
+  font-family: var(--police-texte);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sable);
+}
+
+.admin-badge {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 11px;
+  background: var(--rouge);
+  color: #fff;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.admin-rubrique-mobile {
+  display: none;
 }
 
 .admin-lien {
   display: grid;
   text-align: left;
   gap: 2px;
-  padding: 12px 14px;
+  padding: 9px 14px;
   border-radius: var(--rayon-petit);
+}
+
+.admin-lien:hover {
+  background: var(--espresso-2);
 }
 
 .admin-lien small {
@@ -362,6 +424,19 @@ select {
   margin-bottom: 10px;
 }
 
+/* iPad en portrait : menu plus étroit, sans les sous-titres. */
+@media (min-width: 801px) and (max-width: 1100px) {
+  .admin-corps:not(.sans-menu) {
+    grid-template-columns: 196px 1fr;
+    gap: 16px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .admin-liste .admin-lien small {
+    display: none;
+  }
+}
+
 @media (max-width: 800px) {
   .admin-barre {
     padding: 8px 12px;
@@ -374,13 +449,19 @@ select {
     grid-template-columns: 1fr;
     padding: 16px 12px 48px;
   }
+  /* En dessous de 800 px, le menu latéral devient une liste déroulante « Rubrique ». */
   .admin-liste {
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    overflow-x: auto;
-  }
-  .admin-liste h2 {
     display: none;
+  }
+  .admin-rubrique-mobile {
+    display: grid;
+  }
+  .admin-rubrique-mobile select {
+    width: 100%;
+    min-height: 48px;
+  }
+  .admin-etab {
+    flex: 1 1 auto;
   }
   .admin-section {
     padding: 16px;
@@ -1032,21 +1113,17 @@ code.cle-api {
     font-size: 1.4rem;
   }
 
-  /* Navigation : pastilles qui passent à la ligne, rien de caché à gauche. */
-  .admin-liste {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    overflow: visible;
-  }
   .admin-liste-titre {
     display: none;
   }
-  .admin-lien {
-    padding: 8px 12px;
-    background: var(--espresso-2);
+  /* En-tête iPhone : logo, établissement, déconnexion ; le nom « Matalon POS » cède sa place. */
+  .admin-barre {
+    gap: 8px;
   }
-  .admin-lien small:not(.admin-compteurs) {
+  .admin-barre .barre-marque span {
+    display: none;
+  }
+  .admin-etab > .icone {
     display: none;
   }
 

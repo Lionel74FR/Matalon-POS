@@ -64,11 +64,13 @@ const parUnite = (u: UniteStock) => (u === "piece" ? "pièce" : u);
  * recettes sont communs au groupe ; les prix et les coûts affichés sont
  * ceux de l'établissement choisi.
  */
-export function Stock() {
+export function Stock(props: { etablissementId?: string } = {}) {
   const [stock, setStock] = useState<ReponseStock | null>(null);
   const [erreur, setErreur] = useState("");
   const [onglet, setOnglet] = useState<Onglet>("produits");
-  const [etab, setEtab] = useState("");
+  const [etabChoisi, setEtab] = useState("");
+  // Choisi dans l'en-tête de l'administration ; sans lui, la liste déroulante du stock.
+  const etab = props.etablissementId ?? etabChoisi;
   useEffect(() => {
     api
       .stock()
@@ -90,16 +92,18 @@ export function Stock() {
           <h1 className="titre-icone">
             <AvecIcone icone={Package} taille={26}>Stock et fiches techniques</AvecIcone>
           </h1>
-          <label className="champ stock-etab">
-            <span>Prix et coûts de</span>
-            <select value={etab} onChange={(e) => setEtab(e.target.value)}>
-              {stock.etablissements.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.enseigne}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!props.etablissementId && (
+            <label className="champ stock-etab">
+              <span>Prix et coûts de</span>
+              <select value={etab} onChange={(e) => setEtab(e.target.value)}>
+                {stock.etablissements.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.enseigne}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
         <p className="explication">
           Produits et recettes sont communs à tous les établissements. Les prix d'achat sont ceux de chaque établissement : sans achat

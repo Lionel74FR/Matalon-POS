@@ -98,6 +98,10 @@ admin.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
 await admin.goto(`${URL}/admin`);
 await admin.locator(".admin-caisse", { hasText: "iPhone ·" }).waitFor();
 await admin.screenshot({ path: `${sortie}/m10-admin.png` });
+largeurs.adminAppareils = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+// Sur iPhone, le menu latéral devient la liste « Rubrique » ; la fiche Identité est assez longue pour défiler.
+await admin.locator(".admin-rubrique-mobile select").selectOption("identite");
+await admin.getByText("Raison sociale").first().waitFor();
 largeurs.admin = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const tactile = await ctx.newCDPSession(admin);
 await tactile.send("Input.synthesizeScrollGesture", { x: 200, y: 600, yDistance: -700, speed: 1500 });

@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 51, copiée le 11 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 52, copiée le 11 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -81,6 +81,7 @@ Choix techniques :
 - **Serveur** : une fonction Edge Vercel en région Paris (cdg1) ; Postgres Neon en région Francfort, table des enregistrements fiscaux en ajout seul (trigger). Le serveur ne signe rien : une clôture de secours ne peut venir que d'un iPad, le serveur peut seulement alerter si un Z manque.
 - **Numérotation** : une séquence par iPad, identifiant de caisse sur chaque ticket ; aucune dépendance réseau pour encaisser.
 - **Multi-établissements** : application générique « Matalon POS ». Chaque iPad est rattaché à un établissement par un code à usage unique (48 h) généré dans l'administration ; il reçoit alors l'établissement, l'équipe, les tables et la carte.
+- **Administration web** : l'établissement se choisit dans l'en-tête (avec ses alertes et ses caisses), puis un menu latéral ouvre ses rubriques : Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix (communes au groupe), Stock et recettes, Alertes, Identité et carte. Une page par rubrique au lieu d'une seule page longue ; sur iPhone, le menu devient une liste « Rubrique ». L'adresse garde l'établissement et la rubrique (lien ou rechargement), et le poste retrouve le dernier établissement ouvert. Ajouté le 11 octobre 2026.
 - **Synchronisation** : chaque enregistrement fiscal est répliqué vers le serveur dès que le réseau le permet (après écriture, toutes les minutes, au retour du réseau). Le serveur revérifie continuité, empreinte, signature et totaux ; toute divergence est signalée sans bloquer l'encaissement, l'iPad détenant l'original.
 
 Dépôt Git (GitHub), en monorepo :
