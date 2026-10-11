@@ -216,11 +216,10 @@ interface Contact {
   commentaire: string;
   memoriser: boolean;
   offresEmail: boolean;
-  offresSms: boolean;
   conditions: boolean;
 }
 function contactMemorise(): Contact {
-  const vide: Contact = { civilite: "", prenom: "", nom: "", pays: "FR", telephone: "", email: "", commentaire: "", memoriser: false, offresEmail: false, offresSms: false, conditions: false };
+  const vide: Contact = { civilite: "", prenom: "", nom: "", pays: "FR", telephone: "", email: "", commentaire: "", memoriser: false, offresEmail: false, conditions: false };
   try {
     const m = JSON.parse(localStorage.getItem(MEMOIRE) ?? "null") as Partial<Contact> | null;
     return m ? { ...vide, ...m, commentaire: "", conditions: false, memoriser: true } : vide;
@@ -551,7 +550,7 @@ async function pageReservation(etabId: string) {
         contact[cle] = (e.target as HTMLInputElement).value;
       },
     });
-  const caseACocher = (cle: "conditions" | "memoriser" | "offresEmail" | "offresSms", ...libelle: Enfant[]) =>
+  const caseACocher = (cle: "conditions" | "memoriser" | "offresEmail", ...libelle: Enfant[]) =>
     el(
       "label",
       { class: "case-cocher" },
@@ -591,7 +590,6 @@ async function pageReservation(etabId: string) {
         commentaire: contact.commentaire,
         ...(etat.zone ? { zone: etat.zone } : {}),
         offresEmail: contact.offresEmail,
-        offresSms: contact.offresSms,
         conditions: true,
         site: (document.getElementById("site-web") as HTMLInputElement | null)?.value ?? "",
       });
@@ -702,7 +700,6 @@ async function pageReservation(etabId: string) {
           ),
           caseACocher("memoriser", "Sauvegarder les informations pour mes prochaines réservations."),
           caseACocher("offresEmail", "Envoyez-moi des offres et actualités par e-mail."),
-          caseACocher("offresSms", "Envoyez-moi des offres et actualités par SMS."),
         ),
         etat.erreur ? el("p", { class: "erreur" }, etat.erreur) : null,
         el("div", { class: "pied-form" }, el("button", { class: "bouton sombre", type: "submit", disabled: etat.envoi }, etat.envoi ? "Réservation…" : "Réserver")),

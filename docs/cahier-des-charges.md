@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 49, copiée le 10 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 50, copiée le 11 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -176,7 +176,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 ### Module du site
 
 - Une balise `<script src="…/reservation.js" data-etablissement="moka" async>` ajoute un bouton flottant « Réserver une table » ; les boutons du site marqués `data-matalon-reserver` ou pointant vers `#reserver` ouvrent le même panneau. Lien direct en page entière pour Google, Instagram ou un QR code.
-- Parcours : nombre de couverts, date (prochaines disponibilités ou calendrier), préférence de salle s'il y a plusieurs zones, horaire par service (complet signalé), puis civilité, prénom, nom, téléphone avec indicatif, e-mail, commentaire, conditions à accepter, offres par e-mail ou SMS (consentement facultatif), mémorisation sur l'appareil. Confirmation avec ajout à l'agenda et lien d'annulation.
+- Parcours : nombre de couverts, date (prochaines disponibilités ou calendrier), préférence de salle s'il y a plusieurs zones, horaire par service (complet signalé), puis civilité, prénom, nom, téléphone avec indicatif, e-mail, commentaire, conditions à accepter, offres par e-mail (consentement facultatif), mémorisation sur l'appareil. Confirmation avec ajout à l'agenda et lien d'annulation.
 - Au-delà du groupe maximum en ligne, le module invite à appeler ou écrire. Une même personne (téléphone) ne réserve qu'une fois par jour en ligne ; un champ piège écarte les robots.
 
 ### Administration
