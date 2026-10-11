@@ -25,7 +25,7 @@ Dernière mise à jour : 11 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Administration : établissement choisi dans l'en-tête, menu latéral des rubriques (Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix, Stock et recettes, Alertes, Identité et carte) au lieu d'une page unique ; liste « Rubrique » sur iPhone ; adresse `#/<établissement>/<rubrique>` et dernier établissement retenus ; scénario `admin-navigation` (aucun débordement sur iPad paysage, portrait et iPhone) |
+| 047fef7 | Administration : établissement choisi dans l'en-tête, menu latéral des rubriques (Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix, Stock et recettes, Alertes, Identité et carte) au lieu d'une page unique ; liste « Rubrique » sur iPhone ; adresse `#/<établissement>/<rubrique>` et dernier établissement retenus ; scénario `admin-navigation` (aucun débordement sur iPad paysage, portrait et iPhone) |
 | f2e3ee8 | Réservations : vue « À venir » dans l'administration (toutes les réservations des prochaines semaines par jour, recherche par nom, téléphone, e-mail ou note) et fiche de réservation pour modifier date, heure, personnes, durée, coordonnées et note, annuler ou rétablir, avec l'historique |
 | 3de7420 | Réservations : clé API Resend propre à chaque établissement, saisie dans l'administration, chiffrée sur le serveur (clé maîtresse `CLE_SECRETS`), jamais réaffichée ; e-mails envoyés avec la clé de leur établissement |
 | 85faffc | Réservations : adresse d'expédition réglée par établissement dans l'administration et e-mail d'essai ; seule la clé Resend du groupe reste dans Vercel |
