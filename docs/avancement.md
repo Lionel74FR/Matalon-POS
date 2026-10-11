@@ -25,6 +25,7 @@ Dernière mise à jour : 11 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Administration : connexion par clé d'accès (passkey, WebAuthn) à la place du mot de passe et du code ; création depuis l'icône clé de l'en-tête avec le code redemandé, liste et retrait ; invitation après connexion tant qu'aucune clé n'existe ; vérification WebAuthn sans dépendance (ES256, RS256) testée avec un authentificateur simulé et l'authentificateur virtuel de Chromium |
 | 047fef7 | Administration : établissement choisi dans l'en-tête, menu latéral des rubriques (Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix, Stock et recettes, Alertes, Identité et carte) au lieu d'une page unique ; liste « Rubrique » sur iPhone ; adresse `#/<établissement>/<rubrique>` et dernier établissement retenus ; scénario `admin-navigation` (aucun débordement sur iPad paysage, portrait et iPhone) |
 | f2e3ee8 | Réservations : vue « À venir » dans l'administration (toutes les réservations des prochaines semaines par jour, recherche par nom, téléphone, e-mail ou note) et fiche de réservation pour modifier date, heure, personnes, durée, coordonnées et note, annuler ou rétablir, avec l'historique |
 | 3de7420 | Réservations : clé API Resend propre à chaque établissement, saisie dans l'administration, chiffrée sur le serveur (clé maîtresse `CLE_SECRETS`), jamais réaffichée ; e-mails envoyés avec la clé de leur établissement |
@@ -56,6 +57,7 @@ Dernière mise à jour : 11 octobre 2026.
 
 ## Décisions techniques à ne pas défaire
 
+- Clés d'accès de l'administration (11 octobre) : vérification maison dans `packages/serveur/src/webauthn.ts` (pas d'attestation demandée, vérification de l'utilisateur exigée, défi à usage unique stocké par empreinte). Une clé est liée au domaine qui l'a créée : en passant à un domaine définitif, il faudra recréer les clés.
 - Administration (demande de Lionel du 11 octobre) : l'établissement se choisit dans l'en-tête, chaque rubrique a sa page au menu latéral. Stock et Réservations reçoivent l'établissement de l'en-tête (plus de sélecteur interne). Ne pas revenir à une page unique.
 - Montants en centimes entiers ; TVA en points de base.
 - Le noyau fiscal tient une chaîne par caisse, signée par une clé ECDSA propre à l'iPad. Le serveur vérifie et réplique, mais ne signe jamais.

@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 52, copiée le 11 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 53, copiée le 11 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -238,7 +238,7 @@ Contrôle : à chaque clôture Z, le total CB de la caisse est comparé au total
 
 Chaque action est rattachée à un utilisateur nommé, chaque iPad à une clé révocable, et toutes les données restent hébergées en UE.
 
-- **Utilisateurs** : un compte par personne, code PIN en caisse, double authentification pour le back-office.
+- **Utilisateurs** : un compte par personne, code PIN en caisse, double authentification pour le back-office. Clé d'accès (passkey) possible à la place du mot de passe et du code : Face ID, Touch ID ou code de l'appareil exigé, défi à usage unique, clé liée au domaine de l'administration, seule la partie publique gardée sur le serveur ; créée avec le code de vérification redemandé, retirable, connexions et ajouts journalisés. Le mot de passe et le code restent valables en secours. Ajouté le 11 octobre 2026.
 - **Droits** : remises, offerts, annulations et clôtures réservés aux rôles autorisés.
 - **Appareils** : rattachement par code à usage unique ; clé de signature propre à chaque iPad, non exportable (trousseau iOS en V2) ; un iPad perdu ou volé est révoqué depuis l'administration et ne peut plus encaisser.
 - **Secrets** : variables d'environnement Vercel et Secrets Replit, jamais dans le dépôt Git.

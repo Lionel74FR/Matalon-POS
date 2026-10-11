@@ -12,6 +12,8 @@ import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type Rappo
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { Reservations } from "./Reservations";
+import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces";
+import { cleAccesDisponible, utiliserCleAcces } from "./cleAcces";
 import {
   Archive,
   Ban,
@@ -21,6 +23,7 @@ import {
   BookOpen,
   CalendarCheck,
   FileJson,
+  Fingerprint,
   FileSpreadsheet,
   KeyRound,
   LayoutGrid,
@@ -251,10 +254,25 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
       props.onConnecte();
     });
   };
+  const avecCle = () =>
+    void envoyer(async () => {
+      const { options } = await api.optionsConnexionCle();
+      await api.connexionCle(await utiliserCleAcces(options));
+      props.onConnecte();
+    });
   return (
     <div className="admin-acces">
       <EnteteAcces titre="Connexion" />
+      {cleAccesDisponible() && (
+        <div className="admin-carte connexion-cle">
+          <button type="button" className="bouton principal" disabled={enCours} onClick={avecCle}>
+            <AvecIcone icone={Fingerprint}>Se connecter avec une clé d'accès</AvecIcone>
+          </button>
+          <p className="explication">Face ID, Touch ID ou le code de l'appareil, sans mot de passe ni code de vérification.</p>
+        </div>
+      )}
       <form className="admin-carte" onSubmit={valider}>
+        {cleAccesDisponible() && <h2 className="connexion-ou">Ou avec le mot de passe et le code</h2>}
         <Champ libelle="Identifiant">
           <input value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} autoComplete="username" required />
         </Champ>
@@ -273,7 +291,7 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
         <p className="erreur" aria-live="assertive">
           {erreur}
         </p>
-        <button className="bouton principal" disabled={enCours || code.length !== 6}>
+        <button className={`bouton${cleAccesDisponible() ? "" : " principal"}`} disabled={enCours || code.length !== 6}>
           <AvecIcone icone={LogIn}>Se connecter</AvecIcone>
         </button>
       </form>
@@ -348,6 +366,8 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     setCarteOuverte(vue.carte ?? null);
   };
   const [erreur, setErreur] = useState("");
+  const clesAcces = useClesAcces();
+  const [fenetreCles, setFenetreCles] = useState(false);
 
   const recharger = useCallback(async () => {
     try {
@@ -410,6 +430,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
         )}
         <div className="admin-barre-droite">
           <span className="admin-identifiant">{props.identifiant}</span>
+          <BoutonIcone icone={KeyRound} libelle="Clés d'accès" variante="discret" onClick={() => setFenetreCles(true)} />
           <BoutonIcone
             icone={LogOut}
             libelle={`Se déconnecter (${props.identifiant})`}
@@ -461,6 +482,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
         )}
         <main className="admin-contenu" aria-label={etablissement ? `${etablissement.identite.enseigne} · ${libelleRubrique}` : "Administration"}>
           {erreur && <p className="erreur">{erreur}</p>}
+          <SuggestionCleAcces cles={clesAcces.cles} onOuvrir={() => setFenetreCles(true)} />
           {!donnees ? (
             <p>Chargement…</p>
           ) : choisi === "nouveau" || !etablissement ? (
@@ -495,6 +517,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           )}
         </main>
       </div>
+      {fenetreCles && <FenetreClesAcces cles={clesAcces.cles} onChange={clesAcces.setCles} onFermer={() => setFenetreCles(false)} />}
     </div>
   );
 }

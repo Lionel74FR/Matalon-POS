@@ -2,6 +2,7 @@ import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
 import type { EtatEnvoi } from "@matalon/serveur/partage";
+import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
@@ -42,6 +43,15 @@ export interface RapportVerification {
   compteurs: Record<string, number>;
 }
 
+export interface CleAccesAdmin {
+  id: string;
+  nom: string;
+  /** Domaine pour lequel la clé a été créée : elle ne vaut que sur lui. */
+  domaine: string;
+  creeLe: string;
+  utiliseeLe: string | null;
+}
+
 export class ErreurAdmin extends Error {
   constructor(
     readonly statut: number,
@@ -77,6 +87,12 @@ export const api = {
   confirmer: (identifiant: string, motDePasse: string, code: string) => appel("POST", "/confirmer", { identifiant, motDePasse, code }),
   connexion: (identifiant: string, motDePasse: string, code: string) => appel("POST", "/connexion", { identifiant, motDePasse, code }),
   deconnexion: () => appel("POST", "/deconnexion", {}),
+  optionsConnexionCle: () => appel<{ options: OptionsConnexion }>("POST", "/cle-acces/options", {}),
+  connexionCle: (reponse: unknown) => appel("POST", "/cle-acces/connexion", { reponse }),
+  clesAcces: () => appel<{ cles: CleAccesAdmin[] }>("GET", "/cles-acces"),
+  optionsCleAcces: (code: string) => appel<{ options: OptionsCreation }>("POST", "/cles-acces/options", { code }),
+  enregistrerCleAcces: (nom: string, reponse: unknown) => appel<{ cles: CleAccesAdmin[] }>("POST", "/cles-acces", { nom, reponse }),
+  retirerCleAcces: (id: string) => appel<{ cles: CleAccesAdmin[] }>("DELETE", `/cles-acces/${id}`),
   etablissements: () => appel<{ etablissements: EtablissementAdmin[]; cartes: Array<{ id: string; nom: string }> }>("GET", "/etablissements"),
   creerEtablissement: (corps: { id: string; identite: Partial<IdentiteEtablissement>; carteId: string; tables: Table[]; seuilNote: number }) =>
     appel("POST", "/etablissements", corps),

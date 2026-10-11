@@ -77,8 +77,10 @@ import {
   type UtilisateurApi,
 } from "./partage.js";
 import { migrer } from "./schema.js";
+import { ALGORITHMES, depuisBase64Url, ErreurWebAuthn, verifierAssertion, verifierEnregistrement, type ReponseAssertion, type ReponseEnregistrement } from "./webauthn.js";
 import {
   aleatoire,
+  base64Url,
   egaux,
   hacherMotDePasse,
   nouveauJeton,
@@ -1695,11 +1697,11 @@ async function verifierIdentifiants(env: Environnement, corps: Record<string, un
   return a;
 }
 
-async function ouvrirSession(env: Environnement, adminId: string): Promise<Response> {
+async function ouvrirSession(env: Environnement, adminId: string, details: Record<string, unknown> = {}): Promise<Response> {
   const jeton = nouveauJeton();
   const expire = new Date(horloge(env).getTime() + DUREE_SESSION_MS).toISOString();
   await env.db.requete("insert into sessions_admin (jeton_hash, admin_id, expire_le) values ($1, $2, $3)", [await sha256(jeton), adminId, expire]);
-  await journaliserAdmin(env, adminId, "connexion", {});
+  await journaliserAdmin(env, adminId, "connexion", details);
   return json(200, { ok: true }, {
     "Set-Cookie": `${COOKIE}=${jeton}; Path=/api/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=${DUREE_SESSION_MS / 1000}`,
   });
@@ -1716,6 +1718,176 @@ async function connexionAdmin(env: Environnement, requete: Request): Promise<Res
   controlerOrigine(requete);
   const a = await verifierIdentifiants(env, await lireJson(requete), false);
   return ouvrirSession(env, a.id);
+}
+
+// ───────── Clés d'accès (passkeys) ─────────
+
+const DUREE_DEFI_MS = 5 * 60_000;
+const CLES_MAX = 10;
+
+/** Domaine et origine attendus : ceux de l'adresse servie (une clé créée sur un domaine ne vaut que pour lui). */
+function partieConfiante(requete: Request): { rpId: string; origine: string } {
+  const u = new URL(requete.url);
+  return { rpId: u.hostname, origine: u.origin };
+}
+
+async function nouveauDefi(env: Environnement, usage: "connexion" | "enregistrement", adminId: string | null): Promise<string> {
+  const maintenant = horloge(env);
+  await env.db.requete("delete from defis_admin where expire_le < $1", [maintenant.toISOString()]);
+  const [n] = await env.db.requete<{ n: number }>("select count(*)::int as n from defis_admin");
+  if ((n?.n ?? 0) >= 500) throw new ErreurHttp(429, "TROP_DE_DEMANDES", "Trop de demandes : réessayez dans quelques minutes.");
+  const defi = base64Url(aleatoire(32));
+  await env.db.requete("insert into defis_admin (defi_hash, usage, admin_id, expire_le) values ($1, $2, $3, $4)", [
+    await sha256(defi),
+    usage,
+    adminId,
+    new Date(maintenant.getTime() + DUREE_DEFI_MS).toISOString(),
+  ]);
+  return defi;
+}
+
+/** Retire le défi cité par le navigateur (usage unique) ; rend le défi, ou refuse s'il est inconnu ou expiré. */
+async function consommerDefi(env: Environnement, clientDataJSON: unknown, usage: string, adminId: string | null): Promise<string> {
+  let defi = "";
+  try {
+    const d = JSON.parse(new TextDecoder().decode(depuisBase64Url(String(clientDataJSON ?? "")))) as { challenge?: unknown };
+    defi = typeof d.challenge === "string" ? d.challenge : "";
+  } catch {
+    /* refusé ci-dessous */
+  }
+  const lignes = defi
+    ? await env.db.requete<{ admin_id: string | null }>(
+        "delete from defis_admin where defi_hash = $1 and usage = $2 and expire_le > $3 returning admin_id",
+        [await sha256(defi), usage, horloge(env).toISOString()],
+      )
+    : [];
+  if (!lignes.length || (adminId !== null && lignes[0]!.admin_id !== adminId)) {
+    throw new ErreurHttp(400, "DEFI_EXPIRE", "Demande expirée : recommencez.");
+  }
+  return defi;
+}
+
+interface LigneCleAcces {
+  id: string;
+  admin_id: string;
+  nom: string;
+  alg: number;
+  jwk: JsonWebKey;
+  compteur: string | number;
+  rp_id: string;
+  cree_le: string;
+  utilisee_le: string | null;
+}
+
+async function listeClesAcces(env: Environnement, adminId: string): Promise<Response> {
+  const cles = await env.db.requete<LigneCleAcces>("select * from cles_acces_admin where admin_id = $1 order by cree_le", [adminId]);
+  return json(200, { cles: cles.map((c) => ({ id: c.id, nom: c.nom, domaine: c.rp_id, creeLe: c.cree_le, utiliseeLe: c.utilisee_le })) });
+}
+
+/** Code de double authentification redemandé avant d'ajouter une clé (une session volée ne suffit pas). */
+async function verifierCodeAdmin(env: Environnement, adminId: string, code: string) {
+  const maintenant = horloge(env);
+  const [a] = await env.db.requete<LigneAdmin>("select * from admins where id = $1", [adminId]);
+  if (!a) throw new ErreurHttp(401, "NON_AUTHENTIFIE", "Connexion administrateur requise.");
+  if (a.bloque_jusqua && a.bloque_jusqua > maintenant.toISOString()) {
+    throw new ErreurHttp(429, "COMPTE_BLOQUE", "Trop d'essais : réessayez dans 15 minutes.");
+  }
+  if (await verifierTotp(a.totp_secret, code, maintenant.getTime())) {
+    await env.db.requete("update admins set echecs = 0, bloque_jusqua = null where id = $1", [a.id]);
+    return a;
+  }
+  const echecs = a.echecs + 1;
+  await env.db.requete("update admins set echecs = $2, bloque_jusqua = $3 where id = $1", [
+    a.id,
+    echecs >= ECHECS_MAX ? 0 : echecs,
+    echecs >= ECHECS_MAX ? new Date(maintenant.getTime() + BLOCAGE_MS).toISOString() : null,
+  ]);
+  throw new ErreurHttp(400, "CODE_INVALIDE", "Code de vérification incorrect.");
+}
+
+async function optionsEnregistrementCle(env: Environnement, requete: Request, admin: { id: string; identifiant: string }): Promise<Response> {
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  await verifierCodeAdmin(env, admin.id, String(corps.code ?? ""));
+  const { rpId } = partieConfiante(requete);
+  const existantes = await env.db.requete<{ id: string }>("select id from cles_acces_admin where admin_id = $1 and rp_id = $2", [admin.id, rpId]);
+  if (existantes.length >= CLES_MAX) throw new ErreurHttp(409, "TROP_DE_CLES", `${CLES_MAX} clés d'accès au plus : retirez-en une d'abord.`);
+  const defi = await nouveauDefi(env, "enregistrement", admin.id);
+  return json(200, {
+    options: {
+      challenge: defi,
+      rp: { name: "Matalon POS", id: rpId },
+      user: { id: base64Url(new TextEncoder().encode(admin.id)), name: admin.identifiant, displayName: `${admin.identifiant} (Matalon POS)` },
+      pubKeyCredParams: ALGORITHMES.map((alg) => ({ type: "public-key", alg })),
+      timeout: DUREE_DEFI_MS,
+      attestation: "none",
+      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+      excludeCredentials: existantes.map((c) => ({ type: "public-key", id: c.id })),
+    },
+  });
+}
+
+async function enregistrerCle(env: Environnement, requete: Request, admin: { id: string; identifiant: string }): Promise<Response> {
+  const corps = await lireJson<{ nom?: unknown; reponse?: ReponseEnregistrement }>(requete);
+  const nom = texte(corps.nom, "nom", 60);
+  const r = corps.reponse;
+  if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.response) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Réponse de la clé manquante.");
+  const defi = await consommerDefi(env, r.response.clientDataJSON, "enregistrement", admin.id);
+  const { rpId, origine } = partieConfiante(requete);
+  let cle;
+  try {
+    cle = await verifierEnregistrement(r, { defi, origine, rpId });
+  } catch (e) {
+    if (e instanceof ErreurWebAuthn) throw new ErreurHttp(400, "CLE_REFUSEE", `Clé refusée : ${e.message}`);
+    throw e;
+  }
+  const [deja] = await env.db.requete<{ id: string }>("select id from cles_acces_admin where id = $1", [cle.id]);
+  if (deja) throw new ErreurHttp(409, "CLE_EXISTANTE", "Cette clé d'accès est déjà enregistrée.");
+  await env.db.requete(
+    "insert into cles_acces_admin (id, admin_id, nom, alg, jwk, compteur, rp_id, cree_le) values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)",
+    [cle.id, admin.id, nom, cle.alg, JSON.stringify(cle.jwk), cle.compteur, rpId, horloge(env).toISOString()],
+  );
+  await journaliserAdmin(env, admin.id, "cle_acces_ajoutee", { nom, domaine: rpId });
+  return listeClesAcces(env, admin.id);
+}
+
+async function retirerCle(env: Environnement, admin: { id: string }, id: string): Promise<Response> {
+  const [c] = await env.db.requete<{ nom: string }>("delete from cles_acces_admin where id = $1 and admin_id = $2 returning nom", [id, admin.id]);
+  if (!c) throw new ErreurHttp(404, "INTROUVABLE", "Clé d'accès introuvable.");
+  await journaliserAdmin(env, admin.id, "cle_acces_retiree", { nom: c.nom });
+  return listeClesAcces(env, admin.id);
+}
+
+async function optionsConnexionCle(env: Environnement, requete: Request): Promise<Response> {
+  controlerOrigine(requete);
+  const { rpId } = partieConfiante(requete);
+  const defi = await nouveauDefi(env, "connexion", null);
+  // Pas de liste de clés : l'appareil propose celles qu'il connaît pour ce domaine (clés découvrables).
+  return json(200, { options: { challenge: defi, rpId, timeout: DUREE_DEFI_MS, userVerification: "required", allowCredentials: [] } });
+}
+
+async function connexionCle(env: Environnement, requete: Request): Promise<Response> {
+  controlerOrigine(requete);
+  const corps = await lireJson<{ reponse?: ReponseAssertion }>(requete);
+  const r = corps.reponse;
+  if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.response) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Réponse de la clé manquante.");
+  const defi = await consommerDefi(env, r.response.clientDataJSON, "connexion", null);
+  const { rpId, origine } = partieConfiante(requete);
+  const [c] = await env.db.requete<LigneCleAcces>(
+    `select k.* from cles_acces_admin k join admins a on a.id = k.admin_id where k.id = $1 and k.rp_id = $2 and a.totp_actif`,
+    [r.id, rpId],
+  );
+  const refus = new ErreurHttp(401, "CLE_INCONNUE", "Clé d'accès non reconnue : connectez-vous avec le mot de passe et le code.");
+  if (!c) throw refus;
+  let compteur: number;
+  try {
+    ({ compteur } = await verifierAssertion(r, { id: c.id, alg: c.alg, jwk: c.jwk, compteur: Number(c.compteur) }, { defi, origine, rpId, utilisateur: c.admin_id }));
+  } catch (e) {
+    if (!(e instanceof ErreurWebAuthn)) throw e;
+    await journaliserAdmin(env, c.admin_id, "connexion_refusee", { methode: "cle", nom: c.nom, motif: e.message });
+    throw refus;
+  }
+  await env.db.requete("update cles_acces_admin set compteur = $2, utilisee_le = $3 where id = $1", [c.id, compteur, horloge(env).toISOString()]);
+  return ouvrirSession(env, c.admin_id, { methode: "cle", nom: c.nom });
 }
 
 async function deconnexionAdmin(env: Environnement, requete: Request): Promise<Response> {
@@ -2222,9 +2394,16 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/admin/confirmer" && m === "POST") return await confirmerAdmin(env, requete);
     if (chemin === "/api/admin/connexion" && m === "POST") return await connexionAdmin(env, requete);
     if (chemin === "/api/admin/deconnexion" && m === "POST") return await deconnexionAdmin(env, requete);
+    if (chemin === "/api/admin/cle-acces/options" && m === "POST") return await optionsConnexionCle(env, requete);
+    if (chemin === "/api/admin/cle-acces/connexion" && m === "POST") return await connexionCle(env, requete);
 
     if (chemin.startsWith("/api/admin/")) {
       const admin = await exigerAdmin(env, requete);
+      if (chemin === "/api/admin/cles-acces" && m === "GET") return await listeClesAcces(env, admin.id);
+      if (chemin === "/api/admin/cles-acces" && m === "POST") return await enregistrerCle(env, requete, admin);
+      if (chemin === "/api/admin/cles-acces/options" && m === "POST") return await optionsEnregistrementCle(env, requete, admin);
+      const pk = /^\/api\/admin\/cles-acces\/([A-Za-z0-9_-]{16,1400})$/.exec(chemin);
+      if (pk && m === "DELETE") return await retirerCle(env, admin, pk[1]!);
       if (chemin === "/api/admin/etablissements" && m === "GET") return await listeEtablissements(env);
       if (chemin === "/api/admin/cartes" && m === "GET") return await listeCartes(env);
       if (chemin === "/api/admin/cartes" && m === "POST") return await creerCarte(env, requete, admin);

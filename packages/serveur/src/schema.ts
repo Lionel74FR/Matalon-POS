@@ -324,6 +324,25 @@ export const MIGRATIONS: string[] = [
     maj_par text,
     primary key (etablissement_id, nom)
   )`,
+  // Clés d'accès (passkeys) des administrateurs : clé publique seule, liée au domaine (rp_id) qui l'a créée.
+  `create table if not exists cles_acces_admin (
+    id text primary key,
+    admin_id text not null references admins(id),
+    nom text not null,
+    alg integer not null,
+    jwk jsonb not null,
+    compteur bigint not null default 0,
+    rp_id text not null,
+    cree_le text not null,
+    utilisee_le text
+  )`,
+  // Défis WebAuthn à usage unique (5 minutes) ; seule leur empreinte est gardée.
+  `create table if not exists defis_admin (
+    defi_hash text primary key,
+    usage text not null,
+    admin_id text,
+    expire_le text not null
+  )`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

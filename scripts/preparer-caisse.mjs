@@ -35,8 +35,9 @@ export async function preparerServeur(url, nomCaisse = "iPad") {
   };
   const acces = { identifiant: "lionel", motDePasse: "un-mot-de-passe-solide" };
   const { initialise } = await appel("GET", "/statut");
+  let secret = "";
   if (!initialise) {
-    const { secret } = await appel("POST", "/initialiser", acces);
+    ({ secret } = await appel("POST", "/initialiser", acces));
     await appel("POST", "/confirmer", { ...acces, code: totp(secret) });
   } else {
     throw new Error("Serveur déjà initialisé : relancez scripts/serveur-local.mjs pour repartir d'une base vierge.");
@@ -57,5 +58,5 @@ export async function preparerServeur(url, nomCaisse = "iPad") {
   });
   await appel("POST", "/etablissements/moka/utilisateurs", { nom: "Lionel", role: "responsable", pin: "1234", actif: true });
   const { code } = await appel("POST", "/etablissements/moka/codes", { nomCaisse });
-  return { code, cookie, appel };
+  return { code, cookie, appel, secret };
 }

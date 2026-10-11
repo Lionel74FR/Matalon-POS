@@ -77,6 +77,105 @@ select {
   gap: 6px;
 }
 
+/* Connexion par clé d'accès, au-dessus du formulaire mot de passe + code. */
+.connexion-cle {
+  margin-bottom: 16px;
+  gap: 10px;
+}
+
+.connexion-cle .bouton {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+.connexion-cle p {
+  margin: 0;
+  text-align: center;
+}
+
+.connexion-ou {
+  margin: 0 0 8px;
+  font-family: var(--police-texte);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sable);
+}
+
+/* Invitation à créer une clé d'accès, en tête de l'administration. */
+.admin-suggestion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  border-radius: var(--rayon);
+  border: 2px solid var(--terre);
+  background: var(--espresso-2);
+}
+
+.admin-suggestion p {
+  flex: 1 1 280px;
+  margin: 0;
+}
+
+.admin-suggestion > .icone {
+  color: var(--terre);
+}
+
+.admin-suggestion .options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Fenêtre « Clés d'accès ». */
+.cles-liste {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.cles-liste li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 6px 10px 14px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+}
+
+.cles-liste li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cles-liste small {
+  color: var(--sable);
+}
+
+.cles-creation {
+  display: grid;
+  gap: 8px;
+}
+
+.cles-creation h3 {
+  margin: 4px 0;
+}
+
+.cles-creation .champ {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.cles-creation .erreur:empty {
+  display: none;
+}
+
 .admin-totp {
   display: flex;
   flex-wrap: wrap;
