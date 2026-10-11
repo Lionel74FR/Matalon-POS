@@ -181,6 +181,28 @@ verifier("liste de l'administration", resultats.admin.length === 3 && resultats.
 const statuts = await a.locator(".resa-table tbody tr select[aria-label^='Statut']").evaluateAll((l) => l.map((s) => s.value).sort());
 verifier("statuts", statuts.join() === "annulee,arrivee,confirmee", statuts);
 
+// Réservations à venir : recherche, fiche, modification (heure, personnes), puis annulation.
+await a.getByLabel("Rechercher une réservation").fill("roux");
+resultats.recherche = await a.locator(".resa-table tbody tr").count();
+verifier("recherche à venir", resultats.recherche === 1, resultats.recherche);
+await a.getByRole("button", { name: "Modifier la réservation de Zoé Roux" }).click();
+const fiche = a.locator(".modale");
+await fiche.getByLabel("Heure").fill("23:15");
+await fiche.getByLabel("Personnes").fill("4");
+await fiche.getByLabel("Note").fill("Table au calme");
+await fiche.getByRole("button", { name: "Enregistrer" }).click();
+await a.locator(".resa-table tbody tr", { hasText: "Table au calme" }).waitFor();
+resultats.modifiee = (await a.locator(".resa-table tbody tr").first().innerText()).replace(/\s+/g, " ");
+verifier("réservation modifiée", /23:15/.test(resultats.modifiee) && /Zoé Roux/.test(resultats.modifiee), resultats.modifiee);
+await a.screenshot({ path: `${sortie}/rv14-a-venir.png`, fullPage: true });
+await a.getByRole("button", { name: "Modifier la réservation de Zoé Roux" }).click();
+await a.getByRole("button", { name: "Annuler la réservation" }).click();
+await a.locator(".modale").waitFor({ state: "detached" });
+await a.locator(".resa-table tbody tr.annule", { hasText: "Zoé Roux" }).waitFor();
+resultats.annulee = await a.locator(".resa-table tbody tr", { hasText: "Zoé Roux" }).locator("select[aria-label^='Statut']").inputValue();
+verifier("annulée depuis la fiche", resultats.annulee === "annulee", resultats.annulee);
+await a.getByLabel("Rechercher une réservation").fill("");
+
 // Administration sur iPhone : rien ne dépasse, sur les trois onglets.
 await a.setViewportSize({ width: 390, height: 844 });
 for (const onglet of [/^Réservations/, /Services et réglages/, /Sur votre site/]) {

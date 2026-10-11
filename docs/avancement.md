@@ -25,6 +25,7 @@ Dernière mise à jour : 10 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (avenir) | Réservations : vue « À venir » dans l'administration (toutes les réservations des prochaines semaines par jour, recherche par nom, téléphone, e-mail ou note) et fiche de réservation pour modifier date, heure, personnes, durée, coordonnées et note, annuler ou rétablir, avec l'historique |
 | 3de7420 | Réservations : clé API Resend propre à chaque établissement, saisie dans l'administration, chiffrée sur le serveur (clé maîtresse `CLE_SECRETS`), jamais réaffichée ; e-mails envoyés avec la clé de leur établissement |
 | 85faffc | Réservations : adresse d'expédition réglée par établissement dans l'administration et e-mail d'essai ; seule la clé Resend du groupe reste dans Vercel |
 | 62ae3bb | E-mails des réservations par Resend au lieu de Brevo (`RESEND_API_KEY`, `EMAIL_EXPEDITEUR`), le domaine moka-annecy.com y étant déjà vérifié |

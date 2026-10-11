@@ -1244,3 +1244,48 @@ code.cle-api {
   min-height: 44px;
   font-family: ui-monospace, Menlo, monospace;
 }
+
+.resa-filtres {
+  margin-top: 8px;
+}
+
+.resa-recherche {
+  flex: 1 1 280px;
+  margin-bottom: 0;
+}
+
+.resa-groupe::first-letter {
+  text-transform: uppercase;
+}
+
+.resa-actions {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.resa-historique {
+  margin-top: 10px;
+  color: var(--sable);
+}
+
+.resa-historique ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .resa-recherche {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .resa-recherche input {
+    min-width: 0;
+  }
+  .resa-jour .options {
+    flex: 1 1 100%;
+  }
+  .resa-actions {
+    width: auto;
+  }
+}
