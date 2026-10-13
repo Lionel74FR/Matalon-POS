@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 11 octobre 2026.
+Dernière mise à jour : 13 octobre 2026.
 
 ## Règle de conduite
 
@@ -100,8 +100,8 @@ Dernière mise à jour : 11 octobre 2026.
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.
 - [ ] Console Neon : fenêtre de restauration à 7 jours et sauvegarde quotidienne.
 - [ ] Faire un service hors ligne réel sur l'iPad.
-- [ ] Tester l'imprimante du Moka sur l'iPad (Réglages › Imprimante, puis ticket, addition et Z).
-- [ ] App native iPhone/iPad (coque Capacitor), objectif final Tap to Pay (SDK SumUp, autorisation Apple) : à lancer sur feu vert de Lionel, après le test de l'imprimante. Préalables : numéro D-U-N-S de PROIA CONSEIL obtenu le 8 octobre 2026 (286382469) ; compte développeur Apple existant (Team ID A3G34UGTY4) mais inscrit en personne physique au nom de Lionel : demande de passage en organisation PROIA CONSEIL envoyée au support Apple Developer le 8 octobre 2026 (indispensable pour demander Tap to Pay, réservé aux comptes organisation ; l'éditeur de l'app sera alors celui de l'attestation).
+- [x] Tester l'imprimante du Moka sur l'iPad : testée et fonctionnelle (Lionel, 13 octobre 2026).
+- [ ] App native iPhone/iPad (coque Capacitor), objectif final Tap to Pay (SDK SumUp, autorisation Apple) : à lancer sur feu vert de Lionel (test de l'imprimante fait le 13 octobre 2026). Préalables : numéro D-U-N-S de PROIA CONSEIL obtenu le 8 octobre 2026 (286382469) ; compte développeur Apple existant (Team ID A3G34UGTY4) mais inscrit en personne physique au nom de Lionel : demande de passage en organisation PROIA CONSEIL envoyée au support Apple Developer le 8 octobre 2026 (indispensable pour demander Tap to Pay, réservé aux comptes organisation ; l'éditeur de l'app sera alors celui de l'attestation).
 - [ ] Vérifier avec Audrex les mentions de facturation électronique.
 - [ ] Réservations : dans Vercel, projet de la caisse (Settings › Environment Variables), ajouter `CLE_SECRETS` (générée une fois : `openssl rand -base64 32`, à garder aussi dans un coffre : la perdre oblige à ressaisir les clés des établissements) et redéployer. Puis, pour le Moka : dans son compte Resend, créer une clé « Sending access » sur moka-annecy.com ; dans l'administration › Réservations › Services et réglages, « Ajouter la clé », l'adresse d'expédition (ex. reservations@moka-annecy.com), l'e-mail de l'établissement, « Envoyer un e-mail d'essai » ; régler les services, ouvrir la réservation en ligne, poser la balise sur le site. `RESEND_API_KEY` dans Vercel n'est plus nécessaire.
 - [ ] Stock : envoyer les premiers produits à importer, puis les fiches du Moka ; faire l'inventaire d'ouverture avant le premier service ; créer la clé de l'agent de factures (Stock et recettes › Factures) et la mettre dans sa configuration.
