@@ -108,4 +108,4 @@ Dernière mise à jour : 13 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 15 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 17 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
