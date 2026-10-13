@@ -1,4 +1,5 @@
 import { Banknote, Check, CreditCard, NotebookPen, Printer, Ticket as TicketPapier, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
+import type { Reservation } from "../../donnees/partage";
 import { AvecIcone } from "../icones";
 import { ErreurFiscale, type ClientCompte, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useState } from "react";
@@ -30,7 +31,15 @@ const encaisseVente = (t: Ticket) => t.totalTTC - t.paiements.filter((p) => p.mo
 const RENDU_A_CONFIRMER = 2000;
 
 /** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
-export function ModaleEncaissement(props: { commande: Commande; onTermine: () => void; onFermer: () => void }) {
+export function ModaleEncaissement(props: {
+  commande: Commande;
+  onTermine: () => void;
+  onFermer: () => void;
+  /** Ferme la table sur le serveur avant d'encaisser (deux appareils n'encaissent pas la même table). */
+  reserver?: (c: Commande) => Promise<Reservation>;
+  /** Encaissement impossible après la réservation : la table se rouvre. */
+  liberer?: (tableId: string) => void;
+}) {
   const { caisse, config, majConfig, utilisateur, notifier, imprimer, imprimanteConfiguree, blocage, demanderResponsable } = useCaisse();
   /** Client au compte duquel une partie est portée (une vente, un seul client). */
   const [client, setClient] = useState<ClientCompte | null>(null);
@@ -94,14 +103,25 @@ export function ModaleEncaissement(props: { commande: Commande; onTermine: () =>
     if (blocage) return notifier(blocage, "erreur");
     setEnCours(true);
     try {
-      const t = await caisse.registre.enregistrerVente({
-        lignes: lignesActives(props.commande).map(versSaisie),
-        paiements,
-        operateurId: utilisateur.id,
-        tableId: props.commande.tableId === ID_COMPTOIR ? null : props.commande.tableId,
-        couverts: props.commande.couverts,
-        ...(client && paiements.some((p) => p.mode === "EN_COMPTE") ? { client } : {}),
-      });
+      const reservation = props.reserver ? await props.reserver(props.commande) : ({ ok: true } as const);
+      if (!reservation.ok) {
+        notifier(reservation.raison, "erreur");
+        return props.onFermer();
+      }
+      let t: Ticket;
+      try {
+        t = await caisse.registre.enregistrerVente({
+          lignes: lignesActives(props.commande).map(versSaisie),
+          paiements,
+          operateurId: utilisateur.id,
+          tableId: props.commande.tableId === ID_COMPTOIR ? null : props.commande.tableId,
+          couverts: props.commande.couverts,
+          ...(client && paiements.some((p) => p.mode === "EN_COMPTE") ? { client } : {}),
+        });
+      } catch (e) {
+        props.liberer?.(props.commande.tableId);
+        throw e;
+      }
       setTicket(t);
       // Ce qui n'a pas été envoyé en production part maintenant (la commande se ferme : rien à marquer).
       const carte = carteDe(config);

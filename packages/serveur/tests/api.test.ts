@@ -411,6 +411,49 @@ describe("imprimantes de production", () => {
   });
 });
 
+describe("commandes en cours partagées", () => {
+  const commande = (tableId: string, articles: string[]) => ({
+    tableId,
+    couverts: 2,
+    ouverteLe: "2026-10-15T10:00:00Z",
+    ouvertePar: "u1",
+    lignes: articles.map((a) => ({ uid: a, articleId: a, libelle: a, details: [], quantite: 1, prixUnitaireTTC: 400, tauxTVA: 1000 })),
+    additionsImprimees: 0,
+  });
+
+  it("partage les tables ouvertes entre appareils, avec écriture conditionnelle", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    // Ouverte sur A, visible sur B.
+    const ouverte = await appel("PUT", "/api/caisse/commandes/t5", { commande: commande("t5", ["cafe"]), version: 0 }, a.bearer);
+    expect(ouverte.corps).toEqual({ ok: true, version: 1 });
+    const vue = await appel("GET", "/api/caisse/commandes", undefined, b.bearer);
+    expect(vue.corps.commandes).toEqual([expect.objectContaining({ tableId: "t5", version: 1, commande: commande("t5", ["cafe"]) })]);
+    // B ajoute depuis la version 1 ; A, resté sur la version 1, est refusé et reçoit la version 2 à fusionner.
+    expect((await appel("PUT", "/api/caisse/commandes/t5", { commande: commande("t5", ["cafe", "the"]), version: 1 }, b.bearer)).corps).toEqual({ ok: true, version: 2 });
+    const refus = await appel("PUT", "/api/caisse/commandes/t5", { commande: commande("t5", ["cafe", "jus"]), version: 1 }, a.bearer);
+    expect(refus.corps).toMatchObject({ ok: false, actuelle: { version: 2, commande: commande("t5", ["cafe", "the"]) } });
+    // Encaissée sur B : la table se ferme partout.
+    expect((await appel("PUT", "/api/caisse/commandes/t5", { commande: null, version: 2 }, b.bearer)).corps).toEqual({ ok: true, version: 3 });
+    expect((await appel("GET", "/api/caisse/commandes", undefined, a.bearer)).corps.commandes).toEqual([]);
+    // A, resté sur l'ancienne version, ne peut pas la rouvrir avec ses anciens articles…
+    const rouverture = await appel("PUT", "/api/caisse/commandes/t5", { commande: commande("t5", ["cafe", "the", "jus"]), version: 2 }, a.bearer);
+    expect(rouverture.corps).toMatchObject({ ok: false, actuelle: { version: 3, commande: null } });
+    // … mais une nouvelle commande (version 0) rouvre la table.
+    expect((await appel("PUT", "/api/caisse/commandes/t5", { commande: commande("t5", ["jus"]), version: 0 }, a.bearer)).corps).toEqual({ ok: true, version: 4 });
+    // Deux fermetures croisées : la seconde ne change rien.
+    expect((await appel("PUT", "/api/caisse/commandes/t5", { commande: null, version: 4 }, a.bearer)).corps.ok).toBe(true);
+    expect((await appel("PUT", "/api/caisse/commandes/t5", { commande: null, version: 4 }, b.bearer)).corps.ok).toBe(true);
+    // Mais pas pour encaisser : la table a déjà été encaissée sur l'autre appareil.
+    expect((await appel("PUT", "/api/caisse/commandes/t5", { commande: null, version: 4, stricte: true }, b.bearer)).corps).toMatchObject({ ok: false, actuelle: { commande: null } });
+    // Le comptoir reste propre à chaque appareil ; une commande doit porter sa table.
+    expect((await appel("PUT", "/api/caisse/commandes/comptoir", { commande: commande("comptoir", []), version: 0 }, a.bearer)).statut).toBe(400);
+    expect((await appel("PUT", "/api/caisse/commandes/t6", { commande: commande("t7", []), version: 0 }, a.bearer)).statut).toBe(400);
+    expect((await appel("GET", "/api/caisse/commandes")).statut).toBe(401);
+  });
+});
+
 describe("tickets partagés", () => {
   it("chaque appareil voit les derniers tickets de toutes les caisses de l'établissement", async () => {
     const cookie = await adminConnecte();

@@ -326,6 +326,18 @@ export const MIGRATIONS: string[] = [
     maj_par text,
     primary key (etablissement_id, nom)
   )`,
+  // Commandes en cours (tables), partagées entre les appareils d'un établissement. Données de
+  // travail hors périmètre fiscal : elles ne deviennent un ticket qu'à l'encaissement, sur un appareil.
+  // contenu null = table fermée ; version incrémentée à chaque écriture (écriture conditionnelle).
+  `create table if not exists commandes_ouvertes (
+    etablissement_id text not null references etablissements(id),
+    table_id text not null,
+    contenu jsonb,
+    version bigint not null default 1,
+    maj_le text not null,
+    maj_par text,
+    primary key (etablissement_id, table_id)
+  )`,
   // Clés d'accès (passkeys) des administrateurs : clé publique seule, liée au domaine (rp_id) qui l'a créée.
   `create table if not exists cles_acces_admin (
     id text primary key,

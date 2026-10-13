@@ -21,6 +21,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { ID_COMPTOIR, imprimanteDe } from "../donnees/configuration";
+import { PartageCommandes, type Reservation as ReservationTable } from "../donnees/partage";
 import {
   commandeAGarder,
   fusionnerCommandes,
@@ -128,9 +129,51 @@ export function Coque() {
     };
   }, [vue.nom, caisse, fondRemisPourZ]);
 
+  // Commandes en cours : gardées sur l'appareil et partagées avec les autres appareils de l'établissement.
+  const configRef = useRef(config);
+  configRef.current = config;
+  const notifierRef = useRef(notifier);
+  notifierRef.current = notifier;
+  const partage = useMemo(
+    () =>
+      new PartageCommandes(
+        {
+          lister: async () => (await caisse.client.commandesPartagees()).commandes,
+          ecrire: (tableId, c, version, stricte) => caisse.client.ecrireCommande(tableId, c, version, stricte),
+        },
+        {
+          commandes: () => caisse.db.getAll("commandes"),
+          suivis: () => caisse.db.getAll("partage"),
+          ecrireCommande: async (tableId, c) => {
+            if (c) await caisse.db.put("commandes", c);
+            else await caisse.db.delete("commandes", tableId);
+          },
+          ecrireSuivi: async (x) => {
+            if ("supprime" in x) await caisse.db.delete("partage", x.tableId);
+            else await caisse.db.put("partage", x);
+          },
+        },
+        (tableId) => nomTable(configRef.current, tableId),
+        (message) => notifierRef.current(message, "erreur"),
+        setCommandes,
+      ),
+    [caisse.client, caisse.db],
+  );
   useEffect(() => {
-    void caisse.db.getAll("commandes").then((liste) => setCommandes(new Map(liste.map((c) => [c.tableId, c]))));
-  }, [caisse.db]);
+    let actif = true;
+    void partage.charger().then(() => actif && partage.demarrer());
+    const auRetour = () => void partage.synchroniser();
+    window.addEventListener("online", auRetour);
+    document.addEventListener("visibilitychange", auRetour);
+    return () => {
+      actif = false;
+      partage.arreter();
+      window.removeEventListener("online", auRetour);
+      document.removeEventListener("visibilitychange", auRetour);
+    };
+  }, [partage]);
+  const reserverEncaissement = useCallback((c: Commande): Promise<ReservationTable> => partage.reserver(c.tableId, c), [partage]);
+  const libererEncaissement = useCallback((tableId: string) => void partage.liberer(tableId), [partage]);
 
   // Une heure d'iPad antérieure au dernier ticket signale une horloge déréglée.
   useEffect(() => {
@@ -140,17 +183,8 @@ export function Coque() {
   }, [caisse.stockage, maintenant]);
 
   const enregistrerCommande = useCallback(
-    async (c: Commande | null, tableId: string) => {
-      setCommandes((m) => {
-        const copie = new Map(m);
-        if (commandeAGarder(c)) copie.set(tableId, c);
-        else copie.delete(tableId);
-        return copie;
-      });
-      if (commandeAGarder(c)) await caisse.db.put("commandes", c);
-      else await caisse.db.delete("commandes", tableId);
-    },
-    [caisse.db],
+    (c: Commande | null, tableId: string) => partage.modifier(tableId, commandeAGarder(c) ? c : null),
+    [partage],
   );
 
   /** Mise à jour d'une commande d'après sa dernière version (après une impression qui a pris du temps). */
@@ -203,16 +237,8 @@ export function Coque() {
     if (!source || de === vers) return;
     const cible = commandes.get(vers);
     const resultat = cible ? fusionnerCommandes(cible, source) : transfererCommande(source, vers);
-    const tx = caisse.db.transaction("commandes", "readwrite");
-    await tx.store.put(resultat);
-    await tx.store.delete(de);
-    await tx.done;
-    setCommandes((m) => {
-      const copie = new Map(m);
-      copie.delete(de);
-      copie.set(vers, resultat);
-      return copie;
-    });
+    await partage.modifier(vers, resultat);
+    await partage.modifier(de, null);
     const t = totauxCommande(source);
     await caisse.registre.journaliser(
       "TRANSFERT_TABLE",
@@ -339,6 +365,8 @@ export function Coque() {
               setVue({ nom: "salle" });
             }}
             onRetour={() => setVue({ nom: "salle" })}
+            reserver={reserverEncaissement}
+            liberer={libererEncaissement}
           />
         )}
         {vue.nom === "tickets" && <Tickets />}

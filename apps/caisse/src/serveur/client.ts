@@ -1,7 +1,9 @@
 import type { Reservation } from "@matalon/reservations";
 import type { Ticket } from "@matalon/noyau-fiscal";
 import type {
+  CommandePartagee,
   DocumentStock,
+  ReponseEcritureCommande,
   EtatStock,
   ReponseStockCaisse,
   ClientApi as FicheClient,
@@ -181,6 +183,16 @@ export class ClientApi {
 
   enregistrerPlan(plan: { zones: ZonePlan[]; tables: Table[]; version: number }) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/plan", plan);
+  }
+
+  /** Commandes en cours des tables de l'établissement (tous appareils). */
+  commandesPartagees() {
+    return this.appel<{ commandes: CommandePartagee[] }>("GET", "/api/caisse/commandes");
+  }
+
+  /** Écriture conditionnelle d'une commande (null : table fermée), à partir de la version connue. */
+  ecrireCommande(tableId: string, commande: unknown | null, version: number, stricte = false) {
+    return this.appel<ReponseEcritureCommande>("PUT", `/api/caisse/commandes/${encodeURIComponent(tableId)}`, { commande, version, ...(stricte ? { stricte } : {}) });
   }
 
   /** Imprimante des tickets commune à l'établissement (null la retire). */

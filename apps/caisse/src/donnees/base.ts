@@ -3,6 +3,7 @@ import type { Cloture, Evenement, PaireCles, Ticket } from "@matalon/noyau-fisca
 import type { Derniers } from "@matalon/serveur/partage";
 import type { Commande } from "../metier/commande";
 import type { Configuration } from "./configuration";
+import type { SuiviPartage } from "./partage";
 
 export interface ClesStockees extends Omit<PaireCles, "clePrivee"> {
   /** Clé privée non exportable : IndexedDB la conserve sans jamais exposer son contenu. */
@@ -32,6 +33,8 @@ export interface SchemaCaisse extends DBSchema {
   config: { key: "configuration"; value: Configuration };
   cles: { key: "caisse"; value: ClesStockees };
   commandes: { key: string; value: Commande };
+  /** Suivi des commandes partagées avec les autres appareils (version du serveur, base des fusions). */
+  partage: { key: string; value: SuiviPartage };
   serveur: { key: "connexion"; value: ConnexionServeur };
 }
 
@@ -40,7 +43,7 @@ export type BaseCaisse = IDBPDatabase<SchemaCaisse>;
 export const NOM_BASE = "matalon-pos";
 
 export function ouvrirBase(nom = NOM_BASE): Promise<BaseCaisse> {
-  return openDB<SchemaCaisse>(nom, 2, {
+  return openDB<SchemaCaisse>(nom, 3, {
     upgrade(db, ancienne) {
       if (ancienne < 1) {
         db.createObjectStore("tickets", { keyPath: "numero" });
@@ -51,6 +54,7 @@ export function ouvrirBase(nom = NOM_BASE): Promise<BaseCaisse> {
         db.createObjectStore("commandes", { keyPath: "tableId" });
       }
       if (ancienne < 2) db.createObjectStore("serveur");
+      if (ancienne < 3) db.createObjectStore("partage", { keyPath: "tableId" });
     },
   });
 }

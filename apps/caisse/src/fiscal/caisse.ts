@@ -173,7 +173,7 @@ export async function enregistrerConfiguration(caisse: Caisse, config: Configura
  */
 export async function effacerCaisseDeTest(db: BaseCaisse): Promise<void> {
   if (!MODE_TEST) throw new Error("Seule une caisse de test peut être effacée.");
-  const magasins = ["tickets", "evenements", "clotures", "config", "cles", "commandes", "serveur"] as const;
+  const magasins = ["tickets", "evenements", "clotures", "config", "cles", "commandes", "partage", "serveur"] as const;
   const tx = db.transaction(magasins, "readwrite");
   for (const m of magasins) await tx.objectStore(m).clear();
   await tx.done;

@@ -55,7 +55,9 @@ import {
   type ElementDecor,
   type ZonePlan,
   type EntreeSynchro,
+  type CommandePartagee,
   type ImprimanteReseau,
+  type ReponseEcritureCommande,
   type PostesProduction,
   type ReponseComptes,
   type ReponseTickets,
@@ -303,6 +305,75 @@ async function historiqueImprimanteTickets(env: Environnement, etablissementId: 
     }
   }
   return [...vues.values()].slice(0, 5);
+}
+
+// ───────── Commandes en cours partagées ─────────
+
+const ID_TABLE_PARTAGEE = /^[A-Za-z0-9_-]{1,40}$/;
+const TAILLE_MAX_COMMANDE = 256 * 1024;
+
+interface LigneCommandeOuverte {
+  table_id: string;
+  contenu: unknown | null;
+  version: string | number;
+  maj_le: string;
+  maj_par_nom: string | null;
+}
+
+const versCommandePartagee = (l: LigneCommandeOuverte): CommandePartagee => ({
+  tableId: l.table_id,
+  version: Number(l.version),
+  commande: l.contenu ?? null,
+  majLe: l.maj_le,
+  majPar: l.maj_par_nom,
+});
+
+async function commandesOuvertes(env: Environnement, etablissementId: string): Promise<CommandePartagee[]> {
+  const lignes = await env.db.requete<LigneCommandeOuverte>(
+    `select o.table_id, o.contenu, o.version, o.maj_le, c.nom as maj_par_nom from commandes_ouvertes o
+     left join caisses c on c.id = o.maj_par where o.etablissement_id = $1 and o.contenu is not null order by o.table_id`,
+    [etablissementId],
+  );
+  return lignes.map(versCommandePartagee);
+}
+
+/**
+ * Écriture conditionnelle d'une commande : acceptée si l'appareil part de la version en cours, ou
+ * s'il ouvre une table fermée (version 0) ; sinon refusée avec la version actuelle, que l'appareil
+ * fusionne. Un appareil resté sur une ancienne version ne peut donc pas rouvrir une table encaissée
+ * ailleurs avec ses anciens articles.
+ * Une seule requête : pas de transaction nécessaire (Neon HTTP).
+ */
+async function ecrireCommande(env: Environnement, caisse: LigneCaisse, tableId: string, corps: Record<string, unknown>): Promise<ReponseEcritureCommande> {
+  if (!ID_TABLE_PARTAGEE.test(tableId) || tableId === "comptoir") throw new ErreurHttp(400, "CHAMP_INVALIDE", "Table invalide.");
+  const base = Number(corps.version ?? 0);
+  if (!Number.isSafeInteger(base) || base < 0) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Version invalide.");
+  const commande = corps.commande ?? null;
+  if (commande !== null) {
+    const c = commande as { tableId?: unknown; lignes?: unknown };
+    if (typeof commande !== "object" || Array.isArray(commande) || c.tableId !== tableId || !Array.isArray(c.lignes) || c.lignes.length > 500) {
+      throw new ErreurHttp(400, "CHAMP_INVALIDE", "Commande invalide.");
+    }
+    if (JSON.stringify(commande).length > TAILLE_MAX_COMMANDE) throw new ErreurHttp(413, "TROP_VOLUMINEUX", "Commande trop volumineuse.");
+  }
+  const [ecrite] = await env.db.requete<{ version: string | number }>(
+    `insert into commandes_ouvertes (etablissement_id, table_id, contenu, version, maj_le, maj_par)
+     values ($1, $2, $3::jsonb, 1, $5, $6)
+     on conflict (etablissement_id, table_id) do update
+       set contenu = excluded.contenu, version = commandes_ouvertes.version + 1, maj_le = excluded.maj_le, maj_par = excluded.maj_par
+       where commandes_ouvertes.version = $4::bigint or (commandes_ouvertes.contenu is null and $4::bigint = 0)
+     returning version`,
+    [caisse.etablissement_id, tableId, commande === null ? null : JSON.stringify(commande), base, horloge(env).toISOString(), caisse.id],
+  );
+  if (ecrite) return { ok: true, version: Number(ecrite.version) };
+  const [actuelle] = await env.db.requete<LigneCommandeOuverte>(
+    `select o.table_id, o.contenu, o.version, o.maj_le, c.nom as maj_par_nom from commandes_ouvertes o
+     left join caisses c on c.id = o.maj_par where o.etablissement_id = $1 and o.table_id = $2`,
+    [caisse.etablissement_id, tableId],
+  );
+  // Déjà fermée de part et d'autre : rien à faire. Sauf pour un encaissement (stricte) : la table l'a été ailleurs.
+  if (commande === null && corps.stricte !== true && actuelle && actuelle.contenu == null) return { ok: true, version: Number(actuelle.version) };
+  return { ok: false, actuelle: versCommandePartagee(actuelle!) };
 }
 
 interface LigneUtilisateur {
@@ -2436,6 +2507,15 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/plan" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
       return json(200, { etablissement: await majPlan(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
+    }
+    if (chemin === "/api/caisse/commandes" && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { commandes: await commandesOuvertes(env, c.etablissement_id), heure: horloge(env).toISOString() });
+    }
+    const pcmd = /^\/api\/caisse\/commandes\/([^/]+)$/.exec(chemin);
+    if (pcmd && m === "PUT") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, await ecrireCommande(env, c, decodeURIComponent(pcmd[1]!), await lireJson<Record<string, unknown>>(requete)));
     }
     if (chemin === "/api/caisse/imprimante" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);

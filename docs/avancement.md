@@ -25,6 +25,7 @@ Dernière mise à jour : 13 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Commandes en cours partagées entre les appareils (demande de Lionel du 13 octobre) : table ouverte sur un appareil visible sur les autres en quelques secondes, modifiable partout ; écriture conditionnelle par version et fusion ligne par ligne des modifications simultanées ; table fermée sur le serveur avant d'encaisser (pas de double encaissement) ; hors ligne, l'appareil continue ; comptoir propre à chaque appareil ; scénario `commandes-partagees` |
 | 0649e84 | Imprimante des tickets, garde-fous après une perte d'adresse : chaque changement journalisé avec l'adresse d'avant (depuis une caisse ou l'administration) ; administration › Imprimantes : confirmation avant de la retirer, formulaire à jour, « Adresses déjà utilisées » à reprendre d'un toucher ; chaque appareil garde la dernière imprimante utilisée et propose « Rétablir » |
 | 62d057d | Imprimante des tickets commune à l'établissement : réglée sur un appareil (Réglages, assistant) ou dans l'administration (Imprimantes), reçue par les autres appareils à la synchronisation ; « Cet iPad / iPhone seulement » pour une imprimante propre ; l'assistant d'un nouvel appareil part de l'adresse commune (reste le certificat) |
 | bfedb86 | Administration : connexion par clé d'accès (passkey, WebAuthn) à la place du mot de passe et du code ; création depuis l'icône clé de l'en-tête avec le code redemandé, liste et retrait ; invitation après connexion tant qu'aucune clé n'existe ; vérification WebAuthn sans dépendance (ES256, RS256) testée avec un authentificateur simulé et l'authentificateur virtuel de Chromium |
@@ -59,6 +60,7 @@ Dernière mise à jour : 13 octobre 2026.
 
 ## Décisions techniques à ne pas défaire
 
+- Commandes en cours partagées (13 octobre) : table `commandes_ouvertes` (contenu opaque, version), écriture conditionnelle en une requête ; l'appareil garde ses commandes (IndexedDB, magasin `partage` pour la version et la base de fusion) et fusionne (`metier/fusion.ts`). Fermeture « stricte » sur le serveur avant de sceller un ticket. Hors périmètre fiscal. Le comptoir n'est pas partagé.
 - Imprimante des tickets (13 octobre, demande de Lionel) : commune à l'établissement (`imprimante_tickets`), l'adresse propre à un appareil (`config.imprimante`) passe avant. Le certificat de l'imprimante reste à accepter sur chaque appareil (limite de Safari, levée par l'app native).
 - Clés d'accès de l'administration (11 octobre) : vérification maison dans `packages/serveur/src/webauthn.ts` (pas d'attestation demandée, vérification de l'utilisateur exigée, défi à usage unique stocké par empreinte). Une clé est liée au domaine qui l'a créée : en passant à un domaine définitif, il faudra recréer les clés.
 - Administration (demande de Lionel du 11 octobre) : l'établissement se choisit dans l'en-tête, chaque rubrique a sa page au menu latéral. Stock et Réservations reçoivent l'établissement de l'en-tête (plus de sélecteur interne). Ne pas revenir à une page unique.
@@ -111,4 +113,4 @@ Dernière mise à jour : 13 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 18 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 19 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

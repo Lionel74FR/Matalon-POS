@@ -323,6 +323,17 @@
     <p class="attendu"><b>Attendu :</b> après la vente, le stock théorique des ingrédients baisse ; l'inventaire remplace le théorique des produits comptés (le premier fait le stock d'ouverture) ; la réception augmente le stock et son prix devient le dernier prix ; la perte sort du stock avec sa valeur. Le food cost montre le théorique (fiches des ventes), le réel (pertes et écarts en plus) et les ventes sans fiche. Sur iPhone, l'écran tient en une colonne.</p>
   </section>
 
+  <section class="scenario" data-id="s6p">
+    <label><input type="checkbox">Tables partagées entre l'iPad et l'iPhone</label>
+    <ol>
+      <li>Sur l'iPad, ouvrez la table 5 et ajoutez un café. Revenez à la salle.</li>
+      <li>Sur l'iPhone, regardez la salle : la table 5 apparaît occupée en quelques secondes. Ouvrez-la et ajoutez un article.</li>
+      <li>Sur l'iPad, ouvrez la table 5 : l'article de l'iPhone y est. Encaissez-la.</li>
+      <li>Sur l'iPhone, essayez d'encaisser la même table.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la table et ses articles se suivent d'un appareil à l'autre ; après l'encaissement sur l'iPad, l'iPhone refuse (« déjà encaissée sur … ») et la table redevient libre partout. La vente comptoir reste propre à chaque appareil.</p>
+  </section>
+
   <section class="scenario" data-id="s6e">
     <label><input type="checkbox">Plan de salle et tables assemblées</label>
     <ol>

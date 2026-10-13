@@ -183,6 +183,19 @@ export interface ReponseRattachement {
   utilisateurs: UtilisateurApi[];
 }
 
+/** Commande en cours d'une table, partagée entre les appareils (contenu opaque pour le serveur). */
+export interface CommandePartagee {
+  tableId: string;
+  version: number;
+  /** null : table fermée (encaissée, libérée ou déplacée). */
+  commande: unknown | null;
+  majLe: string;
+  /** Appareil qui l'a écrite en dernier (nom donné dans l'administration). */
+  majPar: string | null;
+}
+
+export type ReponseEcritureCommande = { ok: true; version: number } | { ok: false; actuelle: CommandePartagee };
+
 export interface ReponseEtat {
   caisse: { id: string; nom: string };
   etablissement: EtablissementApi;

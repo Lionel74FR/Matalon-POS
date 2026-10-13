@@ -1,4 +1,5 @@
 import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, StickyNote, Users } from "lucide-react";
+import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
@@ -57,6 +58,9 @@ interface ProprietesCommande {
   onMaj: (f: (c: Commande) => Commande) => void;
   onTerminee: () => void;
   onRetour: () => void;
+  /** Réservation de la table sur le serveur avant d'encaisser (commandes partagées). */
+  reserver?: (c: Commande) => Promise<Reservation>;
+  liberer?: (tableId: string) => void;
 }
 
 /** La carte vient de l'établissement (référentiel serveur). */
@@ -398,7 +402,13 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         />
       )}
       {encaissement && (
-        <ModaleEncaissement commande={c} onTermine={props.onTerminee} onFermer={() => setEncaissement(false)} />
+        <ModaleEncaissement
+          commande={c}
+          onTermine={props.onTerminee}
+          onFermer={() => setEncaissement(false)}
+          reserver={props.reserver}
+          liberer={props.liberer}
+        />
       )}
     </div>
   );

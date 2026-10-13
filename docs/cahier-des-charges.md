@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 54, copiée le 13 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 55, copiée le 13 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -83,6 +83,7 @@ Choix techniques :
 - **Multi-établissements** : application générique « Matalon POS ». Chaque iPad est rattaché à un établissement par un code à usage unique (48 h) généré dans l'administration ; il reçoit alors l'établissement, l'équipe, les tables et la carte.
 - **Administration web** : l'établissement se choisit dans l'en-tête (avec ses alertes et ses caisses), puis un menu latéral ouvre ses rubriques : Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix (communes au groupe), Stock et recettes, Alertes, Identité et carte. Une page par rubrique au lieu d'une seule page longue ; sur iPhone, le menu devient une liste « Rubrique ». L'adresse garde l'établissement et la rubrique (lien ou rechargement), et le poste retrouve le dernier établissement ouvert. Ajouté le 11 octobre 2026.
 - **Synchronisation** : chaque enregistrement fiscal est répliqué vers le serveur dès que le réseau le permet (après écriture, toutes les minutes, au retour du réseau). Le serveur revérifie continuité, empreinte, signature et totaux ; toute divergence est signalée sans bloquer l'encaissement, l'iPad détenant l'original.
+- **Commandes en cours partagées** : une table ouverte sur un appareil apparaît sur les autres en quelques secondes (lecture du serveur toutes les 4 secondes) ; chacun peut y ajouter, modifier, envoyer, transférer ou encaisser. Écriture conditionnelle par version ; deux modifications simultanées sont fusionnées ligne par ligne, sans rien perdre de ce qui a été ajouté. À l'encaissement, la table est d'abord fermée sur le serveur : un autre appareil ne peut plus l'encaisser (refus « déjà encaissée sur … »). Hors ligne, l'appareil continue (y compris l'encaissement) et se remet à jour au retour du réseau. Le comptoir reste propre à chaque appareil. Hors périmètre fiscal : seuls les tickets, scellés sur l'appareil qui encaisse, comptent. Ajouté le 13 octobre 2026.
 
 Dépôt Git (GitHub), en monorepo :
 
