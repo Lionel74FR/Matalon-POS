@@ -44,6 +44,8 @@ export interface Configuration {
   postesProduction?: PostesProduction;
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */
   imprimanteEtablissement?: ImprimanteReseau | null;
+  /** Dernière imprimante utilisée par cet appareil : survit à un retrait, pour la rétablir d'un toucher. */
+  imprimanteConnue?: ImprimanteReseau;
   /** Appareils en service de l'établissement, au dernier contact avec le serveur (clôture hors ligne d'un appareil seul). */
   appareils?: Record<string, string>;
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`) et sa version. */
@@ -71,10 +73,17 @@ export function fusionnerReferentiel(
     seuilNoteAutomatique: etat.etablissement.seuilNote,
     ...(etat.etablissement.postesProduction ? { postesProduction: etat.etablissement.postesProduction } : {}),
     ...(etat.etablissement.imprimanteTickets !== undefined ? { imprimanteEtablissement: etat.etablissement.imprimanteTickets } : {}),
+    ...(etat.etablissement.imprimanteTickets?.adresse && !config.imprimante.adresse ? { imprimanteConnue: etat.etablissement.imprimanteTickets } : {}),
     ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
     ...(etat.appareils ? { appareils: etat.appareils } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
+}
+
+/** Retient l'imprimante en service, pour pouvoir la rétablir si elle est retirée. */
+export function retenirImprimante(config: Configuration): Configuration {
+  const i = imprimanteDe(config);
+  return i ? { ...config, imprimanteConnue: { adresse: i.adresse, sansAccents: i.sansAccents } } : config;
 }
 
 /** Imprimante des tickets utilisée par cet appareil : la sienne, sinon celle de l'établissement. */

@@ -8,6 +8,8 @@ import { useEffect, useState } from "react";
 import {
   carteDe,
   hacherPin,
+  imprimanteDe,
+  retenirImprimante,
   identifiantAleatoire,
   type Configuration,
   type Etablissement,
@@ -83,7 +85,7 @@ export function Reglages(props: { onAssistant: () => void }) {
         suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote };
         setEtablissement(e.identite);
       }
-      await majConfig(suivante);
+      await majConfig(retenirImprimante(suivante));
       notifier(
         partageModifie || imprimanteCommuneModifiee ? "Réglages enregistrés et partagés avec les autres caisses." : `Réglages de cet ${NOM_APPAREIL} enregistrés.`,
       );
@@ -194,6 +196,14 @@ export function Reglages(props: { onAssistant: () => void }) {
                 ? `Commune à tous les appareils de l'établissement${commune ? ` (actuellement ${commune.adresse})` : ""} ; la modifier demande une connexion Internet. Chaque appareil accepte une fois le certificat de l'imprimante (assistant, étape « Autoriser »).`
                 : `Cet ${NOM_APPAREIL} imprime sur sa propre imprimante${commune ? ` au lieu de celle de l'établissement (${commune.adresse})` : ""}.`}
             </p>
+            {!imprimanteDe(config) && config.imprimanteConnue && imprimante.adresse.trim() !== config.imprimanteConnue.adresse && (
+              <div className="imprimante-connue">
+                <span>Dernière imprimante utilisée sur cet {NOM_APPAREIL} : {config.imprimanteConnue.adresse}</span>
+                <button className="bouton" onClick={() => setImprimante(config.imprimanteConnue!)}>
+                  <AvecIcone icone={RefreshCw}>Rétablir</AvecIcone>
+                </button>
+              </div>
+            )}
             <button className="bouton principal" onClick={props.onAssistant}>
               <AvecIcone icone={Printer}>Assistant de connexion</AvecIcone>
             </button>

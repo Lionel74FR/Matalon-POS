@@ -43,6 +43,13 @@ export interface RapportVerification {
   compteurs: Record<string, number>;
 }
 
+/** Adresse d'imprimante déjà utilisée par l'établissement (journal des changements). */
+export interface AdresseImprimante {
+  adresse: string;
+  sansAccents: boolean;
+  le: string;
+}
+
 export interface CleAccesAdmin {
   id: string;
   nom: string;
@@ -114,7 +121,9 @@ export const api = {
   enregistrerPlan: (etablissementId: string, plan: { zones: ZonePlan[]; tables: Table[]; version: number }) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/plan`, plan),
   enregistrerImprimanteTickets: (etablissementId: string, imprimante: { adresse: string; sansAccents: boolean } | null) =>
-    appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/imprimante`, { imprimante }),
+    appel<{ etablissement: EtablissementApi; historique: AdresseImprimante[] }>("PUT", `/etablissements/${etablissementId}/imprimante`, { imprimante }),
+  historiqueImprimanteTickets: (etablissementId: string) =>
+    appel<{ historique: AdresseImprimante[] }>("GET", `/etablissements/${etablissementId}/imprimante/historique`),
   enregistrerPostes: (etablissementId: string, postes: PostesProduction) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/postes`, { postes }),
   comptes: (etablissementId: string) => appel<ReponseComptes>("GET", `/etablissements/${etablissementId}/comptes`),

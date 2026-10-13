@@ -402,6 +402,12 @@ describe("imprimantes de production", () => {
     expect((await appel("PUT", "/api/caisse/imprimante", { imprimante: { adresse: "http://evil" } }, a.bearer)).statut).toBe(400);
     const retrait = await appel("PUT", "/api/caisse/imprimante", { imprimante: { adresse: "" } }, a.bearer);
     expect(retrait.corps.etablissement.imprimanteTickets).toBeNull();
+    // Retirée par erreur : l'historique garde les adresses déjà utilisées, la plus récente d'abord.
+    const historique = await appel("GET", "/api/admin/etablissements/moka/imprimante/historique", undefined, { Cookie: cookie });
+    expect(historique.corps.historique.map((h: { adresse: string }) => h.adresse)).toEqual(["192.168.1.70", "192.168.1.50"]);
+    const journal = await db.requete<{ admin_id: string | null; details: any }>("select admin_id, details from journal_admin where action = 'imprimante_tickets' order by id");
+    expect(journal.length).toBe(3);
+    expect(journal[2]).toMatchObject({ admin_id: null, details: { caisse: expect.any(String), avant: { adresse: "192.168.1.70" }, apres: null } });
   });
 });
 

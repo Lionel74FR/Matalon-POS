@@ -8,7 +8,7 @@ import { EditeurPostes } from "../ui/EditeurPostes";
 import { EditeurPlan } from "../ui/EditeurPlan";
 import { nouvelIdClient } from "../donnees/clients";
 import type { AlerteApi } from "@matalon/serveur/partage";
-import { api, ErreurAdmin, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
+import { api, ErreurAdmin, type AdresseImprimante, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { Reservations } from "./Reservations";
@@ -1057,19 +1057,34 @@ function ImprimanteTickets(props: { e: EtablissementAdmin; onChange: () => Promi
   const actuelle = props.e.imprimanteTickets ?? null;
   const [adresse, setAdresse] = useState(actuelle?.adresse ?? "");
   const [sansAccents, setSansAccents] = useState(actuelle?.sansAccents ?? false);
+  const [historique, setHistorique] = useState<AdresseImprimante[]>([]);
   const [fait, setFait] = useState("");
   const { enCours, erreur, setErreur, envoyer } = useEnvoi();
+  // Réglée entre-temps depuis une caisse : le formulaire suit, pour ne jamais renvoyer une valeur périmée.
+  useEffect(() => {
+    setAdresse(actuelle?.adresse ?? "");
+    setSansAccents(actuelle?.sansAccents ?? false);
+  }, [actuelle?.adresse, actuelle?.sansAccents]);
+  useEffect(() => {
+    api
+      .historiqueImprimanteTickets(props.e.id)
+      .then((r) => setHistorique(r.historique))
+      .catch(() => setHistorique([]));
+  }, [props.e.id, actuelle?.adresse]);
   const enregistrer = (ev: FormEvent) => {
     ev.preventDefault();
     setFait("");
     const a = adresse.trim();
     if (a && !/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) return setErreur("Adresse IP attendue, par exemple 192.168.1.50.");
+    if (!a && actuelle && !window.confirm(`Retirer l'imprimante ${actuelle.adresse} ? Les appareils sans imprimante à eux n'imprimeront plus.`)) return;
     void envoyer(async () => {
-      await api.enregistrerImprimanteTickets(props.e.id, a ? { adresse: a, sansAccents } : null);
+      const r = await api.enregistrerImprimanteTickets(props.e.id, a ? { adresse: a, sansAccents } : null);
+      setHistorique(r.historique);
       await props.onChange();
       setFait(a ? "Enregistrée : les appareils la reçoivent à leur prochaine synchronisation." : "Retirée.");
     });
   };
+  const anciennes = historique.filter((h) => h.adresse !== actuelle?.adresse);
   return (
     <form className="admin-section" onSubmit={enregistrer}>
       <Titre icone={Printer}>Imprimante des tickets</Titre>
@@ -1084,6 +1099,25 @@ function ImprimanteTickets(props: { e: EtablissementAdmin; onChange: () => Promi
       <label className="case">
         <input type="checkbox" checked={sansAccents} onChange={(ev) => setSansAccents(ev.target.checked)} /> Imprimer sans accents
       </label>
+      {anciennes.length > 0 && (
+        <div className="imprimante-historique">
+          <span>Adresses déjà utilisées :</span>
+          {anciennes.map((h) => (
+            <button
+              key={h.adresse}
+              type="button"
+              className="bouton"
+              title={`Dernière utilisation le ${dateHeure(h.le)}`}
+              onClick={() => {
+                setAdresse(h.adresse);
+                setSansAccents(h.sansAccents);
+              }}
+            >
+              <AvecIcone icone={RotateCw}>{h.adresse}</AvecIcone>
+            </button>
+          ))}
+        </div>
+      )}
       {erreur && <p className="erreur">{erreur}</p>}
       {fait && <p className="succes">{fait}</p>}
       <div className="options">

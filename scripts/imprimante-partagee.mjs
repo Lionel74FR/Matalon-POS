@@ -1,6 +1,7 @@
 // Imprimante des tickets commune à l'établissement : réglée sur l'iPad, l'iPhone la reçoit à la
 // synchronisation et imprime dessus sans rien saisir ; un appareil peut garder la sienne ; l'adminis-
-// tration la règle aussi. Les imprimantes sont simulées (requêtes ePOS-Print interceptées).
+// tration la règle aussi. Retirée par erreur, elle se retrouve dans l'historique et se rétablit
+// d'un toucher depuis un appareil. Les imprimantes sont simulées (requêtes ePOS-Print interceptées).
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/imprimante-partagee.mjs [dossier-captures]
 import { chromium } from "playwright";
@@ -93,6 +94,21 @@ await ipad.p.waitForTimeout(800);
 // ── Administration : la même imprimante commune ──
 const etab = (await appel("GET", "/etablissements")).etablissements.find((e) => e.id === "moka");
 resultats.serveur = etab.imprimanteTickets;
+
+// ── Retirée par erreur : l'administration garde l'historique, l'iPad propose de la rétablir ──
+await appel("PUT", "/etablissements/moka/imprimante", { imprimante: null });
+resultats.historique = (await appel("GET", "/etablissements/moka/imprimante/historique")).historique.map((h) => h.adresse);
+await ipad.p.getByRole("tab", { name: "Salle" }).click();
+await ipad.p.locator(".puce-synchro").click();
+await ipad.p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
+await ipad.p.waitForTimeout(500);
+await ipad.reglages();
+await ipad.p.locator(".imprimante-connue", { hasText: COMMUNE }).waitFor();
+await ipad.p.screenshot({ path: `${sortie}/i03-ipad-retablir.png` });
+await ipad.p.getByRole("button", { name: "Rétablir" }).click();
+await ipad.clic("Enregistrer les réglages");
+await ipad.p.getByText("partagés avec les autres caisses").waitFor();
+resultats.retablie = (await appel("GET", "/etablissements")).etablissements.find((e) => e.id === "moka").imprimanteTickets;
 await b.close();
 
 resultats.recus = recus.map((r) => `${r.appareil}→${r.imprimante}`);
@@ -105,6 +121,8 @@ const ok =
   /actuellement 10\.0\.0\.30/.test(resultats.aideIphone) &&
   !resultats.debordementIphone &&
   resultats.serveur?.adresse === COMMUNE &&
+  resultats.historique?.[0] === COMMUNE &&
+  resultats.retablie?.adresse === COMMUNE &&
   JSON.stringify(resultats.recus) === JSON.stringify(["iphone→10.0.0.30", "iphone→10.0.0.31", "ipad→10.0.0.30"]) &&
   !erreurs.length;
 if (!ok) process.exit(1);

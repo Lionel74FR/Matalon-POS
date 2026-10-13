@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fusionnerReferentiel, imprimanteDe, type Configuration } from "../src/donnees/configuration";
+import { fusionnerReferentiel, imprimanteDe, retenirImprimante, type Configuration } from "../src/donnees/configuration";
 
 const base = {
   etablissementId: "moka",
@@ -31,5 +31,16 @@ describe("imprimante des tickets", () => {
     expect(imprimanteDe(fusionnerReferentiel(recue, etat(null))!)).toBeNull();
     // Serveur d'avant ce réglage (champ absent) : on garde ce qu'on avait.
     expect(fusionnerReferentiel(recue, etat(undefined))).toBeNull();
+  });
+
+  it("garde la dernière imprimante connue après un retrait, pour la rétablir", () => {
+    const recue = fusionnerReferentiel(base, etat({ adresse: "192.168.1.50", sansAccents: false }))!;
+    expect(recue.imprimanteConnue).toEqual({ adresse: "192.168.1.50", sansAccents: false });
+    const retiree = fusionnerReferentiel(recue, etat(null))!;
+    expect(imprimanteDe(retiree)).toBeNull();
+    expect(retiree.imprimanteConnue).toEqual({ adresse: "192.168.1.50", sansAccents: false });
+    // Une imprimante propre à l'appareil est retenue à l'enregistrement, pas remplacée par celle de l'établissement.
+    const propre = retenirImprimante({ ...retiree, imprimante: { adresse: "192.168.1.80", sansAccents: true } });
+    expect(fusionnerReferentiel(propre, etat({ adresse: "192.168.1.50", sansAccents: false }))!.imprimanteConnue).toEqual({ adresse: "192.168.1.80", sansAccents: true });
   });
 });

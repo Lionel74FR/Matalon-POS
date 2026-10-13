@@ -1465,3 +1465,13 @@ code.cle-api {
     width: auto;
   }
 }
+
+/* Imprimante des tickets : adresses déjà utilisées, à reprendre d'un toucher. */
+.imprimante-historique {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  color: var(--sable);
+}

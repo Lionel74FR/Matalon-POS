@@ -370,13 +370,13 @@ export function Coque() {
                 if (!commune || commune.adresse === imprimante.adresse) {
                   try {
                     const { etablissement: e } = await caisse.client.enregistrerImprimante(imprimante);
-                    await majConfig({ ...config, imprimante: { adresse: "", sansAccents: false }, imprimanteEtablissement: e.imprimanteTickets ?? null });
+                    await majConfig({ ...config, imprimante: { adresse: "", sansAccents: false }, imprimanteEtablissement: e.imprimanteTickets ?? null, imprimanteConnue: imprimante });
                     return notifier("Imprimante connectée, pour tous les appareils de l'établissement.");
                   } catch {
                     /* hors ligne : gardée sur cet appareil */
                   }
                 }
-                await majConfig({ ...config, imprimante });
+                await majConfig({ ...config, imprimante, imprimanteConnue: imprimante });
                 notifier("Imprimante connectée sur cet appareil.");
               })();
             }}

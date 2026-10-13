@@ -256,17 +256,53 @@ async function majPostes(env: Environnement, etablissementId: string, corps: Rec
 }
 
 /** Imprimante des tickets de l'établissement ; une adresse vide la retire. */
-async function majImprimanteTickets(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
+/**
+ * Imprimante des tickets de l'établissement ; une adresse vide la retire. Chaque changement est
+ * journalisé avec l'adresse d'avant, pour pouvoir la retrouver (historique de l'administration).
+ */
+async function majImprimanteTickets(
+  env: Environnement,
+  etablissementId: string,
+  corps: Record<string, unknown>,
+  auteur: { adminId: string | null; caisseId?: string },
+): Promise<EtablissementApi> {
   const v = corps.imprimante as { adresse?: unknown; sansAccents?: unknown } | null | undefined;
   const adresse = typeof v?.adresse === "string" ? v.adresse.trim() : "";
   if (!/^[a-z0-9.:-]{0,100}$/i.test(adresse)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Adresse d'imprimante invalide.");
   const imprimante: ImprimanteReseau | null = adresse ? { adresse, sansAccents: v?.sansAccents === true } : null;
-  const [maj] = await env.db.requete<{ id: string }>(
-    "update etablissements set imprimante_tickets = $2::jsonb, maj_le = $3 where id = $1 returning id",
-    [etablissementId, imprimante ? JSON.stringify(imprimante) : null, horloge(env).toISOString()],
-  );
-  if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  const [avant] = await env.db.requete<{ imprimante_tickets: ImprimanteReseau | null }>("select imprimante_tickets from etablissements where id = $1", [
+    etablissementId,
+  ]);
+  if (!avant) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  await env.db.requete("update etablissements set imprimante_tickets = $2::jsonb, maj_le = $3 where id = $1", [
+    etablissementId,
+    imprimante ? JSON.stringify(imprimante) : null,
+    horloge(env).toISOString(),
+  ]);
+  if (JSON.stringify(avant.imprimante_tickets ?? null) !== JSON.stringify(imprimante)) {
+    await journaliserAdmin(env, auteur.adminId, "imprimante_tickets", {
+      etablissement: etablissementId,
+      ...(auteur.caisseId ? { caisse: auteur.caisseId } : {}),
+      avant: avant.imprimante_tickets ?? null,
+      apres: imprimante,
+    });
+  }
   return etablissement(env.db, etablissementId);
+}
+
+/** Adresses d'imprimante des tickets déjà utilisées par l'établissement, la plus récente d'abord. */
+async function historiqueImprimanteTickets(env: Environnement, etablissementId: string) {
+  const lignes = await env.db.requete<{ horodatage: string; details: { etablissement?: string; avant?: ImprimanteReseau | null; apres?: ImprimanteReseau | null } }>(
+    "select horodatage, details from journal_admin where action = 'imprimante_tickets' and details->>'etablissement' = $1 order by id desc limit 50",
+    [etablissementId],
+  );
+  const vues = new Map<string, { adresse: string; sansAccents: boolean; le: string }>();
+  for (const l of lignes) {
+    for (const i of [l.details.apres, l.details.avant]) {
+      if (i?.adresse && !vues.has(i.adresse)) vues.set(i.adresse, { adresse: i.adresse, sansAccents: i.sansAccents === true, le: l.horodatage });
+    }
+  }
+  return [...vues.values()].slice(0, 5);
 }
 
 interface LigneUtilisateur {
@@ -2403,7 +2439,9 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     }
     if (chemin === "/api/caisse/imprimante" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
-      return json(200, { etablissement: await majImprimanteTickets(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
+      return json(200, {
+        etablissement: await majImprimanteTickets(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete), { adminId: null, caisseId: c.id }),
+      });
     }
     if (chemin === "/api/caisse/postes" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
@@ -2470,10 +2508,11 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/imprimante$/.exec(chemin);
       if (p && m === "PUT") {
-        const e = await majImprimanteTickets(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
-        await journaliserAdmin(env, admin.id, "imprimante_tickets", { etablissement: e.id, imprimante: e.imprimanteTickets ?? null });
-        return json(200, { etablissement: e });
+        const e = await majImprimanteTickets(env, p[1]!, await lireJson<Record<string, unknown>>(requete), { adminId: admin.id });
+        return json(200, { etablissement: e, historique: await historiqueImprimanteTickets(env, e.id) });
       }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/imprimante\/historique$/.exec(chemin);
+      if (p && m === "GET") return json(200, { historique: await historiqueImprimanteTickets(env, p[1]!) });
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/clients$/.exec(chemin);
       if (p && m === "PUT") {
         const e = await etablissement(env.db, p[1]!);
