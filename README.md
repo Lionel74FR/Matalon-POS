@@ -76,6 +76,7 @@ URL=… node scripts/tickets.mjs captures            # écran Tickets : recherch
 URL=… node scripts/reservations.mjs captures      # réservations : services réglés dans l'administration, balise sur un site, réservation sur iPhone, e-mails, annulation par lien, table réservée sur le plan de l'iPad, installation
 URL=… node scripts/admin-navigation.mjs captures  # administration : établissement dans l'en-tête, rubriques au menu latéral (liste sur iPhone), aucune rubrique ne déborde sur iPad paysage, portrait et iPhone, adresse et dernier établissement retenus
 URL=… node scripts/cles-acces.mjs captures       # clés d'accès (authentificateur virtuel de Chromium) : invitation, création avec le code, connexion sans mot de passe ni code, retrait, iPhone
+URL=… node scripts/imprimante-partagee.mjs captures # imprimante des tickets commune : réglée sur l'iPad, reçue et utilisée par l'iPhone, imprimante propre à un appareil
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

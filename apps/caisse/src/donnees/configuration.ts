@@ -1,6 +1,6 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
 import { CARTES, type Catalogue } from "@matalon/catalogue";
-import type { ClientApi, IdentiteEtablissement, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type { ClientApi, IdentiteEtablissement, ImprimanteReseau, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export type { Role, Table };
 export type Utilisateur = UtilisateurApi;
@@ -9,7 +9,8 @@ export type Etablissement = IdentiteEtablissement;
 /**
  * Configuration locale de la caisse. L'établissement, l'équipe, les tables, le
  * seuil et la carte viennent du serveur (référentiel du groupe) et sont gardés
- * ici pour fonctionner hors ligne. Seule l'imprimante est propre à l'iPad.
+ * ici pour fonctionner hors ligne. L'imprimante des tickets est celle de l'établissement,
+ * sauf si cet appareil en a une à lui.
  */
 export interface Configuration {
   etablissementId: string;
@@ -25,6 +26,7 @@ export interface Configuration {
   /** Carte reçue du serveur (éditée dans l'administration) et sa version. */
   carte?: Catalogue;
   carteVersion?: number;
+  /** Imprimante propre à cet appareil ; adresse vide = celle de l'établissement (`imprimanteEtablissement`). */
   imprimante: {
     /** Adresse IP de l'imprimante Epson (ePOS-Print), ex. 192.168.1.50. */
     adresse: string;
@@ -40,6 +42,8 @@ export interface Configuration {
   clients?: ClientApi[];
   /** Imprimantes de production de l'établissement : poste de la carte → imprimante. */
   postesProduction?: PostesProduction;
+  /** Imprimante des tickets commune à l'établissement (reçue du serveur). */
+  imprimanteEtablissement?: ImprimanteReseau | null;
   /** Appareils en service de l'établissement, au dernier contact avec le serveur (clôture hors ligne d'un appareil seul). */
   appareils?: Record<string, string>;
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`) et sa version. */
@@ -66,10 +70,18 @@ export function fusionnerReferentiel(
     // La carte (et son identifiant) ne change qu'une fois la nouvelle carte téléchargée.
     seuilNoteAutomatique: etat.etablissement.seuilNote,
     ...(etat.etablissement.postesProduction ? { postesProduction: etat.etablissement.postesProduction } : {}),
+    ...(etat.etablissement.imprimanteTickets !== undefined ? { imprimanteEtablissement: etat.etablissement.imprimanteTickets } : {}),
     ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
     ...(etat.appareils ? { appareils: etat.appareils } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
+}
+
+/** Imprimante des tickets utilisée par cet appareil : la sienne, sinon celle de l'établissement. */
+export function imprimanteDe(config: Configuration): (ImprimanteReseau & { source: "appareil" | "etablissement" }) | null {
+  if (config.imprimante.adresse.trim()) return { ...config.imprimante, source: "appareil" };
+  if (config.imprimanteEtablissement?.adresse) return { ...config.imprimanteEtablissement, source: "etablissement" };
+  return null;
 }
 
 /**

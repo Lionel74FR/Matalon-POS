@@ -383,6 +383,26 @@ describe("imprimantes de production", () => {
     expect((await appel("PUT", "/api/caisse/postes", { postes: { "Bar\n": { adresse: "x" } } }, a.bearer)).statut).toBe(400);
     expect((await appel("PUT", "/api/caisse/postes", { postes: { Bar: { adresse: "http://evil" } } }, a.bearer)).statut).toBe(400);
   });
+
+  it("partage l'imprimante des tickets entre les appareils de l'établissement", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    expect(((await appel("GET", "/api/caisse/etat", undefined, b.bearer)).corps as ReponseEtat).etablissement.imprimanteTickets).toBeNull();
+    // Réglée sur un appareil, elle arrive sur l'autre à la synchronisation.
+    const r = await appel("PUT", "/api/caisse/imprimante", { imprimante: { adresse: " 192.168.1.50 ", sansAccents: true } }, a.bearer);
+    expect(r.corps.etablissement.imprimanteTickets).toEqual({ adresse: "192.168.1.50", sansAccents: true });
+    expect(((await appel("GET", "/api/caisse/etat", undefined, b.bearer)).corps as ReponseEtat).etablissement.imprimanteTickets).toEqual({
+      adresse: "192.168.1.50",
+      sansAccents: true,
+    });
+    // Depuis l'administration aussi ; une adresse vide la retire.
+    const admin = await appel("PUT", "/api/admin/etablissements/moka/imprimante", { imprimante: { adresse: "192.168.1.70", sansAccents: false } }, { Cookie: cookie });
+    expect(admin.corps.etablissement.imprimanteTickets).toEqual({ adresse: "192.168.1.70", sansAccents: false });
+    expect((await appel("PUT", "/api/caisse/imprimante", { imprimante: { adresse: "http://evil" } }, a.bearer)).statut).toBe(400);
+    const retrait = await appel("PUT", "/api/caisse/imprimante", { imprimante: { adresse: "" } }, a.bearer);
+    expect(retrait.corps.etablissement.imprimanteTickets).toBeNull();
+  });
 });
 
 describe("tickets partagés", () => {

@@ -310,7 +310,7 @@ const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: s
       { id: "appareils", libelle: "Appareils", icone: TabletSmartphone, aide: "iPad et iPhone rattachés, clôtures" },
       { id: "equipe", libelle: "Équipe", icone: Users, aide: "Personnes, rôles, codes PIN" },
       { id: "plan", libelle: "Plan de salle", icone: LayoutGrid, aide: "Zones, tables, chaises" },
-      { id: "imprimantes", libelle: "Imprimantes", icone: Printer, aide: "Postes bar et cuisine" },
+      { id: "imprimantes", libelle: "Imprimantes", icone: Printer, aide: "Tickets, bar et cuisine" },
       { id: "reservations", libelle: "Réservations", icone: CalendarCheck, aide: "À venir, services, module du site" },
       { id: "comptes", libelle: "Comptes clients", icone: NotebookPen, aide: "Ventes en compte, règlements" },
     ],
@@ -609,7 +609,12 @@ function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; 
       )}
       {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
       {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
-      {rubrique === "imprimantes" && <ImprimantesProduction e={e} onChange={props.onChange} />}
+      {rubrique === "imprimantes" && (
+        <>
+          <ImprimanteTickets e={e} onChange={props.onChange} />
+          <ImprimantesProduction e={e} onChange={props.onChange} />
+        </>
+      )}
       {rubrique === "reservations" && <Reservations etablissements={[e]} />}
       {rubrique === "comptes" && <ComptesClients etablissementId={e.id} />}
       {rubrique === "stock" && <Stock etablissementId={e.id} />}
@@ -1047,6 +1052,49 @@ function PlanDeSalle(props: { e: EtablissementAdmin; onChange: () => Promise<voi
 }
 
 /** Postes de production de la carte de l'établissement → imprimantes de son réseau. */
+/** Imprimante des tickets commune aux appareils de l'établissement (un appareil peut en garder une à lui). */
+function ImprimanteTickets(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
+  const actuelle = props.e.imprimanteTickets ?? null;
+  const [adresse, setAdresse] = useState(actuelle?.adresse ?? "");
+  const [sansAccents, setSansAccents] = useState(actuelle?.sansAccents ?? false);
+  const [fait, setFait] = useState("");
+  const { enCours, erreur, setErreur, envoyer } = useEnvoi();
+  const enregistrer = (ev: FormEvent) => {
+    ev.preventDefault();
+    setFait("");
+    const a = adresse.trim();
+    if (a && !/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) return setErreur("Adresse IP attendue, par exemple 192.168.1.50.");
+    void envoyer(async () => {
+      await api.enregistrerImprimanteTickets(props.e.id, a ? { adresse: a, sansAccents } : null);
+      await props.onChange();
+      setFait(a ? "Enregistrée : les appareils la reçoivent à leur prochaine synchronisation." : "Retirée.");
+    });
+  };
+  return (
+    <form className="admin-section" onSubmit={enregistrer}>
+      <Titre icone={Printer}>Imprimante des tickets</Titre>
+      <p className="explication">
+        Notes, factures, Z et reçus. Commune à tous les iPad et iPhone de l'établissement, sauf ceux à qui on a donné leur propre
+        imprimante dans leurs Réglages. Sur chaque appareil, l'assistant de connexion fait accepter une fois le certificat de
+        l'imprimante (étape « Autoriser »).
+      </p>
+      <Champ libelle="Adresse IP" aide="Page d'état de l'imprimante (bouton Feed au démarrage)">
+        <input value={adresse} onChange={(ev) => setAdresse(ev.target.value)} placeholder="192.168.1.50" inputMode="decimal" />
+      </Champ>
+      <label className="case">
+        <input type="checkbox" checked={sansAccents} onChange={(ev) => setSansAccents(ev.target.checked)} /> Imprimer sans accents
+      </label>
+      {erreur && <p className="erreur">{erreur}</p>}
+      {fait && <p className="succes">{fait}</p>}
+      <div className="options">
+        <button className="bouton principal" disabled={enCours}>
+          <AvecIcone icone={Save}>Enregistrer</AvecIcone>
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
   const [postesCarte, setPostesCarte] = useState<string[] | null>(null);
   const { erreur, envoyer } = useEnvoi();

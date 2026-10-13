@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AvecIcone, BoutonIcone } from "./icones";
-import { ID_COMPTOIR } from "../donnees/configuration";
+import { ID_COMPTOIR, imprimanteDe } from "../donnees/configuration";
 import {
   commandeAGarder,
   fusionnerCommandes,
@@ -312,7 +312,7 @@ export function Coque() {
           ticket. Réglez la date et l'heure dans les réglages de l'iPad ou de l'iPhone avant d'encaisser.
         </div>
       )}
-      {!config.imprimante.adresse && utilisateur.role === "responsable" && (
+      {!imprimanteDe(config) && utilisateur.role === "responsable" && (
         <div className="bandeau-info">
           <span className="bandeau-texte">
             Caisse sans imprimante : les notes passent par QR code, les Z restent consultables dans Clôtures.
@@ -363,8 +363,22 @@ export function Coque() {
           <AssistantImprimante
             config={config}
             onTerminer={(imprimante) => {
-              void majConfig({ ...config, imprimante }).then(() => notifier("Imprimante connectée."));
               setAssistant(false);
+              void (async () => {
+                // L'imprimante devient celle de l'établissement, sauf s'il en a déjà une autre (celle-ci reste alors propre à l'appareil).
+                const commune = config.imprimanteEtablissement;
+                if (!commune || commune.adresse === imprimante.adresse) {
+                  try {
+                    const { etablissement: e } = await caisse.client.enregistrerImprimante(imprimante);
+                    await majConfig({ ...config, imprimante: { adresse: "", sansAccents: false }, imprimanteEtablissement: e.imprimanteTickets ?? null });
+                    return notifier("Imprimante connectée, pour tous les appareils de l'établissement.");
+                  } catch {
+                    /* hors ligne : gardée sur cet appareil */
+                  }
+                }
+                await majConfig({ ...config, imprimante });
+                notifier("Imprimante connectée sur cet appareil.");
+              })();
             }}
             onPlusTard={() => setAssistant(false)}
           />

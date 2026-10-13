@@ -46,7 +46,12 @@ export function Reglages(props: { onAssistant: () => void }) {
   const carte = carteDe(config);
   const [envoi, setEnvoi] = useState(false);
   const [etablissement, setEtablissement] = useState(config.etablissement);
-  const [imprimante, setImprimante] = useState(config.imprimante);
+  const commune = config.imprimanteEtablissement ?? null;
+  // Imprimante de l'établissement par défaut ; « propre à cet appareil » seulement si elle diffère de celle de l'établissement.
+  const [pourTous, setPourTous] = useState(!config.imprimante.adresse || !commune || config.imprimante.adresse === commune.adresse);
+  const [imprimante, setImprimante] = useState(
+    config.imprimante.adresse ? config.imprimante : (commune ?? config.imprimante),
+  );
   const [seuil, setSeuil] = useState(config.seuilNoteAutomatique / 100);
   const [nouveau, setNouveau] = useState<{ nom: string; role: Role; pin: string }>({ nom: "", role: "serveur", pin: "" });
   const [persistant, setPersistant] = useState<boolean | null>(null);
@@ -57,11 +62,18 @@ export function Reglages(props: { onAssistant: () => void }) {
 
   const enregistrer = async () => {
     const seuilNote = Math.round(seuil * 100);
-    let suivante: Configuration = { ...config, imprimante: { ...imprimante, adresse: imprimante.adresse.trim() } };
+    const choisie = { ...imprimante, adresse: imprimante.adresse.trim() };
+    let suivante: Configuration = { ...config, imprimante: pourTous ? { adresse: "", sansAccents: false } : choisie };
     const partageModifie =
       JSON.stringify([etablissement, seuilNote]) !== JSON.stringify([config.etablissement, config.seuilNoteAutomatique]);
+    const imprimanteCommuneModifiee =
+      pourTous && JSON.stringify(choisie.adresse ? choisie : null) !== JSON.stringify(commune ? { adresse: commune.adresse, sansAccents: commune.sansAccents } : null);
     setEnvoi(true);
     try {
+      if (imprimanteCommuneModifiee) {
+        const { etablissement: e } = await caisse.client.enregistrerImprimante(choisie.adresse ? choisie : null);
+        suivante = { ...suivante, imprimanteEtablissement: e.imprimanteTickets ?? null };
+      }
       if (partageModifie) {
         const { etablissement: e } = await caisse.client.enregistrerEtablissement({
           identite: { ...etablissement, siret: etablissement.siret.replace(/\s/g, "") },
@@ -72,7 +84,9 @@ export function Reglages(props: { onAssistant: () => void }) {
         setEtablissement(e.identite);
       }
       await majConfig(suivante);
-      notifier(partageModifie ? "Réglages enregistrés et partagés avec les autres caisses." : `Réglages de cet ${NOM_APPAREIL} enregistrés.`);
+      notifier(
+        partageModifie || imprimanteCommuneModifiee ? "Réglages enregistrés et partagés avec les autres caisses." : `Réglages de cet ${NOM_APPAREIL} enregistrés.`,
+      );
     } catch (e) {
       notifier(messageServeur(e), "erreur");
     } finally {
@@ -167,6 +181,19 @@ export function Reglages(props: { onAssistant: () => void }) {
         <div>
           <fieldset>
             <legend>Imprimante Epson</legend>
+            <div className="options" role="radiogroup" aria-label="Imprimante des tickets">
+              <button role="radio" aria-checked={pourTous} className={`bouton${pourTous ? " actif" : ""}`} onClick={() => setPourTous(true)}>
+                Tout l'établissement
+              </button>
+              <button role="radio" aria-checked={!pourTous} className={`bouton${!pourTous ? " actif" : ""}`} onClick={() => setPourTous(false)}>
+                Cet {NOM_APPAREIL} seulement
+              </button>
+            </div>
+            <p className="aide-champ">
+              {pourTous
+                ? `Commune à tous les appareils de l'établissement${commune ? ` (actuellement ${commune.adresse})` : ""} ; la modifier demande une connexion Internet. Chaque appareil accepte une fois le certificat de l'imprimante (assistant, étape « Autoriser »).`
+                : `Cet ${NOM_APPAREIL} imprime sur sa propre imprimante${commune ? ` au lieu de celle de l'établissement (${commune.adresse})` : ""}.`}
+            </p>
             <button className="bouton principal" onClick={props.onAssistant}>
               <AvecIcone icone={Printer}>Assistant de connexion</AvecIcone>
             </button>

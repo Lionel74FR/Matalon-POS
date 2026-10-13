@@ -6,7 +6,7 @@ import type { Catalogue } from "@matalon/catalogue";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import type { BaseCaisse, ConnexionServeur } from "../donnees/base";
-import { carteATelecharger, fusionnerReferentiel, type Configuration, type Utilisateur } from "../donnees/configuration";
+import { carteATelecharger, fusionnerReferentiel, imprimanteDe, type Configuration, type Utilisateur } from "../donnees/configuration";
 import {
   demarrer,
   effacerCaisseDeTest,
@@ -173,12 +173,12 @@ export function App() {
         remplacerCaisse(await enregistrerConfiguration(caisse, config));
       },
       notifier,
-      imprimanteConfiguree: !!caisse.config.imprimante.adresse,
+      imprimanteConfiguree: !!imprimanteDe(caisse.config),
       async imprimer(recu: Recu, titre: string) {
-        const { adresse, sansAccents } = caisse.config.imprimante;
-        if (!adresse) return setApercu({ recu, titre });
+        const imprimante = imprimanteDe(caisse.config);
+        if (!imprimante) return setApercu({ recu, titre });
         try {
-          await envoyerEpson(adresse, recu, { sansAccents });
+          await envoyerEpson(imprimante.adresse, recu, { sansAccents: imprimante.sansAccents });
         } catch (e) {
           setApercu({ recu, titre, erreur: e instanceof Error ? e.message : String(e) });
         }

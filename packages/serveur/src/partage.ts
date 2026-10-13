@@ -140,12 +140,21 @@ export interface EtablissementApi {
   seuilNote: number;
   /** Imprimantes de production : poste de la carte → imprimante Epson du réseau de l'établissement. */
   postesProduction?: PostesProduction;
+  /** Imprimante des tickets commune à l'établissement : sert à tout appareil qui n'en a pas une à lui. */
+  imprimanteTickets?: ImprimanteReseau | null;
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`). */
   zones?: ZonePlan[];
   planVersion?: number;
 }
 
-export type PostesProduction = Record<string, { adresse: string; sansAccents: boolean }>;
+/** Imprimante Epson du réseau de l'établissement (ePOS-Print). */
+export interface ImprimanteReseau {
+  adresse: string;
+  /** Retire les accents si l'imprimante les affiche mal. */
+  sansAccents: boolean;
+}
+
+export type PostesProduction = Record<string, ImprimanteReseau>;
 
 /** Nom de poste de production (« Bar », « Cuisine ») : court, lisible, sans caractère de contrôle. */
 export function posteValide(nom: unknown): nom is string {

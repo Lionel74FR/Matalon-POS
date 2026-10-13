@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, Ban, Banknote, Check, Clock, ExternalLink, Print
 import { AvecIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { useEffect, useState } from "react";
-import type { Configuration } from "../donnees/configuration";
+import { imprimanteDe, type Configuration } from "../donnees/configuration";
 import { ADRESSE_IPV4, envoyerEpson, ErreurImpression, testerEpson, type EtatImprimante } from "../impression/epson";
 import { gabaritTest } from "../impression/gabarits";
 import { Recu } from "../impression/recu";
@@ -28,8 +28,9 @@ export function AssistantImprimante(props: {
   onPlusTard: () => void;
 }) {
   const [etape, setEtape] = useState(0);
-  const [adresse, setAdresse] = useState(props.config.imprimante.adresse);
-  const [sansAccents, setSansAccents] = useState(props.config.imprimante.sansAccents);
+  // Celle de l'appareil, sinon celle de l'établissement : sur un nouvel appareil, il ne reste qu'à autoriser le certificat.
+  const [adresse, setAdresse] = useState(imprimanteDe(props.config)?.adresse ?? "");
+  const [sansAccents, setSansAccents] = useState(imprimanteDe(props.config)?.sansAccents ?? false);
   const [test, setTest] = useState<Test | null>(null);
   const [impression, setImpression] = useState<"attente" | "envoyee" | "erreur">("attente");
   const [tiroir, setTiroir] = useState<"attente" | "envoye" | "bloque">("attente");

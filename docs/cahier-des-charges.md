@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 53, copiée le 11 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 54, copiée le 13 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -77,7 +77,7 @@ Le noyau fiscal, en couleur, est le seul composant couvert par l'attestation ; t
 
 Choix techniques :
 
-- **V1 en web app installée (PWA)**, ouverte depuis l'écran d'accueil de l'iPad ou de l'iPhone : stockage persistant demandé au système, base IndexedDB, clé de signature WebCrypto non exportable propre à chaque iPad, impression Epson en ePOS-Print par le réseau local. La V2 passera en app native (App Store / Apple Business Manager) pour le trousseau iOS et le SDK de l'imprimante.
+- **V1 en web app installée (PWA)**, ouverte depuis l'écran d'accueil de l'iPad ou de l'iPhone : stockage persistant demandé au système, base IndexedDB, clé de signature WebCrypto non exportable propre à chaque iPad, impression Epson en ePOS-Print par le réseau local. L'imprimante des tickets est commune à l'établissement (réglée sur un appareil ou dans l'administration, reçue par les autres à la synchronisation) ; un appareil peut garder la sienne. Chaque appareil accepte une fois le certificat de l'imprimante (ajouté le 13 octobre 2026). La V2 passera en app native (App Store / Apple Business Manager) pour le trousseau iOS et le SDK de l'imprimante.
 - **Serveur** : une fonction Edge Vercel en région Paris (cdg1) ; Postgres Neon en région Francfort, table des enregistrements fiscaux en ajout seul (trigger). Le serveur ne signe rien : une clôture de secours ne peut venir que d'un iPad, le serveur peut seulement alerter si un Z manque.
 - **Numérotation** : une séquence par iPad, identifiant de caisse sur chaque ticket ; aucune dépendance réseau pour encaisser.
 - **Multi-établissements** : application générique « Matalon POS ». Chaque iPad est rattaché à un établissement par un code à usage unique (48 h) généré dans l'administration ; il reçoit alors l'établissement, l'équipe, les tables et la carte.

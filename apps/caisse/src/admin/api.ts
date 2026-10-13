@@ -113,6 +113,8 @@ export const api = {
   creerCarte: (corps: { id: string; nom: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
   enregistrerPlan: (etablissementId: string, plan: { zones: ZonePlan[]; tables: Table[]; version: number }) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/plan`, plan),
+  enregistrerImprimanteTickets: (etablissementId: string, imprimante: { adresse: string; sansAccents: boolean } | null) =>
+    appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/imprimante`, { imprimante }),
   enregistrerPostes: (etablissementId: string, postes: PostesProduction) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/postes`, { postes }),
   comptes: (etablissementId: string) => appel<ReponseComptes>("GET", `/etablissements/${etablissementId}/comptes`),

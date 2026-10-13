@@ -183,6 +183,11 @@ export class ClientApi {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/plan", plan);
   }
 
+  /** Imprimante des tickets commune à l'établissement (null la retire). */
+  enregistrerImprimante(imprimante: { adresse: string; sansAccents: boolean } | null) {
+    return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/imprimante", { imprimante });
+  }
+
   enregistrerPostes(postes: PostesProduction) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/postes", { postes });
   }

@@ -55,6 +55,7 @@ import {
   type ElementDecor,
   type ZonePlan,
   type EntreeSynchro,
+  type ImprimanteReseau,
   type PostesProduction,
   type ReponseComptes,
   type ReponseTickets,
@@ -197,6 +198,7 @@ interface LigneEtablissement {
   tables: Table[];
   seuil_note: number;
   postes_production: PostesProduction | null;
+  imprimante_tickets: ImprimanteReseau | null;
   zones: ZonePlan[] | null;
   plan_version: number | null;
 }
@@ -221,6 +223,7 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     tables: l.tables,
     seuilNote: l.seuil_note,
     postesProduction: l.postes_production ?? {},
+    imprimanteTickets: l.imprimante_tickets?.adresse ? l.imprimante_tickets : null,
     zones: l.zones ?? [],
     planVersion: l.plan_version ?? 0,
   };
@@ -247,6 +250,20 @@ async function majPostes(env: Environnement, etablissementId: string, corps: Rec
   const [maj] = await env.db.requete<{ id: string }>(
     "update etablissements set postes_production = $2::jsonb, maj_le = $3 where id = $1 returning id",
     [etablissementId, JSON.stringify(postes), horloge(env).toISOString()],
+  );
+  if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  return etablissement(env.db, etablissementId);
+}
+
+/** Imprimante des tickets de l'établissement ; une adresse vide la retire. */
+async function majImprimanteTickets(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
+  const v = corps.imprimante as { adresse?: unknown; sansAccents?: unknown } | null | undefined;
+  const adresse = typeof v?.adresse === "string" ? v.adresse.trim() : "";
+  if (!/^[a-z0-9.:-]{0,100}$/i.test(adresse)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Adresse d'imprimante invalide.");
+  const imprimante: ImprimanteReseau | null = adresse ? { adresse, sansAccents: v?.sansAccents === true } : null;
+  const [maj] = await env.db.requete<{ id: string }>(
+    "update etablissements set imprimante_tickets = $2::jsonb, maj_le = $3 where id = $1 returning id",
+    [etablissementId, imprimante ? JSON.stringify(imprimante) : null, horloge(env).toISOString()],
   );
   if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
   return etablissement(env.db, etablissementId);
@@ -2384,6 +2401,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const c = await caisseAuthentifiee(env, requete);
       return json(200, { etablissement: await majPlan(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
     }
+    if (chemin === "/api/caisse/imprimante" && m === "PUT") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { etablissement: await majImprimanteTickets(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
+    }
     if (chemin === "/api/caisse/postes" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
       return json(200, { etablissement: await majPostes(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
@@ -2445,6 +2466,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "PUT") {
         const e = await majPostes(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
         await journaliserAdmin(env, admin.id, "postes_production", { etablissement: e.id, postes: e.postesProduction ?? {} });
+        return json(200, { etablissement: e });
+      }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/imprimante$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await majImprimanteTickets(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
+        await journaliserAdmin(env, admin.id, "imprimante_tickets", { etablissement: e.id, imprimante: e.imprimanteTickets ?? null });
         return json(200, { etablissement: e });
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/clients$/.exec(chemin);
