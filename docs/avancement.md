@@ -25,7 +25,7 @@ Dernière mise à jour : 14 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Plan de salle : « Tourner (90°) » sur la table sélectionnée, carrée ou rectangulaire, par quarts de tour (0, 90, 180, 270°), plateau et chaises tournés ensemble |
+| 1001e39 | Plan de salle : « Tourner (90°) » sur la table sélectionnée, carrée ou rectangulaire, par quarts de tour (0, 90, 180, 270°), plateau et chaises tournés ensemble |
 | c08cb48 | Note : réglage « Imprimer la note d'office à partir de ce montant » (caisse et administration, commun à l'établissement) ; sans impression d'office, l'encaissement rappelle de remettre la note (papier ou QR code). Tickets : duplicata « Note sans détail » (total par taux de TVA), tracé au journal |
 | da8724e | Réservations en caisse comme dans l'administration : vues Aujourd'hui, À venir, Par jour, recherche, fiche de réservation (modifier, annuler, rétablir, historique) commune à la caisse et à l'administration, saisie pour n'importe quel jour |
 | 8563223 | Commandes en cours partagées entre les appareils (demande de Lionel du 13 octobre) : table ouverte sur un appareil visible sur les autres en quelques secondes, modifiable partout ; écriture conditionnelle par version et fusion ligne par ligne des modifications simultanées ; table fermée sur le serveur avant d'encaisser (pas de double encaissement) ; hors ligne, l'appareil continue ; comptoir propre à chaque appareil ; scénario `commandes-partagees` |
