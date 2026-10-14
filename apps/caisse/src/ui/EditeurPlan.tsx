@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { identifiantAleatoire } from "../donnees/configuration";
-import { chevauchements, chaisesDe, formeDe, nomSuivant, placerTables, zonesDuPlan } from "../metier/plan";
+import { chevauchements, chaisesDe, formeDe, nomSuivant, placerTables, tournee, zonesDuPlan } from "../metier/plan";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { PlanSalle } from "./PlanSalle";
 
@@ -218,7 +218,7 @@ export function EditeurPlan(props: { plan: PlanEditable; onEnregistrer: (p: Plan
                     role="radio"
                     aria-checked={formeDe(table) === forme}
                     className={`option${formeDe(table) === forme ? " active" : ""}`}
-                    onClick={() => majTable(table.id, { forme, ...(forme !== "rectangle" ? { rotation: 0 } : {}) })}
+                    onClick={() => majTable(table.id, { forme, ...(forme === "rond" ? { rotation: 0 } : {}) })}
                   >
                     <AvecIcone icone={icone}>{libelle}</AvecIcone>
                   </button>
@@ -236,9 +236,9 @@ export function EditeurPlan(props: { plan: PlanEditable; onEnregistrer: (p: Plan
                 </button>
               </div>
               <div className="options">
-                {formeDe(table) === "rectangle" && (
-                  <button className="bouton" onClick={() => majTable(table.id, { rotation: table.rotation === 90 ? 0 : 90 })}>
-                    <AvecIcone icone={RotateCw}>Tourner</AvecIcone>
+                {formeDe(table) !== "rond" && (
+                  <button className="bouton" aria-label={`Tourner la table d'un quart de tour (${table.rotation ?? 0}°)`} onClick={() => majTable(table.id, { rotation: tournee(table) })}>
+                    <AvecIcone icone={RotateCw}>Tourner (90°)</AvecIcone>
                   </button>
                 )}
                 <button className="bouton" onClick={() => ajouterTable(formeDe(table), table)}>

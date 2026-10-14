@@ -1,4 +1,4 @@
-import type { FormeTable, Table, ZonePlan } from "@matalon/serveur/partage";
+import type { FormeTable, RotationTable, Table, ZonePlan } from "@matalon/serveur/partage";
 
 /**
  * Géométrie du plan de salle, en cases de grille (25 cm). La position d'une
@@ -12,8 +12,19 @@ export const ZONE_PAR_DEFAUT = { largeur: 40, hauteur: 24 };
 export const formeDe = (t: Table): FormeTable => t.forme ?? "carre";
 export const chaisesDe = (t: Table): number => t.chaises ?? 4;
 
+const quartTourImpair = (t: Pick<Table, "rotation">) => t.rotation === 90 || t.rotation === 270;
+
+/** Quart de tour suivant (bouton « Tourner ») : 0 → 90 → 180 → 270 → 0. */
+export const tournee = (t: Pick<Table, "rotation">): RotationTable => (((t.rotation ?? 0) + 90) % 360) as RotationTable;
+
 /** Plateau de la table (sans les chaises), rotation comprise. */
 export function dimensions(t: Pick<Table, "forme" | "chaises" | "rotation">): { largeur: number; hauteur: number } {
+  const base = dimensionsDroites(t);
+  return quartTourImpair(t) ? { largeur: base.hauteur, hauteur: base.largeur } : base;
+}
+
+/** Plateau sans rotation. */
+function dimensionsDroites(t: Pick<Table, "forme" | "chaises">): { largeur: number; hauteur: number } {
   const n = t.chaises ?? 4;
   switch (t.forme ?? "carre") {
     case "rond": {
@@ -27,15 +38,33 @@ export function dimensions(t: Pick<Table, "forme" | "chaises" | "rotation">): { 
     case "rectangle": {
       // Chaises sur les deux grands côtés, environ 50 cm chacune.
       const long = Math.max(4, Math.ceil(n / 2) * 2 + 1);
-      return t.rotation === 90 ? { largeur: 3, hauteur: long } : { largeur: long, hauteur: 3 };
+      return { largeur: long, hauteur: 3 };
     }
   }
 }
 
-/** Centre de chaque chaise, relatif au coin haut-gauche du plateau. */
+/**
+ * Centre de chaque chaise, relatif au coin haut-gauche du plateau : disposées sur la table droite,
+ * puis tournées avec elle (une table carrée de 2 ou 3 chaises change de côtés en tournant).
+ */
 export function chaises(t: Pick<Table, "forme" | "chaises" | "rotation">): Array<{ x: number; y: number }> {
+  const droites = chaisesDroites(t);
+  const { largeur: l, hauteur: h } = dimensionsDroites(t);
+  switch (t.rotation ?? 0) {
+    case 90:
+      return droites.map(({ x, y }) => ({ x: h - y, y: x }));
+    case 180:
+      return droites.map(({ x, y }) => ({ x: l - x, y: h - y }));
+    case 270:
+      return droites.map(({ x, y }) => ({ x: y, y: l - x }));
+    default:
+      return droites;
+  }
+}
+
+function chaisesDroites(t: Pick<Table, "forme" | "chaises">): Array<{ x: number; y: number }> {
   const n = t.chaises ?? 4;
-  const { largeur, hauteur } = dimensions(t);
+  const { largeur, hauteur } = dimensionsDroites(t);
   const ecart = 0.9;
   if (n === 0) return [];
   if ((t.forme ?? "carre") === "rond") {
@@ -49,14 +78,7 @@ export function chaises(t: Pick<Table, "forme" | "chaises" | "rotation">): Array
   if (t.forme === "rectangle") {
     const a = Math.ceil(n / 2);
     const b = n - a;
-    const horizontal = t.rotation !== 90;
-    const long = horizontal ? largeur : hauteur;
-    const court = horizontal ? hauteur : largeur;
-    const cotes = [
-      ...repartir(a, long).map((p) => ({ p, q: -ecart })),
-      ...repartir(b, long).map((p) => ({ p, q: court + ecart })),
-    ];
-    return cotes.map(({ p, q }) => (horizontal ? { x: p, y: q } : { x: q, y: p }));
+    return [...repartir(a, largeur).map((x) => ({ x, y: -ecart })), ...repartir(b, largeur).map((x) => ({ x, y: hauteur + ecart }))];
   }
   // Carré : haut, bas, droite, gauche, tour à tour.
   const parCote = [0, 0, 0, 0];

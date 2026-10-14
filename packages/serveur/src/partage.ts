@@ -30,6 +30,9 @@ export interface IdentiteEtablissement {
   mentionsLegales: string;
 }
 
+export type RotationTable = 0 | 90 | 180 | 270;
+export const ROTATIONS: readonly RotationTable[] = [0, 90, 180, 270];
+
 export interface Table {
   id: string;
   nom: string;
@@ -40,7 +43,8 @@ export interface Table {
   /** Coin haut-gauche, en cases de la grille (CASE_CM). Absent : placée d'office. */
   x?: number;
   y?: number;
-  rotation?: 0 | 90;
+  /** Quart de tour dans le sens des aiguilles d'une montre (plateau et chaises). */
+  rotation?: RotationTable;
   /** Une table n'est jamais supprimée (les tickets la citent) : elle est masquée. */
   masquee?: boolean;
 }
@@ -121,7 +125,7 @@ export function problemePlan(zones: ZonePlan[], tables: Table[], anciennes: Tabl
     if (t.x !== undefined && ![t.x, t.y].every((v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 200)) {
       return `Table ${t.nom} : position invalide.`;
     }
-    if (t.rotation !== undefined && t.rotation !== 0 && t.rotation !== 90) return `Table ${t.nom} : rotation invalide.`;
+    if (t.rotation !== undefined && !ROTATIONS.includes(t.rotation)) return `Table ${t.nom} : rotation invalide.`;
     if (t.masquee !== undefined && typeof t.masquee !== "boolean") return `Table ${t.nom} : état invalide.`;
   }
   const disparue = anciennes.find((a) => !ids.has(a.id));

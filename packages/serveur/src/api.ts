@@ -460,7 +460,7 @@ function lirePlan(corps: Record<string, unknown>): { zones: ZonePlan[]; tables: 
       ...(t.forme !== undefined ? { forme: t.forme as Table["forme"] } : {}),
       ...(t.chaises !== undefined ? { chaises: entier(t.chaises) } : {}),
       ...(t.x !== undefined || t.y !== undefined ? { x: entier(t.x), y: entier(t.y) } : {}),
-      ...(t.rotation !== undefined ? { rotation: t.rotation as 0 | 90 } : {}),
+      ...(t.rotation !== undefined ? { rotation: t.rotation as Table["rotation"] } : {}),
       ...(t.masquee === true ? { masquee: true } : {}),
     };
   });

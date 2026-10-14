@@ -1,7 +1,7 @@
 import type { Table, ZonePlan } from "@matalon/serveur/partage";
 import { describe, expect, it } from "vitest";
 import { fusionnerCommandes, nouvelleCommande, tablesDeCommande, transfererCommande } from "../src/metier/commande";
-import { chaises, chevauchements, dimensions, nomSuivant, placerTables, zonesDuPlan } from "../src/metier/plan";
+import { chaises, chevauchements, dimensions, nomSuivant, placerTables, tournee, zonesDuPlan } from "../src/metier/plan";
 
 const salle: ZonePlan = { nom: "Salle", largeur: 40, hauteur: 24, decor: [] };
 const table = (id: string, v: Partial<Table> = {}): Table => ({ id, nom: id.replace(/\D/g, ""), zone: "Salle", ...v });
@@ -12,6 +12,32 @@ describe("géométrie du plan", () => {
     expect(dimensions({ forme: "rond", chaises: 8 })).toEqual({ largeur: 5, hauteur: 5 });
     expect(dimensions({ forme: "rectangle", chaises: 6 })).toEqual({ largeur: 7, hauteur: 3 });
     expect(dimensions({ forme: "rectangle", chaises: 6, rotation: 90 })).toEqual({ largeur: 3, hauteur: 7 });
+  });
+
+  it("tourne une table d'un quart de tour : plateau et chaises", () => {
+    expect([0, 90, 180, 270].map((r) => tournee({ rotation: r as 0 }))).toEqual([90, 180, 270, 0]);
+    expect(tournee({})).toBe(90);
+    expect(dimensions({ forme: "rectangle", chaises: 6, rotation: 270 })).toEqual({ largeur: 3, hauteur: 7 });
+    expect(dimensions({ forme: "rectangle", chaises: 6, rotation: 180 })).toEqual({ largeur: 7, hauteur: 3 });
+    // Table carrée de 2 : chaises en haut et en bas, puis à droite et à gauche après un quart de tour.
+    const cote = (t: { forme: "carre"; chaises: number; rotation?: 0 | 90 | 180 | 270 }) =>
+      chaises(t).map((c) => {
+        const d = dimensions(t);
+        return c.y < 0 ? "haut" : c.y > d.hauteur ? "bas" : c.x > d.largeur ? "droite" : "gauche";
+      });
+    expect(cote({ forme: "carre", chaises: 2 })).toEqual(["haut", "bas"]);
+    expect(cote({ forme: "carre", chaises: 2, rotation: 90 }).sort()).toEqual(["droite", "gauche"]);
+    expect(cote({ forme: "carre", chaises: 3 }).sort()).toEqual(["bas", "droite", "haut"]);
+    expect(cote({ forme: "carre", chaises: 3, rotation: 90 }).sort()).toEqual(["bas", "droite", "gauche"]);
+    expect(cote({ forme: "carre", chaises: 3, rotation: 180 }).sort()).toEqual(["bas", "gauche", "haut"]);
+    // Toujours hors du plateau, quelle que soit la rotation.
+    for (const rotation of [0, 90, 180, 270] as const) {
+      for (const forme of ["carre", "rectangle"] as const) {
+        const t = { forme, chaises: 5, rotation };
+        const d = dimensions(t);
+        for (const c of chaises(t)) expect(c.x > 0 && c.x < d.largeur && c.y > 0 && c.y < d.hauteur).toBe(false);
+      }
+    }
   });
 
   it("place autant de chaises que demandé, hors du plateau", () => {

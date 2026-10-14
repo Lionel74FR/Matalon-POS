@@ -39,7 +39,13 @@ await glisser(a, section.getByRole("button", { name: "Table 13" }), 140, 60);
 await section.getByRole("button", { name: "Bar", exact: true }).click();
 await section.getByRole("button", { name: "Table 1", exact: true }).click();
 await section.getByRole("radio", { name: "Rectangle" }).click();
-await section.getByRole("button", { name: "Tourner" }).click();
+await section.getByRole("button", { name: /^Tourner la table/ }).click();
+// Table carrée de 2 : un quart de tour met les chaises à droite et à gauche (puis 180°).
+await section.getByRole("button", { name: "Table 2", exact: true }).click();
+await section.getByRole("button", { name: "Une chaise de moins" }).click();
+await section.getByRole("button", { name: "Une chaise de moins" }).click();
+await section.getByRole("button", { name: /^Tourner la table/ }).click();
+await section.getByRole("button", { name: /^Tourner la table/ }).click();
 await section.getByRole("button", { name: "Table 12", exact: true }).click();
 await section.getByRole("button", { name: "Masquer" }).click();
 await section.screenshot({ path: `${sortie}/s01-editeur-admin.png` });
@@ -110,6 +116,10 @@ await b.close();
 const resultat = {
   t13: t13 && { forme: t13.forme, chaises: t13.chaises, x: t13.x, y: t13.y },
   t1: t1 && { forme: t1.forme, rotation: t1.rotation },
+  t2: (() => {
+    const t2 = moka.tables.find((t) => t.id === "t2");
+    return t2 && { forme: t2.forme ?? "carre", chaises: t2.chaises, rotation: t2.rotation };
+  })(),
   t12Masquee: moka.tables.find((t) => t.id === "t12")?.masquee,
   toutesPlacees: moka.tables.filter((t) => !t.masquee).every((t) => Number.isInteger(t.x)),
   decor: moka.zones[0]?.decor.map((d) => d.type),
@@ -131,6 +141,8 @@ const ok =
   resultat.t13.chaises === 6 &&
   resultat.t1?.forme === "rectangle" &&
   resultat.t1.rotation === 90 &&
+  resultat.t2?.chaises === 2 &&
+  resultat.t2.rotation === 180 &&
   resultat.t12Masquee === true &&
   resultat.toutesPlacees &&
   resultat.decor?.includes("bar") &&
