@@ -55,6 +55,7 @@ export function Reglages(props: { onAssistant: () => void }) {
     config.imprimante.adresse ? config.imprimante : (commune ?? config.imprimante),
   );
   const [seuil, setSeuil] = useState(config.seuilNoteAutomatique / 100);
+  const [noteAuto, setNoteAuto] = useState(config.noteAutomatique !== false);
   const [nouveau, setNouveau] = useState<{ nom: string; role: Role; pin: string }>({ nom: "", role: "serveur", pin: "" });
   const [persistant, setPersistant] = useState<boolean | null>(null);
 
@@ -67,7 +68,7 @@ export function Reglages(props: { onAssistant: () => void }) {
     const choisie = { ...imprimante, adresse: imprimante.adresse.trim() };
     let suivante: Configuration = { ...config, imprimante: pourTous ? { adresse: "", sansAccents: false } : choisie };
     const partageModifie =
-      JSON.stringify([etablissement, seuilNote]) !== JSON.stringify([config.etablissement, config.seuilNoteAutomatique]);
+      JSON.stringify([etablissement, seuilNote, noteAuto]) !== JSON.stringify([config.etablissement, config.seuilNoteAutomatique, config.noteAutomatique !== false]);
     const imprimanteCommuneModifiee =
       pourTous && JSON.stringify(choisie.adresse ? choisie : null) !== JSON.stringify(commune ? { adresse: commune.adresse, sansAccents: commune.sansAccents } : null);
     setEnvoi(true);
@@ -80,9 +81,10 @@ export function Reglages(props: { onAssistant: () => void }) {
         const { etablissement: e } = await caisse.client.enregistrerEtablissement({
           identite: { ...etablissement, siret: etablissement.siret.replace(/\s/g, "") },
           seuilNote,
+          noteAutomatique: noteAuto,
         });
         // La carte suit sa propre mise à jour (téléchargement à la synchronisation).
-        suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote };
+        suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote, noteAutomatique: e.noteAutomatique !== false };
         setEtablissement(e.identite);
       }
       await majConfig(retenirImprimante(suivante));
@@ -233,11 +235,20 @@ export function Reglages(props: { onAssistant: () => void }) {
             </button>
             <label className="champ">
               <span>
-                Note imprimée d'office à partir de
-                <small>En dessous, la note est imprimée à la demande du client</small>
+                Note due à partir de
+                <small>En dessous, la note est remise à la demande du client</small>
               </span>
               <input type="number" min={0} step={1} value={seuil} onChange={(e) => setSeuil(Number(e.target.value))} />
             </label>
+            <label className="case">
+              <input type="checkbox" checked={noteAuto} onChange={(e) => setNoteAuto(e.target.checked)} />
+              Imprimer la note d'office à partir de ce montant
+            </label>
+            {!noteAuto && (
+              <p className="aide-champ">
+                La note reste due au client sans qu'il la demande : sur papier, ou par QR code s'il préfère la version dématérialisée. L'écran d'encaissement le rappelle et propose l'impression ou le QR code. Commun à toutes les caisses.
+              </p>
+            )}
           </fieldset>
 
           <fieldset>
@@ -358,7 +369,9 @@ export function Reglages(props: { onAssistant: () => void }) {
           </div>
           <div>
             <dt>Seuil de note</dt>
-            <dd>{euros(config.seuilNoteAutomatique)}</dd>
+            <dd>
+              {euros(config.seuilNoteAutomatique)} · {config.noteAutomatique === false ? "proposée à l'encaissement" : "imprimée d'office"}
+            </dd>
           </div>
         </dl>
       </fieldset>

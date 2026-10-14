@@ -129,7 +129,7 @@ export function ModaleEncaissement(props: {
       // Sans imprimante, rien ne sort : la note passe par le QR code.
       if (imprimanteConfiguree) {
         const avecEspeces = paiements.some((p) => p.mode === "ESPECES");
-        if (t.totalTTC >= config.seuilNoteAutomatique) {
+        if (t.totalTTC >= config.seuilNoteAutomatique && config.noteAutomatique !== false) {
           await imprimerNote(t, avecEspeces);
           setNoteImprimee(true);
         } else if (avecEspeces) {
@@ -162,6 +162,8 @@ export function ModaleEncaissement(props: {
 
   if (ticket) {
     const auDelaSeuil = ticket.totalTTC >= config.seuilNoteAutomatique;
+    /** Note due mais pas imprimée d'office (réglage) : la remettre, sur papier ou par le QR code. */
+    const noteARemettre = auDelaSeuil && config.noteAutomatique === false && !noteImprimee;
     return (
       <Modale
         titre={`Ticket n° ${ticket.numero} encaissé`}
@@ -171,7 +173,7 @@ export function ModaleEncaissement(props: {
           <>
             {!noteImprimee && (
               <button
-                className="bouton"
+                className={`bouton${noteARemettre && imprimanteConfiguree ? " principal" : ""}`}
                 onClick={() => void imprimerNote(ticket, false).then(() => imprimanteConfiguree && setNoteImprimee(true))}
               >
                 <AvecIcone icone={Printer}>{imprimanteConfiguree ? "Imprimer la note" : "Voir la note"}</AvecIcone>
@@ -206,6 +208,12 @@ export function ModaleEncaissement(props: {
           <QrNote url={urlNoteTicket(ticket, config)} />
         </div>
         {noteImprimee && <p className="explication">La note a été imprimée (montant de {euros(config.seuilNoteAutomatique)} ou plus).</p>}
+        {noteARemettre && (
+          <p className="note-a-remettre" role="alert">
+            Note à remettre au client ({euros(config.seuilNoteAutomatique)} ou plus) : imprimez-la, ou montrez-lui le QR code s'il préfère la
+            version dématérialisée.
+          </p>
+        )}
         {!imprimanteConfiguree && auDelaSeuil && !MODE_TEST && (
           <p className="erreur">
             Au-delà de {euros(config.seuilNoteAutomatique)}, la note doit être remise imprimée : connectez l'imprimante dans les

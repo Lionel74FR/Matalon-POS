@@ -119,6 +119,7 @@ export async function rattacher(
     carteId: r.etablissement.carteId,
     imprimante: { adresse: "", sansAccents: false },
     seuilNoteAutomatique: r.etablissement.seuilNote,
+    ...(r.etablissement.noteAutomatique !== undefined ? { noteAutomatique: r.etablissement.noteAutomatique } : {}),
     ...(r.etablissement.postesProduction ? { postesProduction: r.etablissement.postesProduction } : {}),
     ...(r.etablissement.imprimanteTickets !== undefined ? { imprimanteEtablissement: r.etablissement.imprimanteTickets } : {}),
     ...(r.etablissement.zones ? { zones: r.etablissement.zones, planVersion: r.etablissement.planVersion ?? 0 } : {}),

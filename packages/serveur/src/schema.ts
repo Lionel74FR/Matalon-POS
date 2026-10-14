@@ -25,6 +25,8 @@ export const MIGRATIONS: string[] = [
   `alter table etablissements add column if not exists mentions_legales text not null default ''`,
   // Imprimantes de production : poste de la carte (« Bar », « Cuisine »…) → imprimante de l'établissement.
   `alter table etablissements add column if not exists postes_production jsonb not null default '{}'::jsonb`,
+  // Note imprimée d'office au-delà du seuil (sinon proposée à chaque encaissement : papier ou QR code).
+  `alter table etablissements add column if not exists note_auto boolean not null default true`,
   // Imprimante des tickets commune à l'établissement (un appareil peut en garder une à lui).
   `alter table etablissements add column if not exists imprimante_tickets jsonb`,
   // Plan de salle : zones dimensionnées et décor ; la version refuse d'écraser une modification faite ailleurs.

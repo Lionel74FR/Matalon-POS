@@ -199,6 +199,7 @@ interface LigneEtablissement {
   carte_version: number | null;
   tables: Table[];
   seuil_note: number;
+  note_auto?: boolean | null;
   postes_production: PostesProduction | null;
   imprimante_tickets: ImprimanteReseau | null;
   zones: ZonePlan[] | null;
@@ -224,6 +225,7 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     carteVersion: l.carte_version ?? 0,
     tables: l.tables,
     seuilNote: l.seuil_note,
+    noteAutomatique: l.note_auto !== false,
     postesProduction: l.postes_production ?? {},
     imprimanteTickets: l.imprimante_tickets?.adresse ? l.imprimante_tickets : null,
     zones: l.zones ?? [],
@@ -1291,6 +1293,9 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
       valeurs.filter((_, i) => i !== 8),
     );
     if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+    if (typeof corps.noteAutomatique === "boolean") {
+      await env.db.requete("update etablissements set note_auto = $2 where id = $1", [id, corps.noteAutomatique]);
+    }
     if (corps.carteId !== undefined) {
       const carteId = texte(corps.carteId, "carteId", 60);
       await exigerCarte(env.db, carteId);

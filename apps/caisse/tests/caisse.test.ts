@@ -129,6 +129,27 @@ describe("impression", () => {
     expect(xml).toContain('<cut type="feed"/>');
   });
 
+  it("édite une note sans détail en duplicata : total par taux de TVA, sans les articles", async () => {
+    const { registre } = await preparer();
+    const t = await registre.enregistrerVente({
+      lignes: commandeType().lignes.map(versSaisie),
+      paiements: [{ mode: "CB", montant: 2450 }],
+      operateurId: "u-lea",
+      tableId: "t4",
+      couverts: 2,
+    });
+    const texte = versTexte(gabaritNote(t, config, 2, true));
+    expect(texte.every((l) => l.length <= LARGEUR)).toBe(true);
+    const tout = texte.join("\n");
+    expect(tout).toContain("DUPLICATA n° 2 · NOTE SANS DÉTAIL");
+    expect(tout).not.toContain("Cappuccino");
+    expect(tout).toMatch(/Restauration \(TVA 10 %\)/);
+    expect(tout).toContain("24,50 EUR");
+    expect(tout).toContain("Carte bancaire");
+    // Jamais sur la note d'origine : le détail y reste obligatoire.
+    expect(versTexte(gabaritNote(t, config, undefined, true)).join("\n")).toContain("2 x Cappuccino");
+  });
+
   it("imprime une addition et un Z lisibles", async () => {
     const { registre } = await preparer();
     const addition = versTexte(gabaritAddition(commandeType(), config, "u-lea")).join("\n");

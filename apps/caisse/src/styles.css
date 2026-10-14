@@ -3017,3 +3017,12 @@ a.bouton {
 .resa-caisse-groupe h3::first-letter {
   text-transform: uppercase;
 }
+
+/* Encaissement : note due, pas imprimée d'office (réglage). */
+.note-a-remettre {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--terre);
+  font-weight: 600;
+}

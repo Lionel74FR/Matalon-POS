@@ -136,8 +136,10 @@ export interface EtablissementApi {
   /** Version de la carte : la caisse la télécharge quand elle change. */
   carteVersion: number;
   tables: Table[];
-  /** Montant TTC (centimes) à partir duquel la note est imprimée d'office. */
+  /** Montant TTC (centimes) à partir duquel la note est due au client (imprimée d'office si `noteAutomatique`). */
   seuilNote: number;
+  /** Faux : la note n'est plus imprimée d'office ; la caisse rappelle de la remettre (papier ou QR code). */
+  noteAutomatique?: boolean;
   /** Imprimantes de production : poste de la carte → imprimante Epson du réseau de l'établissement. */
   postesProduction?: PostesProduction;
   /** Imprimante des tickets commune à l'établissement : sert à tout appareil qui n'en a pas une à lui. */

@@ -214,7 +214,7 @@ export class ClientApi {
     return this.appel<{ utilisateurs: UtilisateurApi[] }>("PUT", "/api/caisse/utilisateurs", { utilisateurs, responsable });
   }
 
-  enregistrerEtablissement(corps: { identite: IdentiteEtablissement; seuilNote: number }) {
+  enregistrerEtablissement(corps: { identite: IdentiteEtablissement; seuilNote: number; noteAutomatique?: boolean }) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/etablissement", corps);
   }
 }

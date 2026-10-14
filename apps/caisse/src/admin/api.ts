@@ -103,7 +103,7 @@ export const api = {
   etablissements: () => appel<{ etablissements: EtablissementAdmin[]; cartes: Array<{ id: string; nom: string }> }>("GET", "/etablissements"),
   creerEtablissement: (corps: { id: string; identite: Partial<IdentiteEtablissement>; carteId: string; tables: Table[]; seuilNote: number }) =>
     appel("POST", "/etablissements", corps),
-  modifierEtablissement: (id: string, corps: { identite: IdentiteEtablissement; carteId: string; seuilNote: number }) =>
+  modifierEtablissement: (id: string, corps: { identite: IdentiteEtablissement; carteId: string; seuilNote: number; noteAutomatique?: boolean }) =>
     appel("PUT", `/etablissements/${id}`, corps),
   enregistrerUtilisateur: (etablissementId: string, corps: { id?: string; nom: string; role: Role; pin?: string; actif: boolean }) =>
     appel("POST", `/etablissements/${etablissementId}/utilisateurs`, corps),

@@ -1247,6 +1247,7 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
   const [identite, setIdentite] = useState(e.identite);
   const [carteId, setCarteId] = useState(e.carteId);
   const [seuil, setSeuil] = useState(e.seuilNote / 100);
+  const [noteAuto, setNoteAuto] = useState(e.noteAutomatique !== false);
   const [enregistre, setEnregistre] = useState(false);
   const { enCours, erreur, envoyer } = useEnvoi();
 
@@ -1258,6 +1259,7 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
         identite: { ...identite, siret: identite.siret.replace(/\s/g, "") },
         carteId,
         seuilNote: Math.round(seuil * 100),
+        noteAutomatique: noteAuto,
       });
       setEnregistre(true);
       await props.onChange();
@@ -1285,9 +1287,13 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
               ))}
             </select>
           </Champ>
-          <Champ libelle="Note imprimée d'office à partir de (€)" aide={`Actuellement ${euros(e.seuilNote)}`}>
+          <Champ libelle="Note due à partir de (€)" aide={`Actuellement ${euros(e.seuilNote)}`}>
             <input type="number" min={0} step={1} value={seuil} onChange={(ev) => setSeuil(Number(ev.target.value))} />
           </Champ>
+          <label className="case">
+            <input type="checkbox" checked={noteAuto} onChange={(ev) => setNoteAuto(ev.target.checked)} /> Imprimer la note d'office à partir de ce montant
+          </label>
+          {!noteAuto && <p className="explication">La note reste due au client sans qu'il la demande : sur papier, ou par QR code s'il préfère la version dématérialisée. La caisse le rappelle à chaque encaissement concerné.</p>}
         </div>
       </div>
       <div className="admin-ligne">

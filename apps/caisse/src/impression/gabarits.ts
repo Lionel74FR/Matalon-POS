@@ -57,12 +57,16 @@ function paiements(r: Recu, liste: Paiement[], rendu: number): void {
 }
 
 /** Note client (ticket de caisse) d'une vente ou d'une annulation, éventuellement en duplicata. */
-export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: number): Recu {
+/**
+ * Note d'une vente. `sansDetail` (duplicata seulement, à la demande du client, pour une note de
+ * frais) : les articles sont remplacés par un total par taux de TVA, le reste de la note est inchangé.
+ */
+export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: number, sansDetail = false): Recu {
   if (ticket.reglement) return gabaritReglement(ticket, config, duplicata);
   if (ticket.type === "CORRECTION") return gabaritCorrection(ticket, config, duplicata);
   const r = new Recu();
   entete(r, config);
-  if (duplicata) r.texte(`DUPLICATA n° ${duplicata}`, { align: "centre", gras: true }).filet();
+  if (duplicata) r.texte(`DUPLICATA n° ${duplicata}${sansDetail ? " · NOTE SANS DÉTAIL" : ""}`, { align: "centre", gras: true }).filet();
   if (ticket.type === "ANNULATION") {
     r.texte(`ANNULATION du ticket n° ${numero(ticket.ticketOrigine!.numero)}`, { align: "centre", gras: true });
     if (ticket.motif) r.texte(`Motif : ${ticket.motif}`, { align: "centre" });
@@ -72,10 +76,16 @@ export function gabaritNote(ticket: Ticket, config: Configuration, duplicata?: n
   r.colonnes(nomTable(config, ticket.tableId), ticket.couverts ? `${Math.abs(ticket.couverts)} couvert(s)` : "");
   r.texte(`Servi par ${nomUtilisateur(config, ticket.operateurId)}`);
   r.filet();
-  for (const l of ticket.lignes) {
-    const qte = `${l.quantite} x `;
-    r.colonnes(`${qte}${l.libelle}`, formaterEuros(l.quantite * l.prixUnitaireTTC));
-    if (l.remiseTTC !== 0) r.colonnes(`   Remise (${l.motifRemise ?? ""})`, formaterEuros(-l.remiseTTC));
+  if (sansDetail && duplicata) {
+    for (const v of ticket.ventilationTVA.filter((x) => x.montantTTC !== 0)) {
+      r.colonnes(`Restauration (TVA ${tauxLisible(v.tauxTVA)})`, formaterEuros(v.montantTTC));
+    }
+  } else {
+    for (const l of ticket.lignes) {
+      const qte = `${l.quantite} x `;
+      r.colonnes(`${qte}${l.libelle}`, formaterEuros(l.quantite * l.prixUnitaireTTC));
+      if (l.remiseTTC !== 0) r.colonnes(`   Remise (${l.motifRemise ?? ""})`, formaterEuros(-l.remiseTTC));
+    }
   }
   r.filet();
   r.colonnes("TOTAL TTC", `${formaterEuros(ticket.totalTTC)} EUR`, { gras: true, grand: true });

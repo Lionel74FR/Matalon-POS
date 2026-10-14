@@ -139,6 +139,12 @@ describe("administration", () => {
     // Un iPad d'une version antérieure n'envoie pas le champ : la valeur enregistrée reste.
     const ancien = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, tables: [], seuilNote: 3000 }, { Cookie: cookie });
     expect(ancien.corps.etablissement.identite.mentionsLegales).toBe("SAS au capital de 10 000 €");
+    // Note d'office au-delà du seuil : oui par défaut, se coupe, et reste coupée si le champ manque.
+    expect(ancien.corps.etablissement.noteAutomatique).toBe(true);
+    const sansNote = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, seuilNote: 3000, noteAutomatique: false }, { Cookie: cookie });
+    expect(sansNote.corps.etablissement.noteAutomatique).toBe(false);
+    const inchange = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, seuilNote: 3000 }, { Cookie: cookie });
+    expect(inchange.corps.etablissement.noteAutomatique).toBe(false);
   });
 });
 

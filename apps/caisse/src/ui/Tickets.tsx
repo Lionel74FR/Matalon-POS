@@ -1,4 +1,4 @@
-import { Eye, FileText, Printer, QrCode, RefreshCw, Search, SlidersHorizontal, Undo2, Wallet, X } from "lucide-react";
+import { Eye, FileText, Printer, QrCode, ReceiptText, RefreshCw, Search, SlidersHorizontal, Undo2, Wallet, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { dateComptable, ErreurFiscale, MODES_PAIEMENT, paiementsEffectifs, ticketCouvertPar, type ModePaiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -164,12 +164,13 @@ export function Tickets() {
     !annules.has(cle(t)) &&
     !paiementsEffectifs(t, tous).some((p) => p.mode === "EN_COMPTE");
 
-  const duplicata = async (t: Ticket) => {
+  /** Duplicata ; `sansDetail` : un total par taux de TVA au lieu des articles (note de frais). */
+  const duplicata = async (t: Ticket, sansDetail = false) => {
     const n = await prochainDuplicata(t);
-    await imprimer(gabaritNote(t, config, n), `Duplicata n° ${n}`);
+    await imprimer(gabaritNote(t, config, n, sansDetail), `Duplicata n° ${n}${sansDetail ? " (note sans détail)" : ""}`);
     await caisse.registre.journaliser(
       "REIMPRESSION_TICKET",
-      { ticket: t.numero, duplicata: n, canal: imprimanteConfiguree ? "papier" : "ecran" },
+      { ticket: t.numero, duplicata: n, canal: imprimanteConfiguree ? "papier" : "ecran", ...(sansDetail ? { sansDetail: true } : {}) },
       utilisateur.id,
     );
   };
@@ -505,6 +506,11 @@ export function Tickets() {
               <button className="bouton" onClick={() => void duplicata(choisi)}>
                 <AvecIcone icone={imprimanteConfiguree ? Printer : Eye}>{imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}</AvecIcone>
               </button>
+              {choisi.type === "VENTE" && !choisi.reglement && (
+                <button className="bouton" onClick={() => void duplicata(choisi, true)}>
+                  <AvecIcone icone={ReceiptText}>Note sans détail</AvecIcone>
+                </button>
+              )}
             </>
             ) : undefined
           }

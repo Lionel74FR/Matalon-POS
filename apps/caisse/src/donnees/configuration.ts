@@ -33,8 +33,10 @@ export interface Configuration {
     /** Retire les accents si l'imprimante les affiche mal. */
     sansAccents: boolean;
   };
-  /** Montant TTC à partir duquel la note est imprimée d'office (centimes). */
+  /** Montant TTC à partir duquel la note est due au client, imprimée d'office sauf `noteAutomatique` faux (centimes). */
   seuilNoteAutomatique: number;
+  /** Faux : la note n'est plus imprimée d'office ; la caisse rappelle de la remettre (papier ou QR code). */
+  noteAutomatique?: boolean;
   /**
    * Clients des comptes (ardoises) : ceux du serveur, plus ceux créés ici et
    * pas encore connus du serveur (il les apprend par le ticket en compte).
@@ -71,6 +73,7 @@ export function fusionnerReferentiel(
     tables: etat.etablissement.tables,
     // La carte (et son identifiant) ne change qu'une fois la nouvelle carte téléchargée.
     seuilNoteAutomatique: etat.etablissement.seuilNote,
+    ...(etat.etablissement.noteAutomatique !== undefined ? { noteAutomatique: etat.etablissement.noteAutomatique } : {}),
     ...(etat.etablissement.postesProduction ? { postesProduction: etat.etablissement.postesProduction } : {}),
     ...(etat.etablissement.imprimanteTickets !== undefined ? { imprimanteEtablissement: etat.etablissement.imprimanteTickets } : {}),
     ...(etat.etablissement.imprimanteTickets?.adresse && !config.imprimante.adresse ? { imprimanteConnue: etat.etablissement.imprimanteTickets } : {}),

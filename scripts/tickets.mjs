@@ -111,6 +111,38 @@ resultats.aujourdhui = await lignes();
 verifier("aujourd'hui", resultats.aujourdhui === 5, resultats.aujourdhui);
 await p.screenshot({ path: `${sortie}/tk02-aujourdhui.png` });
 
+// ── Reprise d'un ticket : note sans détail (duplicata, total par taux de TVA) ──
+await p.locator(".tableau-tickets tbody tr", { hasText: "8,50" }).first().click();
+await clic("Note sans détail");
+await p.locator(".apercu-recu").waitFor();
+resultats.noteSansDetail = (await p.locator(".apercu-recu").textContent()) ?? "";
+verifier("note sans détail", /NOTE SANS DÉTAIL/.test(resultats.noteSansDetail) && /Restauration \(TVA/.test(resultats.noteSansDetail) && !/Flat white/.test(resultats.noteSansDetail), resultats.noteSansDetail);
+await p.screenshot({ path: `${sortie}/tk02b-note-sans-detail.png` });
+await p.keyboard.press("Escape");
+await p.keyboard.press("Escape");
+
+// ── Réglages : note plus imprimée d'office ; l'encaissement rappelle de la remettre ──
+await p.getByRole("button", { name: /^Menu/ }).click();
+await p.getByRole("menuitem", { name: "Réglages" }).click();
+await p.getByLabel(/Note due à partir de/).fill("5");
+await p.getByLabel("Imprimer la note d'office à partir de ce montant").uncheck();
+await clic("Enregistrer les réglages");
+await p.getByText("partagés avec les autres caisses").waitFor();
+await p.getByRole("tab", { name: "Salle" }).click();
+await clic("Vente comptoir");
+await p.locator(".tuile", { hasText: "Flat white" }).first().click();
+await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
+await clic("Encaisser");
+await p.locator(".mode", { hasText: "Carte bancaire" }).click();
+await p.getByRole("button", { name: /^Valider l'encaissement/ }).click();
+await p.locator(".note-a-remettre").waitFor();
+resultats.rappelNote = ((await p.locator(".note-a-remettre").textContent()) ?? "").replace(/\s+/g, " ").trim();
+verifier("rappel de la note", /Note à remettre au client/.test(resultats.rappelNote), resultats.rappelNote);
+await p.screenshot({ path: `${sortie}/tk02c-rappel-note.png` });
+await clic("Terminé");
+await p.getByRole("tab", { name: "Tickets" }).click();
+await p.locator(".tableau-tickets tbody tr").first().waitFor();
+
 // ── iPhone ──
 await p.setViewportSize({ width: 390, height: 844 });
 await p.waitForTimeout(300);
