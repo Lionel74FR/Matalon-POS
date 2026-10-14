@@ -164,6 +164,36 @@ await p.locator(".resa-caisse-ligne", { hasText: "Zoé Roux" }).waitFor();
 resultats.lignes = await p.locator(".resa-caisse-ligne").allInnerTexts();
 await p.screenshot({ path: `${sortie}/rv10-liste-caisse.png` });
 verifier("deux réservations à venir", resultats.lignes.length === 2, resultats.lignes);
+// Réservations des jours suivants depuis la caisse : saisie pour demain, vues « À venir » et « Par jour », fiche.
+const demain = new Date(Date.now() + 86_400_000).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+await clic("Nouvelle");
+await f.getByLabel("Date").fill(demain);
+await f.getByLabel("Heure").fill("20:00");
+await f.getByLabel("Personnes").fill("2");
+await f.getByLabel("Prénom").fill("Hugo");
+await f.getByLabel("Nom", { exact: true }).fill("Blanc");
+await f.getByLabel("Téléphone").fill("0644444444");
+await f.getByRole("button", { name: "Enregistrer" }).click();
+await p.getByText("Réservation de Hugo Blanc enregistrée.").waitFor();
+resultats.aujourdhuiSansDemain = await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).count();
+verifier("demain absent de la vue du jour", resultats.aujourdhuiSansDemain === 0, resultats.aujourdhuiSansDemain);
+await p.getByRole("button", { name: "À venir", exact: true }).click();
+await p.locator(".resa-caisse-groupe h3", { hasText: /^Demain/ }).waitFor();
+resultats.aVenirCaisse = (await p.locator(".resa-caisse-groupe h3").allInnerTexts()).map((t) => t.replace(/\s+/g, " "));
+verifier("à venir en caisse", resultats.aVenirCaisse.length === 2 && /^Aujourd'hui · 2 réservations/i.test(resultats.aVenirCaisse[0] ?? ""), resultats.aVenirCaisse);
+await p.screenshot({ path: `${sortie}/rv10b-a-venir-caisse.png` });
+await p.getByRole("button", { name: "Par jour", exact: true }).click();
+await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).waitFor();
+resultats.parJourCaisse = await p.locator(".resa-caisse-ligne").count();
+verifier("par jour en caisse", resultats.parJourCaisse === 1, resultats.parJourCaisse);
+await p.getByRole("button", { name: "Modifier la réservation de Hugo Blanc" }).click();
+const ficheCaisse = p.locator(".modale", { has: p.getByRole("heading", { name: "Réservation de Hugo Blanc" }) });
+await ficheCaisse.getByLabel("Personnes").fill("3");
+await ficheCaisse.getByRole("button", { name: "Enregistrer" }).click();
+await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).filter({ hasText: "3 pers." }).waitFor();
+await p.screenshot({ path: `${sortie}/rv10c-fiche-caisse.png` });
+await p.getByRole("button", { name: "Aujourd'hui", exact: true }).click();
+await p.locator(".resa-caisse-ligne", { hasText: "Léa Martin" }).waitFor();
 // Installer Léa : la table s'ouvre avec 4 couverts et la note.
 await p.locator(".resa-caisse-ligne", { hasText: "Léa Martin" }).getByRole("button", { name: "Installer" }).click();
 await p.getByText(/4 couverts/).first().waitFor();
@@ -177,9 +207,10 @@ await a.locator(".resa-table tbody tr").first().waitFor();
 await a.getByText("Annulées et absentes").click();
 resultats.admin = (await a.locator(".resa-table tbody tr").allInnerTexts()).map((l) => l.replace(/\s+/g, " ").trim());
 await a.screenshot({ path: `${sortie}/rv12-liste-admin.png`, fullPage: true });
-verifier("liste de l'administration", resultats.admin.length === 3 && resultats.admin.some((l) => /Paul Durand/.test(l)), resultats.admin);
+// Aujourd'hui (Léa, Paul, Zoé) et demain (Hugo, saisi depuis la caisse).
+verifier("liste de l'administration", resultats.admin.length === 4 && resultats.admin.some((l) => /Paul Durand/.test(l)) && resultats.admin.some((l) => /Hugo Blanc .* 3 /.test(l)), resultats.admin);
 const statuts = await a.locator(".resa-table tbody tr select[aria-label^='Statut']").evaluateAll((l) => l.map((s) => s.value).sort());
-verifier("statuts", statuts.join() === "annulee,arrivee,confirmee", statuts);
+verifier("statuts", statuts.join() === "annulee,arrivee,confirmee,confirmee", statuts);
 
 // Réservations à venir : recherche, fiche, modification (heure, personnes), puis annulation.
 await a.getByLabel("Rechercher une réservation").fill("roux");

@@ -2429,7 +2429,13 @@ async function reservationsCaisse(env: Environnement, requete: Request, chemin: 
     const url = new URL(requete.url);
     const date = url.searchParams.get("date") ?? maintenantParis(ctx.maintenant).jour;
     const { reglages } = await lireReglages(env.db, etab.id);
-    return json(200, { date, reservations: await listeReservations(ctx, etab.id, date, url.searchParams.get("au") ?? date), dureeMinutes: reglages.dureeMinutes, actif: reglages.actif });
+    return json(200, {
+      date,
+      reservations: await listeReservations(ctx, etab.id, date, url.searchParams.get("au") ?? date),
+      dureeMinutes: reglages.dureeMinutes,
+      actif: reglages.actif,
+      horizonJours: reglages.horizonJours,
+    });
   }
   if (chemin === "/api/caisse/reservations" && m === "POST") {
     const corps = await lireJson<Record<string, unknown>>(requete);

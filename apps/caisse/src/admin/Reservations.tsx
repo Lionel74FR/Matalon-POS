@@ -5,20 +5,11 @@ import { Modale } from "../ui/communs";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
+import { dateLongue, decaler, FicheReservation, JOURS_A_VENIR, LIBELLES_SOURCE, LIBELLES_STATUT } from "../ui/FicheReservation";
 
 type Onglet = "liste" | "reglages" | "site";
 const JOURS = ["L", "M", "M", "J", "V", "S", "D"];
 const NOMS_JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
-export const LIBELLES_STATUT: Record<StatutReservation, string> = { confirmee: "Confirmée", arrivee: "Arrivée", absente: "Absente", annulee: "Annulée" };
-export const LIBELLES_SOURCE: Record<Reservation["source"], string> = { en_ligne: "en ligne", telephone: "téléphone", sur_place: "sur place" };
-
-const decaler = (jour: string, n: number) => {
-  const d = new Date(`${jour}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-};
-const dateLongue = (jour: string) =>
-  new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const entierOuNul = (v: string) => (v.trim() === "" ? null : Math.max(0, Math.round(Number(v))));
 
@@ -96,7 +87,6 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
 // ───────── Liste du jour ─────────
 
 /** Jours montrés par « À venir » : la fenêtre de réservation en ligne, au moins 60 jours. */
-const JOURS_A_VENIR = (r: ReglagesReservation) => Math.max(60, r.horizonJours);
 
 function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation }) {
   const { etab, reglages } = props;
@@ -283,9 +273,9 @@ function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation 
         ))
       )}
       {edition && (
-        <EditionReservation
-          etabId={etab.id}
+        <FicheReservation
           reservation={edition}
+          modifier={(corps) => api.modifierReservation(etab.id, edition.id, corps).then(() => undefined)}
           onFermer={() => setEdition(null)}
           onFaite={() => {
             setEdition(null);
@@ -294,142 +284,6 @@ function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation 
         />
       )}
     </section>
-  );
-}
-
-/**
- * Fiche d'une réservation : date, heure, personnes, durée, coordonnées, note ;
- * annulation (le client est prévenu par e-mail s'il en a laissé un).
- */
-function EditionReservation(props: { etabId: string; reservation: Reservation; onFermer: () => void; onFaite: () => void }) {
-  const r = props.reservation;
-  const [f, setF] = useState({
-    date: r.date,
-    heure: r.heure,
-    couverts: String(r.couverts),
-    dureeMinutes: String(r.dureeMinutes),
-    prenom: r.prenom,
-    nom: r.nom,
-    telephone: r.telephone,
-    email: r.email ?? "",
-    commentaire: r.commentaire ?? "",
-  });
-  const [erreur, setErreur] = useState("");
-  const [envoi, setEnvoi] = useState(false);
-  const maj = (cle: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [cle]: e.target.value }));
-
-  const envoyer = async (corps: Record<string, unknown>) => {
-    setEnvoi(true);
-    setErreur("");
-    try {
-      try {
-        await api.modifierReservation(props.etabId, r.id, corps);
-      } catch (e) {
-        if (e instanceof ErreurAdmin && e.statut === 409 && window.confirm(e.message)) await api.modifierReservation(props.etabId, r.id, { ...corps, forcer: true });
-        else throw e;
-      }
-      props.onFaite();
-    } catch (e) {
-      setErreur(message(e));
-    } finally {
-      setEnvoi(false);
-    }
-  };
-
-  const enregistrer = (e: FormEvent) => {
-    e.preventDefault();
-    const corps: Record<string, unknown> = {};
-    if (f.date !== r.date) corps.date = f.date;
-    if (f.heure !== r.heure) corps.heure = f.heure;
-    if (Number(f.couverts) !== r.couverts) corps.couverts = Number(f.couverts);
-    if (Number(f.dureeMinutes) !== r.dureeMinutes) corps.dureeMinutes = Number(f.dureeMinutes);
-    for (const c of ["prenom", "nom", "telephone", "email", "commentaire"] as const) if (f[c].trim() !== (r[c] ?? "")) corps[c] = f[c];
-    if (Object.keys(corps).length === 0) return props.onFermer();
-    void envoyer(corps);
-  };
-
-  const annuler = () => {
-    if (!window.confirm(`Annuler la réservation de ${r.prenom} ${r.nom} (${dateLongue(r.date)}, ${r.heure}, ${r.couverts} pers.) ?${r.email ? " Le client est prévenu par e-mail." : ""}`)) return;
-    void envoyer({ statut: "annulee" });
-  };
-
-  const active = r.statut === "confirmee" || r.statut === "arrivee";
-  return (
-    <Modale
-      titre={`Réservation de ${r.prenom} ${r.nom}`}
-      large
-      onFermer={props.onFermer}
-      pied={
-        <>
-          {active ? (
-            <button className="bouton danger" disabled={envoi} onClick={annuler}>
-              <AvecIcone icone={X}>Annuler la réservation</AvecIcone>
-            </button>
-          ) : (
-            <button className="bouton" disabled={envoi} onClick={() => void envoyer({ statut: "confirmee" })}>
-              <AvecIcone icone={CalendarCheck}>Rétablir la réservation</AvecIcone>
-            </button>
-          )}
-          <button className="bouton principal" type="submit" form="edition-resa" disabled={envoi}>
-            <AvecIcone icone={Save}>Enregistrer</AvecIcone>
-          </button>
-        </>
-      }
-    >
-      <form id="edition-resa" className="resa-saisie" onSubmit={enregistrer}>
-        <label className="champ">
-          <span>Date</span>
-          <input type="date" value={f.date} onChange={maj("date")} required />
-        </label>
-        <label className="champ">
-          <span>Heure</span>
-          <input type="time" step={900} value={f.heure} onChange={maj("heure")} required />
-        </label>
-        <label className="champ">
-          <span>Personnes</span>
-          <input type="number" min={1} max={200} value={f.couverts} onChange={maj("couverts")} required />
-        </label>
-        <label className="champ">
-          <span>Durée (min)</span>
-          <input type="number" min={15} max={480} step={5} value={f.dureeMinutes} onChange={maj("dureeMinutes")} required />
-        </label>
-        <label className="champ">
-          <span>Prénom</span>
-          <input value={f.prenom} onChange={maj("prenom")} required maxLength={60} />
-        </label>
-        <label className="champ">
-          <span>Nom</span>
-          <input value={f.nom} onChange={maj("nom")} required maxLength={60} />
-        </label>
-        <label className="champ">
-          <span>Téléphone</span>
-          <input type="tel" value={f.telephone} onChange={maj("telephone")} required />
-        </label>
-        <label className="champ">
-          <span>E-mail</span>
-          <input type="email" value={f.email} onChange={maj("email")} />
-        </label>
-        <label className="champ resa-large">
-          <span>Note</span>
-          <input value={f.commentaire} onChange={maj("commentaire")} maxLength={500} />
-        </label>
-      </form>
-      <p className="explication">
-        Statut : {LIBELLES_STATUT[r.statut]} · prise {LIBELLES_SOURCE[r.source]}
-        {r.email ? " · un changement de date ou d'heure renvoie la confirmation au client" : ""}.
-      </p>
-      {erreur && <p className="erreur">{erreur}</p>}
-      <details className="resa-historique">
-        <summary>Historique</summary>
-        <ul>
-          {r.historique.map((h, i) => (
-            <li key={i}>
-              {new Date(h.le).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "short", timeStyle: "short" })} · {h.par} · {h.action}
-            </li>
-          ))}
-        </ul>
-      </details>
-    </Modale>
   );
 }
 

@@ -1,10 +1,11 @@
 import { maintenantParis, minutes, type Reservation, type StatutReservation } from "@matalon/reservations";
-import { CalendarCheck, Phone, Plus, RefreshCw, UserCheck, UserX, Undo2, X } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ChevronRight, Pencil, Phone, Plus, RefreshCw, Search, UserCheck, UserX, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Modale } from "./communs";
 import { useCaisse } from "./contexte";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { messageServeur } from "./Reglages";
+import { dateLongue, decaler, FicheReservation, JOURS_A_VENIR, LIBELLES_STATUT } from "./FicheReservation";
 
 const CLE = "matalon.reservations.jour";
 const LIBELLES: Record<StatutReservation, string> = { confirmee: "À venir", arrivee: "Installée", absente: "Absente", annulee: "Annulée" };
@@ -13,6 +14,8 @@ interface Jour {
   date: string;
   reservations: Reservation[];
   actif: boolean;
+  /** Fenêtre de réservation en ligne (jours) : étendue de la vue « À venir ». */
+  horizonJours?: number;
   /** Lu sur le serveur à cette heure ; hors ligne, la dernière copie gardée. */
   luLe: string;
 }
@@ -37,7 +40,7 @@ export function useReservationsDuJour() {
   const recharger = useCallback(async () => {
     try {
       const r = await caisse.client.reservations();
-      const j: Jour = { date: r.date, reservations: r.reservations, actif: r.actif, luLe: new Date().toISOString() };
+      const j: Jour = { date: r.date, reservations: r.reservations, actif: r.actif, horizonJours: r.horizonJours, luLe: new Date().toISOString() };
       setJour(j);
       setHorsLigne(false);
       try {
@@ -78,7 +81,19 @@ export function aVenirParTable(liste: Reservation[]): Map<string, Reservation> {
 
 export const nomClient = (r: Reservation) => `${r.prenom} ${r.nom}`.trim();
 
-/** Liste des réservations du jour : installer, placer, absent, annuler, saisir au téléphone. */
+type Vue = "jour" | "avenir" | "date";
+
+const sansAccents = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+/**
+ * Réservations : celles du jour (installer, placer, absente, annuler), celles à venir sur toute
+ * la fenêtre de réservation, ou celles d'un jour choisi ; recherche, fiche pour modifier ou annuler,
+ * saisie d'une réservation prise au téléphone. Comme dans l'administration.
+ */
 export function PanneauReservations(props: {
   jour: Jour | null;
   horsLigne: boolean;
@@ -88,10 +103,38 @@ export function PanneauReservations(props: {
   onFermer: () => void;
 }) {
   const { caisse, config, utilisateur, notifier } = useCaisse();
+  const aujourdhui = props.jour?.date ?? maintenantParis(new Date()).jour;
+  const [vue, setVue] = useState<Vue>("jour");
+  const [dateChoisie, setDateChoisie] = useState(decaler(aujourdhui, 1));
+  const [autres, setAutres] = useState<Reservation[] | null>(null);
+  const [erreur, setErreur] = useState("");
   const [saisie, setSaisie] = useState(false);
   const [toutes, setToutes] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const [fiche, setFiche] = useState<Reservation | null>(null);
   const tables = config.tables.filter((t) => !t.masquee);
   const nomTables = (ids: string[]) => ids.map((id) => config.tables.find((t) => t.id === id)?.nom ?? id).join(" + ");
+
+  const chargerAutres = useCallback(async () => {
+    if (vue === "jour") return;
+    setErreur("");
+    try {
+      const r =
+        vue === "avenir"
+          ? await caisse.client.reservations(aujourdhui, decaler(aujourdhui, JOURS_A_VENIR({ horizonJours: props.jour?.horizonJours ?? 60 })))
+          : await caisse.client.reservations(dateChoisie);
+      setAutres(r.reservations);
+    } catch (e) {
+      setAutres(null);
+      setErreur(`${messageServeur(e)} Seules les réservations du jour restent consultables hors ligne.`);
+    }
+  }, [vue, dateChoisie, aujourdhui, caisse.client, props.jour?.horizonJours]);
+  useEffect(() => void chargerAutres(), [chargerAutres]);
+
+  const recharger = async () => {
+    await props.onRecharger();
+    await chargerAutres();
+  };
 
   const modifier = async (r: Reservation, corps: Record<string, unknown>, quoi: string) => {
     try {
@@ -102,12 +145,24 @@ export function PanneauReservations(props: {
         await caisse.client.modifierReservation(r.id, { ...corps, par: utilisateur.id, forcer: true }).catch((e2) => notifier(messageServeur(e2), "erreur"));
       } else notifier(messageServeur(e), "erreur");
     }
-    await props.onRecharger();
+    await recharger();
   };
 
-  const liste = (props.jour?.reservations ?? []).filter((r) => toutes || r.statut === "confirmee" || r.statut === "arrivee");
-  const actives = (props.jour?.reservations ?? []).filter((r) => r.statut === "confirmee" || r.statut === "arrivee");
-  const couverts = actives.reduce((n, r) => n + r.couverts, 0);
+  const source = vue === "jour" ? (props.jour?.reservations ?? []) : (autres ?? []);
+  const q = sansAccents(recherche.trim());
+  const liste = source
+    .filter((r) => toutes || r.statut === "confirmee" || r.statut === "arrivee")
+    .filter(
+      (r) =>
+        !q ||
+        sansAccents(`${r.prenom} ${r.nom} ${r.telephone} ${r.email ?? ""} ${r.commentaire ?? ""}`).includes(q) ||
+        r.telephone.replace(/\D/g, "").includes(q.replace(/\D/g, "") || "§"),
+    )
+    .sort((a, b) => a.date.localeCompare(b.date) || a.heure.localeCompare(b.heure));
+  const actives = (l: Reservation[]) => l.filter((r) => r.statut === "confirmee" || r.statut === "arrivee");
+  const couverts = (l: Reservation[]) => actives(l).reduce((n, r) => n + r.couverts, 0);
+  const pl = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+  const groupes = [...new Set(liste.map((r) => r.date))].map((d) => ({ date: d, liste: liste.filter((r) => r.date === d) }));
 
   const creer = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -126,24 +181,54 @@ export function PanneauReservations(props: {
     }
     notifier(`Réservation de ${f.prenom} ${f.nom} enregistrée.`);
     setSaisie(false);
-    await props.onRecharger();
+    await recharger();
   };
 
+  const resume =
+    vue === "jour"
+      ? `${props.horsLigne ? "Hors ligne : dernière liste reçue. " : ""}Aujourd'hui · ${pl(actives(source).length, "réservation")} · ${pl(couverts(source), "couvert")}`
+      : vue === "avenir"
+        ? `À venir · ${pl(actives(source).length, "réservation")} · ${pl(couverts(source), "couvert")}`
+        : `${dateLongue(dateChoisie)} · ${pl(actives(source).length, "réservation")} · ${pl(couverts(source), "couvert")}`;
+
   return (
-    <Modale titre="Réservations du jour" large onFermer={props.onFermer}>
+    <Modale titre="Réservations" large onFermer={props.onFermer}>
+      <div className="resa-caisse-vues">
+        <div className="options" role="group" aria-label="Période">
+          {(
+            [
+              ["jour", "Aujourd'hui"],
+              ["avenir", "À venir"],
+              ["date", "Par jour"],
+            ] as const
+          ).map(([v, libelle]) => (
+            <button key={v} className={`option${vue === v ? " active" : ""}`} aria-pressed={vue === v} onClick={() => setVue(v)}>
+              {libelle}
+            </button>
+          ))}
+        </div>
+        {vue === "date" && (
+          <div className="resa-caisse-date">
+            <BoutonIcone icone={ChevronLeft} libelle="Jour précédent" variante="discret" onClick={() => setDateChoisie(decaler(dateChoisie, -1))} />
+            <input type="date" value={dateChoisie} aria-label="Jour" onChange={(e) => e.target.value && setDateChoisie(e.target.value)} />
+            <BoutonIcone icone={ChevronRight} libelle="Jour suivant" variante="discret" onClick={() => setDateChoisie(decaler(dateChoisie, 1))} />
+          </div>
+        )}
+      </div>
       <div className="resa-caisse-tete">
-        <p>
-          {props.horsLigne ? "Hors ligne : dernière liste reçue. " : ""}
-          {actives.length} réservation{actives.length > 1 ? "s" : ""} · {couverts} couvert{couverts > 1 ? "s" : ""}
-        </p>
+        <p>{resume}</p>
         <label className="case">
           <input type="checkbox" checked={toutes} onChange={(e) => setToutes(e.target.checked)} /> Annulées et absentes
         </label>
-        <BoutonIcone icone={RefreshCw} variante="discret" libelle="Actualiser les réservations" onClick={() => void props.onRecharger()} />
+        <BoutonIcone icone={RefreshCw} variante="discret" libelle="Actualiser les réservations" onClick={() => void recharger()} />
         <button className="bouton" disabled={props.horsLigne} onClick={() => setSaisie((o) => !o)}>
           <AvecIcone icone={saisie ? X : Plus}>{saisie ? "Fermer" : "Nouvelle"}</AvecIcone>
         </button>
       </div>
+      <label className="recherche-client resa-caisse-recherche">
+        <Search size={20} aria-hidden="true" />
+        <input type="search" value={recherche} placeholder="Nom, téléphone, e-mail, note…" aria-label="Rechercher une réservation" onChange={(e) => setRecherche(e.target.value)} />
+      </label>
       {saisie && (
         <form className="resa-caisse-saisie" onSubmit={(e) => void creer(e)}>
           <label className="champ">
@@ -172,7 +257,7 @@ export function PanneauReservations(props: {
           </label>
           <label className="champ">
             <span>Date</span>
-            <input name="date" type="date" defaultValue={props.jour?.date ?? maintenantParis(new Date()).jour} required />
+            <input name="date" type="date" defaultValue={vue === "date" ? dateChoisie : aujourdhui} required />
           </label>
           <label className="champ">
             <span>Note</span>
@@ -184,74 +269,104 @@ export function PanneauReservations(props: {
           </button>
         </form>
       )}
-      {liste.length === 0 ? (
-        <p className="explication">{props.jour?.actif === false ? "La réservation en ligne est fermée (administration › Réservations)." : "Aucune réservation aujourd'hui."}</p>
+      {erreur && vue !== "jour" && <p className="erreur">{erreur}</p>}
+      {vue !== "jour" && autres === null && !erreur ? (
+        <p className="explication">Chargement…</p>
+      ) : liste.length === 0 ? (
+        <p className="explication">
+          {q
+            ? "Aucune réservation ne correspond."
+            : props.jour?.actif === false && vue === "jour"
+              ? "La réservation en ligne est fermée (administration › Réservations)."
+              : vue === "jour"
+                ? "Aucune réservation aujourd'hui."
+                : vue === "avenir"
+                  ? "Aucune réservation à venir."
+                  : "Aucune réservation ce jour-là."}
+        </p>
       ) : (
-        <ul className="resa-caisse-liste">
-          {liste.map((r) => {
-            const occupee = r.tables.some((t) => props.occupees.has(t));
-            return (
-              <li key={r.id} className={`resa-caisse-ligne ${r.statut}`}>
-                <div className="resa-caisse-heure">
-                  <strong>{r.heure}</strong>
-                  <span>{r.couverts} pers.</span>
-                </div>
-                <div className="resa-caisse-client">
-                  <strong>{nomClient(r)}</strong>
-                  <span>
-                    <a href={`tel:${r.telephone}`}>
-                      <AvecIcone icone={Phone} taille={14}>{r.telephone}</AvecIcone>
-                    </a>
-                    {" · "}
-                    {LIBELLES[r.statut]}
-                  </span>
-                  {r.commentaire && <em>{r.commentaire}</em>}
-                </div>
-                <label className="resa-caisse-table">
-                  <span className="lecteur-ecran">Table de {nomClient(r)}</span>
-                  <select
-                    value={r.tables.length === 1 ? r.tables[0] : r.tables.length ? "plusieurs" : ""}
-                    disabled={props.horsLigne || r.statut === "annulee"}
-                    onChange={(e) => void modifier(r, { tables: e.target.value ? [e.target.value] : [] }, e.target.value ? `table ${nomTables([e.target.value])}` : "à placer")}
-                  >
-                    <option value="">À placer</option>
-                    {r.tables.length > 1 && <option value="plusieurs">{nomTables(r.tables)}</option>}
-                    {tables.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        Table {t.nom} ({t.chaises ?? 4})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="resa-caisse-actions">
-                  {r.statut === "confirmee" && (
-                    <>
-                      <button
-                        className="bouton principal"
-                        disabled={r.tables.length === 0 || occupee}
-                        title={r.tables.length === 0 ? "Placez d'abord la réservation sur une table" : occupee ? "La table est encore occupée" : undefined}
-                        onClick={() => void props.onInstaller(r)}
+        groupes.map((g) => (
+          <section key={g.date} className="resa-caisse-groupe">
+            {vue === "avenir" && (
+              <h3>
+                {g.date === aujourdhui ? "Aujourd'hui" : g.date === decaler(aujourdhui, 1) ? "Demain" : dateLongue(g.date)} · {pl(actives(g.liste).length, "réservation")} ·{" "}
+                {pl(couverts(g.liste), "couvert")}
+              </h3>
+            )}
+            <ul className="resa-caisse-liste">
+              {g.liste.map((r) => {
+                const occupee = r.tables.some((t) => props.occupees.has(t));
+                const duJour = r.date === aujourdhui;
+                return (
+                  <li key={r.id} className={`resa-caisse-ligne ${r.statut}`}>
+                    <div className="resa-caisse-heure">
+                      <strong>{r.heure}</strong>
+                      <span>{r.couverts} pers.</span>
+                    </div>
+                    <div className="resa-caisse-client">
+                      <strong>{nomClient(r)}</strong>
+                      <span>
+                        <a href={`tel:${r.telephone}`}>
+                          <AvecIcone icone={Phone} taille={14}>{r.telephone}</AvecIcone>
+                        </a>
+                        {" · "}
+                        {duJour ? LIBELLES[r.statut] : LIBELLES_STATUT[r.statut]}
+                      </span>
+                      {r.commentaire && <em>{r.commentaire}</em>}
+                    </div>
+                    <label className="resa-caisse-table">
+                      <span className="lecteur-ecran">Table de {nomClient(r)}</span>
+                      <select
+                        value={r.tables.length === 1 ? r.tables[0] : r.tables.length ? "plusieurs" : ""}
+                        disabled={props.horsLigne || r.statut === "annulee"}
+                        onChange={(e) => void modifier(r, { tables: e.target.value ? [e.target.value] : [] }, e.target.value ? `table ${nomTables([e.target.value])}` : "à placer")}
                       >
-                        <AvecIcone icone={UserCheck}>Installer</AvecIcone>
-                      </button>
-                      <BoutonIcone icone={UserX} variante="discret" libelle={`${nomClient(r)} ne vient pas (absente)`} disabled={props.horsLigne} onClick={() => void modifier(r, { statut: "absente" }, "absente")} />
-                      <BoutonIcone
-                        icone={X}
-                        variante="discret"
-                        libelle={`Annuler la réservation de ${nomClient(r)}`}
-                        disabled={props.horsLigne}
-                        onClick={() => window.confirm(`Annuler la réservation de ${nomClient(r)} (${r.heure}, ${r.couverts} pers.) ?`) && void modifier(r, { statut: "annulee" }, "annulée")}
-                      />
-                    </>
-                  )}
-                  {r.statut !== "confirmee" && (
-                    <BoutonIcone icone={Undo2} variante="discret" libelle={`Remettre la réservation de ${nomClient(r)} à venir`} disabled={props.horsLigne} onClick={() => void modifier(r, { statut: "confirmee" }, "remise à venir")} />
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                        <option value="">À placer</option>
+                        {r.tables.length > 1 && <option value="plusieurs">{nomTables(r.tables)}</option>}
+                        {tables.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            Table {t.nom} ({t.chaises ?? 4})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="resa-caisse-actions">
+                      {duJour && r.statut === "confirmee" && (
+                        <>
+                          <button
+                            className="bouton principal"
+                            disabled={r.tables.length === 0 || occupee}
+                            title={r.tables.length === 0 ? "Placez d'abord la réservation sur une table" : occupee ? "La table est encore occupée" : undefined}
+                            onClick={() => void props.onInstaller(r)}
+                          >
+                            <AvecIcone icone={UserCheck}>Installer</AvecIcone>
+                          </button>
+                          <BoutonIcone icone={UserX} variante="discret" libelle={`${nomClient(r)} ne vient pas (absente)`} disabled={props.horsLigne} onClick={() => void modifier(r, { statut: "absente" }, "absente")} />
+                        </>
+                      )}
+                      {duJour && r.statut !== "confirmee" && (
+                        <BoutonIcone icone={Undo2} variante="discret" libelle={`Remettre la réservation de ${nomClient(r)} à venir`} disabled={props.horsLigne} onClick={() => void modifier(r, { statut: "confirmee" }, "remise à venir")} />
+                      )}
+                      <BoutonIcone icone={Pencil} variante="discret" libelle={`Modifier la réservation de ${nomClient(r)}`} disabled={props.horsLigne} onClick={() => setFiche(r)} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))
+      )}
+      {fiche && (
+        <FicheReservation
+          reservation={fiche}
+          modifier={(corps) => caisse.client.modifierReservation(fiche.id, { ...corps, par: utilisateur.id }).then(() => undefined)}
+          onFermer={() => setFiche(null)}
+          onFaite={() => {
+            notifier(`Réservation de ${nomClient(fiche)} enregistrée.`);
+            setFiche(null);
+            void recharger();
+          }}
+        />
       )}
     </Modale>
   );

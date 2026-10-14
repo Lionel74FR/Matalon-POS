@@ -169,8 +169,13 @@ export class ClientApi {
   }
 
   /** Réservations d'un jour (Paris), avec la durée par défaut. */
-  reservations(date?: string) {
-    return this.appel<{ date: string; reservations: Reservation[]; dureeMinutes: number; actif: boolean }>("GET", `/api/caisse/reservations${date ? `?date=${date}` : ""}`);
+  /** Réservations d'un jour (aujourd'hui par défaut), ou du jour `date` au jour `au`. */
+  reservations(date?: string, au?: string) {
+    const q = [date ? `date=${date}` : "", au ? `au=${au}` : ""].filter(Boolean).join("&");
+    return this.appel<{ date: string; reservations: Reservation[]; dureeMinutes: number; actif: boolean; horizonJours?: number }>(
+      "GET",
+      `/api/caisse/reservations${q ? `?${q}` : ""}`,
+    );
   }
 
   creerReservation(corps: Record<string, unknown>) {

@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 55, copiée le 13 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 56, copiée le 14 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -192,6 +192,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 
 - Plan de salle : table réservée (heure et nom), bord plein dans la demi-heure ; une table occupée affiche « Résa 20:00 » dans l'heure qui précède. Même indication dans la vue en liste.
 - Réservations du jour : installer (la table s'ouvre avec les couverts et une note au nom du client, tables assemblées comprises), placer sur une table, absent, annuler, remettre à venir, saisir au téléphone. Liste relue chaque minute ; hors ligne, la dernière copie du jour.
+- Toutes les réservations depuis la caisse, comme dans l'administration : vues « Aujourd'hui », « À venir » (par jour, sur la fenêtre de réservation en ligne, au moins 60 jours) et « Par jour » (jour au choix) ; recherche par nom, téléphone, e-mail ou note ; fiche pour modifier date, heure, personnes, durée, coordonnées et note, annuler ou rétablir, avec l'historique ; saisie pour n'importe quel jour. Les jours suivants demandent une connexion. Ajouté le 14 octobre 2026.
 - L'équipe peut dépasser un plafond après confirmation (« Enregistrer quand même »), tracé dans l'historique de la réservation ; le client en ligne jamais.
 
 ### Règles

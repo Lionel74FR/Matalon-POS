@@ -1085,29 +1085,6 @@ code.cle-api {
   max-width: 220px;
 }
 
-.resa-saisie,
-.resa-grille {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 4px 18px;
-  margin-top: 12px;
-}
-
-.resa-saisie .champ,
-.resa-grille .champ {
-  grid-template-columns: 1fr;
-  gap: 4px;
-}
-
-.resa-saisie {
-  padding: 14px;
-  border-radius: var(--rayon);
-  background: var(--espresso);
-}
-
-.resa-large {
-  grid-column: 1 / -1;
-}
 
 .resa-ouverture {
   font-size: 1.1rem;
@@ -1439,16 +1416,6 @@ code.cle-api {
   white-space: nowrap;
 }
 
-.resa-historique {
-  margin-top: 10px;
-  color: var(--sable);
-}
-
-.resa-historique ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
-  font-size: 0.9rem;
-}
 
 @media (max-width: 700px) {
   .resa-recherche {

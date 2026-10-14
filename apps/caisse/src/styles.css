@@ -2939,3 +2939,81 @@ a.bouton {
   border-radius: var(--rayon-petit);
   border: 2px solid var(--terre);
 }
+
+/* Fiche de réservation (caisse et administration). */
+.resa-saisie,
+.resa-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 18px;
+  margin-top: 12px;
+}
+
+.resa-saisie .champ,
+.resa-grille .champ {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.resa-saisie {
+  padding: 14px;
+  border-radius: var(--rayon);
+  background: var(--espresso);
+}
+
+.resa-large {
+  grid-column: 1 / -1;
+}
+
+.resa-historique {
+  margin-top: 10px;
+  color: var(--sable);
+}
+
+.resa-historique ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+
+/* Réservations en caisse : aujourd'hui, à venir, par jour. */
+.resa-caisse-vues {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 12px;
+}
+
+.resa-caisse-vues .options {
+  margin: 0;
+}
+
+.resa-caisse-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.resa-caisse-date input {
+  min-height: 44px;
+}
+
+.resa-caisse-recherche {
+  margin-bottom: 12px;
+}
+
+.resa-caisse-groupe + .resa-caisse-groupe {
+  margin-top: 16px;
+}
+
+.resa-caisse-groupe h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  color: var(--sable);
+}
+
+.resa-caisse-groupe h3::first-letter {
+  text-transform: uppercase;
+}
