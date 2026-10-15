@@ -122,6 +122,9 @@ const prerempli = await p.getByLabel("Bombay Sapphire : nombre reçu").inputValu
 verifier("reste pré-rempli", prerempli === "10", prerempli);
 await p.getByLabel("Bombay Sapphire : nombre reçu").fill("6");
 await p.getByLabel("Bon de livraison").fill("BL-77");
+// Prix du tarif à trois décimales : arrondi au centime. Les articles hors commande restent cachés.
+await p.getByLabel("Prosecco : prix HT du conditionnement").fill("6,295");
+verifier("hors commande caché", (await p.locator(".inventaire-liste li").count()) === 3, await p.locator(".inventaire-liste li").count());
 await p.screenshot({ path: `${sortie}/f04-reception-ipad.png`, fullPage: true });
 await p.getByRole("button", { name: /^Réceptionner ·/ }).click();
 await p.locator(".commande-detail .statut-commande", { hasText: "Reçue en partie" }).waitFor();

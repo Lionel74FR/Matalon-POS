@@ -45,6 +45,20 @@ export function lireDecimal(texte: string): number | null {
   return Number(t);
 }
 
+/**
+ * Prix d'achat saisi en euros, au centime le plus proche : les tarifs
+ * fournisseurs ont souvent trois décimales (« 24,945 » → 2 495 centimes).
+ * Calcul sur les chiffres, sans flottant ; null si vide, négatif ou illisible.
+ */
+export function lireCentimes(texte: string): number | null {
+  const t = texte.trim().replace(/[\s  ]/g, "").replace(/€|eur(os?)?/gi, "").replace(",", ".");
+  const m = /^(\d+)(?:\.(\d*))?$/.exec(t);
+  if (!m) return null;
+  const decimales = (m[2] ?? "").padEnd(3, "0");
+  const centimes = Number(m[1]) * 100 + Number(decimales.slice(0, 2));
+  return centimes + (Number(decimales[2]) >= 5 ? 1 : 0);
+}
+
 const FACTEURS: Record<string, { unite: UniteBase; facteur: number }> = {
   g: { unite: "g", facteur: 1 },
   gr: { unite: "g", facteur: 1 },

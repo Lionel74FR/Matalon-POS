@@ -2,6 +2,7 @@ import {
   Couts,
   formaterEnUnite,
   journeeParis,
+  lireCentimes,
   lireDecimal,
   MOTIFS_PERTE,
   normaliserNom,
@@ -15,7 +16,6 @@ import type { CommandeFournisseur, DocumentStock, EtatStock } from "@matalon/ser
 import { Check, ClipboardList, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ChampQuantite, ChoixComposant, composants, euros, eurosMicro, type Composant } from "../admin/stock-commun";
-import { centimesDepuisSaisie } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import "./stock.css";
 
@@ -180,6 +180,8 @@ export function FormulaireReception(props: {
     ),
   );
   const { enCours, erreur, ok, envoyer } = useEnvoi(props.onEnregistrer);
+  // Contre une commande : seulement les articles commandés, les autres du fournisseur sur demande.
+  const [horsCommande, setHorsCommande] = useState(false);
   const produit = (id: string) => ref.produits.find((p) => p.id === id);
   const dernier = (articleId: string) => props.prix.filter((p) => p.articleId === articleId && p.etablissementId === props.etablissementId).sort((a, b) => b.le.localeCompare(a.le))[0];
   const commandee = (articleId: string) => commande?.lignes.find((l) => l.articleId === articleId);
@@ -190,11 +192,12 @@ export function FormulaireReception(props: {
     .map((a) => {
       const s = saisies[a.id];
       const nb = s ? milliemes(s.nombre) : null;
-      const prixHT = s?.prix.trim() ? centimesDepuisSaisie(s.prix) : (dernier(a.id)?.prixHT ?? commandee(a.id)?.prixHT ?? null);
-      return { a, nb, prixHT };
+      const prixHT = s?.prix.trim() ? lireCentimes(s.prix) : (dernier(a.id)?.prixHT ?? commandee(a.id)?.prixHT ?? null);
+      return { a, nb, prixHT, illisible: !!s?.prix.trim() && prixHT == null };
     })
     .filter((l) => l.nb != null && l.nb > 0);
-  const incompletes = lignes.filter((l) => l.prixHT == null);
+  const incompletes = lignes.filter((l) => l.prixHT == null && !l.illisible);
+  const illisibles = lignes.filter((l) => l.illisible);
   const total = lignes.reduce((s, l) => s + (l.prixHT == null ? 0 : Math.round((l.prixHT * l.nb!) / 1000)), 0);
   const nombre = (n: number) => (n / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
 
@@ -232,7 +235,7 @@ export function FormulaireReception(props: {
         <p className="explication">Aucun fournisseur : ajoutez-en aux produits dans l'administration.</p>
       ) : (
         <ul className="inventaire-liste">
-          {articles.map((a) => {
+          {articles.filter((a) => !commande || horsCommande || commandee(a.id) || saisies[a.id]).map((a) => {
             const p = produit(a.produitId);
             const d = dernier(a.id);
             const s = saisies[a.id] ?? { nombre: "", prix: "" };
@@ -270,7 +273,13 @@ export function FormulaireReception(props: {
           })}
         </ul>
       )}
+      {commande && !horsCommande && articles.some((a) => !commandee(a.id) && !saisies[a.id]) && (
+        <button className="bouton discret" onClick={() => setHorsCommande(true)}>
+          <AvecIcone icone={Plus}>Article livré hors commande (gratuité, ajout)</AvecIcone>
+        </button>
+      )}
       {incompletes.length > 0 && <p className="erreur">Prix HT à saisir pour {incompletes.map((l) => produit(l.a.produitId)?.nom).join(", ")}.</p>}
+      {illisibles.length > 0 && <p className="erreur">Prix HT illisible pour {illisibles.map((l) => produit(l.a.produitId)?.nom).join(", ")} (ex. 24,95 ou 24,945).</p>}
       {erreur && <p className="erreur">{erreur}</p>}
       {ok && <p className="admin-ok succes">{ok}</p>}
       <div className="operation-actions">
@@ -281,7 +290,7 @@ export function FormulaireReception(props: {
         )}
         <button
           className="bouton principal"
-          disabled={enCours || !lignes.length || incompletes.length > 0}
+          disabled={enCours || !lignes.length || incompletes.length > 0 || illisibles.length > 0}
           onClick={() =>
             void envoyer(
               { fournisseur, numero, date, ...(commande ? { commandeId: commande.id } : {}), lignes: lignes.map((l) => ({ articleId: l.a.id, nombre: l.nb, prixHT: l.prixHT })) },

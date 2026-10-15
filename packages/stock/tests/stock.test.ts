@@ -5,6 +5,7 @@ import {
   foodCost,
   formaterQuantite,
   estTableauRecettes,
+  lireCentimes,
   lireLignesImport,
   lireLignesRecettes,
   lireQuantite,
@@ -208,6 +209,20 @@ describe("import", () => {
     const c = planifierImport(a.referentiel, a.prix, [{ ligne: 2, produit: "creme liquide 35%", unite: "kg" }], "moka", "2026-10-10T10:00:00Z");
     expect(c.referentiel.produits).toHaveLength(3);
     expect(c.rapport.erreurs[0]!.message).toMatch(/existe déjà, compté en L/);
+  });
+});
+
+describe("prix saisis", () => {
+  it("arrondit au centime les tarifs à trois décimales, sans flottant", () => {
+    expect(lireCentimes("24,945")).toBe(2495);
+    expect(lireCentimes("24,944")).toBe(2494);
+    expect(lireCentimes("1,005")).toBe(101);
+    expect(lireCentimes(" 1 234,5 € ")).toBe(123450);
+    expect(lireCentimes("13")).toBe(1300);
+    expect(lireCentimes("0,0951")).toBe(10);
+    expect(lireCentimes("")).toBeNull();
+    expect(lireCentimes("-2")).toBeNull();
+    expect(lireCentimes("douze")).toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@ import {
   formaterQuantite,
   estTableauRecettes,
   identifiantStock,
+  lireCentimes,
   lireDecimal,
   lireLignesImport,
   lireLignesRecettes,
@@ -24,7 +25,6 @@ import type { ReponseStock } from "@matalon/serveur/partage";
 import { Archive, Check, ChefHat, FileUp, History, Package, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Modale } from "../ui/communs";
-import { centimesDepuisSaisie } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api } from "./api";
 import {
@@ -406,7 +406,7 @@ function ArticlesFournisseurs(props: ProprietesOnglet & { etab: string; produit:
     const f = new FormData(e.currentTarget);
     const fournisseur = String(f.get("fournisseur") ?? "").trim();
     const q = lireDecimal(String(f.get("quantite") ?? ""));
-    const prix = centimesDepuisSaisie(String(f.get("prix") ?? ""));
+    const prix = lireCentimes(String(f.get("prix") ?? ""));
     if (!fournisseur) return setErreur("Fournisseur obligatoire.");
     if (q == null || q <= 0) return setErreur(`Quantité du conditionnement en ${parUnite(p.unite)} (ex. 6 pour 6 ${parUnite(p.unite)}).`);
     if (prix == null) return setErreur("Prix HT du conditionnement obligatoire (ex. 21,90).");
@@ -424,7 +424,7 @@ function ArticlesFournisseurs(props: ProprietesOnglet & { etab: string; produit:
   };
 
   const nouveauPrix = async (a: ArticleFournisseur, texte: string) => {
-    const prix = centimesDepuisSaisie(texte);
+    const prix = lireCentimes(texte);
     if (prix == null) return setErreur("Prix illisible : saisissez par exemple 21,90.");
     await executer(() => api.enregistrerPrix(a.id, props.etab, prix));
   };
