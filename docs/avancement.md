@@ -99,7 +99,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 ## Actions en attente côté Lionel
 
-- [ ] Commandes fournisseurs : importer `MOKA_import_1_produits.xlsx` puis `MOKA_import_2_fiches_techniques.xlsx` (Stock et recettes › Importer, Vérifier puis Importer), relier les 20 cocktails à leur fiche dans l'éditeur de carte ; compléter la fiche Caves du Mont (e-mail de commande : mettre d'abord sa propre adresse pour le test) et les réglages d'envoi des commandes ; confirmer les points du fichier (volumes Corona et limonade, fournisseur des trois tarifs du 15/10, prix estimés).
+- [ ] Commandes fournisseurs : importer `MOKA_import_1_produits.xlsx` puis `MOKA_import_2_fiches_techniques.xlsx` (Stock et recettes › Importer, Vérifier puis Importer), relier les 20 cocktails à leur fiche dans l'éditeur de carte ; compléter la fiche Caves du Mont (e-mail de commande : mettre d'abord sa propre adresse pour le test) et les réglages d'envoi des commandes ; confirmer les points du fichier (volume de la Corona, fournisseur des trois tarifs du 15/10, prix estimés) ; corrigés le 15 octobre : limonade 150 cl, Citadelle 24,96 € HT chez Metro, zone unique Bar.
 
 - [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
 - [ ] Remplir les mentions légales des factures dans l'administration.
