@@ -13,6 +13,7 @@ import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { Reservations } from "./Reservations";
 import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces";
+import { FenetreConfiguration } from "./Configuration";
 import { cleAccesDisponible, utiliserCleAcces } from "./cleAcces";
 import {
   Archive,
@@ -368,6 +369,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const [erreur, setErreur] = useState("");
   const clesAcces = useClesAcces();
   const [fenetreCles, setFenetreCles] = useState(false);
+  const [fenetreConfiguration, setFenetreConfiguration] = useState(false);
 
   const recharger = useCallback(async () => {
     try {
@@ -430,6 +432,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
         )}
         <div className="admin-barre-droite">
           <span className="admin-identifiant">{props.identifiant}</span>
+          <BoutonIcone icone={FileJson} libelle="Configuration de l'installation" variante="discret" onClick={() => setFenetreConfiguration(true)} />
           <BoutonIcone icone={KeyRound} libelle="Clés d'accès" variante="discret" onClick={() => setFenetreCles(true)} />
           <BoutonIcone
             icone={LogOut}
@@ -517,6 +520,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           )}
         </main>
       </div>
+      {fenetreConfiguration && <FenetreConfiguration onFermer={() => setFenetreConfiguration(false)} onImporte={() => void recharger()} />}
       {fenetreCles && <FenetreClesAcces cles={clesAcces.cles} onChange={clesAcces.setCles} onFermer={() => setFenetreCles(false)} />}
     </div>
   );

@@ -78,6 +78,7 @@ URL=… node scripts/admin-navigation.mjs captures  # administration : établiss
 URL=… node scripts/cles-acces.mjs captures       # clés d'accès (authentificateur virtuel de Chromium) : invitation, création avec le code, connexion sans mot de passe ni code, retrait, iPhone
 URL=… node scripts/imprimante-partagee.mjs captures # imprimante des tickets commune : réglée sur l'iPad, reçue et utilisée par l'iPhone, imprimante propre à un appareil
 URL=… node scripts/commandes-partagees.mjs captures # tables partagées : ouverte sur l'iPad, vue et complétée sur l'iPhone, encaissée sur l'un, refusée sur l'autre, un seul ticket
+URL=… node scripts/mise-en-service.mjs captures   # configuration exportée de l'administration de test, importée dans une installation neuve (second serveur local), sans les ventes ; second import refusé
 URL=… node scripts/commandes-fournisseurs.mjs captures # commandes fournisseurs : fiches techniques importées, fiche fournisseur, réglages d'envoi, bon saisi et envoyé par e-mail depuis l'iPad, réception partielle puis solde, bon marqué envoyé, iPhone
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
@@ -85,3 +86,5 @@ pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) 
 ## Déploiement Vercel
 
 Projet à la racine `apps/caisse`, commande de build `pnpm build:vercel`, préréglage « Other ». La base Neon (région Francfort) est reliée au projet par l'intégration Vercel, qui fournit `DATABASE_URL`. Le schéma se crée seul au premier appel de l'API. `VITE_MODE_TEST=1` sur le projet de test : bandeau et mention « sans valeur » sur chaque note.
+
+Deux projets : `matalon-pos` (production, domaine matalon-pos.app, sans `VITE_MODE_TEST`) et `matalon-pos-test` (test, matalon-pos-test.vercel.app), chacun avec sa base Neon. Les deux portent la même `CLE_SECRETS` pour que les clés chiffrées (Resend) passent de l'un à l'autre. Mise en service d'une installation neuve : créer l'administrateur, puis administration › icône « Configuration de l'installation » › Importer le fichier exporté depuis l'autre installation (refusé dès que la base a servi).

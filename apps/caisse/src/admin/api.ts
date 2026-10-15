@@ -131,6 +131,8 @@ export const api = {
     appel<{ client: ClientApi }>("PUT", `/etablissements/${etablissementId}/clients`, client),
   clotures: (caisseId: string) => appel<{ clotures: ResumeCloture[] }>("GET", `/caisses/${caisseId}/clotures`),
   ventesCarte: (id: string) => appel<ReponseVentesCarte>("GET", `/cartes/${id}/ventes`),
+  exporterConfiguration: () => appel<{ format: string; exporteLe: string; versionNoyau: string; tables: Record<string, unknown[]> }>("GET", "/configuration"),
+  importerConfiguration: (configuration: unknown) => appel<{ importe: Record<string, number> }>("POST", "/configuration", configuration),
   stock: () => appel<ReponseStock>("GET", "/stock"),
   enregistrerProduit: (produit: Produit) => appel<ReponseStock>("PUT", `/stock/produits/${produit.id}`, { produit }),
   enregistrerArticleFournisseur: (article: ArticleFournisseur) => appel<ReponseStock>("PUT", `/stock/articles/${article.id}`, { article }),

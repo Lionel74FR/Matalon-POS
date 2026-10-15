@@ -11,6 +11,13 @@ import {
 } from "../src/index.js";
 import { CAPPUCCINO, nouveauRegistre, SPRITZ } from "./aide.js";
 
+describe("version attestée", () => {
+  it("est la 1.0.0, citée par l'attestation de l'éditeur et imprimée sur chaque ticket", () => {
+    // Gel pour la mise en service : toute modification du noyau doit faire évoluer ce numéro et l'attestation.
+    expect(VERSION_NOYAU_FISCAL).toBe("1.0.0");
+  });
+});
+
 describe("tickets", () => {
   it("numérote, chaîne et signe les ventes", async () => {
     const { registre, resoudreCle, stockage } = await nouveauRegistre();

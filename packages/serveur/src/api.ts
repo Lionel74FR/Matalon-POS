@@ -148,6 +148,7 @@ import {
 import type { EtatEnvoi } from "./partage.js";
 import { maintenantParis } from "@matalon/reservations";
 import { enregistrerSecret, etatSecret, lireSecret, retirerSecret } from "./secrets.js";
+import { exporterConfiguration, importerConfiguration, resumeConfiguration } from "./configuration.js";
 
 export interface Environnement {
   db: Db;
@@ -2696,6 +2697,18 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const pk = /^\/api\/admin\/cles-acces\/([A-Za-z0-9_-]{16,1400})$/.exec(chemin);
       if (pk && m === "DELETE") return await retirerCle(env, admin, pk[1]!);
       if (chemin === "/api/admin/etablissements" && m === "GET") return await listeEtablissements(env);
+      // Mise en service : configuration de l'installation (sans aucune vente), importée dans une base vierge.
+      if (chemin === "/api/admin/configuration" && m === "GET") {
+        const maintenant = horloge(env).toISOString();
+        const conf = await exporterConfiguration(env.db, VERSION_NOYAU_FISCAL, maintenant, new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(new Date(maintenant)));
+        await journaliserAdmin(env, admin.id, "configuration_exportee", resumeConfiguration(conf));
+        return json(200, conf);
+      }
+      if (chemin === "/api/admin/configuration" && m === "POST") {
+        const resume = await importerConfiguration(env.db, await lireJson<unknown>(requete));
+        await journaliserAdmin(env, admin.id, "configuration_importee", resume);
+        return json(200, { importe: resume });
+      }
       if (chemin === "/api/admin/cartes" && m === "GET") return await listeCartes(env);
       if (chemin === "/api/admin/cartes" && m === "POST") return await creerCarte(env, requete, admin);
       const pc = /^\/api\/admin\/cartes\/([a-z0-9-]+)$/.exec(chemin);

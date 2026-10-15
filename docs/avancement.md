@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 15 octobre 2026.
+Dernière mise à jour : 16 octobre 2026.
 
 ## Règle de conduite
 
@@ -14,7 +14,7 @@ Dernière mise à jour : 15 octobre 2026.
 | Lot | État | Ce qui reste |
 | --- | --- | --- |
 | 0. Cadrage | En cours, côté Lionel | Fiches techniques du Moka, caisse de transition conforme (plan B), outil comptable destinataire des Z, calendrier de facturation électronique B2B (Audrex) |
-| 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients) | Attestation éditeur rédigée (7 octobre), à compléter, valider par Audrex et signer ; noyau à geler en 1.0.0. Ticket envoyé par e-mail (optionnel) : non fait |
+| 1. Noyau fiscal et caisse minimale | Code terminé ; noyau gelé en 1.0.0 le 16 octobre pour la mise en service (même code que la 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients) | Attestation éditeur rédigée (7 octobre), à compléter pour la 1.0.0, valider par Audrex et signer avant la première vente réelle ; tag `noyau-fiscal-v1.0.0` à poser. Ticket envoyé par e-mail (optionnel) : non fait |
 | 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
 | 4. Stock et fiches techniques | Code livré le 9 octobre 2026, avant la fin des lots 1 à 3 sur décision de Lionel : 4a référentiel et liaison carte, 4b consommation à la vente et pertes, 4c réceptions et inventaires (iPad, iPhone, administration), 4d food cost réel, transferts, agent de factures ; commandes fournisseurs et import des fiches techniques le 15 octobre 2026 (demande de Lionel) | Critère de sortie : écarts calculés sur un inventaire réel au Moka. Reste côté Lionel : premiers produits (pas de reprise Yokitup), fiches du Moka, inventaire d'ouverture, clé pour l'agent de factures |
@@ -25,6 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Mise en service (demande de Lionel du 15 octobre) : noyau fiscal gelé en 1.0.0 (version citée par l'attestation, aucun changement de comportement) ; administration › « Configuration de l'installation » : export d'un fichier (établissements, équipe, plan, imprimante, cartes, stock sans les consommations des ventes, commandes fournisseurs, réservations à venir, clés chiffrées) et import dans une installation neuve, refusé dès que la base a servi (vente, appareil, équipe, stock) ; scénario `mise-en-service` (21 parcours) |
 | 6c9bb22 | Éditeur de carte (demande de Lionel du 15 octobre) : déplacer un rayon, flèches à côté de son nom ; l'ordre des onglets de la caisse suit (catégories regroupées par rayon, leur ordre dans chaque rayon gardé) ; scénario `carte` complété |
 | b592173 | Détail d'un inventaire (demande de Lionel du 15 octobre) : champ de recherche par nom de produit ; scénario `stock-operations` complété |
 | 922be87 | Onglet Inventaire (demande de Lionel du 15 octobre), caisse et administration : liste des inventaires d'abord (date du comptage, zone, nombre de produits, stock d'ouverture ou écart valorisé ; détail par produit : compté, théorique, écart, valeur), puis « Nouvel inventaire ». Date du comptage : un jour passé (92 jours au plus) se compare au stock théorique de ce jour-là (mouvements d'avant midi), les livraisons et ventes d'après s'y ajoutent ; refusé pour un produit déjà inventorié depuis. Route `GET /api/caisse/stock/documents?type=` ; scénario `stock-operations` complété |
@@ -76,6 +77,7 @@ Dernière mise à jour : 15 octobre 2026.
 ## Décisions techniques à ne pas défaire
 
 - Inventaire daté (15 octobre) : un comptage d'un jour passé est horodaté à midi ce jour-là, comme toute pièce datée ; son écart se calcule sur les mouvements d'avant cet instant (le théorique de ce jour-là), et ses mouvements portent cet horodatage, donc la somme des mouvements donne bien le stock actuel. Refusé pour un produit qui a un inventaire plus récent (son écart a été calculé sans lui) : un inventaire ne s'annule pas et ne s'insère jamais avant un autre.
+- Production et test (16 octobre, décision de Lionel) : deux projets Vercel et deux bases Neon, la production sur matalon-pos.app, le test sur matalon-pos-test.vercel.app (mode test, notes « sans valeur »). Les ventes de test ne sont jamais effacées (enregistrements en ajout seul) : la production part d'une base neuve, qui reçoit la configuration par `GET`/`POST /api/admin/configuration` (format `matalon-configuration/1`). Import d'un seul bloc, seulement si aucune vente, aucun appareil, aucune équipe, aucun stock ; l'établissement créé d'office au démarrage est remplacé ; carte et référentiel remplacés ; séquences recalées. Mêmes `CLE_SECRETS` des deux côtés pour les clés Resend. Les appareils se rattachent avec des codes neufs ; les clés d'accès de l'administration sont à recréer sur le nouveau domaine.
 - Dépenses en espèces (15 octobre) : déclarées au comptage de clôture, dans les détails de l'événement `COMPTAGE_CAISSE` (texte JSON, valeurs simples seulement dans un événement) ; pas de modification du noyau fiscal (le contenu des détails est libre). Espèces attendues = fond + espèces encaissées − dépenses ; la remise en banque reste comptées − fond laissé.
 - Prix d'achat (Lionel, 15 octobre) : toujours le prix net HT droits **et vignette sécurité sociale** compris, à la saisie comme à la réception. Les confirmations et factures Caves du Mont portent la vignette sur une ligne à part : elle s'ajoute au prix unitaire (0,062 € × degré × litres au-delà de 18°, soit environ 1,74 € pour 70 cl à 40°).
 - Diluants des alcools au verre (Lionel, 15 octobre) : le Coca PET 1,25 L (produit « Coca-Cola PET 1,25 L », en litres) sert à tous les alcools à la verse ; le Coca 33 cl reste la vente en bouteille. Pas de choix de diluant au service (trop lourd en soirée) : la fiche d'un verre ne décompte que l'alcool, la consommation de Coca PET, tonic, jus se constate à l'inventaire. Seules les fiches de cocktails décomptent leur diluant (Long Island : 6 cl de Coca PET).
@@ -121,10 +123,11 @@ Dernière mise à jour : 15 octobre 2026.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
-- [ ] Tag `noyau-fiscal-v0.7.0` sur fefbad6 (clôtures d'établissement).
+- [ ] Tag `noyau-fiscal-v0.7.0` sur fefbad6 (clôtures d'établissement), puis `noyau-fiscal-v1.0.0` sur le commit de mise en service.
 - [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
-- [ ] Geler le noyau en 1.0.0 (au plus tard au go/no-go du 13 octobre) et poser le tag `noyau-fiscal-v1.0.0` : c'est la version citée par l'attestation.
+- [x] Geler le noyau en 1.0.0 (fait le 16 octobre ; reste le tag `noyau-fiscal-v1.0.0`, version citée par l'attestation).
+- [ ] Mise en service sur matalon-pos.app : projet Vercel `matalon-pos` (même `CLE_SECRETS` que le test), base Neon (restauration 7 jours), domaine ; créer l'administrateur, importer la configuration ; recréer la clé d'accès ; rattacher chaque appareil depuis matalon-pos.app et accepter le certificat de l'imprimante ; mettre à jour la balise des réservations sur le site du Moka ; ajouter les vrais comptes de l'équipe ; recréer la clé de l'agent de factures si besoin.
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
 - [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.
@@ -138,4 +141,4 @@ Dernière mise à jour : 15 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 20 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 21 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

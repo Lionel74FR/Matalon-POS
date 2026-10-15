@@ -1525,3 +1525,18 @@ code.cle-api {
   color: var(--mousse);
   font: inherit;
 }
+
+/* Configuration de l'installation (mise en service) */
+.configuration-bloc {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.configuration-bloc h3 {
+  margin: 0;
+}
+
+.configuration-bloc .bouton {
+  justify-self: start;
+}
