@@ -40,7 +40,7 @@ import {
   type Composant,
 } from "./stock-commun";
 import { OngletFournisseurs } from "./StockFournisseurs";
-import { OngletCommandes, OngletEtat, OngletFactures, OngletFoodCost, OngletPiece, OngletTransfert } from "./StockOperations";
+import { MouvementsAdmin, OngletCommandes, OngletEtat, OngletFactures, OngletFoodCost, OngletPiece, OngletTransfert } from "./StockOperations";
 import { lireFichierTableau } from "./tableur";
 
 /** « 1 produit créé », « 5 produits créés », « 2 prix à enregistrer ». */
@@ -268,6 +268,7 @@ function ModaleProduit(props: ProprietesOnglet & { etab: string; produit: Produi
   const [contenance, setContenance] = useState<Quantite | null>(props.produit.contenance ?? null);
   const [erreur, setErreur] = useState("");
   const [enCours, setEnCours] = useState(false);
+  const [mouvements, setMouvements] = useState(false);
   const familles = [...new Set(ref.produits.map((x) => x.famille).filter(Boolean) as string[])];
   const zones = [...new Set(ref.produits.map((x) => x.zone).filter(Boolean) as string[])];
   // Doublons possibles : un nom proche d'un produit existant (accents, casse et ponctuation ignorés).
@@ -300,6 +301,11 @@ function ModaleProduit(props: ProprietesOnglet & { etab: string; produit: Produi
       onFermer={props.onFermer}
       pied={
         <>
+          {!nouveau && (
+            <button className="bouton" onClick={() => setMouvements(true)}>
+              <AvecIcone icone={History}>{`Mouvements (${props.nomEtab})`}</AvecIcone>
+            </button>
+          )}
           {!nouveau && (
             <button
               className="bouton"
@@ -379,6 +385,7 @@ function ModaleProduit(props: ProprietesOnglet & { etab: string; produit: Produi
       ) : (
         <ArticlesFournisseurs {...props} produit={props.produit} articles={articles} />
       )}
+      {mouvements && <MouvementsAdmin referentiel={ref} etab={props.etab} produitId={p.id} onFermer={() => setMouvements(false)} />}
     </Modale>
   );
 }

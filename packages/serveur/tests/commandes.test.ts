@@ -171,6 +171,10 @@ describe("commandes fournisseurs", () => {
     const etat = (await appel("GET", "/api/admin/stock/etat?etab=moka", undefined, admin)).corps;
     expect(etat.produits.find((p: any) => p.produitId === "bombay-sapphire").quantite).toBe(4200);
     expect(etat.produits.find((p: any) => p.produitId === "carlsberg-pression").quantite).toBe(60_000);
+    // Mouvements du produit sur la caisse : la réception, avec son fournisseur et sa commande.
+    const mvt = (await appel("GET", "/api/caisse/stock/mouvements?produit=bombay-sapphire", undefined, bearer)).corps.mouvements;
+    expect(mvt[0]).toMatchObject({ type: "reception", quantite: 4200, origine: { fournisseur: "Caves du Mont", numero: "BL-77", commande: 1 } });
+    expect((await appel("GET", "/api/caisse/stock/mouvements?produit=Pas%20valide", undefined, bearer)).statut).toBe(400);
     // Annuler une commande en partie reçue : refusé, on la solde.
     expect((await appel("POST", `/api/admin/stock/commandes/${c.id}/annuler?etab=moka`, { version: c.version }, admin)).statut).toBe(409);
 

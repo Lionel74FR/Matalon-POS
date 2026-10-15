@@ -3,6 +3,7 @@ import type { ReponseStockCaisse } from "@matalon/serveur/partage";
 import { ClipboardList, Package, PackagePlus, RefreshCw, ShoppingCart, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Commandes, type AccesCommandes } from "../stock/Commandes";
+import { MouvementsProduit } from "../stock/MouvementsProduit";
 import { FormulaireInventaire, FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
 import { Vide } from "./communs";
 import { useCaisse } from "./contexte";
@@ -21,6 +22,14 @@ export function StockCaisse() {
   const [donnees, setDonnees] = useState<ReponseStockCaisse | null>(null);
   const [erreur, setErreur] = useState("");
   const [onglet, setOnglet] = useState<Onglet>("inventaire");
+  const [produit, setProduit] = useState<string | null>(null);
+  const chargerMouvements = useCallback(async () => {
+    try {
+      return produit ? (await caisse.client.mouvementsStock(produit)).mouvements : [];
+    } catch (e) {
+      throw new Error(messageServeur(e));
+    }
+  }, [caisse, produit]);
   const charger = useCallback(async () => {
     try {
       setDonnees(await caisse.client.stock());
@@ -104,7 +113,15 @@ export function StockCaisse() {
           {onglet === "perte" && <FormulairePerte referentiel={donnees.referentiel} couts={couts} onEnregistrer={enregistrer("pertes")} />}
           {onglet === "stock" && (
             <>
-              <TableauStock referentiel={donnees.referentiel} etat={donnees.etat} />
+              <TableauStock referentiel={donnees.referentiel} etat={donnees.etat} onProduit={setProduit} />
+              {produit && donnees.referentiel.produits.some((p) => p.id === produit) && (
+                <MouvementsProduit
+                  produit={donnees.referentiel.produits.find((p) => p.id === produit)!}
+                  stockActuel={donnees.etat.produits.find((p) => p.produitId === produit)?.quantite ?? 0}
+                  charger={chargerMouvements}
+                  onFermer={() => setProduit(null)}
+                />
+              )}
               <h2>Dernières pièces</h2>
               <ListePieces documents={donnees.documents} referentiel={donnees.referentiel} />
             </>

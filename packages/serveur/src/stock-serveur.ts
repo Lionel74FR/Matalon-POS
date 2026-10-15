@@ -268,7 +268,7 @@ export async function receptionner(db: Db, etablissementId: string, corps: Recor
     type: "reception",
     le,
     dateComptable: date,
-    origine: { reception: id, fournisseur, numero, ligne: i },
+    origine: { reception: id, fournisseur, numero, ligne: i, ...(commande ? { commande: commande.numero } : {}) },
     cle: `rx:${id}:${i}`,
   }));
   const prix = lignes.map((l) => ({

@@ -4,6 +4,7 @@ import type {
   CommandePartagee,
   CommandeFournisseur,
   DocumentStock,
+  MouvementApi,
   ReponseEcritureCommande,
   EtatStock,
   ReponseCommandes,
@@ -155,6 +156,11 @@ export class ClientApi {
   /** Réception, inventaire ou perte saisi sur l'appareil par un responsable. */
   operationStock(type: "receptions" | "inventaires" | "pertes", corps: Record<string, unknown>) {
     return this.appel<{ document: DocumentStock; etat: EtatStock }>("POST", `/api/caisse/stock/${type}`, corps);
+  }
+
+  /** Mouvements d'un produit dans l'établissement (300 derniers). */
+  mouvementsStock(produitId: string) {
+    return this.appel<{ mouvements: MouvementApi[] }>("GET", `/api/caisse/stock/mouvements?produit=${encodeURIComponent(produitId)}`);
   }
 
   /** Commandes fournisseurs de l'établissement (lecture). */

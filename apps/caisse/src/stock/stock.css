@@ -414,3 +414,50 @@
     align-items: flex-start;
   }
 }
+
+/* Mouvements d'un produit */
+.mouvements-solde {
+  margin: 0 0 10px;
+}
+
+.mouvements-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.mouvements-liste li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+}
+
+.mouvements-liste li > span {
+  display: grid;
+  min-width: 0;
+}
+
+.mouvements-liste small {
+  color: var(--sable);
+  font-size: 0.82rem;
+}
+
+.mouvement-quantite {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mouvements-liste li.mouvement-reception .mouvement-quantite strong,
+.mouvements-liste li.mouvement-annulation .mouvement-quantite strong {
+  color: #a9cf96;
+}
+
+.tableau-stock tbody tr {
+  cursor: pointer;
+}

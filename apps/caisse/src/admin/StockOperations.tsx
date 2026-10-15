@@ -3,6 +3,7 @@ import type { CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, R
 import { ArrowRightLeft, Check, ChartPie, KeyRound, Plus, Receipt, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Commandes, type AccesCommandes } from "../stock/Commandes";
+import { MouvementsProduit } from "../stock/MouvementsProduit";
 import { FormulaireInventaire, FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
 import { Modale } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
@@ -63,58 +64,21 @@ export function OngletEtat(props: Proprietes) {
         />
         {erreur && <p className="erreur">{erreur}</p>}
       </section>
-      {produit && <ModaleMouvements referentiel={props.stock.referentiel} etab={props.etab} produitId={produit} onFermer={() => setProduit(null)} />}
+      {produit && <MouvementsAdmin referentiel={props.stock.referentiel} etab={props.etab} produitId={produit} stockActuel={etat?.produits.find((x) => x.produitId === produit)?.quantite ?? null} onFermer={() => setProduit(null)} />}
     </>
   );
 }
 
-function ModaleMouvements(props: { referentiel: Referentiel; etab: string; produitId: string; onFermer: () => void }) {
+/** Mouvements d'un produit dans l'établissement choisi (administration). */
+export function MouvementsAdmin(props: { referentiel: Referentiel; etab: string; produitId: string; stockActuel?: number | null; onFermer: () => void }) {
   const p = props.referentiel.produits.find((x) => x.id === props.produitId)!;
-  const [mouvements, setMouvements] = useState<MouvementApi[] | null>(null);
+  const { etab, produitId } = props;
+  const [stock, setStock] = useState<number | null>(props.stockActuel ?? null);
   useEffect(() => {
-    void api.mouvementsStock(props.etab, { produit: props.produitId }).then((r) => setMouvements(r.mouvements));
-  }, [props.etab, props.produitId]);
-  const origine = (m: MouvementApi) => {
-    const o = m.origine;
-    if (o.libelle) return `${String(o.libelle)} · ticket ${String(o.ticket)}`;
-    if (o.fournisseur) return `${String(o.fournisseur)}${o.numero ? ` · BL ${String(o.numero)}` : ""}${o.annulation ? " · annulée" : ""}`;
-    if (o.motif) return `${String(o.motif)} · ${String(o.composant ?? "")}`;
-    if (o.zone !== undefined) return o.zone ? `Zone ${String(o.zone)}` : "Inventaire";
-    if (o.vers) return `Vers ${String(o.vers)}`;
-    if (o.de) return `Depuis ${String(o.de)}`;
-    return "";
-  };
-  return (
-    <Modale large titre={`Mouvements : ${p.nom}`} onFermer={props.onFermer}>
-      {!mouvements ? (
-        <p>Chargement…</p>
-      ) : (
-        <table className="tableau admin-tableau stock-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Mouvement</th>
-              <th className="nombre">Quantité</th>
-              <th className="nombre">Valeur HT</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mouvements.map((m) => (
-              <tr key={m.id}>
-                <td>{new Date(m.le).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}</td>
-                <td>
-                  {LIBELLES_MOUVEMENT[m.type]}
-                  <small>{origine(m)}</small>
-                </td>
-                <td className="nombre">{`${m.quantite > 0 ? "+" : ""}${formaterEnUnite(m.quantite, p.unite)}`}</td>
-                <td className="nombre">{m.valeurMicro == null ? "sans prix" : eurosMicro(m.valeurMicro)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </Modale>
-  );
+    if (props.stockActuel === undefined) void api.etatStock(etab).then((e) => setStock(e.produits.find((x) => x.produitId === produitId)?.quantite ?? 0));
+  }, [etab, produitId, props.stockActuel]);
+  const charger = useCallback(() => api.mouvementsStock(etab, { produit: produitId }).then((r) => r.mouvements), [etab, produitId]);
+  return <MouvementsProduit produit={p} stockActuel={stock} charger={charger} onFermer={props.onFermer} />;
 }
 
 // ───────── Réception, inventaire, perte (formulaires partagés avec la caisse) ─────────

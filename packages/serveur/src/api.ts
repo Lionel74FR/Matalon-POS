@@ -1765,6 +1765,12 @@ async function stockCaisse(env: Environnement, requete: Request, chemin: string,
     const par = await responsableCaisse(env, c, corps.utilisateurId);
     return await operationStock(env, c.etablissement_id, p[1]!, corps, par);
   }
+  if (chemin === "/api/caisse/stock/mouvements" && m === "GET") {
+    // Mouvements d'un produit (lecture, tout appareil rattaché) : ventes, réceptions, inventaires, pertes, transferts.
+    const produit = new URL(requete.url).searchParams.get("produit") ?? "";
+    if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(produit)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Produit attendu.");
+    return json(200, { mouvements: await listeMouvements(env.db, c.etablissement_id, { produit }, 300) });
+  }
   const pc = /^\/api\/caisse\/stock\/commandes(\/.*)?$/.exec(chemin);
   if (pc) {
     const r = await routeCommandes(env, requete, c.etablissement_id, pc[1] ?? "", m, (corps) => responsableCaisse(env, c, corps.utilisateurId));

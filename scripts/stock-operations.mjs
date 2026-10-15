@@ -112,8 +112,8 @@ await a.goto(`${URL}/admin#/moka/stock`);
 await a.getByRole("tab", { name: "Stock et pièces" }).click();
 await a.locator(".tableau-stock").waitFor();
 await a.locator(".tableau-stock tr", { hasText: "Lait entier" }).click();
-await a.locator(".modale tbody tr").first().waitFor();
-const mouvementsLait = (await a.locator(".modale tbody").textContent()).replace(/\s+/g, " ");
+await a.locator(".mouvements-liste li").first().waitFor();
+const mouvementsLait = (await a.locator(".modale").textContent()).replace(/\s+/g, " ");
 await a.screenshot({ path: `${sortie}/o04-mouvements.png` });
 await a.getByRole("button", { name: "Fermer" }).click();
 

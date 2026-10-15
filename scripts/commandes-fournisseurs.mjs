@@ -131,6 +131,17 @@ await p.locator(".commande-detail .statut-commande", { hasText: "Reçue en parti
 const detail = (await p.locator(".tableau-commande tbody").textContent()).replace(/\s+/g, " ");
 verifier("reçu par ligne", /Bombay Sapphire.*10.*6/.test(detail), detail);
 
+// Mouvements du gin, depuis Stock et pièces : la réception, sa commande et son bon de livraison.
+await p.getByRole("tab", { name: "Stock et pièces" }).click();
+await p.locator(".tableau-stock tr", { hasText: "Bombay Sapphire" }).click();
+await p.locator(".mouvements-liste li").first().waitFor();
+const mouvementsGin = (await p.locator(".modale").textContent()).replace(/\s+/g, " ");
+verifier("mouvements du produit", /Réception/.test(mouvementsGin) && /commande n° 1 · BL BL-77/.test(mouvementsGin) && /\+4,2 L/.test(mouvementsGin), mouvementsGin.slice(0, 200));
+await p.screenshot({ path: `${sortie}/f05b-mouvements-ipad.png` });
+await p.getByRole("button", { name: "Fermer" }).click();
+await p.getByRole("tab", { name: "Commandes" }).click();
+await p.locator(".commande-carte", { hasText: "Reçue en partie" }).click();
+
 // iPhone : liste et saisie sans débordement.
 await p.setViewportSize({ width: 390, height: 844 });
 await p.getByRole("button", { name: "Retour aux commandes" }).click();
