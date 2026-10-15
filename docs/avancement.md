@@ -25,7 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Retrait d'un article déjà envoyé (retour de Lionel du 15 octobre) : motif obligatoire et accord d'un responsable (code PIN si un serveur est connecté), tracés dans `SUPPRESSION_LIGNE` ; statistiques : tuile « Articles retirés après envoi », tableau par motif, colonne par serveur (les retraits d'avant ce correctif apparaissent « sans motif ») |
+| c97491e | Retrait d'un article déjà envoyé (retour de Lionel du 15 octobre) : motif obligatoire et accord d'un responsable (code PIN si un serveur est connecté), tracés dans `SUPPRESSION_LIGNE` ; statistiques : tuile « Articles retirés après envoi », tableau par motif, colonne par serveur (les retraits d'avant ce correctif apparaissent « sans motif ») |
 | 1001e39 | Plan de salle : « Tourner (90°) » sur la table sélectionnée, carrée ou rectangulaire, par quarts de tour (0, 90, 180, 270°), plateau et chaises tournés ensemble |
 | c08cb48 | Note : réglage « Imprimer la note d'office à partir de ce montant » (caisse et administration, commun à l'établissement) ; sans impression d'office, l'encaissement rappelle de remettre la note (papier ou QR code). Tickets : duplicata « Note sans détail » (total par taux de TVA), tracé au journal |
 | da8724e | Réservations en caisse comme dans l'administration : vues Aujourd'hui, À venir, Par jour, recherche, fiche de réservation (modifier, annuler, rétablir, historique) commune à la caisse et à l'administration, saisie pour n'importe quel jour |
