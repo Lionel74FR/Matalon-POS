@@ -1,0 +1,1653 @@
+{
+  "id": "carte-automne-2026",
+  "nom": "Carte du Moka (15 octobre 2026)",
+  "source": "Carte_Boissons_A5.pdf + MOKA_Carte_A5_Cuisine.pdf (Lionel, 15 octobre 2026)",
+  "etablissementId": "moka",
+  "categories": [
+    {
+      "id": "cafes",
+      "nom": "Cafés",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "espresso",
+          "nom": "Espresso",
+          "prixTTC": 200,
+          "tauxTVA": 1000,
+          "supplements": [
+            {
+              "id": "sirop-vanille",
+              "nom": "Sirop vanille",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-caramel",
+              "nom": "Sirop caramel",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-speculoos",
+              "nom": "Sirop speculoos",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-noisette",
+              "nom": "Sirop noisette",
+              "prixTTC": 50
+            }
+          ]
+        },
+        {
+          "id": "cortado",
+          "nom": "Cortado",
+          "prixTTC": 250,
+          "tauxTVA": 1000,
+          "supplements": [
+            {
+              "id": "sirop-vanille",
+              "nom": "Sirop vanille",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-caramel",
+              "nom": "Sirop caramel",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-speculoos",
+              "nom": "Sirop speculoos",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-noisette",
+              "nom": "Sirop noisette",
+              "prixTTC": 50
+            }
+          ]
+        },
+        {
+          "id": "double-espresso",
+          "nom": "Double espresso",
+          "prixTTC": 350,
+          "tauxTVA": 1000,
+          "supplements": [
+            {
+              "id": "sirop-vanille",
+              "nom": "Sirop vanille",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-caramel",
+              "nom": "Sirop caramel",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-speculoos",
+              "nom": "Sirop speculoos",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-noisette",
+              "nom": "Sirop noisette",
+              "prixTTC": 50
+            }
+          ]
+        },
+        {
+          "id": "cappuccino",
+          "nom": "Cappuccino",
+          "prixTTC": 400,
+          "tauxTVA": 1000,
+          "supplements": [
+            {
+              "id": "sirop-vanille",
+              "nom": "Sirop vanille",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-caramel",
+              "nom": "Sirop caramel",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-speculoos",
+              "nom": "Sirop speculoos",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-noisette",
+              "nom": "Sirop noisette",
+              "prixTTC": 50
+            }
+          ]
+        },
+        {
+          "id": "mocaccino",
+          "nom": "Mocaccino",
+          "prixTTC": 550,
+          "tauxTVA": 1000,
+          "supplements": [
+            {
+              "id": "sirop-vanille",
+              "nom": "Sirop vanille",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-caramel",
+              "nom": "Sirop caramel",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-speculoos",
+              "nom": "Sirop speculoos",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-noisette",
+              "nom": "Sirop noisette",
+              "prixTTC": 50
+            }
+          ]
+        },
+        {
+          "id": "latte",
+          "nom": "Latte",
+          "prixTTC": 500,
+          "tauxTVA": 1000,
+          "supplements": [
+            {
+              "id": "sirop-vanille",
+              "nom": "Sirop vanille",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-caramel",
+              "nom": "Sirop caramel",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-speculoos",
+              "nom": "Sirop speculoos",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-noisette",
+              "nom": "Sirop noisette",
+              "prixTTC": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "latte-creations",
+      "nom": "Latte créations",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "chai-latte",
+          "nom": "Chaï Latte BIO",
+          "prixTTC": 500,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "matcha-bio",
+          "nom": "Matcha BIO",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "chocolat-chaud",
+          "nom": "Chocolat chaud signature",
+          "prixTTC": 500,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "thes",
+      "nom": "Thés & infusions",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "the",
+          "nom": "Thé / infusion",
+          "prixTTC": 450,
+          "tauxTVA": 1000,
+          "variantes": [
+            {
+              "id": "earl-grey",
+              "nom": "Earl Grey"
+            },
+            {
+              "id": "menthe",
+              "nom": "Menthe"
+            },
+            {
+              "id": "fruits-rouges",
+              "nom": "Fruits rouges"
+            },
+            {
+              "id": "sencha",
+              "nom": "Sencha"
+            },
+            {
+              "id": "camomille",
+              "nom": "Camomille"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bubble-tea",
+      "nom": "Bubble tea",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "bubble-tea",
+          "nom": "Bubble tea",
+          "prixTTC": 650,
+          "tauxTVA": 1000,
+          "variantes": [
+            {
+              "id": "classique",
+              "nom": "Classique"
+            },
+            {
+              "id": "matcha",
+              "nom": "Matcha"
+            },
+            {
+              "id": "taro",
+              "nom": "Taro"
+            },
+            {
+              "id": "fraise",
+              "nom": "Fraise"
+            }
+          ],
+          "supplements": [
+            {
+              "id": "lait-avoine",
+              "nom": "Lait d'avoine",
+              "prixTTC": 50
+            },
+            {
+              "id": "perles-popping",
+              "nom": "Perles popping",
+              "prixTTC": 50
+            },
+            {
+              "id": "sirop-maison",
+              "nom": "Sirop maison",
+              "prixTTC": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jus",
+      "nom": "Jus & boissons fraîches",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "orange-pressee",
+          "nom": "Orange pressée",
+          "prixTTC": 500,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "jus-pomme",
+          "nom": "Pomme-Poires des Vergers Tissot",
+          "prixTTC": 400,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "carotte-pomme-gingembre",
+          "nom": "Carotte-pomme-gingembre",
+          "prixTTC": 600,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "limonade-hibiscus",
+          "nom": "Limonade hibiscus",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "smoothies-glaces",
+      "nom": "Glacés",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "smoothie",
+          "nom": "Smoothie",
+          "prixTTC": 650,
+          "tauxTVA": 1000,
+          "variantes": [
+            {
+              "id": "tropical",
+              "nom": "Tropical"
+            },
+            {
+              "id": "forest",
+              "nom": "Forest"
+            },
+            {
+              "id": "green",
+              "nom": "Green"
+            }
+          ]
+        },
+        {
+          "id": "iced-latte",
+          "nom": "Iced latte",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "iced-chai",
+          "nom": "Iced Chaï",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "iced-matcha",
+          "nom": "Iced matcha",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "moka-iced-tea",
+          "nom": "Moka Iced Tea Maison",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "softs",
+      "nom": "Softs & eaux",
+      "rayon": "Boissons",
+      "articles": [
+        {
+          "id": "coca",
+          "nom": "Coca-Cola",
+          "prixTTC": 450,
+          "tauxTVA": 1000,
+          "variantes": [
+            {
+              "id": "original",
+              "nom": "Original",
+              "libelle": "Coca-Cola"
+            },
+            {
+              "id": "zero",
+              "nom": "Zero",
+              "libelle": "Coca Zero"
+            }
+          ]
+        },
+        {
+          "id": "limonade",
+          "nom": "Limonade",
+          "prixTTC": 450,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "ginger-beer",
+          "nom": "Ginger beer",
+          "prixTTC": 450,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "fuze-tea",
+          "nom": "Fuze Tea",
+          "prixTTC": 450,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "badoit",
+          "nom": "Badoit",
+          "prixTTC": 400,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "evian",
+          "nom": "Evian",
+          "prixTTC": 400,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "red-bull",
+          "nom": "Red Bull",
+          "prixTTC": 600,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "cocktails-signature",
+      "nom": "Signature",
+      "rayon": "Cocktails",
+      "articles": [
+        {
+          "id": "moka-velvet",
+          "nom": "Moka Velvet",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Grey Goose, liqueur de café, espresso & vanille"
+        },
+        {
+          "id": "terracotta",
+          "nom": "Terracotta",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Patrón Silver, passion, citron vert & sirop d'agave"
+        },
+        {
+          "id": "dolce-vita",
+          "nom": "Dolce Vita",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Bombay Sapphire, St-Germain, citron & prosecco"
+        },
+        {
+          "id": "rouge-nuit",
+          "nom": "Rouge Nuit",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Grey Goose, framboise, hibiscus & citron"
+        },
+        {
+          "id": "goose-berry",
+          "nom": "Goose Berry",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Grey Goose Berry Rouge, cranberry, limonade & citron"
+        },
+        {
+          "id": "eclipse",
+          "nom": "Éclipse",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Bacardí Carta Oro, ananas, citron vert & sirop de cannelle"
+        },
+        {
+          "id": "espresso-martini-patron",
+          "nom": "Espresso Martini Patrón",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "description": "Patrón XO Café, espresso, sirop de sucre & pincée de sel"
+        }
+      ]
+    },
+    {
+      "id": "classiques",
+      "nom": "Classiques",
+      "rayon": "Cocktails",
+      "articles": [
+        {
+          "id": "espresso-martini",
+          "nom": "Espresso Martini",
+          "prixTTC": 1300,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "long-island",
+          "nom": "Long Island",
+          "prixTTC": 1400,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "mojito",
+          "nom": "Mojito Bacardí",
+          "prixTTC": 1300,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "paloma",
+          "nom": "Paloma Patrón",
+          "prixTTC": 1400,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "moscow-mule",
+          "nom": "Moscow Mule",
+          "prixTTC": 1300,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "margarita",
+          "nom": "Margarita Patrón",
+          "prixTTC": 1400,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "moka-spritz",
+          "nom": "Saint-Germain Spritz",
+          "prixTTC": 1200,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "spritz-aperol",
+          "nom": "Aperol Spritz",
+          "prixTTC": 1100,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "martini-bianco-spritz",
+          "nom": "Martini Bianco Spritz",
+          "prixTTC": 1200,
+          "tauxTVA": 2000
+        }
+      ]
+    },
+    {
+      "id": "mocktails",
+      "nom": "Sans alcool",
+      "rayon": "Cocktails",
+      "articles": [
+        {
+          "id": "moka-spritz-sans-alcool",
+          "nom": "Moka Spritz sans alcool",
+          "prixTTC": 900,
+          "tauxTVA": 1000,
+          "description": "Martini Vibrante, tonic & eau pétillante"
+        },
+        {
+          "id": "virgin-mojito",
+          "nom": "Virgin Mojito",
+          "prixTTC": 900,
+          "tauxTVA": 1000,
+          "description": "Menthe, citron vert, sucre & eau pétillante"
+        },
+        {
+          "id": "passion-fizz",
+          "nom": "Passion Fizz",
+          "prixTTC": 900,
+          "tauxTVA": 1000,
+          "description": "Passion, citron, sirop de vanille & eau pétillante"
+        }
+      ]
+    },
+    {
+      "id": "shooters",
+      "nom": "Shooters",
+      "rayon": "Cocktails",
+      "articles": [
+        {
+          "id": "shooter-classique",
+          "nom": "Shooter classique",
+          "prixTTC": 500,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "shooter-premium",
+          "nom": "Shooter premium",
+          "prixTTC": 700,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "jager-bomb",
+          "nom": "Jäger Bomb",
+          "prixTTC": 800,
+          "tauxTVA": 2000
+        }
+      ]
+    },
+    {
+      "id": "ateliers",
+      "nom": "Ateliers",
+      "rayon": "Cocktails",
+      "articles": [
+        {
+          "id": "atelier-cocktails",
+          "nom": "Cocktails chez MOKA (par personne)",
+          "prixTTC": 7000,
+          "tauxTVA": 2000,
+          "description": "Atelier de 2 h, 6 à 8 personnes"
+        }
+      ]
+    },
+    {
+      "id": "bieres",
+      "nom": "Bières",
+      "rayon": "Cave",
+      "articles": [
+        {
+          "id": "pression-blonde",
+          "nom": "Pression blonde",
+          "prixTTC": 480,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "25cl",
+              "nom": "25 cl",
+              "prixTTC": 480
+            },
+            {
+              "id": "50cl",
+              "nom": "50 cl",
+              "prixTTC": 900
+            }
+          ]
+        },
+        {
+          "id": "pression-blanche",
+          "nom": "Pression blanche",
+          "prixTTC": 500,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "25cl",
+              "nom": "25 cl",
+              "prixTTC": 500
+            },
+            {
+              "id": "50cl",
+              "nom": "50 cl",
+              "prixTTC": 950
+            }
+          ]
+        },
+        {
+          "id": "pression-ipa",
+          "nom": "Pression IPA",
+          "prixTTC": 600,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "25cl",
+              "nom": "25 cl",
+              "prixTTC": 600
+            },
+            {
+              "id": "50cl",
+              "nom": "50 cl",
+              "prixTTC": 1100
+            }
+          ]
+        },
+        {
+          "id": "biere-du-moment",
+          "nom": "Bière du moment",
+          "prixTTC": 650,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "25cl",
+              "nom": "25 cl",
+              "prixTTC": 650
+            },
+            {
+              "id": "50cl",
+              "nom": "50 cl",
+              "prixTTC": 1200
+            }
+          ]
+        },
+        {
+          "id": "corona",
+          "nom": "Corona",
+          "prixTTC": 700,
+          "tauxTVA": 2000
+        }
+      ]
+    },
+    {
+      "id": "champagnes",
+      "nom": "Champagnes & bulles",
+      "rayon": "Cave",
+      "articles": [
+        {
+          "id": "laurent-perrier",
+          "nom": "Laurent Perrier Brut",
+          "prixTTC": 1200,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "coupe",
+              "nom": "Coupe",
+              "prixTTC": 1200
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 8500
+            }
+          ]
+        },
+        {
+          "id": "laurent-perrier-rose",
+          "nom": "Laurent Perrier Rosé",
+          "prixTTC": 1400,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "coupe",
+              "nom": "Coupe",
+              "prixTTC": 1400
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 14500
+            }
+          ]
+        },
+        {
+          "id": "prosecco",
+          "nom": "Prosecco (coupe)",
+          "prixTTC": 800,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "veuve-clicquot",
+          "nom": "Veuve Clicquot Carte Jaune (bouteille)",
+          "prixTTC": 13500,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "dom-perignon",
+          "nom": "Dom Pérignon (bouteille)",
+          "prixTTC": 38000,
+          "tauxTVA": 2000
+        }
+      ]
+    },
+    {
+      "id": "vins",
+      "nom": "Vins",
+      "rayon": "Cave",
+      "articles": [
+        {
+          "id": "chardonnay-paul-mas",
+          "nom": "Chardonnay — Paul Mas",
+          "prixTTC": 700,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 700
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 3800
+            }
+          ]
+        },
+        {
+          "id": "chignin-bergeron",
+          "nom": "Chignin-Bergeron Les Amandiers",
+          "prixTTC": 900,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 900
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 4200
+            }
+          ]
+        },
+        {
+          "id": "chambre-d-amour",
+          "nom": "Chambre d'Amour — moelleux",
+          "prixTTC": 800,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 800
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 4000
+            }
+          ]
+        },
+        {
+          "id": "kairos",
+          "nom": "Kairos — Provence (rosé)",
+          "prixTTC": 600,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 600
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 4000
+            }
+          ]
+        },
+        {
+          "id": "syrahvissante",
+          "nom": "Syrahvissante — Louis Chèze",
+          "prixTTC": 700,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 700
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 3800
+            }
+          ]
+        },
+        {
+          "id": "grand-marrenon",
+          "nom": "Le Grand Marrenon",
+          "prixTTC": 800,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 800
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 4200
+            }
+          ]
+        },
+        {
+          "id": "pinot-noir-bourgogne",
+          "nom": "Pinot Noir de Bourgogne",
+          "prixTTC": 900,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre 12 cl",
+              "prixTTC": 900
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 4500
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whisky",
+      "nom": "Whisky",
+      "rayon": "Bar",
+      "articles": [
+        {
+          "id": "clan-campbell",
+          "nom": "Clan Campbell",
+          "tauxTVA": 2000,
+          "prixTTC": 1000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1000
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 9000
+            }
+          ]
+        },
+        {
+          "id": "jack-daniels",
+          "nom": "Jack Daniel's",
+          "tauxTVA": 2000,
+          "prixTTC": 1200,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1200
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 10000
+            }
+          ]
+        },
+        {
+          "id": "lagavulin-16",
+          "nom": "Lagavulin 16 ans",
+          "prixTTC": 1500,
+          "tauxTVA": 2000
+        }
+      ]
+    },
+    {
+      "id": "gin",
+      "nom": "Gin",
+      "rayon": "Bar",
+      "articles": [
+        {
+          "id": "bombay-sapphire",
+          "nom": "Bombay Sapphire",
+          "tauxTVA": 2000,
+          "prixTTC": 1000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1000
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 9000
+            }
+          ]
+        },
+        {
+          "id": "hendricks",
+          "nom": "Hendrick's",
+          "tauxTVA": 2000,
+          "prixTTC": 1200,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1200
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 11500
+            }
+          ]
+        },
+        {
+          "id": "roku",
+          "nom": "Roku",
+          "prixTTC": 1300,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "gin-mare",
+          "nom": "Gin Mare",
+          "tauxTVA": 2000,
+          "prixTTC": 1400,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1400
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 14000
+            }
+          ]
+        },
+        {
+          "id": "citadelle",
+          "nom": "Citadelle",
+          "prixTTC": 1400,
+          "tauxTVA": 2000
+        }
+      ]
+    },
+    {
+      "id": "vodka",
+      "nom": "Vodka",
+      "rayon": "Bar",
+      "articles": [
+        {
+          "id": "eristoff",
+          "nom": "Eristoff",
+          "tauxTVA": 2000,
+          "prixTTC": 1000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1000
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 8000
+            }
+          ],
+          "supplements": [
+            {
+              "id": "red-bull-verre",
+              "nom": "Vodka-Red Bull (verre)",
+              "prixTTC": 100
+            },
+            {
+              "id": "red-bull-bouteille",
+              "nom": "Red Bull (bouteille)",
+              "prixTTC": 1000
+            }
+          ]
+        },
+        {
+          "id": "grey-goose",
+          "nom": "Grey Goose (bouteille)",
+          "prixTTC": 13000,
+          "tauxTVA": 2000,
+          "supplements": [
+            {
+              "id": "red-bull-bouteille",
+              "nom": "Red Bull (bouteille)",
+              "prixTTC": 1000
+            }
+          ]
+        },
+        {
+          "id": "grey-goose-berry-rouge",
+          "nom": "Grey Goose Berry Rouge (bouteille)",
+          "prixTTC": 13000,
+          "tauxTVA": 2000,
+          "supplements": [
+            {
+              "id": "red-bull-bouteille",
+              "nom": "Red Bull (bouteille)",
+              "prixTTC": 1000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tequila",
+      "nom": "Téquila",
+      "rayon": "Bar",
+      "articles": [
+        {
+          "id": "cazadores-blanco",
+          "nom": "Cazadores Blanco",
+          "tauxTVA": 2000,
+          "prixTTC": 1000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1000
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 10000
+            }
+          ]
+        },
+        {
+          "id": "don-julio-reposado",
+          "nom": "Don Julio Reposado",
+          "tauxTVA": 2000,
+          "prixTTC": 1200,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1200
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 13000
+            }
+          ]
+        },
+        {
+          "id": "patron-silver",
+          "nom": "Patrón Silver",
+          "tauxTVA": 2000,
+          "prixTTC": 1300,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1300
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 15000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rhum",
+      "nom": "Rhum",
+      "rayon": "Bar",
+      "articles": [
+        {
+          "id": "bacardi-carta-blanca",
+          "nom": "Bacardí Carta Blanca",
+          "tauxTVA": 2000,
+          "prixTTC": 1000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1000
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 8000
+            }
+          ]
+        },
+        {
+          "id": "havana-club-7",
+          "nom": "Havana Club 7 ans",
+          "tauxTVA": 2000,
+          "prixTTC": 1000,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1000
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 9000
+            }
+          ]
+        },
+        {
+          "id": "diplomatico-reserva",
+          "nom": "Diplomático Reserva",
+          "tauxTVA": 2000,
+          "prixTTC": 1200,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1200
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 11000
+            }
+          ]
+        },
+        {
+          "id": "don-papa",
+          "nom": "Don Papa",
+          "tauxTVA": 2000,
+          "prixTTC": 1200,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1200
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 11000
+            }
+          ]
+        },
+        {
+          "id": "zacapa-23",
+          "nom": "Zacapa 23",
+          "tauxTVA": 2000,
+          "prixTTC": 1400,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1400
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 14000
+            }
+          ]
+        },
+        {
+          "id": "santa-teresa-1796",
+          "nom": "Santa Teresa 1796",
+          "tauxTVA": 2000,
+          "prixTTC": 1400,
+          "variantes": [
+            {
+              "id": "verre",
+              "nom": "Verre",
+              "prixTTC": 1400
+            },
+            {
+              "id": "bouteille",
+              "nom": "Bouteille",
+              "prixTTC": 15000
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cognac-digestifs",
+      "nom": "Cognac & digestifs",
+      "rayon": "Bar",
+      "articles": [
+        {
+          "id": "hennessy-vs",
+          "nom": "Hennessy VS",
+          "prixTTC": 1300,
+          "tauxTVA": 2000
+        },
+        {
+          "id": "digestif",
+          "nom": "Digestif",
+          "prixTTC": 1000,
+          "tauxTVA": 2000,
+          "variantes": [
+            {
+              "id": "baileys",
+              "nom": "Baileys",
+              "libelle": "Baileys"
+            },
+            {
+              "id": "limoncello",
+              "nom": "Limoncello",
+              "libelle": "Limoncello"
+            },
+            {
+              "id": "genepi",
+              "nom": "Génépi",
+              "libelle": "Génépi"
+            },
+            {
+              "id": "chartreuse-verte",
+              "nom": "Chartreuse verte",
+              "libelle": "Chartreuse verte"
+            },
+            {
+              "id": "chartreuse-jaune",
+              "nom": "Chartreuse jaune",
+              "libelle": "Chartreuse jaune"
+            },
+            {
+              "id": "get-27",
+              "nom": "Get 27",
+              "libelle": "Get 27"
+            },
+            {
+              "id": "menthe-pastille",
+              "nom": "Menthe pastille",
+              "libelle": "Menthe pastille"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "viennoiseries",
+      "nom": "Viennoiseries",
+      "rayon": "Cuisine",
+      "articles": [
+        {
+          "id": "croissant",
+          "nom": "Croissant pur beurre",
+          "prixTTC": 200,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "pain-au-chocolat",
+          "nom": "Pain au chocolat",
+          "prixTTC": 250,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "brioche-tranchee",
+          "nom": "Brioche tranchée",
+          "prixTTC": 400,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "oeufs",
+      "nom": "Les œufs",
+      "rayon": "Cuisine",
+      "articles": [
+        {
+          "id": "egg-muffin-moka",
+          "nom": "Egg muffin Moka",
+          "prixTTC": 950,
+          "tauxTVA": 1000,
+          "description": "Muffin toasté, œuf poché, bacon grillé, cheddar affiné"
+        },
+        {
+          "id": "oeufs-poches-saumon",
+          "nom": "Œufs pochés, saumon fumé",
+          "prixTTC": 1400,
+          "tauxTVA": 1000,
+          "description": "Deux œufs pochés, saumon fumé, crème d'aneth, pain de campagne"
+        }
+      ]
+    },
+    {
+      "id": "bowls-tartines",
+      "nom": "Bowls & tartines",
+      "rayon": "Cuisine",
+      "articles": [
+        {
+          "id": "granola-bowl",
+          "nom": "Granola bowl",
+          "prixTTC": 900,
+          "tauxTVA": 1000,
+          "description": "Granola maison, yaourt brassé, fruits du moment, miel d'acacia"
+        },
+        {
+          "id": "avocado-toast",
+          "nom": "Avocado toast",
+          "prixTTC": 1100,
+          "tauxTVA": 1000,
+          "description": "Pain de campagne grillé, avocat, graines, citron, fleur de sel"
+        },
+        {
+          "id": "tartine-ricotta-miel",
+          "nom": "Tartine ricotta-miel",
+          "prixTTC": 900,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "tartine-saumon",
+          "nom": "Tartine saumon fumé",
+          "prixTTC": 1300,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "salades",
+      "nom": "Salades",
+      "rayon": "Cuisine",
+      "articles": [
+        {
+          "id": "cesar",
+          "nom": "César revisitée",
+          "prixTTC": 1500,
+          "tauxTVA": 1000,
+          "description": "Poulet fermier grillé, sucrine, parmesan, croûtons de focaccia"
+        },
+        {
+          "id": "salade-du-lac",
+          "nom": "Salade du Lac",
+          "prixTTC": 1800,
+          "tauxTVA": 1000,
+          "description": "Truite fumée, avocat, quinoa, aneth, citron"
+        },
+        {
+          "id": "bowl-vegetal",
+          "nom": "Bowl végétal",
+          "prixTTC": 1300,
+          "tauxTVA": 1000,
+          "description": "Céréales, légumes de saison, houmous, graines torréfiées"
+        }
+      ]
+    },
+    {
+      "id": "chauds-midi",
+      "nom": "Les chauds du midi",
+      "rayon": "Cuisine",
+      "articles": [
+        {
+          "id": "croque-monsieur",
+          "nom": "Croque-monsieur maison",
+          "prixTTC": 1100,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "croque-madame",
+          "nom": "Croque-madame",
+          "prixTTC": 1300,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "quiche-du-jour",
+          "nom": "Quiche du jour, mesclun",
+          "prixTTC": 1200,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "gouter",
+      "nom": "La vitrine",
+      "rayon": "Cuisine",
+      "articles": [
+        {
+          "id": "cookie",
+          "nom": "Cookie",
+          "prixTTC": 350,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "cheesecake",
+          "nom": "Cheesecake",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "carrot-cake",
+          "nom": "Carrot cake",
+          "prixTTC": 550,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "banana-bread",
+          "nom": "Banana bread",
+          "prixTTC": 450,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "cinnamon-roll",
+          "nom": "Cinnamon roll",
+          "prixTTC": 450,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "brownie",
+          "nom": "Brownie",
+          "prixTTC": 450,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "financier",
+          "nom": "Financier",
+          "prixTTC": 250,
+          "tauxTVA": 1000
+        }
+      ]
+    },
+    {
+      "id": "planches",
+      "nom": "Planches pour deux",
+      "rayon": "À partager",
+      "articles": [
+        {
+          "id": "planche-moka",
+          "nom": "Planche Moka",
+          "prixTTC": 2200,
+          "tauxTVA": 1000,
+          "description": "Charcuterie de Savoie, comté affiné, focaccia, olives, pickles maison"
+        },
+        {
+          "id": "planche-bergere",
+          "nom": "Planche Bergère",
+          "prixTTC": 1800,
+          "tauxTVA": 1000,
+          "description": "Trois fromages, confiture maison, noix, pain de campagne"
+        },
+        {
+          "id": "planche-mer",
+          "nom": "Planche Mer",
+          "prixTTC": 2400,
+          "tauxTVA": 1000,
+          "description": "Saumon fumé, truite, terrine de poisson, focaccia, citron"
+        }
+      ]
+    },
+    {
+      "id": "a-l-unite",
+      "nom": "À l'unité",
+      "rayon": "À partager",
+      "articles": [
+        {
+          "id": "olives",
+          "nom": "Olives marinées maison",
+          "prixTTC": 500,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "houmous-focaccia",
+          "nom": "Houmous & focaccia",
+          "prixTTC": 700,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "stracciatella",
+          "nom": "Stracciatella, tomate, basilic",
+          "prixTTC": 1100,
+          "tauxTVA": 1000
+        },
+        {
+          "id": "tartare-boeuf",
+          "nom": "Tartare de bœuf au couteau",
+          "prixTTC": 1600,
+          "tauxTVA": 1000,
+          "description": "Servi avec ses condiments, à assaisonner soi-même"
+        }
+      ]
+    },
+    {
+      "id": "formules",
+      "nom": "Formules",
+      "rayon": "Formules",
+      "articles": [
+        {
+          "id": "french-ptit-dej",
+          "nom": "French ptit'dej",
+          "prixTTC": 700,
+          "tauxTVA": 1000,
+          "description": "Baguette, beurre & confiture, avec une boisson chaude au choix",
+          "formule": [
+            {
+              "id": "boisson-chaude",
+              "nom": "Boisson chaude",
+              "categories": [
+                "cafes",
+                "latte-creations",
+                "thes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "brunch-moka",
+          "nom": "Brunch Moka",
+          "prixTTC": 1600,
+          "tauxTVA": 1000,
+          "description": "Une boisson chaude, un jus pressé, une viennoiserie & un bowl ou une tartine",
+          "formule": [
+            {
+              "id": "boisson-chaude",
+              "nom": "Boisson chaude",
+              "categories": [
+                "cafes",
+                "latte-creations",
+                "thes"
+              ]
+            },
+            {
+              "id": "jus-presse",
+              "nom": "Jus pressé",
+              "articles": [
+                "orange-pressee",
+                "carotte-pomme-gingembre"
+              ]
+            },
+            {
+              "id": "viennoiserie",
+              "nom": "Viennoiserie",
+              "categories": [
+                "viennoiseries"
+              ]
+            },
+            {
+              "id": "bowl-tartine",
+              "nom": "Bowl ou tartine",
+              "categories": [
+                "bowls-tartines"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dejeuner-moka",
+          "nom": "Déjeuner Moka",
+          "prixTTC": 1900,
+          "tauxTVA": 1000,
+          "description": "Servi de 12 h à 15 h",
+          "formule": [
+            {
+              "id": "plat",
+              "nom": "Salade ou chaud du midi",
+              "categories": [
+                "salades",
+                "chauds-midi"
+              ]
+            },
+            {
+              "id": "dessert",
+              "nom": "Dessert de la vitrine",
+              "categories": [
+                "gouter"
+              ]
+            },
+            {
+              "id": "boisson-chaude",
+              "nom": "Boisson chaude",
+              "categories": [
+                "cafes",
+                "latte-creations",
+                "thes"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
