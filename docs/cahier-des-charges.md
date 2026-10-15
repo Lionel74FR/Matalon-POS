@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 62, copiée le 15 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 63, copiée le 15 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -154,7 +154,7 @@ Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors 
 
 - **Consommation à la vente** : à la réception des tickets par le serveur, chaque ligne sort du stock les produits de sa fiche, sous-recettes et pertes matière comprises. Fiche de la carte en vigueur à l'heure de la vente, sinon celle d'aujourd'hui (une fiche ajoutée après coup vaut pour les ventes passées, après « Recalculer la consommation »). Une formule consomme la fiche de chaque article choisi. Une annulation remet en stock ; un offert est consommé. Les ventes sans fiche sont signalées dans le food cost.
 - **Mouvements** : quantité signée et valeur au coût du moment, en ajout seul ; le stock théorique en est la somme. Un même ticket ne se décompte qu'une fois.
-- **Inventaire** (iPad, iPhone ou administration) : par zone ou par produit, en conditionnements et au détail ; seuls les produits saisis sont inventoriés. L'écart compté − théorique devient un mouvement. Le premier inventaire d'un produit donne son stock d'ouverture, hors food cost. L'onglet Inventaire liste d'abord les inventaires faits (détail par produit : compté, théorique, écart, valeur), puis « Nouvel inventaire ». Un comptage se date : celui d'un jour passé (92 jours au plus) se compare au stock théorique de ce jour-là, et les livraisons et ventes d'après s'y ajoutent ; il est refusé pour un produit déjà inventorié depuis (15 octobre 2026).
+- **Inventaire** (iPad, iPhone ou administration) : par zone ou par produit, en conditionnements et au détail ; seuls les produits saisis sont inventoriés. L'écart compté − théorique devient un mouvement. Le premier inventaire d'un produit donne son stock d'ouverture, hors food cost. L'onglet Inventaire liste d'abord les inventaires faits (détail par produit, avec une recherche : compté, théorique, écart, valeur), puis « Nouvel inventaire ». Un comptage se date : celui d'un jour passé (92 jours au plus) se compare au stock théorique de ce jour-là, et les livraisons et ventes d'après s'y ajoutent ; il est refusé pour un produit déjà inventorié depuis (15 octobre 2026).
 - **Réception** (iPad, iPhone ou administration) : fournisseur, date, bon de livraison, nombre de colis et prix payé, qui devient le dernier prix. Une réception se corrige par annulation, jamais par effacement.
 - **Perte** : produit ou préparation, motif obligatoire (casse, péremption, erreur de préparation, repas du personnel, dégustation, vol ou disparition, autre).
 - **Transfert** (administration) : d'un établissement à un autre, au coût de l'expéditeur.

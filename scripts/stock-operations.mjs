@@ -133,9 +133,15 @@ await a.getByLabel("Lait entier : L au détail").fill("2");
 await a.screenshot({ path: `${sortie}/o04b-inventaire-passe.png` });
 await aclic("Valider l'inventaire (1 produit)");
 await a.locator(".inventaires .succes", { hasText: /Inventaire enregistré : 1 produit, compté le/ }).waitFor();
+await a.locator(".inventaires .commandes-liste li").nth(1).waitFor();
 const inventairesAdmin = (await a.locator(".inventaires .commandes-liste").textContent()).replace(/\s+/g, " ");
 await a.locator(".inventaires .commande-carte").nth(1).click();
 const detailInventaire = (await a.locator(".modale").textContent()).replace(/\s+/g, " ");
+// Recherche dans le détail : « sucre » ne trouve rien dans l'inventaire du lait, « lait » le retrouve.
+await a.getByLabel("Chercher un produit dans l'inventaire").fill("sucre");
+const rechercheVide = await a.locator(".inventaire-detail tbody tr").count();
+await a.getByLabel("Chercher un produit dans l'inventaire").fill("lait");
+const rechercheLait = await a.locator(".inventaire-detail tbody tr").count();
 await a.screenshot({ path: `${sortie}/o04c-inventaire-detail.png` });
 await a.getByRole("button", { name: "Fermer" }).click();
 
@@ -206,6 +212,8 @@ const resultat = {
   inventairesIpad,
   inventairesAdmin,
   detailInventaire,
+  rechercheVide,
+  rechercheLait,
   erreurs,
 };
 console.log(JSON.stringify(resultat, null, 2));
@@ -230,6 +238,8 @@ const ok =
   resultat.final.cafe === 1500 &&
   resultat.final.lait === 2000 - 300 + 12000 - 1000 &&
   inventairesIpad === 1 &&
+  rechercheVide === 0 &&
+  rechercheLait === 1 &&
   /Stock d'ouverture/.test(inventairesAdmin) && /Réserve · 2 produits/.test(inventairesAdmin) && /Produits choisis · 1 produit/.test(inventairesAdmin) &&
   /Lait entier/.test(detailInventaire) && /stock d'ouverture/.test(detailInventaire) && /\+2 L/.test(detailInventaire) &&
   resultat.final.sucre === 4000 + 5000 - 1000 &&

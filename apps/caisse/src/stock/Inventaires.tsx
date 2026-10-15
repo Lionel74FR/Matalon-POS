@@ -1,6 +1,6 @@
-import { formaterEnUnite, type Referentiel } from "@matalon/stock";
+import { formaterEnUnite, normaliserNom, type Referentiel } from "@matalon/stock";
 import type { DocumentStock, EtatStock } from "@matalon/serveur/partage";
-import { ClipboardList, Plus } from "lucide-react";
+import { ClipboardList, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { eurosMicro } from "../admin/stock-commun";
 import { Modale } from "../ui/communs";
@@ -114,22 +114,30 @@ export function Inventaires(props: {
 
 function DetailInventaire(props: { document: DocumentStock; referentiel: Referentiel; onFermer: () => void }) {
   const d = props.document;
+  const [recherche, setRecherche] = useState("");
+  const n = normaliserNom(recherche);
   const produits = new Map(props.referentiel.produits.map((p) => [p.id, p]));
-  const lignes = lignesDe(d)
+  const toutes = lignesDe(d)
     .map((l) => ({ ...l, p: produits.get(l.produitId) }))
     .sort((a, b) => (a.p?.nom ?? a.produitId).localeCompare(b.p?.nom ?? b.produitId, "fr"));
+  const lignes = n ? toutes.filter((l) => normaliserNom(l.p?.nom ?? l.produitId).includes(n)) : toutes;
   const q = (v: number, l: (typeof lignes)[number]) => (l.p ? formaterEnUnite(v, l.p.unite) : String(v));
-  const valeurOuverture = lignes.filter((l) => l.ouverture).reduce((s, l) => s + (l.valeurEcart ?? 0), 0);
+  const valeurOuverture = toutes.filter((l) => l.ouverture).reduce((s, l) => s + (l.valeurEcart ?? 0), 0);
   return (
     <Modale large titre={`Inventaire du ${dateLongue(journee(d))}`} onFermer={props.onFermer}>
       <p className="explication">
-        {d.contenu.zone ? `Zone ${String(d.contenu.zone)}` : "Produits choisis"} · {lignes.length} produit{lignes.length > 1 ? "s" : ""}
+        {d.contenu.zone ? `Zone ${String(d.contenu.zone)}` : "Produits choisis"} · {toutes.length} produit{toutes.length > 1 ? "s" : ""}
         {d.par ? ` · ${d.par}` : ""} · saisi le {new Date(d.creeLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
       </p>
       <p className="explication">
         Écart valorisé : <strong>{eurosMicro(Number(d.contenu.valeurEcart ?? 0))} HT</strong>
         {valeurOuverture !== 0 && ` · stock d'ouverture ${eurosMicro(valeurOuverture)} HT (premier inventaire, hors food cost)`}
       </p>
+      <label className="operation-recherche">
+        <Search className="icone" size={18} aria-hidden="true" />
+        <input placeholder="Chercher un produit" value={recherche} onChange={(e) => setRecherche(e.target.value)} aria-label="Chercher un produit dans l'inventaire" />
+      </label>
+      {n && !lignes.length && <p className="explication">Aucun produit de cet inventaire ne correspond à « {recherche} ».</p>}
       <table className="tableau inventaire-detail">
         <thead>
           <tr>

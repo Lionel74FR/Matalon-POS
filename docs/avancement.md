@@ -25,6 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Détail d'un inventaire (demande de Lionel du 15 octobre) : champ de recherche par nom de produit ; scénario `stock-operations` complété |
 | 922be87 | Onglet Inventaire (demande de Lionel du 15 octobre), caisse et administration : liste des inventaires d'abord (date du comptage, zone, nombre de produits, stock d'ouverture ou écart valorisé ; détail par produit : compté, théorique, écart, valeur), puis « Nouvel inventaire ». Date du comptage : un jour passé (92 jours au plus) se compare au stock théorique de ce jour-là (mouvements d'avant midi), les livraisons et ventes d'après s'y ajoutent ; refusé pour un produit déjà inventorié depuis. Route `GET /api/caisse/stock/documents?type=` ; scénario `stock-operations` complété |
 | cdd937a | Comptage de clôture : dépenses payées en espèces sur le fond de caisse (demande de Lionel du 15 octobre), une ou plusieurs, objet et montant ; déduites des espèces attendues, gardées dans l'événement `COMPTAGE_CAISSE` (`depenses` en texte JSON, `depensesEspeces`), imprimées sur le Z et affichées dans le détail de la clôture ; scénario `parcours` complété |
 | 945d25d | Éditeur de carte : « Nouveau rayon » (nom du rayon et sa première catégorie, un rayon existant est refusé) ; « Nouvelle catégorie » choisit son rayon dans une liste |
