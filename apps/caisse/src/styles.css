@@ -1843,6 +1843,41 @@ a.bouton {
   max-width: 240px;
 }
 
+/* iPad et ordinateur : les rayons en colonne, collés à droite du ticket ; les catégories restent en haut. */
+@media (min-width: 701px) {
+  .carte {
+    grid-template-columns: 132px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "rayons categories"
+      "rayons articles";
+    padding-left: 8px;
+  }
+  .rayons {
+    grid-area: rayons;
+    flex-direction: column;
+    overflow-x: visible;
+    overflow-y: auto;
+    padding-bottom: 16px;
+  }
+  .rayon {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px 12px;
+    text-align: left;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .categories {
+    grid-area: categories;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .grille-articles {
+    grid-area: articles;
+  }
+}
+
 /* ───────── Téléphone (iPhone en portrait) ───────── */
 
 .resume-mobile,

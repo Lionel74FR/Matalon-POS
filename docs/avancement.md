@@ -25,6 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Prise de commande sur iPad (demande de Lionel du 15 octobre) : rayons en colonne verticale collée à droite du ticket, catégories en haut sur plusieurs lignes si besoin ; teintes pour les rayons Cocktails, Cave et Bar. iPhone inchangé |
 | 8dea0c9 | Carte définitive du Moka (Lionel, 15 octobre) chargée dans l'administration de test (version 2 de `carte-automne-2026`, 121 articles) et gardée dans `docs/cartes/moka-2026-10-15.json` : rayons Boissons, Cocktails, Cave, Bar, Cuisine, À partager, Formules ; verre et bouteille en variantes, digestifs en variantes, sirops en suppléments ; identifiants de l'ancienne carte conservés pour les articles qui restent. La carte livrée avec le code (tests) n'est pas modifiée |
 | 35fbd9c | Mouvements d'un produit (demande de Lionel du 15 octobre) : sur l'iPad et l'iPhone (Stock › Stock et pièces, toucher un produit) et dans l'administration (Stock et pièces, ou fiche produit › Mouvements) : ventes avec ticket, réceptions avec fournisseur, commande et bon de livraison, inventaires, pertes, transferts, valeur et stock après chaque mouvement ; route `GET /api/caisse/stock/mouvements?produit=` |
 | dffadcb | Réception (retour de Lionel du 15 octobre) : prix à trois décimales acceptés et arrondis au centime (« 24,945 », tarifs Caves du Mont), prix illisible signalé comme tel ; contre une commande, seuls les articles commandés s'affichent, les autres du fournisseur sur « Article livré hors commande » |
@@ -78,6 +79,7 @@ Dernière mise à jour : 15 octobre 2026.
 - Administration (demande de Lionel du 11 octobre) : l'établissement se choisit dans l'en-tête, chaque rubrique a sa page au menu latéral. Stock et Réservations reçoivent l'établissement de l'en-tête (plus de sélecteur interne). Ne pas revenir à une page unique.
 - Montants en centimes entiers ; TVA en points de base.
 - Le noyau fiscal tient une chaîne par caisse, signée par une clé ECDSA propre à l'iPad. Le serveur vérifie et réplique, mais ne signe jamais.
+- Prise de commande sur iPad (Lionel, 15 octobre) : rayons en colonne à droite du ticket, catégories en pastilles en haut ; sur iPhone, rayons et catégories restent en bandes horizontales.
 - Barre de la caisse (demande de Lionel du 9 octobre) : les onglets du service (Salle, Tickets, Comptes) et Vente comptoir dans la barre ; le reste (Clôtures, Stats, Stock, Réglages) dans le menu ☰, qui montre le nom de l'écran ouvert. Sur iPhone, l'en-tête aligne à droite : prénom, synchronisation, menu ☰, déconnexion ; les onglets passent dessous.
 - Administration sur iPhone (demande de Lionel du 9 octobre) : rien ne dépasse la largeur de l'écran. Tableaux en fiches (chaque valeur sous le titre de sa colonne, recopié par `etiqueterTableaux`), navigation en pastilles, rubriques du stock et catégorie de l'éditeur dans une liste déroulante, champs pleine largeur.
 - Interface : une icône seule quand le sens est évident (fermer, retour, imprimer, se déconnecter), toujours avec son libellé pour l'accessibilité ; icône et mot court quand l'action engage. Icônes Lucide intégrées au code (hors ligne).

@@ -37,7 +37,9 @@ const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZ
 
 const TEINTES: Record<string, string> = {
   Boissons: "cafe",
-  Bar: "prune",
+  Cocktails: "prune",
+  Cave: "caramel",
+  Bar: "ardoise",
   Cuisine: "olive",
   Goûter: "caramel",
   "À partager": "lac",
