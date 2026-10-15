@@ -2,9 +2,11 @@ import {
   Couts,
   formaterEnUnite,
   formaterQuantite,
+  estTableauRecettes,
   identifiantStock,
   lireDecimal,
   lireLignesImport,
+  lireLignesRecettes,
   lireTableau,
   quantiteBrute,
   normaliserNom,
@@ -37,7 +39,8 @@ import {
   LIBELLES_UNITE,
   type Composant,
 } from "./stock-commun";
-import { OngletEtat, OngletFactures, OngletFoodCost, OngletPiece, OngletTransfert } from "./StockOperations";
+import { OngletFournisseurs } from "./StockFournisseurs";
+import { OngletCommandes, OngletEtat, OngletFactures, OngletFoodCost, OngletPiece, OngletTransfert } from "./StockOperations";
 import { lireFichierTableau } from "./tableur";
 
 /** « 1 produit créé », « 5 produits créés », « 2 prix à enregistrer ». */
@@ -47,10 +50,10 @@ function nombre(n: number, nom: string, participe: string): string {
   return `${n} ${pluriel && !nom.endsWith("x") ? `${nom}s` : nom} ${accord}`;
 }
 
-type Onglet = "produits" | "recettes" | "import" | "etat" | "reception" | "inventaire" | "perte" | "transfert" | "foodcost" | "factures";
+type Onglet = "produits" | "recettes" | "fournisseurs" | "import" | "etat" | "commandes" | "reception" | "inventaire" | "perte" | "transfert" | "foodcost" | "factures";
 const ONGLETS: Array<[string, Array<[Onglet, string]>]> = [
-  ["Référentiel", [["produits", "Produits"], ["recettes", "Recettes"], ["import", "Importer"]]],
-  ["Opérations", [["etat", "Stock et pièces"], ["reception", "Réception"], ["inventaire", "Inventaire"], ["perte", "Perte"], ["transfert", "Transfert"]]],
+  ["Référentiel", [["produits", "Produits"], ["recettes", "Recettes"], ["fournisseurs", "Fournisseurs"], ["import", "Importer"]]],
+  ["Opérations", [["etat", "Stock et pièces"], ["commandes", "Commandes"], ["reception", "Réception"], ["inventaire", "Inventaire"], ["perte", "Perte"], ["transfert", "Transfert"]]],
   ["Analyse", [["foodcost", "Food cost"], ["factures", "Factures"]]],
 ];
 
@@ -141,6 +144,8 @@ export function Stock(props: { etablissementId?: string } = {}) {
       </section>
       {onglet === "produits" && <Produits stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "recettes" && <Recettes stock={stock} couts={couts} nomEtab={nomEtab} onStock={setStock} />}
+      {onglet === "fournisseurs" && <OngletFournisseurs stock={stock} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
+      {onglet === "commandes" && <OngletCommandes key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "import" && <Import etab={etab} nomEtab={nomEtab} onStock={setStock} onTermine={() => setOnglet("produits")} />}
       {onglet === "etat" && <OngletEtat key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {(onglet === "reception" || onglet === "inventaire" || onglet === "perte") && (
@@ -825,7 +830,12 @@ function Import(props: { etab: string; nomEtab: string; onStock: (s: ReponseStoc
   const [erreur, setErreur] = useState("");
   const [rapport, setRapport] = useState<{ rapport: RapportImport; fait: boolean } | null>(null);
   const [enCours, setEnCours] = useState(false);
-  const lecture = tableau ? lireLignesImport(tableau) : null;
+  // Fiches techniques (colonnes recette et ingrédient) ou produits.
+  const recettes = tableau ? estTableauRecettes(tableau) : false;
+  const lecture = tableau && !recettes ? lireLignesImport(tableau) : null;
+  const lectureRecettes = tableau && recettes ? lireLignesRecettes(tableau) : null;
+  const nbLignes = (lecture ?? lectureRecettes)?.lignes.length ?? 0;
+  const erreursLecture = (lecture ?? lectureRecettes)?.erreurs ?? [];
 
   const charger = async (f: File | undefined) => {
     if (!f) return;
@@ -855,13 +865,18 @@ function Import(props: { etab: string; nomEtab: string; onStock: (s: ReponseStoc
   return (
     <section className="admin-section">
       <h2 className="titre-icone">
-        <AvecIcone icone={FileUp} taille={22}>Importer des produits</AvecIcone>
+        <AvecIcone icone={FileUp} taille={22}>Importer des produits ou des fiches techniques</AvecIcone>
       </h2>
       <p className="explication">
         Une ligne par produit et par fournisseur, première ligne = noms de colonnes : <code>produit</code>, <code>unite</code> (kg, L ou pièce) obligatoires ;{" "}
         <code>famille</code>, <code>zone</code>, <code>fournisseur</code>, <code>reference</code>, <code>conditionnement</code>, <code>quantite</code> (en unité du produit),{" "}
         <code>prix_ht</code> (€ par conditionnement), <code>poids_unitaire_g</code>. Excel (.xlsx), CSV, ou copier-coller depuis le tableur. Un produit déjà connu n'est pas
-        recréé ; les prix vont à <strong>{props.nomEtab}</strong>.
+        recréé ; les prix vont à <strong>{props.nomEtab}</strong>. Volume d'une pièce (canette, bouteille vendue entière) : <code>volume_unitaire_ml</code>.
+      </p>
+      <p className="explication">
+        Fiches techniques : une ligne par ingrédient, colonnes <code>recette</code> (ou <code>cocktail</code>), <code>ingredient</code>, <code>quantite</code>,{" "}
+        <code>unite</code> (g, kg, cl, ml, L, pièce), <code>perte</code> (%) facultative. Les ingrédients sont des produits déjà importés ; une recette
+        existante voit ses lignes remplacées, une nouvelle est créée pour une portion. Reliez ensuite chaque article à sa fiche dans l'éditeur de carte.
       </p>
       <div className="admin-ligne">
         <label className="bouton">
@@ -883,22 +898,43 @@ function Import(props: { etab: string; nomEtab: string; onStock: (s: ReponseStoc
         />
       </label>
       {erreur && <p className="erreur">{erreur}</p>}
-      {lecture && (
+      {(lecture || lectureRecettes) && (
         <>
           <p>
-            <strong>{lecture.lignes.length}</strong> ligne{lecture.lignes.length > 1 ? "s" : ""} lisible{lecture.lignes.length > 1 ? "s" : ""}
-            {lecture.erreurs.length > 0 && <>, {lecture.erreurs.length} à corriger</>}.
+            <strong>{nbLignes}</strong> ligne{nbLignes > 1 ? "s" : ""} lisible{nbLignes > 1 ? "s" : ""}
+            {recettes ? " de fiches techniques" : ""}
+            {erreursLecture.length > 0 && <>, {erreursLecture.length} à corriger</>}.
           </p>
-          {lecture.erreurs.length > 0 && (
+          {erreursLecture.length > 0 && (
             <ul className="erreur">
-              {lecture.erreurs.slice(0, 30).map((e) => (
+              {erreursLecture.slice(0, 30).map((e) => (
                 <li key={`${e.ligne}-${e.message}`}>
                   Ligne {e.ligne} : {e.message}
                 </li>
               ))}
             </ul>
           )}
-          {lecture.lignes.length > 0 && (
+          {lectureRecettes && lectureRecettes.lignes.length > 0 && (
+            <table className="tableau admin-tableau stock-table">
+              <thead>
+                <tr>
+                  <th>Recette</th>
+                  <th>Ingrédient</th>
+                  <th className="nombre">Quantité</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lectureRecettes.lignes.slice(0, 60).map((l) => (
+                  <tr key={l.ligne}>
+                    <td>{l.recette}</td>
+                    <td>{l.composant}</td>
+                    <td className="nombre">{formaterQuantite(l.quantite)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {lecture && lecture.lignes.length > 0 && (
             <table className="tableau admin-tableau stock-table">
               <thead>
                 <tr>
@@ -931,12 +967,12 @@ function Import(props: { etab: string; nomEtab: string; onStock: (s: ReponseStoc
               </tbody>
             </table>
           )}
-          {lecture.lignes.length > 50 && <p className="explication">… et {lecture.lignes.length - 50} autres lignes.</p>}
+          {nbLignes > (recettes ? 60 : 50) && <p className="explication">… et {nbLignes - (recettes ? 60 : 50)} autres lignes.</p>}
           <div className="admin-ligne">
-            <button className="bouton" disabled={enCours || !lecture.lignes.length} onClick={() => void envoyer(true)}>
+            <button className="bouton" disabled={enCours || !nbLignes} onClick={() => void envoyer(true)}>
               <AvecIcone icone={Search}>Vérifier</AvecIcone>
             </button>
-            <button className="bouton principal" disabled={enCours || !lecture.lignes.length || !rapport || rapport.fait} onClick={() => void envoyer(false)}>
+            <button className="bouton principal" disabled={enCours || !nbLignes || !rapport || rapport.fait} onClick={() => void envoyer(false)}>
               <AvecIcone icone={Check}>Importer</AvecIcone>
             </button>
           </div>
@@ -946,6 +982,20 @@ function Import(props: { etab: string; nomEtab: string; onStock: (s: ReponseStoc
         <div className={rapport.fait ? "admin-ok stock-rapport" : "stock-rapport"}>
           <strong>{rapport.fait ? "Import terminé" : "Vérification (rien n'est encore enregistré)"}</strong>
           <ul>
+            {rapport.rapport.recettesCreees ? (
+              <>
+                <li>
+                  {nombre(rapport.rapport.recettesCreees.length, "recette", rapport.fait ? "créée" : "à créer")}
+                  {rapport.rapport.recettesCreees.length > 0 && ` : ${rapport.rapport.recettesCreees.join(", ")}`}
+                </li>
+                {(rapport.rapport.recettesModifiees ?? []).length > 0 && (
+                  <li>
+                    Lignes {rapport.fait ? "remplacées" : "à remplacer"} : {rapport.rapport.recettesModifiees!.join(", ")}
+                  </li>
+                )}
+              </>
+            ) : (
+              <>
             <li>
               {nombre(rapport.rapport.produitsCrees.length, "produit", rapport.fait ? "créé" : "à créer")}
               {rapport.rapport.produitsCrees.length > 0 && ` : ${rapport.rapport.produitsCrees.slice(0, 12).join(", ")}${rapport.rapport.produitsCrees.length > 12 ? "…" : ""}`}
@@ -955,6 +1005,8 @@ function Import(props: { etab: string; nomEtab: string; onStock: (s: ReponseStoc
               {nombre(rapport.rapport.articlesCrees, "fournisseur", rapport.fait ? "ajouté" : "à ajouter")}, {nombre(rapport.rapport.prixEnregistres, "prix", rapport.fait ? "enregistré" : "à enregistrer")} pour{" "}
               {props.nomEtab}
             </li>
+              </>
+            )}
             {rapport.rapport.erreurs.map((e) => (
               <li key={`${e.ligne}-${e.message}`} className="erreur">
                 Ligne {e.ligne} : {e.message}

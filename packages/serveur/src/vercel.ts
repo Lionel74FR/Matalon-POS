@@ -43,6 +43,7 @@ const envoyerCourriel: EnvoiCourriel = async (c) => {
     body: JSON.stringify({
       from: nom ? `"${nom}" <${expediteur}>` : expediteur,
       to: [c.a],
+      ...(c.copies?.length ? { cc: c.copies } : {}),
       ...(c.repondreA ? { reply_to: c.repondreA } : {}),
       subject: c.sujet,
       html: c.html,

@@ -11,7 +11,7 @@ import {
   type Quantite,
   type Referentiel,
 } from "@matalon/stock";
-import type { DocumentStock, EtatStock } from "@matalon/serveur/partage";
+import type { CommandeFournisseur, DocumentStock, EtatStock } from "@matalon/serveur/partage";
 import { Check, ClipboardList, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ChampQuantite, ChoixComposant, composants, euros, eurosMicro, type Composant } from "../admin/stock-commun";
@@ -154,44 +154,71 @@ export function FormulaireInventaire(props: { referentiel: Referentiel; etat: Et
 // ───────── Réception ─────────
 
 /** Réception d'une livraison : un fournisseur, ses articles, le nombre de colis et le prix payé. */
-export function FormulaireReception(props: { referentiel: Referentiel; prix: PrixAchat[]; etablissementId: string; onEnregistrer: (corps: Record<string, unknown>) => Promise<unknown> }) {
+export function FormulaireReception(props: {
+  referentiel: Referentiel;
+  prix: PrixAchat[];
+  etablissementId: string;
+  onEnregistrer: (corps: Record<string, unknown>) => Promise<unknown>;
+  /** Livraison d'une commande : fournisseur imposé, reste à recevoir pré-rempli. */
+  commande?: CommandeFournisseur;
+  onFermer?: () => void;
+}) {
   const ref = props.referentiel;
-  const fournisseurs = [...new Set(ref.articles.filter((a) => a.actif).map((a) => a.fournisseur))].sort((a, b) => a.localeCompare(b, "fr"));
+  const commande = props.commande;
+  const fournisseurs = commande ? [commande.fournisseur] : [...new Set(ref.articles.filter((a) => a.actif).map((a) => a.fournisseur))].sort((a, b) => a.localeCompare(b, "fr"));
   const [fournisseur, setFournisseur] = useState(fournisseurs[0] ?? "");
   const [numero, setNumero] = useState("");
   // Journée du service (bascule à 5 h) : une livraison saisie à 0 h 30 compte pour la veille.
   const [date, setDate] = useState(() => journeeParis(new Date().toISOString()));
-  const [saisies, setSaisies] = useState<Record<string, { nombre: string; prix: string }>>({});
+  // Contre une commande : chaque ligne reprend ce qui reste à recevoir.
+  const [saisies, setSaisies] = useState<Record<string, { nombre: string; prix: string }>>(() =>
+    Object.fromEntries(
+      (commande?.lignes ?? [])
+        .map((l) => [l.articleId, Math.max(0, l.nombre - (commande!.recu[l.articleId] ?? 0))] as const)
+        .filter(([, reste]) => reste > 0)
+        .map(([id, reste]) => [id, { nombre: String(reste / 1000).replace(".", ","), prix: "" }]),
+    ),
+  );
   const { enCours, erreur, ok, envoyer } = useEnvoi(props.onEnregistrer);
   const produit = (id: string) => ref.produits.find((p) => p.id === id);
   const dernier = (articleId: string) => props.prix.filter((p) => p.articleId === articleId && p.etablissementId === props.etablissementId).sort((a, b) => b.le.localeCompare(a.le))[0];
-  const articles = ref.articles.filter((a) => a.actif && a.fournisseur === fournisseur).sort((a, b) => (produit(a.produitId)?.nom ?? "").localeCompare(produit(b.produitId)?.nom ?? "", "fr"));
+  const commandee = (articleId: string) => commande?.lignes.find((l) => l.articleId === articleId);
+  const articles = ref.articles
+    .filter((a) => (a.actif || commandee(a.id)) && normaliserNom(a.fournisseur) === normaliserNom(fournisseur))
+    .sort((a, b) => Number(!commandee(a.id)) - Number(!commandee(b.id)) || (produit(a.produitId)?.nom ?? "").localeCompare(produit(b.produitId)?.nom ?? "", "fr"));
   const lignes = articles
     .map((a) => {
       const s = saisies[a.id];
       const nb = s ? milliemes(s.nombre) : null;
-      const prixHT = s?.prix.trim() ? centimesDepuisSaisie(s.prix) : (dernier(a.id)?.prixHT ?? null);
+      const prixHT = s?.prix.trim() ? centimesDepuisSaisie(s.prix) : (dernier(a.id)?.prixHT ?? commandee(a.id)?.prixHT ?? null);
       return { a, nb, prixHT };
     })
     .filter((l) => l.nb != null && l.nb > 0);
   const incompletes = lignes.filter((l) => l.prixHT == null);
   const total = lignes.reduce((s, l) => s + (l.prixHT == null ? 0 : Math.round((l.prixHT * l.nb!) / 1000)), 0);
+  const nombre = (n: number) => (n / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
 
   return (
     <section className="operation-stock">
       <h2 className="titre-icone">
-        <AvecIcone icone={PackagePlus} taille={22}>Réception</AvecIcone>
+        <AvecIcone icone={PackagePlus} taille={22}>{commande ? `Réception · commande n° ${commande.numero}` : "Réception"}</AvecIcone>
       </h2>
-      <p className="explication">Ce qui est livré entre en stock ; le prix saisi devient le dernier prix payé.</p>
+      <p className="explication">
+        {commande
+          ? `Livraison de ${commande.fournisseur} : le reste à recevoir est pré-rempli, corrigez ce qui manque ou diffère. Ce qui est livré entre en stock ; le prix saisi devient le dernier prix payé.`
+          : "Ce qui est livré entre en stock ; le prix saisi devient le dernier prix payé."}
+      </p>
       <div className="operation-entete">
-        <label className="champ">
-          <span>Fournisseur</span>
-          <select value={fournisseur} onChange={(e) => (setFournisseur(e.target.value), setSaisies({}))}>
-            {fournisseurs.map((f) => (
-              <option key={f}>{f}</option>
-            ))}
-          </select>
-        </label>
+        {!commande && (
+          <label className="champ">
+            <span>Fournisseur</span>
+            <select value={fournisseur} onChange={(e) => (setFournisseur(e.target.value), setSaisies({}))}>
+              {fournisseurs.map((f) => (
+                <option key={f}>{f}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="champ">
           <span>Date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -209,6 +236,7 @@ export function FormulaireReception(props: { referentiel: Referentiel; prix: Pri
             const p = produit(a.produitId);
             const d = dernier(a.id);
             const s = saisies[a.id] ?? { nombre: "", prix: "" };
+            const c = commandee(a.id);
             return (
               <li key={a.id} className={milliemes(s.nombre) ? "compte" : ""}>
                 <span className="inventaire-nom">
@@ -217,6 +245,11 @@ export function FormulaireReception(props: { referentiel: Referentiel; prix: Pri
                     {a.conditionnement || "Conditionnement"} · {p ? formaterEnUnite(a.quantite, p.unite) : ""}
                     {a.reference ? ` · réf. ${a.reference}` : ""}
                   </small>
+                  {commande && (
+                    <small className="reception-commande">
+                      {c ? `commandé ${nombre(c.nombre)}${commande.recu[a.id] ? ` · déjà reçu ${nombre(commande.recu[a.id]!)}` : ""}` : "hors commande"}
+                    </small>
+                  )}
                 </span>
                 <label className="inventaire-saisie">
                   <input value={s.nombre} inputMode="decimal" placeholder="0" aria-label={`${p?.nom ?? a.id} : nombre reçu`} onChange={(e) => setSaisies((x) => ({ ...x, [a.id]: { ...s, nombre: e.target.value } }))} />
@@ -226,7 +259,7 @@ export function FormulaireReception(props: { referentiel: Referentiel; prix: Pri
                   <input
                     value={s.prix}
                     inputMode="decimal"
-                    placeholder={d ? (d.prixHT / 100).toFixed(2).replace(".", ",") : "Prix HT"}
+                    placeholder={d ? (d.prixHT / 100).toFixed(2).replace(".", ",") : c?.prixHT != null ? (c.prixHT / 100).toFixed(2).replace(".", ",") : "Prix HT"}
                     aria-label={`${p?.nom ?? a.id} : prix HT du conditionnement`}
                     onChange={(e) => setSaisies((x) => ({ ...x, [a.id]: { ...s, prix: e.target.value } }))}
                   />
@@ -240,19 +273,26 @@ export function FormulaireReception(props: { referentiel: Referentiel; prix: Pri
       {incompletes.length > 0 && <p className="erreur">Prix HT à saisir pour {incompletes.map((l) => produit(l.a.produitId)?.nom).join(", ")}.</p>}
       {erreur && <p className="erreur">{erreur}</p>}
       {ok && <p className="admin-ok succes">{ok}</p>}
-      <button
-        className="bouton principal"
-        disabled={enCours || !lignes.length || incompletes.length > 0}
-        onClick={() =>
-          void envoyer(
-            { fournisseur, numero, date, lignes: lignes.map((l) => ({ articleId: l.a.id, nombre: l.nb, prixHT: l.prixHT })) },
-            `Réception enregistrée : ${lignes.length} article${lignes.length > 1 ? "s" : ""}, ${euros(total)} HT.`,
-            () => (setSaisies({}), setNumero("")),
-          )
-        }
-      >
-        <AvecIcone icone={Check}>{`Réceptionner · ${euros(total)} HT`}</AvecIcone>
-      </button>
+      <div className="operation-actions">
+        {props.onFermer && (
+          <button className="bouton" onClick={props.onFermer}>
+            Retour
+          </button>
+        )}
+        <button
+          className="bouton principal"
+          disabled={enCours || !lignes.length || incompletes.length > 0}
+          onClick={() =>
+            void envoyer(
+              { fournisseur, numero, date, ...(commande ? { commandeId: commande.id } : {}), lignes: lignes.map((l) => ({ articleId: l.a.id, nombre: l.nb, prixHT: l.prixHT })) },
+              `Réception enregistrée : ${lignes.length} article${lignes.length > 1 ? "s" : ""}, ${euros(total)} HT.`,
+              () => (setSaisies({}), setNumero("")),
+            )
+          }
+        >
+          <AvecIcone icone={Check}>{`Réceptionner · ${euros(total)} HT`}</AvecIcone>
+        </button>
+      </div>
     </section>
   );
 }
@@ -381,7 +421,8 @@ export function ListePieces(props: { documents: DocumentStock[]; referentiel: Re
   const resume = (d: DocumentStock): string => {
     const c = d.contenu as Record<string, unknown>;
     const lignes = (c.lignes as unknown[] | undefined)?.length ?? 0;
-    if (d.type === "reception") return `${String(c.fournisseur)}${c.numero ? ` · BL ${String(c.numero)}` : ""} · ${lignes} article(s) · ${euros(Number(c.totalHT ?? 0))} HT`;
+    if (d.type === "reception")
+      return `${String(c.fournisseur)}${c.commande ? ` · commande n° ${String((c.commande as { numero: number }).numero)}` : ""}${c.numero ? ` · BL ${String(c.numero)}` : ""} · ${lignes} article(s) · ${euros(Number(c.totalHT ?? 0))} HT`;
     if (d.type === "inventaire") return `${c.zone ? String(c.zone) : "Produits choisis"} · ${lignes} produit(s) · écart ${eurosMicro(Number(c.valeurEcart ?? 0))}`;
     if (d.type === "perte") return `${String(c.motif)} · ${eurosMicro(Number(c.valeur ?? 0))} HT`;
     return `Vers ${String(c.vers)} · ${lignes} produit(s)`;

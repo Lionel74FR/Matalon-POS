@@ -654,6 +654,73 @@ export interface CleApi {
   revoqueeLe: string | null;
 }
 
+// ───────── Commandes fournisseurs ─────────
+
+/**
+ * Statut enregistré d'une commande. Une commande envoyée est « reçue en partie »
+ * ou « reçue » d'après ses réceptions (`recu`), sans changer de statut ; « soldée »
+ * dit que le reste ne sera pas livré.
+ */
+export type StatutCommandeFournisseur = "brouillon" | "envoyee" | "soldee" | "annulee";
+
+export interface LigneCommandeFournisseur {
+  articleId: string;
+  produitId: string;
+  /** Nombre de conditionnements commandés, en millièmes (2 cartons = 2 000). */
+  nombre: number;
+  /** Prix HT d'un conditionnement connu à la commande (centimes), indicatif ; null : aucun prix connu. */
+  prixHT: number | null;
+}
+
+export interface EnvoiCommande {
+  le: string;
+  par: string;
+  /** « courriel » : bon envoyé par e-mail ; « manuel » : passé par téléphone, portail ou de vive voix. */
+  mode: "courriel" | "manuel";
+  a?: string;
+  copies?: string[];
+}
+
+export interface CommandeFournisseur {
+  id: string;
+  /** Numéro du bon, propre à l'établissement (1, 2, 3…). */
+  numero: number;
+  etablissementId: string;
+  fournisseur: string;
+  statut: StatutCommandeFournisseur;
+  version: number;
+  lignes: LigneCommandeFournisseur[];
+  /** Date de livraison souhaitée (AAAA-MM-JJ). */
+  livraison?: string;
+  /** Message au fournisseur, repris dans le bon. */
+  message?: string;
+  envoi?: EnvoiCommande;
+  historique: Array<{ le: string; par: string; action: string }>;
+  creeLe: string;
+  creePar: string;
+  majLe: string;
+  /** Reçu par article (millièmes de conditionnement), d'après les réceptions non annulées. */
+  recu: Record<string, number>;
+  receptions: Array<{ id: string; le: string; numero: string; totalHT: number; annulee: boolean }>;
+}
+
+/** Réglages d'envoi des bons de commande d'un établissement. */
+export interface ReglagesCommandes {
+  /** Adresse d'expédition (domaine vérifié chez Resend) ; absente : celle des réservations. */
+  expediteur?: string;
+  /** E-mail de l'établissement : en copie de chaque bon et destinataire des réponses ; absent : celui des réservations. */
+  email?: string;
+  /** Adresse et consignes de livraison imprimées sur le bon (accès, horaires). */
+  livraison?: string;
+}
+
+export interface ReponseCommandes {
+  commandes: CommandeFournisseur[];
+  reglages: ReglagesCommandes;
+  /** Ce qui servira vraiment à l'envoi, réglages des réservations compris. */
+  envoi: { possible: boolean; expediteur: string | null; email: string | null };
+}
+
 /** Ce que reçoit une caisse pour les opérations de stock (responsables, en ligne). */
 export interface ReponseStockCaisse {
   referentiel: Referentiel;

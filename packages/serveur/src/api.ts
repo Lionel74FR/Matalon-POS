@@ -1,13 +1,19 @@
 import { emplacementsFiches, lireCatalogue, nombreArticles, prixCarte, validerCatalogue, type Catalogue } from "@matalon/catalogue";
 import {
+  enregistrerFournisseur,
+  estTableauRecettes,
   lireArticleFournisseur,
+  lireLignesRecettes,
+  lireFournisseur,
   lireLignesImport,
   lireProduit,
   lireRecette,
   planifierImport,
+  planifierImportRecettes,
   REFERENTIEL_VIDE,
   validerReferentiel,
   type ArticleFournisseur,
+  type Fournisseur,
   type PrixAchat,
   type Produit,
   type Recette,
@@ -116,6 +122,17 @@ import {
   recevoirFacture,
   transferer,
 } from "./stock-serveur.js";
+import {
+  annulerCommande,
+  creerCommande,
+  enregistrerReglagesCommandes,
+  envoyerCommande,
+  idCommandeValide,
+  lireCommande,
+  listeCommandes,
+  modifierCommande,
+  solderCommande,
+} from "./commandes-serveur.js";
 import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre } from "./statistiques.js";
 import {
   enregistrerReglages,
@@ -1503,11 +1520,14 @@ async function enregistrerStock(
   env: Environnement,
   requete: Request,
   admin: { id: string; identifiant: string },
-  genre: "produits" | "articles" | "recettes",
+  genre: "produits" | "articles" | "recettes" | "fournisseurs",
   id: string,
 ): Promise<Response> {
   const corps = await lireJson<Record<string, unknown>>(requete);
-  if (genre === "produits") {
+  if (genre === "fournisseurs") {
+    const f = lu<Fournisseur>(lireFournisseur(corps.fournisseur), "fournisseur", id);
+    await modifierReferentiel(env, admin, (r) => enregistrerFournisseur(r, f), "stock_fournisseur", { fournisseur: id, nom: f.nom, actif: f.actif, courriel: f.courriel ?? null });
+  } else if (genre === "produits") {
     const produit = lu<Produit>(lireProduit(corps.produit), "produit", id);
     await modifierReferentiel(env, admin, (r) => ({ ...r, produits: remplacer(r.produits, produit) }), "stock_produit", { produit: id, nom: produit.nom, actif: produit.actif });
   } else if (genre === "articles") {
@@ -1562,6 +1582,7 @@ async function importerStock(env: Environnement, requete: Request, admin: { id: 
   if (!Array.isArray(tableau) || tableau.length > 5001 || !tableau.every((l) => Array.isArray(l) && l.length <= 40 && l.every((c) => typeof c === "string" && c.length <= 400))) {
     throw new ErreurHttp(400, "CHAMP_INVALIDE", "Tableau illisible (5 000 lignes et 40 colonnes au plus).");
   }
+  if (estTableauRecettes(tableau as string[][])) return importerRecettes(env, admin, tableau as string[][], corps.simuler === true);
   const { lignes, erreurs } = lireLignesImport(tableau as string[][]);
   const le = horloge(env).toISOString();
   const existants = (await reponseStock(env)).prix;
@@ -1596,6 +1617,31 @@ async function importerStock(env: Environnement, requete: Request, admin: { id: 
   }
   const final = rapport as unknown as ReponseImport["rapport"];
   const reponse: ReponseImport = { rapport: { ...final, erreurs: [...erreurs, ...final.erreurs].sort((a, b) => a.ligne - b.ligne) }, stock: await reponseStock(env) };
+  return json(200, reponse);
+}
+
+/** Import de fiches techniques (recette, ingrédient, quantité, unité) : recettes créées ou lignes remplacées. */
+async function importerRecettes(env: Environnement, admin: { id: string; identifiant: string }, tableau: string[][], simuler: boolean): Promise<Response> {
+  const { lignes, erreurs } = lireLignesRecettes(tableau);
+  const trier = (r: ReponseImport["rapport"]) => ({ ...r, erreurs: [...erreurs, ...r.erreurs].sort((a, b) => a.ligne - b.ligne) });
+  if (simuler) {
+    const { referentiel } = await lireReferentiel(env.db);
+    const reponse: ReponseImport = { rapport: trier(planifierImportRecettes(referentiel, lignes).rapport) };
+    return json(200, reponse);
+  }
+  let rapport: ReponseImport["rapport"] | null = null;
+  await modifierReferentiel(
+    env,
+    admin,
+    (r) => {
+      const plan = planifierImportRecettes(r, lignes);
+      rapport = plan.rapport;
+      return plan.referentiel;
+    },
+    "stock_import_recettes",
+    { lignes: lignes.length },
+  );
+  const reponse: ReponseImport = { rapport: trier(rapport as unknown as ReponseImport["rapport"]), stock: await reponseStock(env) };
   return json(200, reponse);
 }
 
@@ -1651,6 +1697,56 @@ async function responsableCaisse(env: Environnement, c: LigneCaisse, id: unknown
   return `${c.nom} · ${u.nom}`;
 }
 
+/**
+ * Commandes fournisseurs d'un établissement, communes à la caisse (responsable)
+ * et à l'administration : liste, brouillon, envoi, solde, annulation, réglages d'envoi.
+ */
+async function routeCommandes(
+  env: Environnement,
+  requete: Request,
+  etablissementId: string,
+  suite: string,
+  m: string,
+  auteur: (corps: Record<string, unknown>) => Promise<string>,
+  journal?: (action: string, details: Record<string, unknown>) => Promise<void>,
+): Promise<Response | null> {
+  const ctx = contexteResa(env, requete);
+  const maintenant = ctx.maintenant.toISOString();
+  if (suite === "" && m === "GET") return json(200, await listeCommandes(ctx, etablissementId));
+  if (suite === "" && m === "POST") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const c = await creerCommande(env.db, etablissementId, corps, await auteur(corps), maintenant);
+    await journal?.("commande_fournisseur", { commande: c.id, numero: c.numero, fournisseur: c.fournisseur });
+    return json(201, { commande: c });
+  }
+  if (suite === "/reglages" && m === "PUT") {
+    if (!journal) return json(403, { code: "ADMIN_REQUIS", message: "Les réglages d'envoi se font dans l'administration." });
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const reglages = await enregistrerReglagesCommandes(env.db, etablissementId, corps, await auteur(corps), maintenant);
+    await journal("commandes_reglages", { ...reglages });
+    return json(200, await listeCommandes(ctx, etablissementId));
+  }
+  const p = /^\/([a-z0-9-]{1,20})(?:\/(envoyer|solder|annuler))?$/.exec(suite);
+  if (!p || !idCommandeValide(p[1]!)) return null;
+  const id = p[1]!;
+  if (!p[2] && m === "GET") return json(200, { commande: await lireCommande(env.db, etablissementId, id) });
+  const corps = m === "PUT" || m === "POST" ? await lireJson<Record<string, unknown>>(requete) : {};
+  if (!p[2] && m === "PUT") return json(200, { commande: await modifierCommande(env.db, etablissementId, id, corps, await auteur(corps), maintenant) });
+  if (p[2] && m === "POST") {
+    const par = await auteur(corps);
+    const etab = await etablissement(env.db, etablissementId);
+    const c =
+      p[2] === "envoyer"
+        ? await envoyerCommande(ctx, etab, id, corps, par)
+        : p[2] === "solder"
+          ? await solderCommande(env.db, etablissementId, id, corps, par, maintenant)
+          : await annulerCommande(ctx, etab, id, corps, par);
+    await journal?.(`commande_fournisseur_${p[2]}`, { commande: c.id, numero: c.numero, statut: c.statut });
+    return json(200, { commande: c });
+  }
+  return null;
+}
+
 async function stockCaisse(env: Environnement, requete: Request, chemin: string, m: string): Promise<Response> {
   const c = await caisseAuthentifiee(env, requete);
   if (chemin === "/api/caisse/stock" && m === "GET") {
@@ -1669,6 +1765,11 @@ async function stockCaisse(env: Environnement, requete: Request, chemin: string,
     const par = await responsableCaisse(env, c, corps.utilisateurId);
     return await operationStock(env, c.etablissement_id, p[1]!, corps, par);
   }
+  const pc = /^\/api\/caisse\/stock\/commandes(\/.*)?$/.exec(chemin);
+  if (pc) {
+    const r = await routeCommandes(env, requete, c.etablissement_id, pc[1] ?? "", m, (corps) => responsableCaisse(env, c, corps.utilisateurId));
+    if (r) return r;
+  }
   return json(404, { code: "INTROUVABLE", message: "Route inconnue." });
 }
 
@@ -1677,6 +1778,11 @@ async function stockAdmin(env: Environnement, requete: Request, admin: { id: str
   const etab = async () => (await etablissement(env.db, params.get("etab") ?? "")).id;
   const maintenant = horloge(env).toISOString();
   if (chemin === "/api/admin/stock/etat" && m === "GET") return json(200, await etatStock(env.db, await etab()));
+  const pc = /^\/api\/admin\/stock\/commandes(\/.*)?$/.exec(chemin);
+  if (pc) {
+    const id = await etab();
+    return await routeCommandes(env, requete, id, pc[1] ?? "", m, async () => `administration · ${admin.identifiant}`, async (action, details) => journaliserAdmin(env, admin.id, action, { etablissement: id, ...details }));
+  }
   if (chemin === "/api/admin/stock/mouvements" && m === "GET") {
     const f = { du: params.get("du") ?? undefined, au: params.get("au") ?? undefined, produit: params.get("produit") ?? undefined, type: params.get("type") ?? undefined };
     return json(200, { mouvements: await listeMouvements(env.db, await etab(), f) });
@@ -2592,8 +2698,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       }
       if (chemin === "/api/admin/stock/import" && m === "POST") return await importerStock(env, requete, admin);
       if (chemin === "/api/admin/stock/prix" && m === "POST") return await enregistrerPrix(env, requete, admin);
-      const ps = /^\/api\/admin\/stock\/(produits|articles|recettes)\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
-      if (ps && m === "PUT") return await enregistrerStock(env, requete, admin, ps[1] as "produits" | "articles" | "recettes", ps[2]!);
+      const ps = /^\/api\/admin\/stock\/(produits|articles|recettes|fournisseurs)\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
+      if (ps && m === "PUT") return await enregistrerStock(env, requete, admin, ps[1] as "produits" | "articles" | "recettes" | "fournisseurs", ps[2]!);
       const ph = /^\/api\/admin\/stock\/prix\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
       if (ph && m === "GET") return await historiquePrix(env, ph[1]!);
       if (chemin === "/api/admin/etablissements" && m === "POST") return await creerOuModifierEtablissement(env, requete, admin);

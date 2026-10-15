@@ -849,7 +849,7 @@ describe("stock et fiches techniques", () => {
     const cookie = await adminConnecte();
     const a = await caisseRattachee(cookie);
     const vide = await appel("GET", "/api/admin/stock", undefined, { Cookie: cookie });
-    expect(vide.corps.referentiel).toEqual({ produits: [], articles: [], recettes: [] });
+    expect(vide.corps.referentiel).toEqual({ produits: [], articles: [], recettes: [], fournisseurs: [] });
     expect(vide.corps.etablissements).toEqual([{ id: "moka", enseigne: "Moka", carteId: "carte-automne-2026" }]);
     // Sans session administrateur : refusé ; une caisse non plus.
     expect((await appel("GET", "/api/admin/stock")).statut).toBe(401);

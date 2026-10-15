@@ -237,7 +237,9 @@ async function enregistrerDocument(db: Db, doc: DocumentStock, mouvements: Mouve
  */
 export async function receptionner(db: Db, etablissementId: string, corps: Record<string, unknown>, par: string, maintenant: string): Promise<DocumentStock> {
   const { referentiel } = await lireReferentiel(db);
-  const fournisseur = texteCourt(corps.fournisseur, "Fournisseur", 80, true);
+  const commande = corps.commandeId === undefined || corps.commandeId === null ? null : await commandeAReceptionner(db, etablissementId, corps.commandeId, texteCourt(corps.fournisseur, "Fournisseur", 80));
+  // Contre une commande : le fournisseur est celui de la commande.
+  const fournisseur = commande?.fournisseur ?? texteCourt(corps.fournisseur, "Fournisseur", 80, true);
   const date = typeof corps.date === "string" && DATE.test(corps.date) ? corps.date : journeeParis(maintenant);
   const numero = texteCourt(corps.numero, "Numéro de bon de livraison", 60);
   const le = horodatageDe(date, maintenant);
@@ -245,6 +247,9 @@ export async function receptionner(db: Db, etablissementId: string, corps: Recor
   const lignes = lignesDe(corps.lignes).map((l, i) => {
     const article = referentiel.articles.find((a) => a.id === l.articleId);
     if (!article) throw new ErreurHttp(400, "CHAMP_INVALIDE", `Ligne ${i + 1} : article fournisseur inconnu.`);
+    if (commande && normaliserNom(article.fournisseur) !== normaliserNom(commande.fournisseur)) {
+      throw new ErreurHttp(400, "CHAMP_INVALIDE", `Ligne ${i + 1} : cet article n'est pas vendu par ${commande.fournisseur}.`);
+    }
     return {
       articleId: article.id,
       produitId: article.produitId,
@@ -255,7 +260,7 @@ export async function receptionner(db: Db, etablissementId: string, corps: Recor
     };
   });
   const totalHT = lignes.reduce((s, l) => s + Math.round((l.prixHT * l.nombre) / 1000), 0);
-  const doc: DocumentStock = { id, type: "reception", etablissementId, contenu: { fournisseur, numero, date, lignes, totalHT }, le, creeLe: maintenant, par, annuleLe: null };
+  const doc: DocumentStock = { id, type: "reception", etablissementId, contenu: { fournisseur, numero, date, lignes, totalHT, ...(commande ? { commande: { id: commande.id, numero: commande.numero } } : {}) }, le, creeLe: maintenant, par, annuleLe: null };
   const mouvements: Mouvement[] = lignes.map((l, i) => ({
     produitId: l.produitId,
     quantite: l.quantite,
@@ -272,6 +277,22 @@ export async function receptionner(db: Db, etablissementId: string, corps: Recor
   }));
   await enregistrerDocument(db, doc, mouvements, prix);
   return doc;
+}
+
+/** Commande contre laquelle on réceptionne : de cet établissement, envoyée (ni brouillon, ni soldée, ni annulée), même fournisseur. */
+async function commandeAReceptionner(db: Db, etablissementId: string, id: unknown, fournisseur: string): Promise<{ id: string; numero: number; fournisseur: string }> {
+  if (typeof id !== "string" || !/^cf-[0-9a-f]{8}$/.test(id)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Commande invalide.");
+  const [c] = await db.requete<{ id: string; numero: number; fournisseur: string; statut: string }>(
+    "select id, numero, fournisseur, statut from commandes_fournisseurs where id = $1 and etablissement_id = $2",
+    [id, etablissementId],
+  );
+  if (!c) throw new ErreurHttp(404, "COMMANDE_INCONNUE", "Commande introuvable.");
+  if (c.statut !== "envoyee") {
+    const etat = c.statut === "brouillon" ? "pas encore envoyée" : c.statut === "soldee" ? "soldée" : "annulée";
+    throw new ErreurHttp(409, "STATUT_COMMANDE", `La commande n° ${c.numero} est ${etat} : elle ne se réceptionne pas.`);
+  }
+  if (fournisseur && normaliserNom(fournisseur) !== normaliserNom(c.fournisseur)) throw new ErreurHttp(400, "CHAMP_INVALIDE", `La commande n° ${c.numero} est passée chez ${c.fournisseur}.`);
+  return { id: c.id, numero: c.numero, fournisseur: c.fournisseur };
 }
 
 /** Annule une réception saisie par erreur : les quantités ressortent (les prix restent dans l'historique). */

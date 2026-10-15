@@ -303,7 +303,7 @@
   <section class="scenario" data-id="s6l">
     <label><input type="checkbox">Stock, recettes et food cost (administration, sur ordinateur)</label>
     <ol>
-      <li>Administration › <b>Stock et recettes</b> › Importer des produits : choisissez votre tableur (Excel ou CSV), <span class="bouton">Vérifier</span>, puis <span class="bouton">Importer</span>.</li>
+      <li>Administration › <b>Stock et recettes</b> › Importer : choisissez votre tableur de produits (Excel ou CSV), <span class="bouton">Vérifier</span>, puis <span class="bouton">Importer</span> ; même chose ensuite avec le tableur des fiches techniques (cocktail, ingrédient, quantité, unité).</li>
       <li>Onglet Produits : ouvrez un produit, ajoutez un second fournisseur avec son prix. Essayez de créer un produit portant le même nom qu'un existant.</li>
       <li>Onglet Recettes : <b>Nouvelle recette</b>, une sauce produite au kilo (rendement 1 kg), puis un plat à la pièce qui utilise la sauce ; mettez une perte sur une ligne.</li>
       <li>Cartes et prix › Modifier : ouvrez l'article du plat, section <b>Fiche technique</b>, choisissez la recette, puis Valider et Enregistrer.</li>
@@ -321,6 +321,18 @@
       <li>Dans l'administration, Stock et recettes › Food cost, puis Stock et pièces : touchez un produit pour voir ses mouvements.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> après la vente, le stock théorique des ingrédients baisse ; l'inventaire remplace le théorique des produits comptés (le premier fait le stock d'ouverture) ; la réception augmente le stock et son prix devient le dernier prix ; la perte sort du stock avec sa valeur. Le food cost montre le théorique (fiches des ventes), le réel (pertes et écarts en plus) et les ventes sans fiche. Sur iPhone, l'écran tient en une colonne.</p>
+  </section>
+
+  <section class="scenario" data-id="s6r">
+    <label><input type="checkbox">Commandes fournisseurs : fiche, bon, envoi, réception</label>
+    <ol>
+      <li>Administration › Stock et recettes › <b>Fournisseurs</b> : ouvrez Caves du Mont, mettez <b>votre propre adresse</b> en e-mail de commande (un vrai envoi partirait sinon chez le fournisseur), le n° de client 1411 et le franco, puis enregistrez.</li>
+      <li>Onglet <b>Commandes</b> › Réglages d'envoi des commandes : vérifiez l'adresse d'expédition (domaine vérifié chez Resend) et l'e-mail de l'établissement.</li>
+      <li>Sur l'iPad : <span class="bouton">Menu ☰</span> › <span class="bouton">Stock</span> › Commandes › <span class="bouton">Nouvelle commande</span>, Caves du Mont, quelques quantités, une date de livraison, puis <span class="bouton">Envoyer par e-mail</span> et confirmez.</li>
+      <li>Ouvrez l'e-mail reçu. Puis, sur l'iPad, <span class="bouton">Réceptionner la livraison</span> : baissez une quantité (livraison partielle), réceptionnez. Recommencez avec le reste, puis <span class="bouton">Clore</span>.</li>
+      <li>Une seconde commande chez un fournisseur sans e-mail : <span class="bouton">Marquer envoyée</span>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> l'écran de saisie montre le stock théorique et le dernier prix, et signale un total sous le franco. L'e-mail porte le n° de bon, le n° de client, la livraison souhaitée et les lignes avec référence ; l'établissement est en copie et reçoit les réponses. La réception pré-remplit le reste à recevoir ; la commande passe « Reçue en partie » puis « Reçue », le stock et les derniers prix suivent. Une commande envoyée ne se modifie plus (Dupliquer pour en refaire une).</p>
   </section>
 
   <section class="scenario" data-id="s6q">

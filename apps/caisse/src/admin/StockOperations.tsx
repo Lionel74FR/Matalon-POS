@@ -1,7 +1,8 @@
 import { Couts, formaterEnUnite, LIBELLES_MOUVEMENT, lireDecimal, normaliserNom, type Referentiel } from "@matalon/stock";
 import type { CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseStock } from "@matalon/serveur/partage";
 import { ArrowRightLeft, Check, ChartPie, KeyRound, Plus, Receipt, RefreshCw, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Commandes, type AccesCommandes } from "../stock/Commandes";
 import { FormulaireInventaire, FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
 import { Modale } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
@@ -134,6 +135,37 @@ export function OngletPiece(props: Proprietes & { type: "reception" | "inventair
       {props.type === "reception" && <FormulaireReception referentiel={props.stock.referentiel} prix={props.stock.prix} etablissementId={props.etab} onEnregistrer={envoyer("receptions")} />}
       {props.type === "inventaire" && (etat ? <FormulaireInventaire key={props.etab} referentiel={props.stock.referentiel} etat={etat} onEnregistrer={envoyer("inventaires")} /> : <p>Chargement…</p>)}
       {props.type === "perte" && <FormulairePerte referentiel={props.stock.referentiel} couts={props.couts} onEnregistrer={envoyer("pertes")} />}
+    </section>
+  );
+}
+
+// ───────── Commandes fournisseurs ─────────
+
+export function OngletCommandes(props: Proprietes) {
+  const [etat, setEtat] = useState<EtatStock | null>(null);
+  const { etab, onStock } = props;
+  useEffect(() => {
+    void api.etatStock(etab).then(setEtat);
+  }, [etab]);
+  const acces = useMemo<AccesCommandes>(
+    () => ({
+      lister: () => api.commandes(etab),
+      ecrire: (id, action, corps) =>
+        action === "creer" ? api.creerCommande(etab, corps) : action === "modifier" ? api.modifierCommande(etab, id!, corps) : api.actionCommande(etab, id!, action, corps),
+      receptionner: async (corps) => {
+        const r = await api.operationStock("receptions", { ...corps, etablissementId: etab });
+        setEtat(r.etat);
+        onStock(await api.stock());
+        return r;
+      },
+      regler: (corps) => api.reglagesCommandes(etab, corps),
+    }),
+    [etab, onStock],
+  );
+  return (
+    <section className="admin-section">
+      <p className="surtitre">{props.nomEtab}</p>
+      <Commandes referentiel={props.stock.referentiel} prix={props.stock.prix} etat={etat} etablissementId={etab} acces={acces} />
     </section>
   );
 }

@@ -188,3 +188,229 @@
   align-items: center;
   gap: 10px;
 }
+
+.operation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.reception-commande {
+  color: var(--terre) !important;
+}
+
+/* Commandes fournisseurs (caisse et administration) */
+.commandes-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.commandes-tete h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.commandes-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.commande-carte {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+  color: var(--mousse);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.commande-carte > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.commande-carte small {
+  color: var(--sable);
+  font-size: 0.85rem;
+}
+
+.statut-commande {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  background: var(--espresso-3);
+  color: var(--mousse);
+}
+
+.statut-commande.envoyee {
+  background: var(--t-lac);
+}
+
+.statut-commande.partielle {
+  background: var(--t-caramel);
+}
+
+.statut-commande.close {
+  background: var(--vert);
+  color: #fff;
+}
+
+.statut-commande.annulee {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--espresso-3);
+  color: var(--sable);
+}
+
+.inventaire-liste.commande-lignes li {
+  grid-template-columns: 1fr minmax(80px, 120px) minmax(90px, 130px);
+}
+
+.commande-prix {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-bas {
+  color: #f0a08f !important;
+}
+
+.commande-total {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.commande-total small {
+  color: var(--sable);
+}
+
+.operation-stock .avertissement {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--rayon-petit);
+  background: rgba(192, 86, 46, 0.18);
+  color: var(--mousse);
+}
+
+.commande-confirmation {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+  box-shadow: inset 4px 0 0 var(--terre);
+}
+
+.commande-confirmation p {
+  margin: 0;
+}
+
+.operation-entete .champ.commande-message {
+  flex: 3 1 280px;
+}
+
+.commande-message textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+  resize: vertical;
+}
+
+.commande-message-lu {
+  margin: 0;
+  color: var(--sable);
+  font-style: italic;
+}
+
+.fiche-fournisseur-resume {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  color: var(--sable);
+  font-size: 0.9rem;
+}
+
+.fiche-fournisseur-resume span,
+.fiche-fournisseur-resume a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+
+.tableau-commande td small {
+  display: block;
+  color: var(--sable);
+  font-size: 0.8rem;
+}
+
+.tableau-commande tr.recue td.nombre {
+  color: #a9cf96;
+}
+
+.tableau-commande .icone-recu {
+  margin-left: 6px;
+  vertical-align: -3px;
+}
+
+.tableau-commande tfoot td {
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
+.commande-historique summary,
+.commandes-reglages summary {
+  cursor: pointer;
+  color: var(--sable);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.commande-historique ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--sable);
+  font-size: 0.88rem;
+}
+
+.commandes-reglages {
+  padding: 4px 0;
+  border-top: 1px solid var(--espresso-3);
+}
+
+@media (max-width: 600px) {
+  .inventaire-liste.commande-lignes li {
+    grid-template-columns: 1fr minmax(84px, 110px);
+  }
+
+  .inventaire-liste.commande-lignes .commande-prix {
+    display: none;
+  }
+
+  .commande-carte {
+    align-items: flex-start;
+  }
+}

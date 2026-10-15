@@ -1,18 +1,19 @@
 import { Couts } from "@matalon/stock";
 import type { ReponseStockCaisse } from "@matalon/serveur/partage";
-import { ClipboardList, Package, PackagePlus, RefreshCw, Trash2 } from "lucide-react";
+import { ClipboardList, Package, PackagePlus, RefreshCw, ShoppingCart, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Commandes, type AccesCommandes } from "../stock/Commandes";
 import { FormulaireInventaire, FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
 import { Vide } from "./communs";
 import { useCaisse } from "./contexte";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { messageServeur } from "./Reglages";
 
-type Onglet = "inventaire" | "reception" | "perte" | "stock";
+type Onglet = "inventaire" | "commandes" | "reception" | "perte" | "stock";
 
 /**
  * Stock sur l'iPad ou l'iPhone (responsables, en ligne) : inventaire par
- * zone, réception d'une livraison, perte ; stock théorique et dernières
+ * zone, commandes fournisseurs, réception d'une livraison, perte ; stock théorique et dernières
  * pièces. Les ventes décomptent le stock d'elles-mêmes, à la synchronisation.
  */
 export function StockCaisse() {
@@ -44,6 +45,27 @@ export function StockCaisse() {
     }
   };
 
+  // Commandes fournisseurs : écritures au nom du responsable connecté, erreurs du serveur en clair.
+  const acces = useMemo<AccesCommandes>(() => {
+    const clair = async <T,>(f: () => Promise<T>) => {
+      try {
+        return await f();
+      } catch (e) {
+        throw new Error(messageServeur(e));
+      }
+    };
+    return {
+      lister: () => clair(() => caisse.client.commandesFournisseurs()),
+      ecrire: (id, action, corps) => clair(() => caisse.client.ecrireCommandeFournisseur(id, action, { ...corps, utilisateurId: utilisateur.id })),
+      receptionner: (corps) =>
+        clair(async () => {
+          const r = await caisse.client.operationStock("receptions", { ...corps, utilisateurId: utilisateur.id });
+          notifier("Réception enregistrée.");
+          return r;
+        }),
+    };
+  }, [caisse, utilisateur.id, notifier]);
+
   return (
     <div className="page stock-caisse">
       <header className="page-tete">
@@ -63,6 +85,7 @@ export function StockCaisse() {
             {(
               [
                 ["inventaire", "Inventaire", ClipboardList],
+                ["commandes", "Commandes", ShoppingCart],
                 ["reception", "Réception", PackagePlus],
                 ["perte", "Perte", Trash2],
                 ["stock", "Stock et pièces", Package],
@@ -74,6 +97,9 @@ export function StockCaisse() {
             ))}
           </div>
           {onglet === "inventaire" && <FormulaireInventaire referentiel={donnees.referentiel} etat={donnees.etat} onEnregistrer={enregistrer("inventaires")} />}
+          {onglet === "commandes" && (
+            <Commandes referentiel={donnees.referentiel} prix={donnees.prix} etat={donnees.etat} etablissementId={config.etablissementId} acces={acces} onReception={() => void charger()} />
+          )}
           {onglet === "reception" && <FormulaireReception referentiel={donnees.referentiel} prix={donnees.prix} etablissementId={config.etablissementId} onEnregistrer={enregistrer("receptions")} />}
           {onglet === "perte" && <FormulairePerte referentiel={donnees.referentiel} couts={couts} onEnregistrer={enregistrer("pertes")} />}
           {onglet === "stock" && (

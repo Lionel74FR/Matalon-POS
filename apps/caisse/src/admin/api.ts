@@ -1,7 +1,7 @@
 import type { Catalogue } from "@matalon/catalogue";
-import type { ArticleFournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
+import type { ArticleFournisseur, Fournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
-import type { EtatEnvoi } from "@matalon/serveur/partage";
+import type { CommandeFournisseur, EtatEnvoi, ReponseCommandes } from "@matalon/serveur/partage";
 import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
@@ -134,6 +134,13 @@ export const api = {
   stock: () => appel<ReponseStock>("GET", "/stock"),
   enregistrerProduit: (produit: Produit) => appel<ReponseStock>("PUT", `/stock/produits/${produit.id}`, { produit }),
   enregistrerArticleFournisseur: (article: ArticleFournisseur) => appel<ReponseStock>("PUT", `/stock/articles/${article.id}`, { article }),
+  enregistrerFournisseur: (fournisseur: Fournisseur) => appel<ReponseStock>("PUT", `/stock/fournisseurs/${fournisseur.id}`, { fournisseur }),
+  commandes: (etab: string) => appel<ReponseCommandes>("GET", `/stock/commandes?etab=${etab}`),
+  creerCommande: (etab: string, corps: Record<string, unknown>) => appel<{ commande: CommandeFournisseur }>("POST", `/stock/commandes?etab=${etab}`, corps),
+  modifierCommande: (etab: string, id: string, corps: Record<string, unknown>) => appel<{ commande: CommandeFournisseur }>("PUT", `/stock/commandes/${id}?etab=${etab}`, corps),
+  actionCommande: (etab: string, id: string, action: "envoyer" | "solder" | "annuler", corps: Record<string, unknown>) =>
+    appel<{ commande: CommandeFournisseur }>("POST", `/stock/commandes/${id}/${action}?etab=${etab}`, corps),
+  reglagesCommandes: (etab: string, corps: Record<string, unknown>) => appel<ReponseCommandes>("PUT", `/stock/commandes/reglages?etab=${etab}`, corps),
   enregistrerRecette: (recette: Recette) => appel<ReponseStock>("PUT", `/stock/recettes/${recette.id}`, { recette }),
   enregistrerPrix: (articleId: string, etablissementId: string, prixHT: number) => appel<ReponseStock>("POST", "/stock/prix", { articleId, etablissementId, prixHT }),
   historiquePrix: (articleId: string) => appel<{ prix: Array<PrixAchat & { par: string | null }> }>("GET", `/stock/prix/${articleId}`),

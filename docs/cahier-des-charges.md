@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 59, copiée le 15 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 60, copiée le 15 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -116,7 +116,7 @@ Fonctions V1 :
 5. Écarts théorique / réel par ingrédient et par période.
 6. Food cost théorique et réel par article, par catégorie et par période.
 
-Lot ultérieur : alimentation automatique des prix d'achat par l'agent de routage des factures du groupe, puis suggestions de commande fournisseur.
+Lot ultérieur : alimentation automatique des prix d'achat par l'agent de routage des factures du groupe, puis suggestions de commande fournisseur (les commandes elles-mêmes sont livrées depuis le 15 octobre 2026, voir plus bas).
 
 Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors du périmètre de l'attestation.
 
@@ -161,6 +161,17 @@ Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors 
 - **Food cost** (administration), sur une période : théorique = coût des fiches des articles vendus / CA HT ; réel = théorique + pertes + écarts d'inventaire / CA HT, qui suppose un inventaire en début et en fin de période ; détail par article et par famille, plus gros écarts.
 - **Agent de factures** : dépose les lignes d'une facture par une clé d'accès créée dans l'administration (empreinte seule gardée, révocable). Une ligne reconnue (fournisseur et référence, ou libellé déjà rapproché) devient un prix d'achat ; les autres attendent un rapprochement, retenu pour la fois suivante.
 - **En caisse** : onglet Stock réservé aux responsables, en ligne (inventaire, réception, perte, stock théorique et dernières pièces).
+
+### Commandes fournisseurs (15 octobre 2026)
+
+Demandées par Lionel le 15 octobre 2026 pour le test d'avant ouverture : saisie de la commande dans l'interface, envoi au fournisseur sur les coordonnées de sa fiche, puis réception pour intégration au stock. Hors périmètre fiscal.
+
+- **Fiche fournisseur** (administration › Stock et recettes › Fournisseurs), commune au groupe : e-mail de commande, trois adresses en copie au plus, contact, téléphone, franco de port, jours de livraison, note, numéro de client de chaque établissement. Son nom est celui des articles fournisseurs : la renommer renomme ses articles.
+- **Bon de commande**, propre à l'établissement et numéroté (1, 2, 3…), saisi dans l'administration ou dans l'onglet Stock de la caisse (responsables) : fournisseur, quantités en conditionnements (stock théorique et dernier prix affichés), livraison souhaitée, message ; le franco manquant est signalé. Modifiable tant qu'il est en brouillon.
+- **Envoi** : par e-mail, avec la clé Resend de l'établissement, à l'adresse de la fiche ; en copie les adresses de la fiche et l'e-mail de l'établissement, qui reçoit aussi les réponses. Ou « marquée envoyée » quand la commande passe par téléphone ou par un portail. Un e-mail refusé laisse la commande en brouillon.
+- **Réception** contre la commande : reste à recevoir et prix pré-remplis, corrigés au besoin ; le stock entre et le prix devient le dernier payé, comme toute réception. Livraison partielle : la commande reste ouverte (« reçue en partie ») jusqu'à la livraison suivante ou au solde. Une réception annulée ne compte plus.
+- **Suivi** : brouillon, envoyée, reçue en partie, reçue, soldée, annulée. Annulation seulement avant toute réception, avec un e-mail au fournisseur si le bon lui était parti par e-mail. Historique de chaque bon.
+- **Import** : l'écran Importer accepte aussi les fiches techniques (recette, ingrédient, quantité, unité) et le volume d'une pièce vendue entière (`volume_unitaire_ml`).
 
 ## Réservations en ligne
 

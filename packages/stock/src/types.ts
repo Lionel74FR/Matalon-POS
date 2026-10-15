@@ -51,6 +51,31 @@ export interface ArticleFournisseur {
   actif: boolean;
 }
 
+/**
+ * Fiche d'un fournisseur : coordonnées de commande. Son nom est celui que
+ * portent ses articles (`ArticleFournisseur.fournisseur`) ; le renommer
+ * renomme ses articles.
+ */
+export interface Fournisseur {
+  id: string;
+  nom: string;
+  /** Destinataire des bons de commande. */
+  courriel?: string;
+  /** En copie des bons de commande (représentant, service client). */
+  copies?: string[];
+  /** Interlocuteur (représentant, commercial). */
+  contact?: string;
+  telephone?: string;
+  /** Franco de port, en centimes HT : en dessous, la commande le signale. */
+  francoHT?: number;
+  /** Jours de livraison, délai, heure limite de commande (texte libre). */
+  livraison?: string;
+  note?: string;
+  /** Numéro de client de chaque établissement chez ce fournisseur. */
+  comptes?: Array<{ etablissementId: string; numeroClient: string }>;
+  actif: boolean;
+}
+
 /** Prix d'achat HT d'un article fournisseur dans un établissement. Historique en ajout seul. */
 export interface PrixAchat {
   articleId: string;
@@ -96,6 +121,8 @@ export interface Referentiel {
   produits: Produit[];
   articles: ArticleFournisseur[];
   recettes: Recette[];
+  /** Fiches fournisseurs (absentes des référentiels d'avant les commandes). */
+  fournisseurs?: Fournisseur[];
 }
 
-export const REFERENTIEL_VIDE: Referentiel = { produits: [], articles: [], recettes: [] };
+export const REFERENTIEL_VIDE: Referentiel = { produits: [], articles: [], recettes: [], fournisseurs: [] };

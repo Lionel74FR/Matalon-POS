@@ -4,11 +4,14 @@ import {
   Couts,
   foodCost,
   formaterQuantite,
+  estTableauRecettes,
   lireLignesImport,
+  lireLignesRecettes,
   lireQuantite,
   lireRecette,
   lireTableau,
   planifierImport,
+  planifierImportRecettes,
   prixHT,
   validerReferentiel,
   versBase,
@@ -205,6 +208,69 @@ describe("import", () => {
     const c = planifierImport(a.referentiel, a.prix, [{ ligne: 2, produit: "creme liquide 35%", unite: "kg" }], "moka", "2026-10-10T10:00:00Z");
     expect(c.referentiel.produits).toHaveLength(3);
     expect(c.rapport.erreurs[0]!.message).toMatch(/existe déjà, compté en L/);
+  });
+});
+
+describe("import des fiches techniques", () => {
+  const produits = lireLignesImport(
+    lireTableau(
+      [
+        "produit;unite;fournisseur;conditionnement;quantite;prix_ht;volume_unitaire_ml",
+        "Grey Goose;L;Caves du Mont;Bouteille 70 cl;0,7;33,64;",
+        "Citron vert;kg;Metro;Au kg;1;3,55;",
+        "Coca-Cola;pièce;Caves du Mont;Bouteille 33 cl;1;0,96;330",
+        "Menthe fraîche;pièce;Metro;Botte;1;1,50;",
+      ].join("\n"),
+    ),
+  );
+  const base = planifierImport({ produits: [], articles: [], recettes: [] }, [], produits.lignes, "moka", "2026-10-15T10:00:00Z").referentiel;
+
+  it("reconnaît le tableau, lit quantité et unité, crée une recette par cocktail", () => {
+    expect(produits.erreurs).toEqual([]);
+    expect(base.produits.find((p) => p.nom === "Coca-Cola")!.contenance).toEqual({ valeur: 330, unite: "mL" });
+    const tableau = lireTableau(
+      [
+        "Cocktail;Ingrédient;Quantité;Unité;Note",
+        "Rouge Nuit;Grey Goose;4,5;cl;",
+        "Rouge Nuit;citron vert;0,05;kg;≈ 2 cl de jus",
+        "Long Island;Grey Goose;1,5;cl;",
+        "Long Island;Coca-Cola;6;cl;sur une bouteille de 33 cl",
+        "Mojito;Menthe fraîche;0,1;pièce;",
+        "Mojito;Rhum blanc;5;cl;",
+        "Mojito;Citron vert;deux;kg;",
+      ].join("\n"),
+    );
+    expect(estTableauRecettes(tableau)).toBe(true);
+    expect(estTableauRecettes(lireTableau("produit;unite\nSel;kg"))).toBe(false);
+    const { lignes, erreurs } = lireLignesRecettes(tableau);
+    expect(erreurs).toEqual([{ ligne: 8, message: "« Mojito », Citron vert : quantité « deux kg » illisible (g, kg, mL, cL, L ou pièce)" }]);
+    expect(lignes[0]).toEqual({ ligne: 2, recette: "Rouge Nuit", composant: "Grey Goose", quantite: { valeur: 45, unite: "mL" } });
+    const plan = planifierImportRecettes(base, lignes);
+    expect(plan.rapport.recettesCreees).toEqual(["Rouge Nuit", "Long Island"]);
+    // Un ingrédient inconnu : la recette entière attend (aucune recette à moitié).
+    expect(plan.rapport.erreurs).toEqual([{ ligne: 7, message: "« Mojito » : ingrédient « Rhum blanc » inconnu (importez d'abord les produits)" }]);
+    const rouge = plan.referentiel.recettes.find((r) => r.nom === "Rouge Nuit")!;
+    expect(rouge).toMatchObject({ id: "rouge-nuit", unite: "piece", rendement: 1000, actif: true });
+    expect(rouge.lignes).toEqual([
+      { type: "produit", id: "grey-goose", quantite: { valeur: 45, unite: "mL" } },
+      { type: "produit", id: "citron-vert", quantite: { valeur: 50, unite: "g" } },
+    ]);
+    expect(validerReferentiel(plan.referentiel)).toEqual([]);
+    // Le coût suit : 4,5 cl de Grey Goose (33,64 € les 70 cl) + 50 g de citron vert (3,55 €/kg).
+    const c = new Couts(plan.referentiel, planifierImport({ produits: [], articles: [], recettes: [] }, [], produits.lignes, "moka", "x").prix, "moka");
+    expect(c.cout("recette", "rouge-nuit", 1000).micro).toBe(Math.round((3364 * 45 * 10_000) / 700) + Math.round((355 * 50 * 10_000) / 1000));
+
+    // Réimport corrigé : les lignes sont remplacées, rien n'est recréé.
+    const encore = planifierImportRecettes(plan.referentiel, lireLignesRecettes(lireTableau("recette;ingredient;quantite\nRouge Nuit;Grey Goose;5 cl")).lignes);
+    expect(encore.rapport).toMatchObject({ recettesCreees: [], recettesModifiees: ["Rouge Nuit"] });
+    expect(encore.referentiel.recettes.find((r) => r.nom === "Rouge Nuit")!.lignes).toEqual([{ type: "produit", id: "grey-goose", quantite: { valeur: 50, unite: "mL" } }]);
+    expect(encore.referentiel.recettes).toHaveLength(2);
+  });
+
+  it("refuse un volume pour un produit à la pièce sans volume déclaré", () => {
+    const plan = planifierImportRecettes(base, lireLignesRecettes(lireTableau("recette;ingredient;quantite;unite\nVirgin;Menthe fraîche;10;g")).lignes);
+    expect(plan.rapport.erreurs[0]!.message).toBe("« Virgin » : 10 g de « Menthe fraîche », compté en pièces sans poids par pièce déclaré");
+    expect(lireLignesImport(lireTableau("produit;unite;volume_unitaire_ml\nGin;L;700")).erreurs[0]!.message).toMatch(/ne vaut que pour un produit compté à la pièce/);
   });
 });
 

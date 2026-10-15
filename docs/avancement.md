@@ -17,7 +17,7 @@ Dernière mise à jour : 15 octobre 2026.
 | 1. Noyau fiscal et caisse minimale | Code terminé (noyau 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients) | Attestation éditeur rédigée (7 octobre), à compléter, valider par Audrex et signer ; noyau à geler en 1.0.0. Ticket envoyé par e-mail (optionnel) : non fait |
 | 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
-| 4. Stock et fiches techniques | Code livré le 9 octobre 2026, avant la fin des lots 1 à 3 sur décision de Lionel : 4a référentiel et liaison carte, 4b consommation à la vente et pertes, 4c réceptions et inventaires (iPad, iPhone, administration), 4d food cost réel, transferts, agent de factures | Critère de sortie : écarts calculés sur un inventaire réel au Moka. Reste côté Lionel : premiers produits (pas de reprise Yokitup), fiches du Moka, inventaire d'ouverture, clé pour l'agent de factures |
+| 4. Stock et fiches techniques | Code livré le 9 octobre 2026, avant la fin des lots 1 à 3 sur décision de Lionel : 4a référentiel et liaison carte, 4b consommation à la vente et pertes, 4c réceptions et inventaires (iPad, iPhone, administration), 4d food cost réel, transferts, agent de factures ; commandes fournisseurs et import des fiches techniques le 15 octobre 2026 (demande de Lionel) | Critère de sortie : écarts calculés sur un inventaire réel au Moka. Reste côté Lionel : premiers produits (pas de reprise Yokitup), fiches du Moka, inventaire d'ouverture, clé pour l'agent de factures |
 | 5. Mise en service | Pas commencé | Services à blanc avec l'équipe |
 | 6. Réservations en ligne | Code livré le 10 octobre 2026, lancé avant la fin des lots 1 à 5 sur demande de Lionel : module du site (balise et lien direct), services et capacités dans l'administration, e-mails, table attribuée d'office et affichée au plan, installation depuis la caisse | Critère de sortie : premières réservations réelles au Moka. Reste côté Lionel : clé Resend et variables d'envoi, réglages des services du Moka, balise sur le site |
 
@@ -25,6 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Commandes fournisseurs (demande de Lionel du 15 octobre) : fiche fournisseur (e-mail de commande, copies, contact, téléphone, franco, livraison, n° client par établissement) ; bon numéroté par établissement saisi dans l'administration ou l'onglet Stock de la caisse, envoyé par e-mail (Resend de l'établissement, copie et réponses à l'établissement) ou marqué envoyé ; réception contre la commande (reste pré-rempli, livraisons partielles, solde, annulation avec e-mail au fournisseur) ; import des fiches techniques (recette, ingrédient, quantité, unité) et du volume d'une pièce ; scénario `commandes-fournisseurs` |
 | c97491e | Retrait d'un article déjà envoyé (retour de Lionel du 15 octobre) : motif obligatoire et accord d'un responsable (code PIN si un serveur est connecté), tracés dans `SUPPRESSION_LIGNE` ; statistiques : tuile « Articles retirés après envoi », tableau par motif, colonne par serveur (les retraits d'avant ce correctif apparaissent « sans motif ») |
 | 1001e39 | Plan de salle : « Tourner (90°) » sur la table sélectionnée, carrée ou rectangulaire, par quarts de tour (0, 90, 180, 270°), plateau et chaises tournés ensemble |
 | c08cb48 | Note : réglage « Imprimer la note d'office à partir de ce montant » (caisse et administration, commun à l'établissement) ; sans impression d'office, l'encaissement rappelle de remettre la note (papier ou QR code). Tickets : duplicata « Note sans détail » (total par taux de TVA), tracé au journal |
@@ -64,6 +65,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 ## Décisions techniques à ne pas défaire
 
+- Commandes fournisseurs (15 octobre, demande de Lionel) : fiche fournisseur dans le référentiel du groupe (`fournisseurs`, nom = celui des articles, renommage répercuté) ; bons dans `commandes_fournisseurs` (numéro par établissement, écriture conditionnelle par version, modifiable seulement en brouillon) ; le bon passe « envoyée » avant l'e-mail (pas de double envoi) et redevient brouillon si l'e-mail échoue ; quantités reçues jamais recopiées : lues dans les réceptions qui portent `commande` (une réception annulée ne compte plus). Réglages d'envoi par établissement (`stock_reglages`), à défaut ceux des réservations. Hors fiscal.
 - Retrait après envoi (15 octobre) : c'est une annulation avant encaissement. Motif + responsable obligatoires ; compté dans les statistiques à partir du journal des événements (`SUPPRESSION_LIGNE`, `apresEnvoi`), sans toucher aux tickets ni au CA (rien n'a été encaissé). Avant envoi, un retrait reste libre et sans trace (brouillon).
 - Note de 25 € ou plus (14 octobre) : reste due sans demande du client (arrêté du 8 juin 1967, fiche DGCCRF) ; papier, ou dématérialisée si le client la préfère. Le réglage coupe seulement l'impression d'office, jamais la remise : la caisse la rappelle. La note sans détail n'existe qu'en duplicata (la note d'origine garde le détail).
 - Commandes en cours partagées (13 octobre) : table `commandes_ouvertes` (contenu opaque, version), écriture conditionnelle en une requête ; l'appareil garde ses commandes (IndexedDB, magasin `partage` pour la version et la base de fusion) et fusionne (`metier/fusion.ts`). Fermeture « stricte » sur le serveur avant de sceller un ticket. Hors périmètre fiscal. Le comptoir n'est pas partagé.
@@ -97,6 +99,8 @@ Dernière mise à jour : 15 octobre 2026.
 
 ## Actions en attente côté Lionel
 
+- [ ] Commandes fournisseurs : importer `MOKA_import_1_produits.xlsx` puis `MOKA_import_2_fiches_techniques.xlsx` (Stock et recettes › Importer, Vérifier puis Importer), relier les 20 cocktails à leur fiche dans l'éditeur de carte ; compléter la fiche Caves du Mont (e-mail de commande : mettre d'abord sa propre adresse pour le test) et les réglages d'envoi des commandes ; confirmer les points du fichier (volumes Corona et limonade, fournisseur des trois tarifs du 15/10, prix estimés).
+
 - [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
 - [ ] Remplir les mentions légales des factures dans l'administration.
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
@@ -119,4 +123,4 @@ Dernière mise à jour : 15 octobre 2026.
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 19 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 20 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

@@ -359,6 +359,29 @@ export const MIGRATIONS: string[] = [
     admin_id text,
     expire_le text not null
   )`,
+  // Commandes fournisseurs (hors fiscal) : bon numéroté par établissement, modifiable en brouillon
+  // (écriture conditionnelle par version), puis envoyé ; les quantités reçues se lisent dans les réceptions.
+  `create table if not exists commandes_fournisseurs (
+    id text primary key,
+    etablissement_id text not null references etablissements(id),
+    numero integer not null,
+    fournisseur text not null,
+    statut text not null check (statut in ('brouillon', 'envoyee', 'soldee', 'annulee')),
+    contenu jsonb not null,
+    version integer not null default 1,
+    cree_le text not null,
+    cree_par text not null,
+    maj_le text not null,
+    unique (etablissement_id, numero)
+  )`,
+  `create index if not exists commandes_fournisseurs_etablissement on commandes_fournisseurs (etablissement_id, cree_le)`,
+  // Réglages d'envoi des commandes, par établissement (expéditeur, e-mail de l'établissement, livraison).
+  `create table if not exists stock_reglages (
+    etablissement_id text primary key references etablissements(id),
+    contenu jsonb not null,
+    maj_le text not null,
+    maj_par text
+  )`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

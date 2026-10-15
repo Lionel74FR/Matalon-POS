@@ -1442,3 +1442,37 @@ code.cle-api {
   margin: 4px 0 8px;
   color: var(--sable);
 }
+
+/* Fiche fournisseur */
+.formulaire-fournisseur {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 4px 18px;
+}
+
+.formulaire-fournisseur .explication {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.liste-articles-fournisseur {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.liste-articles-fournisseur li {
+  display: grid;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--espresso-3);
+}
+
+.liste-articles-fournisseur li.annule {
+  opacity: 0.55;
+}
+
+.liste-articles-fournisseur small {
+  color: var(--sable);
+}

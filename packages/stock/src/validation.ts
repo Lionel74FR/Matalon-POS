@@ -1,8 +1,11 @@
-import type { ArticleFournisseur, Fiche, LigneRecette, Produit, Quantite, Recette, Referentiel, TypeComposant, UniteBase, UniteStock } from "./types.js";
+import type { ArticleFournisseur, Fiche, Fournisseur, LigneRecette, Produit, Quantite, Recette, Referentiel, TypeComposant, UniteBase, UniteStock } from "./types.js";
 import { versBase } from "./unites.js";
 
 /** Plafonds : un établissement reste loin de ces volumes. */
-export const LIMITES_STOCK = { produits: 5000, articles: 10000, recettes: 3000, lignes: 60 } as const;
+export const LIMITES_STOCK = { produits: 5000, articles: 10000, recettes: 3000, lignes: 60, fournisseurs: 500 } as const;
+
+/** Adresse e-mail simple (un @, un domaine à point, sans espace). */
+export const COURRIEL = /^[^\s@<>"]{1,64}@[^\s@<>"]+\.[^\s@<>"]{2,}$/;
 
 /** Nom comparable : sans accents, sans casse, sans ponctuation (« Crème 35 % » = « creme 35% »). */
 export function normaliserNom(nom: string): string {
@@ -122,6 +125,76 @@ export function lireArticleFournisseur(v: unknown): { article: ArticleFournisseu
   return { article: l.erreurs.length ? null : article, erreurs: l.erreurs };
 }
 
+export function lireFournisseur(v: unknown): { fournisseur: Fournisseur | null; erreurs: string[] } {
+  const l = new Lecteur();
+  const o = l.objet(v, "fournisseur");
+  const nom = l.texte(o.nom, "fournisseur : nom", 80);
+  const ou = `fournisseur « ${nom || "?"} »`;
+  const courriel = (x: unknown, quoi: string) => {
+    const t = l.texte(x, `${ou} : ${quoi}`, 120, false);
+    if (t && !COURRIEL.test(t)) l.erreurs.push(`${ou} : ${quoi} « ${t} » invalide`);
+    return t.toLowerCase();
+  };
+  const f: Fournisseur = optionnels({
+    id: l.id(o.id, `${ou} : identifiant`),
+    nom,
+    courriel: courriel(o.courriel, "e-mail de commande"),
+    contact: l.texte(o.contact, `${ou} : contact`, 80, false),
+    telephone: l.texte(o.telephone, `${ou} : téléphone`, 30, false),
+    livraison: l.texte(o.livraison, `${ou} : livraison`, 200, false),
+    note: l.texte(o.note, `${ou} : note`, 1000, false),
+    actif: o.actif !== false,
+  });
+  if (Array.isArray(o.copies)) {
+    if (o.copies.length > 3) l.erreurs.push(`${ou} : 3 adresses en copie au plus`);
+    const copies = o.copies.slice(0, 3).map((x) => courriel(x, "e-mail en copie")).filter(Boolean);
+    if (copies.length) f.copies = [...new Set(copies)];
+  }
+  if (o.francoHT !== undefined && o.francoHT !== null && o.francoHT !== 0) f.francoHT = l.entier(o.francoHT, `${ou} : franco`, 0, 10_000_000);
+  if (Array.isArray(o.comptes)) {
+    const comptes = o.comptes.slice(0, 50).map((x, i) => {
+      const c = l.objet(x, `${ou} : compte ${i + 1}`);
+      return { etablissementId: l.id(c.etablissementId, `${ou} : compte ${i + 1}`), numeroClient: l.texte(c.numeroClient, `${ou} : numéro de client`, 40, false) };
+    });
+    const utiles = comptes.filter((c) => c.numeroClient);
+    if (new Set(utiles.map((c) => c.etablissementId)).size !== utiles.length) l.erreurs.push(`${ou} : un seul numéro de client par établissement`);
+    if (utiles.length) f.comptes = utiles;
+  }
+  return { fournisseur: l.erreurs.length ? null : f, erreurs: l.erreurs };
+}
+
+/** Fiche d'un fournisseur nommé par ses articles (casse et accents ignorés). */
+export function ficheFournisseur(ref: Referentiel, nom: string): Fournisseur | undefined {
+  const n = normaliserNom(nom);
+  return (ref.fournisseurs ?? []).find((f) => normaliserNom(f.nom) === n);
+}
+
+/**
+ * Enregistre une fiche fournisseur : ses articles prennent l'orthographe de la
+ * fiche, y compris après un renommage (l'ancien nom disparaît des articles).
+ */
+export function enregistrerFournisseur(ref: Referentiel, f: Fournisseur): Referentiel {
+  const fiches = ref.fournisseurs ?? [];
+  const ancien = fiches.find((x) => x.id === f.id);
+  const noms = new Set([normaliserNom(f.nom), ...(ancien ? [normaliserNom(ancien.nom)] : [])]);
+  return {
+    ...ref,
+    fournisseurs: ancien ? fiches.map((x) => (x.id === f.id ? f : x)) : [...fiches, f],
+    articles: ref.articles.map((a) => (noms.has(normaliserNom(a.fournisseur)) && a.fournisseur !== f.nom ? { ...a, fournisseur: f.nom } : a)),
+  };
+}
+
+/** Fournisseurs connus : fiches et noms portés par des articles, sans doublon, triés. */
+export function nomsFournisseurs(ref: Referentiel, actifsSeulement = true): string[] {
+  const noms = new Map<string, string>();
+  for (const f of ref.fournisseurs ?? []) if (f.actif || !actifsSeulement) noms.set(normaliserNom(f.nom), f.nom);
+  for (const a of ref.articles) {
+    if (!a.actif && actifsSeulement) continue;
+    if (!noms.has(normaliserNom(a.fournisseur))) noms.set(normaliserNom(a.fournisseur), a.fournisseur);
+  }
+  return [...noms.values()].sort((a, b) => a.localeCompare(b, "fr"));
+}
+
 export function lireFiche(v: unknown, ou = "fiche"): { fiche: Fiche | null; erreurs: string[] } {
   const l = new Lecteur();
   const o = l.objet(v, ou);
@@ -181,8 +254,10 @@ export function validerReferentiel(ref: Referentiel): string[] {
       else vus.set(n, x.nom);
     }
   };
+  if ((ref.fournisseurs ?? []).length > LIMITES_STOCK.fournisseurs) erreurs.push(`${LIMITES_STOCK.fournisseurs} fournisseurs au plus`);
   doublons(ref.produits, "produit");
   doublons(ref.recettes, "recette");
+  doublons(ref.fournisseurs ?? [], "fournisseur");
   doublons(ref.articles.map((a) => ({ id: a.id, nom: `${a.produitId} ${a.fournisseur} ${a.reference ?? ""} ${a.conditionnement}` })), "article fournisseur");
   const produits = new Map(ref.produits.map((p) => [p.id, p]));
   const recettes = new Map(ref.recettes.map((r) => [r.id, r]));

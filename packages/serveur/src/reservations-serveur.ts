@@ -37,6 +37,8 @@ export interface Courriel {
   de?: string;
   deNom: string;
   repondreA?: string;
+  /** Destinataires en copie. */
+  copies?: string[];
   /** Clé d'envoi propre à l'établissement (son compte Resend) ; absente : celle du groupe. */
   cle?: string;
   sujet: string;
@@ -359,7 +361,7 @@ function resume(etab: EtablissementApi, r: Reservation, maintenant: Date): Resum
 
 // ───────── E-mails ─────────
 
-const echapper = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export const echapper = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 export const dateLisible = (jour: string) =>
   new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const personnes = (n: number) => `${n} personne${n > 1 ? "s" : ""}`;

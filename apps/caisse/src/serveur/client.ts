@@ -2,9 +2,11 @@ import type { Reservation } from "@matalon/reservations";
 import type { Ticket } from "@matalon/noyau-fiscal";
 import type {
   CommandePartagee,
+  CommandeFournisseur,
   DocumentStock,
   ReponseEcritureCommande,
   EtatStock,
+  ReponseCommandes,
   ReponseStockCaisse,
   ClientApi as FicheClient,
   EntreeSynchro,
@@ -153,6 +155,18 @@ export class ClientApi {
   /** Réception, inventaire ou perte saisi sur l'appareil par un responsable. */
   operationStock(type: "receptions" | "inventaires" | "pertes", corps: Record<string, unknown>) {
     return this.appel<{ document: DocumentStock; etat: EtatStock }>("POST", `/api/caisse/stock/${type}`, corps);
+  }
+
+  /** Commandes fournisseurs de l'établissement (lecture). */
+  commandesFournisseurs() {
+    return this.appel<ReponseCommandes>("GET", "/api/caisse/stock/commandes");
+  }
+
+  /** Bon de commande : création, modification d'un brouillon, envoi, solde, annulation (responsable). */
+  ecrireCommandeFournisseur(id: string | null, action: "creer" | "modifier" | "envoyer" | "solder" | "annuler", corps: Record<string, unknown>) {
+    if (action === "creer") return this.appel<{ commande: CommandeFournisseur }>("POST", "/api/caisse/stock/commandes", corps);
+    if (action === "modifier") return this.appel<{ commande: CommandeFournisseur }>("PUT", `/api/caisse/stock/commandes/${id}`, corps);
+    return this.appel<{ commande: CommandeFournisseur }>("POST", `/api/caisse/stock/commandes/${id}/${action}`, corps);
   }
 
   /** Alerte lue, validée par le code d'un responsable (vérifié par le serveur). */
