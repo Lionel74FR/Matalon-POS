@@ -676,6 +676,22 @@ select {
   margin-top: 16px;
 }
 
+.editeur-ajout-titre {
+  color: var(--sable);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.editeur-ajout select {
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+}
+
 .editeur-ajout input,
 .sous-ligne input {
   min-height: 42px;

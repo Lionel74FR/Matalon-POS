@@ -153,6 +153,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [etat, setEtat] = useState<"" | "envoi" | "enregistre" | "conflit">("");
   const [erreurAjout, setErreurAjout] = useState("");
+  const [erreurRayon, setErreurRayon] = useState("");
   /** Stock et ventes : fiches techniques, coûts et part du CA couverte (facultatifs : l'éditeur marche sans). */
   const [stock, setStock] = useState<ReponseStock | null>(null);
   const [ventes, setVentes] = useState<ReponseVentesCarte | null>(null);
@@ -461,17 +462,45 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
             </div>
           ))}
           <form className="editeur-ajout" onSubmit={ajouterCategorie}>
-            <input name="nom" placeholder="Nouvelle catégorie" maxLength={120} required />
-            <input name="rayon" placeholder="Rayon (ex. Boissons)" list="rayons-carte" maxLength={40} required />
-            <datalist id="rayons-carte">
+            <span className="editeur-ajout-titre">Nouvelle catégorie</span>
+            <input name="nom" placeholder="Nom de la catégorie (ex. Gin)" maxLength={120} required />
+            <select name="rayon" aria-label="Rayon de la nouvelle catégorie" defaultValue={categorie?.rayon ?? rayons[0]}>
               {rayons.map((r) => (
-                <option key={r} value={r} />
+                <option key={r} value={r}>
+                  {r}
+                </option>
               ))}
-            </datalist>
+            </select>
             <button className="bouton">
               <AvecIcone icone={Plus}>Catégorie</AvecIcone>
             </button>
           </form>
+          <form
+            className="editeur-ajout"
+            onSubmit={(e) => {
+              const rayon = String(new FormData(e.currentTarget).get("rayon") ?? "").trim();
+              if (rayons.some((r) => r.toLowerCase() === rayon.toLowerCase())) {
+                e.preventDefault();
+                setErreurRayon(`Le rayon « ${rayon} » existe déjà : ajoutez-y une catégorie.`);
+                return;
+              }
+              setErreurRayon("");
+              ajouterCategorie(e);
+            }}
+          >
+            <span className="editeur-ajout-titre">Nouveau rayon (onglet de la caisse)</span>
+            <input name="rayon" placeholder="Nom du rayon (ex. Desserts)" maxLength={40} required />
+            <input name="nom" placeholder="Sa première catégorie" maxLength={120} required />
+            <button className="bouton">
+              <AvecIcone icone={Plus}>Rayon</AvecIcone>
+            </button>
+            {erreurRayon && <p className="erreur">{erreurRayon}</p>}
+          </form>
+          <datalist id="rayons-carte">
+            {rayons.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
         </aside>
 
         <section className="admin-section editeur-articles">
