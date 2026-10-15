@@ -471,6 +471,21 @@ export interface IndicateursPeriode {
   nbCorrections: number;
   ventesEnCompte: number;
   reglementsComptes: number;
+  /** Articles retirés d'une commande après envoi en préparation (annulations avant encaissement). */
+  articlesRetires?: number;
+  montantRetire?: number;
+}
+
+/** Retrait d'un article déjà envoyé (événement SUPPRESSION_LIGNE du journal d'une caisse). */
+export interface RetraitArticle {
+  caisseId: string;
+  horodatage: string;
+  operateurId: string | null;
+  article: string;
+  quantite: number;
+  montantTTC: number;
+  motif: string | null;
+  autorisePar: string | null;
 }
 
 export interface LigneStat {
@@ -495,6 +510,9 @@ export interface StatServeur {
   offerts: number;
   annulations: number;
   montantAnnule: number;
+  /** Articles retirés après envoi par cette personne. */
+  articlesRetires?: number;
+  montantRetire?: number;
 }
 
 export interface ReponseStatistiques {
@@ -521,6 +539,8 @@ export interface ReponseStatistiques {
   tables: LigneStat[];
   remisesParMotif: LigneStat[];
   annulationsParMotif: LigneStat[];
+  /** Articles retirés après envoi, par motif (quantité, montant). */
+  retraitsParMotif?: LigneStat[];
   /** Dernière synchronisation de chaque appareil : ses ventes non reçues manquent ici. */
   synchros: Record<string, string | null>;
   nomsAppareils: Record<string, string>;

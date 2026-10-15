@@ -133,6 +133,7 @@ await p.getByRole("button", { name: /^Envoyer \(\d+\)/ }).click();
 await p.getByRole("button", { name: "Envoyé", exact: true }).waitFor();
 await p.locator(".ticket-ligne", { hasText: "Egg muffin" }).click();
 await clic("Retirer de la commande");
+await clic("Erreur de saisie");
 await p.locator(".ticket-ligne.retiree", { hasText: "Egg muffin" }).waitFor();
 await capture("05-commande-remise");
 

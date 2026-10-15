@@ -19,6 +19,8 @@ for (const c of carte.categories) {
   if (c.id === "viennoiseries") c.poste = "Cuisine";
 }
 await appel("PUT", "/cartes/carte-automne-2026", { carte, version });
+// Un serveur : le retrait d'un article déjà envoyé lui demande le code d'un responsable.
+await appel("POST", "/etablissements/moka/utilisateurs", { nom: "Sam", role: "serveur", pin: "5678", actif: true });
 
 const BAR = "10.0.0.21";
 const CUISINE = "10.0.0.22";
@@ -91,10 +93,22 @@ await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 const lignesCappuccino = await p.locator(".ticket-ligne", { hasText: "Cappuccino" }).count();
 await p.getByRole("button", { name: "Envoyer (1)" }).waitFor();
 
-// Retrait du croissant déjà parti : bon d'annulation en cuisine.
+// Retrait du croissant déjà parti, par Sam (serveur) : motif, code de Lionel, bon d'annulation en cuisine.
+await p.getByRole("button", { name: /^Retour à la salle/ }).click();
+await p.getByRole("button", { name: /^Quitter \(Lionel\)/ }).click();
+await p.locator(".carte-personne", { hasText: "Sam" }).click();
+for (const x of "5678") await p.locator(".pave .touche", { hasText: new RegExp(`^${x}$`) }).last().click();
+await p.getByRole("button", { name: "Plus tard", exact: true }).click({ timeout: 3000 }).catch(() => undefined);
+await p.getByRole("button", { name: /^Table 5,/ }).click();
 const avantRetrait = recus.length;
 await p.locator(".ticket-ligne", { hasText: "Croissant" }).click();
 await clic("Retirer de la commande");
+await p.getByRole("dialog", { name: /^Retirer 1 × Croissant/ }).waitFor();
+await p.screenshot({ path: `${sortie}/p02b-motif-retrait.png` });
+await clic("Produit indisponible");
+await p.getByRole("dialog", { name: "Validation responsable" }).waitFor();
+const pinDemande = true;
+for (const x of "1234") await p.getByRole("dialog", { name: "Validation responsable" }).locator(".pave .touche", { hasText: new RegExp(`^${x}$`) }).last().click();
 await p.locator(".ticket-ligne.retiree", { hasText: "Croissant" }).waitFor();
 await p.waitForFunction(() => document.querySelectorAll(".ticket-ligne .mention-envoyee").length === 1);
 const annulation = recus.slice(avantRetrait);
@@ -108,9 +122,16 @@ await p.getByRole("button", { name: "Terminé" }).waitFor();
 await p.waitForTimeout(1000);
 const aLEncaissement = recus.slice(avantEncaissement);
 await p.screenshot({ path: `${sortie}/p03-encaisse.png` });
+// Statistiques : le retrait compte, avec son motif.
+await clic("Terminé");
+await p.locator(".puce-synchro").click();
+await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
+const jour = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+const stats = await appel("GET", `/etablissements/moka/statistiques?du=${jour}&au=${jour}`);
+const retraits = { indicateurs: [stats.indicateurs.articlesRetires, stats.indicateurs.montantRetire], parMotif: stats.retraitsParMotif };
 await b.close();
 
-const resultat = { envoyerAvant, essai, apresEnvoi, envoyees, lignesCappuccino, annulation, aLEncaissement, nbRecus: recus.length, erreurs };
+const resultat = { envoyerAvant, essai, apresEnvoi, envoyees, lignesCappuccino, annulation, aLEncaissement, pinDemande, retraits, nbRecus: recus.length, erreurs };
 console.log(JSON.stringify(resultat, null, 2));
 const ok =
   envoyerAvant === 0 &&
@@ -127,5 +148,7 @@ const ok =
   aLEncaissement.length === 1 &&
   aLEncaissement[0].imprimante === "bar" &&
   /1 x Cappuccino/.test(aLEncaissement[0].textes) &&
+  retraits.indicateurs[0] === 1 &&
+  retraits.parMotif?.[0]?.libelle === "Produit indisponible" &&
   erreurs.length === 0;
 if (!ok) process.exit(1);

@@ -657,6 +657,13 @@ describe("statistiques", () => {
     await b.registre.enregistrerVente({ lignes: [cap], paiements: [{ mode: "ESPECES", montant: 500 }], operateurId: lea });
     await b.registre.enregistrerVente({ lignes: [{ ...cap, quantite: 3 }], paiements: [{ mode: "CB", montant: 1200 }], operateurId: lea });
     await b.registre.enregistrerAnnulation({ numeroTicket: 2, motif: "Erreur de saisie", operateurId: lea });
+    // Deux cappuccinos retirés après envoi (annulation avant encaissement) ; un retrait de brouillon ne compte pas.
+    await a.registre.journaliser(
+      "SUPPRESSION_LIGNE",
+      { table: "t2", article: "Cappuccino", quantite: 2, montantTTC: 800, apresEnvoi: true, motif: "Client a changé d'avis", autorisePar: lea },
+      lea,
+    );
+    await a.registre.journaliser("SUPPRESSION_LIGNE", { table: "t2", article: "Cappuccino", quantite: 1, montantTTC: 400 }, lea);
     expect((await a.synchro()).statut).toBe(200);
     expect((await b.synchro()).statut).toBe(200);
 
@@ -685,6 +692,9 @@ describe("statistiques", () => {
     expect(st.appareils.map((x: any) => x.ttc).sort()).toEqual([400, 800]);
     expect(st.remisesParMotif[0]).toMatchObject({ libelle: "Offert · Fidélité", ttc: 1100 });
     expect(st.annulationsParMotif[0]).toMatchObject({ libelle: "Erreur de saisie", ttc: 1200, tickets: 1 });
+    expect(st.indicateurs).toMatchObject({ articlesRetires: 2, montantRetire: 800 });
+    expect(st.retraitsParMotif).toEqual([expect.objectContaining({ libelle: "Client a changé d'avis", ttc: 800, quantite: 2 })]);
+    expect(st.serveurs[0]).toMatchObject({ articlesRetires: 2, montantRetire: 800 });
     expect(st.parJour).toEqual([{ jour: "2026-10-15", ttc: 1200, tickets: 3, couverts: 2 }]);
     expect(st.parJourSemaine[3]).toMatchObject({ jour: 3, ttc: 1200, moyenne: 1200 });
 

@@ -8,6 +8,8 @@ import { euros, useCaisse } from "../contexte";
 const MOTIFS = ["Geste commercial", "Client habitué", "Erreur de service", "Repas du personnel", "Offert maison"];
 const POURCENTAGES = [10, 20, 50, 100];
 const NOTES_RAPIDES = ["Sans sucre", "Lait végétal", "Sans glace", "Allergie", "À servir après"];
+/** Motifs d'un retrait après envoi (article déjà parti en préparation). */
+export const MOTIFS_RETRAIT = ["Erreur de saisie", "Client a changé d'avis", "Produit indisponible", "Produit raté ou renversé", "Attente trop longue"];
 
 /**
  * Quantité, remise ou retrait d'une ligne de commande. Avant envoi, la
@@ -31,9 +33,10 @@ export function ModaleLigne(props: {
   const [erreur, setErreur] = useState("");
   const [note, setNote] = useState(l.note ?? "");
   const [suite, setSuite] = useState<Suite>(suiteDe(l));
+  /** Retrait d'un article déjà envoyé, en attente de son motif (puis du code d'un responsable). */
+  const [retrait, setRetrait] = useState<{ unites: number; suite: () => void } | null>(null);
 
-  const tracerRetrait = async (unites: number) => {
-    if (!l.envoyee) return;
+  const tracerRetrait = async (unites: number, motif: string, autorisePar: string) => {
     await caisse.registre.journaliser(
       "SUPPRESSION_LIGNE",
       {
@@ -43,10 +46,28 @@ export function ModaleLigne(props: {
         montantTTC: unites * l.prixUnitaireTTC,
         ajouteeLe: l.ajouteeLe,
         // Déjà parti en production : un bon d'annulation suit.
-        ...(l.envoyee ? { apresEnvoi: true } : {}),
+        apresEnvoi: true,
+        motif,
+        autorisePar,
       },
       utilisateur.id,
     );
+  };
+
+  /**
+   * Un article déjà envoyé ne se retire qu'avec un motif et l'accord d'un responsable (son code si
+   * un serveur est connecté) : c'est une annulation, comptée dans les statistiques. Avant envoi, rien.
+   */
+  const retirer = (unites: number, suite: () => void) => {
+    if (!l.envoyee || unites <= 0) return suite();
+    setRetrait({ unites, suite });
+  };
+  const confirmerRetrait = async (motifRetrait: string) => {
+    if (!retrait) return;
+    const id = await demanderResponsable(`Retrait de ${retrait.unites} × ${l.libelle}, déjà envoyé (${motifRetrait}).`);
+    if (!id) return;
+    await tracerRetrait(retrait.unites, motifRetrait, id);
+    retrait.suite();
   };
 
   const valider = async () => {
@@ -58,20 +79,35 @@ export function ModaleLigne(props: {
       if (!id) return;
       accordeePar = id;
     }
-    const retrait = Math.max(0, l.quantite - quantite);
-    if (retrait > 0) await tracerRetrait(retrait);
+    const unites = Math.max(0, l.quantite - quantite);
     const { suite: _, ...sansSuite } = l;
     const maj = avecQuantite({ ...sansSuite, ...(suite ? { suite } : {}), remise: undefined, note: note.trim() || undefined }, quantite);
     if (pourcentage > 0) {
       maj.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, pourcentage) };
     }
-    props.onChange(maj, retrait);
+    retirer(unites, () => props.onChange(maj, unites));
   };
 
-  const supprimer = async () => {
-    await tracerRetrait(l.quantite);
-    props.onChange(null, l.quantite);
-  };
+  const supprimer = () => retirer(l.quantite, () => props.onChange(null, l.quantite));
+
+  if (retrait) {
+    return (
+      <Modale titre={`Retirer ${retrait.unites} × ${l.libelle}`} onFermer={() => setRetrait(null)}>
+        <p className="explication">
+          Déjà envoyé en préparation : le retrait compte comme une annulation (statistiques, journal) et imprime un bon d'annulation.
+          {utilisateur.role !== "responsable" ? " Un responsable le valide avec son code." : ""}
+        </p>
+        <h3>Motif</h3>
+        <div className="options">
+          {MOTIFS_RETRAIT.map((m) => (
+            <button key={m} className="option" onClick={() => void confirmerRetrait(m)}>
+              {m}
+            </button>
+          ))}
+        </div>
+      </Modale>
+    );
+  }
 
   const apercu = avecQuantite(
     pourcentage > 0 ? { ...l, remise: { pourcentage, motif: motif || "-", accordeePar: "", montantTTC: 0 } } : { ...l, remise: undefined },

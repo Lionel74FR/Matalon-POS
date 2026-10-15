@@ -58,6 +58,7 @@ import {
   type CommandePartagee,
   type ImprimanteReseau,
   type ReponseEcritureCommande,
+  type RetraitArticle,
   type PostesProduction,
   type ReponseComptes,
   type ReponseTickets,
@@ -1147,6 +1148,27 @@ async function statistiques(env: Environnement, etablissementId: string, requete
       [etablissementId, debut, au],
     )
   ).map((l) => l.contenu);
+  // Articles retirés après envoi : événements SUPPRESSION_LIGNE du journal des caisses (une marge d'un jour
+  // de chaque côté, la journée comptable basculant à 5 h).
+  const retraits: RetraitArticle[] = (
+    await env.db.requete<{ caisse_id: string; contenu: { horodatage: string; operateurId: string | null; details: Record<string, unknown> } }>(
+      `select e.caisse_id, e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+       where c.etablissement_id = $1 and e.chaine = 'evenements' and e.contenu->>'code' = 'SUPPRESSION_LIGNE'
+         and e.horodatage between $2 and $3`,
+      [etablissementId, `${ajouterJours(debut, -1)}T00:00:00`, `${ajouterJours(au, 2)}T00:00:00`],
+    )
+  )
+    .filter((l) => l.contenu.details?.apresEnvoi === true)
+    .map((l) => ({
+      caisseId: l.caisse_id,
+      horodatage: l.contenu.horodatage,
+      operateurId: l.contenu.operateurId ?? null,
+      article: String(l.contenu.details.article ?? ""),
+      quantite: Number(l.contenu.details.quantite ?? 0) || 0,
+      montantTTC: Number(l.contenu.details.montantTTC ?? 0) || 0,
+      motif: typeof l.contenu.details.motif === "string" ? l.contenu.details.motif : null,
+      autorisePar: typeof l.contenu.details.autorisePar === "string" ? l.contenu.details.autorisePar : null,
+    }));
   const [e] = await env.db.requete<{ carte_id: string; tables: Table[] }>("select carte_id, tables from etablissements where id = $1", [etablissementId]);
   const [carte] = e ? await env.db.requete<{ contenu: Catalogue }>("select contenu from cartes where id = $1", [e.carte_id]) : [];
   const equipe = await env.db.requete<{ id: string; nom: string }>("select id, nom from utilisateurs where etablissement_id = $1", [etablissementId]);
@@ -1166,6 +1188,7 @@ async function statistiques(env: Environnement, etablissementId: string, requete
       appareils: Object.fromEntries(caisses.map((x) => [x.id, x.nom])),
       synchros: Object.fromEntries(caisses.filter((x) => !x.revoquee_le).map((x) => [x.id, x.derniere_synchro])),
       maintenant: horloge(env),
+      retraits,
     }),
     alertes: alertes.alertes,
   };

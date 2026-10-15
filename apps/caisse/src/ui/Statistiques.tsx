@@ -122,6 +122,14 @@ function Indicateurs(props: { i: IndicateursPeriode; p: IndicateursPeriode }) {
         hausseFavorable={false}
         sous={euros(i.montantAnnule)}
       />
+      <Tuile
+        libelle="Articles retirés après envoi"
+        valeur={entier(i.articlesRetires ?? 0)}
+        actuel={i.montantRetire ?? 0}
+        precedent={p.montantRetire ?? 0}
+        hausseFavorable={false}
+        sous={`${euros(i.montantRetire ?? 0)} · avant encaissement`}
+      />
     </div>
   );
 }
@@ -496,7 +504,7 @@ export function Statistiques() {
 
           <Tableau
             titre="Équipe"
-            colonnes={["Serveur", "Tickets", "CA TTC", "Ticket moyen", "Couverts", "Remises et offerts", "Annulations"]}
+            colonnes={["Serveur", "Tickets", "CA TTC", "Ticket moyen", "Couverts", "Remises et offerts", "Annulations", "Retraits après envoi"]}
             lignes={s.serveurs.map((v) => [
               v.nom,
               entier(v.tickets),
@@ -505,6 +513,7 @@ export function Statistiques() {
               entier(v.couverts),
               euros(v.remises + v.offerts),
               v.annulations ? `${v.annulations} · ${euros(v.montantAnnule)}` : "—",
+              v.articlesRetires ? `${v.articlesRetires} · ${euros(v.montantRetire ?? 0)}` : "—",
             ])}
           />
 
@@ -539,6 +548,12 @@ export function Statistiques() {
               colonnes={["Motif", "Tickets", "Montant"]}
               lignes={s.annulationsParMotif.map((r) => [r.libelle, entier(r.tickets ?? 0), euros(r.ttc)])}
               vide="Aucune annulation."
+            />
+            <Tableau
+              titre="Articles retirés après envoi, par motif"
+              colonnes={["Motif", "Articles", "Montant"]}
+              lignes={(s.retraitsParMotif ?? []).map((r) => [r.libelle, entier(r.quantite ?? 0), euros(r.ttc)])}
+              vide="Aucun article retiré après envoi."
             />
           </div>
 

@@ -6,7 +6,8 @@
  */
 import type { Catalogue } from "@matalon/catalogue";
 import { totauxTickets, type Ticket } from "@matalon/noyau-fiscal";
-import type { IndicateursPeriode, LigneStat, ReponseStatistiques, StatServeur, Table } from "./partage.js";
+import { dateComptable } from "@matalon/noyau-fiscal";
+import type { IndicateursPeriode, LigneStat, ReponseStatistiques, RetraitArticle, StatServeur, Table } from "./partage.js";
 
 export const JOURS_MAX_STATISTIQUES = 366;
 export const DATE_VALIDE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -34,7 +35,10 @@ function ventesConservees(tickets: Ticket[]): Ticket[] {
   return ventes(tickets).filter((t) => !annulees.has(`${t.caisseId}#${t.numero}`));
 }
 
-export function indicateurs(tickets: Ticket[]): IndicateursPeriode {
+/** Journée comptable d'un retrait (bascule à 5 h, comme les tickets). */
+const jourDe = (r: RetraitArticle) => dateComptable(new Date(r.horodatage));
+
+export function indicateurs(tickets: Ticket[], retraits: RetraitArticle[] = []): IndicateursPeriode {
   const t = totauxTickets(tickets);
   const v = ventesConservees(tickets);
   const servies = v.filter((x) => (x.couverts ?? 0) > 0);
@@ -57,6 +61,8 @@ export function indicateurs(tickets: Ticket[]): IndicateursPeriode {
     nbCorrections: tickets.filter((x) => x.type === "CORRECTION").length,
     ventesEnCompte: t.comptesClients?.ventesEnCompteTTC ?? 0,
     reglementsComptes: t.comptesClients?.reglementsTTC ?? 0,
+    articlesRetires: retraits.reduce((s, r) => s + r.quantite, 0),
+    montantRetire: retraits.reduce((s, r) => s + r.montantTTC, 0),
   };
 }
 
@@ -87,6 +93,8 @@ export interface ContexteStatistiques {
   appareils: Record<string, string>;
   synchros: Record<string, string | null>;
   maintenant: Date;
+  /** Articles retirés après envoi, de la période et de la précédente. */
+  retraits?: RetraitArticle[];
 }
 
 export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStatistiques, "alertes"> {
@@ -94,6 +102,8 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
   const precedente = { du: ajouterJours(c.du, -jours), au: ajouterJours(c.du, -1) };
   const tickets = c.tickets.filter((t) => t.dateComptable >= c.du && t.dateComptable <= c.au);
   const avant = c.tickets.filter((t) => t.dateComptable >= precedente.du && t.dateComptable <= precedente.au);
+  const retraits = (c.retraits ?? []).filter((r) => jourDe(r) >= c.du && jourDe(r) <= c.au);
+  const retraitsAvant = (c.retraits ?? []).filter((r) => jourDe(r) >= precedente.du && jourDe(r) <= precedente.au);
   const va = ventesEtAnnulations(tickets);
 
   // Heures et jours.
@@ -180,6 +190,24 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
     }
     serveurs.set(t.operateurId, s);
   }
+  for (const r of retraits) {
+    const id = r.operateurId ?? "";
+    const s = serveurs.get(id) ?? {
+      id,
+      nom: nomDe.get(id) ?? id,
+      ttc: 0,
+      tickets: 0,
+      ticketMoyen: 0,
+      couverts: 0,
+      remises: 0,
+      offerts: 0,
+      annulations: 0,
+      montantAnnule: 0,
+    };
+    s.articlesRetires = (s.articlesRetires ?? 0) + r.quantite;
+    s.montantRetire = (s.montantRetire ?? 0) + r.montantTTC;
+    serveurs.set(id, s);
+  }
   for (const s of serveurs.values()) {
     const brut = ventes(tickets).filter((t) => t.operateurId === s.id).reduce((x, t) => x + t.totalTTC, 0);
     s.ticketMoyen = s.tickets ? Math.round(brut / s.tickets) : 0;
@@ -222,14 +250,24 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
     (t) => t.motif ?? "sans motif",
   );
 
+  const retraitsParMotif = grouper(
+    retraits,
+    (r) => r.motif ?? "sans motif",
+    (acc, r) => {
+      acc.ttc += r.montantTTC;
+      plus(acc, "quantite", r.quantite);
+    },
+    (r) => r.motif ?? "sans motif",
+  );
+
   return {
     du: c.du,
     au: c.au,
     jours,
     precedente,
     calculeLe: c.maintenant.toISOString(),
-    indicateurs: indicateurs(tickets),
-    indicateursPrecedents: indicateurs(avant),
+    indicateurs: indicateurs(tickets, retraits),
+    indicateursPrecedents: indicateurs(avant, retraitsAvant),
     parHeure,
     parJour,
     parJourSemaine,
@@ -243,6 +281,7 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
     tables,
     remisesParMotif,
     annulationsParMotif,
+    retraitsParMotif,
     synchros: c.synchros,
     nomsAppareils: c.appareils,
   };

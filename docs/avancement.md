@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 14 octobre 2026.
+Dernière mise à jour : 15 octobre 2026.
 
 ## Règle de conduite
 
@@ -25,6 +25,7 @@ Dernière mise à jour : 14 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Retrait d'un article déjà envoyé (retour de Lionel du 15 octobre) : motif obligatoire et accord d'un responsable (code PIN si un serveur est connecté), tracés dans `SUPPRESSION_LIGNE` ; statistiques : tuile « Articles retirés après envoi », tableau par motif, colonne par serveur (les retraits d'avant ce correctif apparaissent « sans motif ») |
 | 1001e39 | Plan de salle : « Tourner (90°) » sur la table sélectionnée, carrée ou rectangulaire, par quarts de tour (0, 90, 180, 270°), plateau et chaises tournés ensemble |
 | c08cb48 | Note : réglage « Imprimer la note d'office à partir de ce montant » (caisse et administration, commun à l'établissement) ; sans impression d'office, l'encaissement rappelle de remettre la note (papier ou QR code). Tickets : duplicata « Note sans détail » (total par taux de TVA), tracé au journal |
 | da8724e | Réservations en caisse comme dans l'administration : vues Aujourd'hui, À venir, Par jour, recherche, fiche de réservation (modifier, annuler, rétablir, historique) commune à la caisse et à l'administration, saisie pour n'importe quel jour |
@@ -63,6 +64,7 @@ Dernière mise à jour : 14 octobre 2026.
 
 ## Décisions techniques à ne pas défaire
 
+- Retrait après envoi (15 octobre) : c'est une annulation avant encaissement. Motif + responsable obligatoires ; compté dans les statistiques à partir du journal des événements (`SUPPRESSION_LIGNE`, `apresEnvoi`), sans toucher aux tickets ni au CA (rien n'a été encaissé). Avant envoi, un retrait reste libre et sans trace (brouillon).
 - Note de 25 € ou plus (14 octobre) : reste due sans demande du client (arrêté du 8 juin 1967, fiche DGCCRF) ; papier, ou dématérialisée si le client la préfère. Le réglage coupe seulement l'impression d'office, jamais la remise : la caisse la rappelle. La note sans détail n'existe qu'en duplicata (la note d'origine garde le détail).
 - Commandes en cours partagées (13 octobre) : table `commandes_ouvertes` (contenu opaque, version), écriture conditionnelle en une requête ; l'appareil garde ses commandes (IndexedDB, magasin `partage` pour la version et la base de fusion) et fusionne (`metier/fusion.ts`). Fermeture « stricte » sur le serveur avant de sceller un ticket. Hors périmètre fiscal. Le comptoir n'est pas partagé.
 - Imprimante des tickets (13 octobre, demande de Lionel) : commune à l'établissement (`imprimante_tickets`), l'adresse propre à un appareil (`config.imprimante`) passe avant. Le certificat de l'imprimante reste à accepter sur chaque appareil (limite de Safari, levée par l'app native).
