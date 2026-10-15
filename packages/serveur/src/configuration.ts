@@ -11,7 +11,9 @@ import { ErreurHttp, type Db } from "./db.js";
  * Restent sur place : tickets et clôtures (enregistrements), appareils et
  * codes, comptes clients, alertes, commandes en cours, comptes et journal
  * d'administration, clés de l'agent de factures, consommations des ventes
- * (mouvements « vente » et « annulation »).
+ * (mouvements « vente » et « annulation »), clés chiffrées des établissements
+ * (Resend) : chaque installation a sa propre clé maîtresse CLE_SECRETS, la clé
+ * de l'établissement se ressaisit dans l'administration.
  */
 
 export const FORMAT_CONFIGURATION = "matalon-configuration/1";
@@ -40,8 +42,6 @@ const TABLES = [
   { nom: "reservations_reglages", lecture: "select * from reservations_reglages" },
   // Réservations à venir seulement (les passées sont des essais ou de l'historique).
   { nom: "reservations", lecture: "select * from reservations where date >= $1 and statut <> 'annulee' order by seq" },
-  // Clés chiffrées (Resend) : lisibles seulement avec la même clé maîtresse CLE_SECRETS.
-  { nom: "secrets_etablissement", lecture: "select * from secrets_etablissement" },
 ] as const;
 
 /**
@@ -127,7 +127,6 @@ export async function importerConfiguration(db: Db, c: unknown): Promise<Record<
     inserer("stock_reglages"),
     inserer("reservations_reglages"),
     inserer("reservations"),
-    inserer("secrets_etablissement"),
     recaler("prix_achats", "id"),
     recaler("stock_mouvements", "id"),
     recaler("reservations", "seq"),

@@ -100,6 +100,8 @@ describe("configuration de mise en service", () => {
     expect(conf.corps.tables.reservations.map((r: any) => r.id)).toEqual(["a-venir"]);
     expect(conf.corps.tables).not.toHaveProperty("enregistrements");
     expect(conf.corps.tables).not.toHaveProperty("caisses");
+    // Les clés chiffrées restent sur place : chaque installation a sa propre clé maîtresse.
+    expect(conf.corps.tables).not.toHaveProperty("secrets_etablissement");
 
     // ── Installation neuve : un administrateur, l'établissement de départ, rien d'autre ──
     const prod = base();

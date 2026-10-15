@@ -25,7 +25,6 @@ const LIBELLES: Record<string, string> = {
   stock_reglages: "réglages des commandes",
   reservations_reglages: "réglages des réservations",
   reservations: "réservations à venir",
-  secrets_etablissement: "clés chiffrées",
 };
 const resume = (r: Record<string, number>) =>
   Object.entries(r)
@@ -80,7 +79,7 @@ export function FenetreConfiguration(props: { onFermer: () => void; onImporte: (
         <h3>Exporter</h3>
         <p className="explication">
           Enregistre les établissements, l'équipe, le plan, l'imprimante des tickets, les cartes, le stock (produits, prix, inventaires, réceptions, commandes)
-          et les réservations à venir. Aucune vente, aucun appareil.
+          et les réservations à venir. Aucune vente, aucun appareil ; la clé d'envoi des e-mails (Resend) se ressaisit dans la nouvelle installation.
         </p>
         <button className="bouton" disabled={enCours} onClick={() => void exporter()}>
           <AvecIcone icone={Download}>Exporter la configuration</AvecIcone>
