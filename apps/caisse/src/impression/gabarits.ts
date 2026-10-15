@@ -15,6 +15,7 @@ import { lignesActives, nomSuite, reclameDe, totauxCommande, versSaisie, type Co
 import type { Bon } from "../metier/production";
 import { mentionsPaiement, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
+import { depensesDuComptage, totalDepenses } from "../metier/tresorerie";
 import { Recu } from "./recu";
 
 export { LIBELLES_PAIEMENT };
@@ -277,6 +278,9 @@ function corpsComptage(r: Recu, e: Evenement): void {
   const d = e.details;
   r.texte("COMPTAGE", { gras: true });
   r.colonnes("Fond du matin", euro(d.fondInitial));
+  const depenses = depensesDuComptage(d);
+  for (const x of depenses) r.colonnes(`Dépense : ${x.libelle}`, `-${formaterEuros(x.montant)}`);
+  if (depenses.length > 1) r.colonnes("Total dépenses espèces", `-${formaterEuros(totalDepenses(depenses))}`);
   r.colonnes("Espèces attendues", euro(d.especesAttendues));
   r.colonnes("Espèces comptées", euro(d.especesComptees));
   r.colonnes("Écart espèces", ecart(d.ecartEspeces), { gras: d.ecartEspeces !== 0 });

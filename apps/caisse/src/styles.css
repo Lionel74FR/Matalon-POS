@@ -2184,6 +2184,42 @@ a.bouton {
   border-color: var(--rouge);
 }
 
+/* Dépenses payées en espèces, déclarées au comptage. */
+.depenses-especes {
+  display: grid;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.depenses-especes h4 {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  color: var(--sable);
+}
+
+.depense-ligne {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.depense-ligne input {
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  width: 100%;
+  font: inherit;
+}
+
+.depense-ligne input:focus {
+  border-color: var(--terre);
+  outline: none;
+}
+
 /* Comptage de fin de journée. */
 .comptage {
   display: grid;

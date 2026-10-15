@@ -25,6 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Comptage de clôture : dépenses payées en espèces sur le fond de caisse (demande de Lionel du 15 octobre), une ou plusieurs, objet et montant ; déduites des espèces attendues, gardées dans l'événement `COMPTAGE_CAISSE` (`depenses` en texte JSON, `depensesEspeces`), imprimées sur le Z et affichées dans le détail de la clôture ; scénario `parcours` complété |
 | 945d25d | Éditeur de carte : « Nouveau rayon » (nom du rayon et sa première catégorie, un rayon existant est refusé) ; « Nouvelle catégorie » choisit son rayon dans une liste |
 | 2326b02 | Éditeur de carte : renommer un rayon (onglet de la caisse) d'un toucher sur le crayon à côté de son titre, toutes ses catégories suivent ; scénario `carte` complété (rayon et catégorie renommés) |
 | 617d737 | Prise de commande sur iPad (demande de Lionel du 15 octobre) : rayons en colonne verticale collée à droite du ticket, catégories en haut sur plusieurs lignes si besoin ; teintes pour les rayons Cocktails, Cave et Bar. iPhone inchangé |
@@ -71,6 +72,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 ## Décisions techniques à ne pas défaire
 
+- Dépenses en espèces (15 octobre) : déclarées au comptage de clôture, dans les détails de l'événement `COMPTAGE_CAISSE` (texte JSON, valeurs simples seulement dans un événement) ; pas de modification du noyau fiscal (le contenu des détails est libre). Espèces attendues = fond + espèces encaissées − dépenses ; la remise en banque reste comptées − fond laissé.
 - Prix d'achat (Lionel, 15 octobre) : toujours le prix net HT droits **et vignette sécurité sociale** compris, à la saisie comme à la réception. Les confirmations et factures Caves du Mont portent la vignette sur une ligne à part : elle s'ajoute au prix unitaire (0,062 € × degré × litres au-delà de 18°, soit environ 1,74 € pour 70 cl à 40°).
 - Commandes fournisseurs (15 octobre, demande de Lionel) : fiche fournisseur dans le référentiel du groupe (`fournisseurs`, nom = celui des articles, renommage répercuté) ; bons dans `commandes_fournisseurs` (numéro par établissement, écriture conditionnelle par version, modifiable seulement en brouillon) ; le bon passe « envoyée » avant l'e-mail (pas de double envoi) et redevient brouillon si l'e-mail échoue ; quantités reçues jamais recopiées : lues dans les réceptions qui portent `commande` (une réception annulée ne compte plus). Réglages d'envoi par établissement (`stock_reglages`), à défaut ceux des réservations. Hors fiscal.
 - Retrait après envoi (15 octobre) : c'est une annulation avant encaissement. Motif + responsable obligatoires ; compté dans les statistiques à partir du journal des événements (`SUPPRESSION_LIGNE`, `apresEnvoi`), sans toucher aux tickets ni au CA (rien n'a été encaissé). Avant envoi, un retrait reste libre et sans trace (brouillon).

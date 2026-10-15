@@ -1,7 +1,7 @@
-import { Calculator, Coins, Lock } from "lucide-react";
-import { AvecIcone } from "../icones";
+import { Calculator, Coins, Lock, Plus, Trash2 } from "lucide-react";
+import { AvecIcone, BoutonIcone } from "../icones";
 import { useEffect, useMemo, useState } from "react";
-import { COUPURES, etatJournee, rapprocher, totalCoupures, type EtatJournee, type SaisieComptage } from "../../metier/tresorerie";
+import { COUPURES, etatJournee, rapprocher, totalCoupures, totalDepenses, type EtatJournee, type SaisieComptage } from "../../metier/tresorerie";
 import type { ReponseJournee } from "@matalon/serveur/partage";
 import { fraicheur } from "../../fiscal/journee";
 import { centimesDepuisSaisie, ChampEuros, Modale, saisieDepuisCentimes } from "../communs";
@@ -59,6 +59,8 @@ export function ModaleComptage(props: {
   const [trPapier, setTrPapier] = useState("");
   const [fondConserve, setFondConserve] = useState<string | null>(null);
   const [motif, setMotif] = useState("");
+  // Dépenses payées avec les espèces du tiroir : libellé et montant saisis.
+  const [depenses, setDepenses] = useState<Array<{ cle: number; libelle: string; montant: string }>>([]);
 
   useEffect(() => {
     etatJournee(caisse, props.journee).then(
@@ -74,6 +76,9 @@ export function ModaleComptage(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caisse, props.journee]);
 
+  const depensesLues = depenses.map((d) => ({ libelle: d.libelle.trim(), montant: centimesDepuisSaisie(d.montant) }));
+  const depensesInvalides = depensesLues.some((d) => d.libelle.length < 2 || d.montant == null || d.montant <= 0);
+  const depensesValides = depensesInvalides ? null : depensesLues.map((d) => ({ libelle: d.libelle, montant: d.montant! }));
   const especesComptees = totalDirect != null ? centimesDepuisSaisie(totalDirect) : totalCoupures(detail);
   const trPapierCaisse = etat?.totaux.paiements.find((p) => p.mode === "TITRE_RESTAURANT_PAPIER")?.montant ?? 0;
   const saisie: SaisieComptage | null = useMemo(() => {
@@ -86,9 +91,10 @@ export function ModaleComptage(props: {
     };
     if (Object.values(valeurs).some((v) => v == null)) return null;
     const fc = fondConserve == null ? valeurs.fondInitial! : centimesDepuisSaisie(fondConserve);
-    if (fc == null) return null;
-    return { ...(valeurs as Record<keyof typeof valeurs, number>), detail: totalDirect != null ? {} : detail, fondConserve: fc, motif };
-  }, [fond, especesComptees, cbTpe, trCarteTpe, trPapier, trPapierCaisse, fondConserve, totalDirect, detail, motif]);
+    if (fc == null || !depensesValides) return null;
+    return { ...(valeurs as Record<keyof typeof valeurs, number>), depenses: depensesValides, detail: totalDirect != null ? {} : detail, fondConserve: fc, motif };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fond, especesComptees, cbTpe, trCarteTpe, trPapier, trPapierCaisse, fondConserve, totalDirect, detail, motif, JSON.stringify(depensesValides)]);
 
   const r = etat && saisie ? rapprocher(etat.totaux, saisie) : null;
   const motifManquant = !!r?.avecEcart && motif.trim().length < 3;
@@ -164,9 +170,49 @@ export function ModaleComptage(props: {
               <dt>Encaissé en espèces (rendu déduit)</dt>
               <dd>{euros(encaisseEspeces)}</dd>
             </div>
+          </dl>
+          <div className="depenses-especes">
+            <h4>Dépenses payées en espèces</h4>
+            {depenses.map((d, i) => (
+              <div key={d.cle} className="depense-ligne">
+                <input
+                  value={d.libelle}
+                  maxLength={60}
+                  placeholder="Objet (glaçons, livreur…)"
+                  aria-label={`Dépense ${i + 1} : objet`}
+                  onChange={(e) => setDepenses((x) => x.map((y) => (y.cle === d.cle ? { ...y, libelle: e.target.value } : y)))}
+                />
+                <span className="champ-euros-saisie">
+                  <input
+                    value={d.montant}
+                    inputMode="decimal"
+                    placeholder="0,00"
+                    aria-label={`Dépense ${i + 1} : montant`}
+                    aria-invalid={d.montant.trim() !== "" && centimesDepuisSaisie(d.montant) == null}
+                    onChange={(e) => setDepenses((x) => x.map((y) => (y.cle === d.cle ? { ...y, montant: e.target.value } : y)))}
+                  />
+                  <span aria-hidden="true">€</span>
+                </span>
+                <BoutonIcone icone={Trash2} taille={18} variante="discret" libelle={`Retirer la dépense ${i + 1}`} onClick={() => setDepenses((x) => x.filter((y) => y.cle !== d.cle))} />
+              </div>
+            ))}
+            {depenses.length < 10 && (
+              <button className="bouton discret" onClick={() => setDepenses((x) => [...x, { cle: Date.now(), libelle: "", montant: "" }])}>
+                <AvecIcone icone={Plus}>Ajouter une dépense</AvecIcone>
+              </button>
+            )}
+            {depensesInvalides && <p className="erreur">Chaque dépense demande un objet et un montant.</p>}
+          </div>
+          <dl className="comptage-lignes">
+            {depenses.length > 0 && (
+              <div>
+                <dt>Dépenses en espèces</dt>
+                <dd>− {euros(totalDepenses(depensesValides ?? []))}</dd>
+              </div>
+            )}
             <div>
               <dt>Attendu dans le tiroir</dt>
-              <dd>{centimesDepuisSaisie(fond) == null ? "—" : euros(centimesDepuisSaisie(fond)! + encaisseEspeces)}</dd>
+              <dd>{centimesDepuisSaisie(fond) == null ? "—" : euros(centimesDepuisSaisie(fond)! + encaisseEspeces - totalDepenses(depensesValides ?? []))}</dd>
             </div>
           </dl>
           {totalDirect == null ? (

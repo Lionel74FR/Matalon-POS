@@ -18,7 +18,7 @@ import { HEURE_BASCULE } from "../fiscal/caisse";
 import { chargerJournee, journeePourCloture, rendreVerrou } from "../fiscal/journee";
 import { ErreurApi } from "../serveur/client";
 import { gabaritCloture, gabaritLectureX, LIBELLES_PAIEMENT } from "../impression/gabarits";
-import { comptageDeLaZ, detailsComptage, type EtatJournee, type SaisieComptage } from "../metier/tresorerie";
+import { comptageDeLaZ, depensesDuComptage, detailsComptage, type EtatJournee, type SaisieComptage } from "../metier/tresorerie";
 import { Modale, Vide } from "./communs";
 import { AppareilsDeLaJournee, ModaleComptage } from "./modales/ModaleComptage";
 import { euros, useCaisse } from "./contexte";
@@ -123,6 +123,11 @@ function ResumeComptage({ e }: { e: Evenement }) {
           {d.trPapierCaisse ? ligne("Titres-restaurant papier", d.trPapierCaisse, d.trPapierComptes, d.ecartTrPapier) : null}
         </tbody>
       </table>
+      {depensesDuComptage(d).length > 0 && (
+        <p className="explication">
+          Dépenses en espèces : {depensesDuComptage(d).map((x) => `${x.libelle} ${montant(x.montant)}`).join(" · ")} (total {montant(d.depensesEspeces)})
+        </p>
+      )}
       <p className="explication">
         Fond du matin {montant(d.fondInitial)} · fond laissé {montant(d.fondConserve)} · remise en banque {montant(d.remiseEnBanque)}
         {d.motif ? ` · motif : ${String(d.motif)}` : ""}

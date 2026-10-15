@@ -198,8 +198,13 @@ const corrections = await p.locator(".tableau-tickets tbody tr.correction").coun
 await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Clôtures" }).click());
 await clic("Lecture X");
 await clic("Clôturer la journée (Z)");
-// Comptage : espèces au centime près, rien sur le TPE.
+// Comptage : une dépense de 12,50 € payée sur le fond, espèces au centime près, rien sur le TPE.
+const attenduAvant = (await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
+await clic("Ajouter une dépense");
+await p.getByLabel("Dépense 1 : objet").fill("Glaçons Metro");
+await p.getByLabel("Dépense 1 : montant").fill("12,50");
 const attendu = (await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
+const depenseDeduite = Math.round(Number(attenduAvant.replace(",", ".")) * 100) - Math.round(Number(attendu.replace(",", ".")) * 100) === 1250;
 await clic("Saisir le total directement");
 await champ("Espèces comptées").fill(attendu);
 await champ("Total CB du TPE").fill("0");
@@ -211,6 +216,7 @@ await p.locator(".tableau-clotures tbody tr").first().click();
 await clic("Voir le ticket Z");
 await p.locator(".apercu-recu").waitFor();
 const zAvecComptage = (await p.locator(".apercu-recu", { hasText: "COMPTAGE" }).count()) > 0;
+const zAvecDepense = (await p.locator(".apercu-recu", { hasText: "Dépense : Glaçons Metro" }).count()) > 0;
 await capture("11-apercu-z");
 await p.getByRole("button", { name: "Fermer" }).last().click();
 await p.getByRole("button", { name: "Fermer" }).last().click().catch(() => {});
@@ -231,5 +237,5 @@ const serveurIntegre = await a.getByText(/Chaîne intègre/).count();
 await a.screenshot({ path: `${sortie}/14-admin-verification.png`, fullPage: true });
 
 await b.close();
-console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, numeroFacture, attendu, zAvecComptage, corrections, paiementCorrige, erreurs }, null, 2));
-if (!integre || !serveurIntegre || !zAvecComptage || corrections !== 2 || !/Carte bancaire/.test(paiementCorrige ?? "") || erreurs.length) process.exit(1);
+console.log(JSON.stringify({ integre: integre > 0, serveurIntegre: serveurIntegre > 0, numeroFacture, attenduAvant, attendu, depenseDeduite, zAvecComptage, zAvecDepense, corrections, paiementCorrige, erreurs }, null, 2));
+if (!integre || !serveurIntegre || !zAvecComptage || !depenseDeduite || !zAvecDepense || corrections !== 2 || !/Carte bancaire/.test(paiementCorrige ?? "") || erreurs.length) process.exit(1);

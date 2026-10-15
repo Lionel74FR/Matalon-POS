@@ -56,8 +56,17 @@ export async function etatJournee(
 export const encaisse = (t: TotauxPeriode, mode: ModePaiement) =>
   t.paiements.filter((p) => p.mode === mode).reduce((s, p) => s + p.montant, 0);
 
+/** Dépense payée avec les espèces du tiroir (achat de dépannage, livreur…), déclarée au comptage. */
+export interface DepenseEspeces {
+  libelle: string;
+  /** Centimes, positif. */
+  montant: number;
+}
+
 export interface SaisieComptage {
   fondInitial: number;
+  /** Dépenses payées en espèces sur le fond de caisse : elles réduisent les espèces attendues. */
+  depenses?: DepenseEspeces[];
   especesComptees: number;
   /** Détail par coupure (nombre de billets ou pièces), facultatif. */
   detail: Partial<Record<(typeof COUPURES)[number], number>>;
@@ -69,6 +78,7 @@ export interface SaisieComptage {
 }
 
 export interface Rapprochement {
+  depensesEspeces: number;
   especesAttendues: number;
   ecartEspeces: number;
   cbCaisse: number;
@@ -83,11 +93,13 @@ export interface Rapprochement {
 
 /** Écarts entre ce que la caisse a enregistré et ce qui a été compté (positif : excédent). */
 export function rapprocher(t: TotauxPeriode, s: SaisieComptage): Rapprochement {
-  const especesAttendues = s.fondInitial + encaisse(t, "ESPECES");
+  const depensesEspeces = totalDepenses(s.depenses);
+  const especesAttendues = s.fondInitial + encaisse(t, "ESPECES") - depensesEspeces;
   const cbCaisse = encaisse(t, "CB");
   const trCarteCaisse = encaisse(t, "TITRE_RESTAURANT_CARTE");
   const trPapierCaisse = encaisse(t, "TITRE_RESTAURANT_PAPIER");
   const r = {
+    depensesEspeces,
     especesAttendues,
     ecartEspeces: s.especesComptees - especesAttendues,
     cbCaisse,
@@ -99,6 +111,19 @@ export function rapprocher(t: TotauxPeriode, s: SaisieComptage): Rapprochement {
     remiseEnBanque: s.especesComptees - s.fondConserve,
   };
   return { ...r, avecEcart: [r.ecartEspeces, r.ecartCb, r.ecartTrCarte, r.ecartTrPapier].some((x) => x !== 0) };
+}
+
+export const totalDepenses = (d: DepenseEspeces[] | undefined) => (d ?? []).reduce((s, x) => s + x.montant, 0);
+
+/** Dépenses relues dans un événement COMPTAGE_CAISSE (texte JSON ; absentes avant cette version). */
+export function depensesDuComptage(details: Evenement["details"]): DepenseEspeces[] {
+  if (typeof details.depenses !== "string") return [];
+  try {
+    const d = JSON.parse(details.depenses) as unknown;
+    return Array.isArray(d) ? d.filter((x): x is DepenseEspeces => typeof x?.libelle === "string" && typeof x?.montant === "number") : [];
+  } catch {
+    return [];
+  }
 }
 
 export function totalCoupures(detail: SaisieComptage["detail"]): number {
@@ -115,6 +140,9 @@ export function detailsComptage(t: TotauxPeriode, s: SaisieComptage, journee: st
     journee,
     fondInitial: s.fondInitial,
     especesEncaissees: encaisse(t, "ESPECES"),
+    // Valeurs simples seulement dans un événement : la liste part en texte JSON, le total à part.
+    depenses: s.depenses?.length ? JSON.stringify(s.depenses.map((d) => ({ libelle: d.libelle.trim(), montant: d.montant }))) : null,
+    depensesEspeces: r.depensesEspeces,
     especesAttendues: r.especesAttendues,
     especesComptees: s.especesComptees,
     ecartEspeces: r.ecartEspeces,

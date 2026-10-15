@@ -1,6 +1,6 @@
 import { genererPaireCles, Registre, signataireDepuis, StockageMemoire, verifierRegistre } from "@matalon/noyau-fiscal";
 import { describe, expect, it } from "vitest";
-import { comptageDeLaZ, detailsComptage, etatJournee, rapprocher, totalCoupures } from "../src/metier/tresorerie";
+import { comptageDeLaZ, depensesDuComptage, detailsComptage, etatJournee, rapprocher, totalCoupures } from "../src/metier/tresorerie";
 
 async function caisseDeTest(debut = "2026-10-15T07:00:00Z") {
   const paire = await genererPaireCles("ipad-0000000a-k1");
@@ -51,6 +51,41 @@ describe("fond de caisse et comptage", () => {
     const demain = await etatJournee({ registre, stockage }, null);
     expect(demain).toMatchObject({ fondDeclare: null, fondPropose: 15000, totaux: { nbVentes: 0 } });
     expect((await verifierRegistre(stockage, resoudre)).integre).toBe(true);
+  });
+
+  it("déduit des espèces attendues les dépenses payées sur le fond, et les garde au journal", async () => {
+    const { stockage, registre } = await caisseDeTest();
+    await registre.journaliser("FOND_DE_CAISSE", { montant: 15000 }, "u-00000001");
+    await registre.enregistrerVente({ lignes: [CAFE, CAFE], paiements: [{ mode: "ESPECES", montant: 500 }], operateurId: "u-00000001" });
+    const etat = await etatJournee({ registre, stockage }, null);
+    const saisie = {
+      fondInitial: 15000,
+      depenses: [
+        { libelle: "Glaçons Metro", montant: 1250 },
+        { libelle: "Pourboire livreur ", montant: 500 },
+      ],
+      // 150 € + 5 € encaissés − 17,50 € dépensés = 137,50 € attendus.
+      especesComptees: 13750,
+      detail: {},
+      cbTpe: 0,
+      trCarteTpe: 0,
+      trPapierComptes: 0,
+      fondConserve: 13750,
+      motif: "",
+    };
+    expect(rapprocher(etat.totaux, saisie)).toMatchObject({ depensesEspeces: 1750, especesAttendues: 13750, ecartEspeces: 0, avecEcart: false });
+    const details = detailsComptage(etat.totaux, saisie, etat.dateComptable!);
+    expect(details).toMatchObject({ depensesEspeces: 1750, especesAttendues: 13750 });
+    await registre.journaliser("COMPTAGE_CAISSE", details, "u-00000001");
+    const [z] = await registre.cloturerJournee("u-00000001");
+    const comptage = await comptageDeLaZ(stockage, z!);
+    expect(depensesDuComptage(comptage!.details)).toEqual([
+      { libelle: "Glaçons Metro", montant: 1250 },
+      { libelle: "Pourboire livreur", montant: 500 },
+    ]);
+    // Comptage d'avant cette version : aucune dépense.
+    expect(depensesDuComptage({ especesComptees: 100 })).toEqual([]);
+    expect(rapprocher(etat.totaux, { ...saisie, depenses: undefined }).especesAttendues).toBe(15500);
   });
 
   it("rattache le comptage à la dernière Z quand une Z oubliée est rattrapée (régression relecture)", async () => {
