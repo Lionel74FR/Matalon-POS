@@ -1501,6 +1501,12 @@ code.cle-api {
   gap: 6px;
 }
 
+.editeur-rayon-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .editeur-rayon-nom {
   display: flex;
   align-items: center;

@@ -42,6 +42,20 @@ function deplacerDansRayon(cats: Categorie[], i: number, sens: -1 | 1): Categori
   return copie;
 }
 
+/**
+ * Déplace un rayon d'un cran (onglets de la caisse, dans l'ordre de leur
+ * première catégorie) : les catégories sont regroupées par rayon dans le
+ * nouvel ordre, sans changer l'ordre des catégories dans chaque rayon.
+ */
+export function deplacerRayon(cats: Categorie[], rayon: string, sens: -1 | 1): Categorie[] {
+  const ordre = [...new Set(cats.map((c) => c.rayon))];
+  const i = ordre.indexOf(rayon);
+  const j = i + sens;
+  if (i < 0 || j < 0 || j >= ordre.length) return cats;
+  [ordre[i], ordre[j]] = [ordre[j]!, ordre[i]!];
+  return ordre.flatMap((r) => cats.filter((c) => c.rayon === r));
+}
+
 function deplacer<T>(liste: T[], i: number, sens: -1 | 1): T[] {
   const j = i + sens;
   if (j < 0 || j >= liste.length) return liste;
@@ -425,7 +439,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
       <div className="editeur-colonnes">
         <aside className="admin-section editeur-categories">
           <h2>Catégories</h2>
-          {rayons.map((rayon) => (
+          {rayons.map((rayon, ri) => (
             <div key={rayon} className="editeur-rayon">
               {rayonEdite?.ancien === rayon ? (
                 <form
@@ -444,7 +458,11 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
               ) : (
                 <h3 className="editeur-rayon-titre">
                   <span>{rayon}</span>
-                  <BoutonIcone icone={Pencil} taille={16} variante="discret" libelle={`Renommer le rayon ${rayon}`} onClick={() => setRayonEdite({ ancien: rayon, nom: rayon })} />
+                  <span className="editeur-rayon-actions">
+                    <BoutonIcone icone={Pencil} taille={16} variante="discret" libelle={`Renommer le rayon ${rayon}`} onClick={() => setRayonEdite({ ancien: rayon, nom: rayon })} />
+                    <BoutonIcone icone={ArrowUp} taille={16} variante="discret" libelle={`Monter le rayon ${rayon}`} disabled={ri === 0} onClick={() => majCategories((cats) => deplacerRayon(cats, rayon, -1))} />
+                    <BoutonIcone icone={ArrowDown} taille={16} variante="discret" libelle={`Descendre le rayon ${rayon}`} disabled={ri === rayons.length - 1} onClick={() => majCategories((cats) => deplacerRayon(cats, rayon, 1))} />
+                  </span>
                 </h3>
               )}
               {carte.categories

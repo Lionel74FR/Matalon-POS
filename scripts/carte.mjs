@@ -44,13 +44,17 @@ const rayonExistant = await a.getByText("Le rayon « Bar » existe déjà").coun
 await a.getByPlaceholder("Nom du rayon (ex. Desserts)").fill("Desserts");
 await a.getByPlaceholder("Sa première catégorie").fill("Glaces");
 await a.getByRole("button", { name: "Rayon", exact: true }).click();
+// Déplacer un rayon : Desserts (créé en dernier) remonte d'un cran, avant Ateliers.
+const ordreAvant = await a.locator(".editeur-rayon-titre > span:first-child").allTextContents();
+await a.getByRole("button", { name: "Monter le rayon Desserts" }).click();
+const ordreApres = await a.locator(".editeur-rayon-titre > span:first-child").allTextContents();
 await a.locator(".editeur-cat-nom", { hasText: "Viennoiseries" }).click();
 await a.locator(".editeur-cat-entete label.champ", { hasText: "Catégorie" }).first().locator("input").fill("Viennoiseries du matin");
 await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistrée").waitFor();
 const renommee = (await appel("GET", "/cartes/carte-automne-2026")).carte;
 await a.locator(".editeur-cat-nom", { hasText: "Cafés" }).click();
-const renommages = { rayonExistant, desserts: renommee.categories.filter((c) => c.rayon === "Desserts").map((c) => c.nom).join(), menus: renommee.categories.filter((c) => c.rayon === "Menus").map((c) => c.id), formules: renommee.categories.filter((c) => c.rayon === "Formules").length, viennoiseries: renommee.categories.find((c) => c.id === "viennoiseries").nom };
+const renommages = { rayonExistant, desserts: renommee.categories.filter((c) => c.rayon === "Desserts").map((c) => c.nom).join(), menus: renommee.categories.filter((c) => c.rayon === "Menus").map((c) => c.id), formules: renommee.categories.filter((c) => c.rayon === "Formules").length, viennoiseries: renommee.categories.find((c) => c.id === "viennoiseries").nom, ordreAvant, ordreApres, ordreServeur: [...new Set(renommee.categories.map((c) => c.rayon))] };
 // Contrôle : un prix illisible est refusé avant l'envoi.
 await a.getByRole("button", { name: "Ristretto", exact: true }).click();
 await a.locator(".fiche-article label.champ", { hasText: "Prix TTC" }).locator("input").fill("2,5,0");
@@ -115,5 +119,5 @@ const apres = await tuile("Espresso").textContent();
 await b.close();
 const resultat = { renommages, avant, apres, refusPrix: refusPrix > 0, varianteDouble, thesPurges, cafesInterdit, vinsFusionnes, erreurs };
 console.log(JSON.stringify(resultat, null, 2));
-const ok = renommages.rayonExistant === 1 && renommages.desserts === "Glaces" && renommages.menus.join() === "formules" && renommages.formules === 0 && renommages.viennoiseries === "Viennoiseries du matin" && avant.espresso.includes("2,70") && avant.ristretto === 1 && avant.cortado.includes("Indisponible") && apres.includes("2,80") && refusPrix && varianteDouble === 350 && thesPurges && cafesInterdit && vinsFusionnes === 5 && !erreurs.length;
+const ok = renommages.rayonExistant === 1 && renommages.ordreAvant.slice(-2).join() === "Ateliers,Desserts" && renommages.ordreApres.slice(-2).join() === "Desserts,Ateliers" && renommages.ordreServeur.join() === renommages.ordreApres.join() && renommages.desserts === "Glaces" && renommages.menus.join() === "formules" && renommages.formules === 0 && renommages.viennoiseries === "Viennoiseries du matin" && avant.espresso.includes("2,70") && avant.ristretto === 1 && avant.cortado.includes("Indisponible") && apres.includes("2,80") && refusPrix && varianteDouble === 350 && thesPurges && cafesInterdit && vinsFusionnes === 5 && !erreurs.length;
 if (!ok) process.exit(1);
