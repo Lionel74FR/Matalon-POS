@@ -25,7 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Comptage de clôture : dépenses payées en espèces sur le fond de caisse (demande de Lionel du 15 octobre), une ou plusieurs, objet et montant ; déduites des espèces attendues, gardées dans l'événement `COMPTAGE_CAISSE` (`depenses` en texte JSON, `depensesEspeces`), imprimées sur le Z et affichées dans le détail de la clôture ; scénario `parcours` complété |
+| cdd937a | Comptage de clôture : dépenses payées en espèces sur le fond de caisse (demande de Lionel du 15 octobre), une ou plusieurs, objet et montant ; déduites des espèces attendues, gardées dans l'événement `COMPTAGE_CAISSE` (`depenses` en texte JSON, `depensesEspeces`), imprimées sur le Z et affichées dans le détail de la clôture ; scénario `parcours` complété |
 | 945d25d | Éditeur de carte : « Nouveau rayon » (nom du rayon et sa première catégorie, un rayon existant est refusé) ; « Nouvelle catégorie » choisit son rayon dans une liste |
 | 2326b02 | Éditeur de carte : renommer un rayon (onglet de la caisse) d'un toucher sur le crayon à côté de son titre, toutes ses catégories suivent ; scénario `carte` complété (rayon et catégorie renommés) |
 | 617d737 | Prise de commande sur iPad (demande de Lionel du 15 octobre) : rayons en colonne verticale collée à droite du ticket, catégories en haut sur plusieurs lignes si besoin ; teintes pour les rayons Cocktails, Cave et Bar. iPhone inchangé |
