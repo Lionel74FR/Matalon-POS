@@ -147,6 +147,8 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
   const [origine, setOrigine] = useState<{ carte: Catalogue; version: number } | null>(null);
   const [carte, setCarte] = useState<Catalogue | null>(null);
   const [catId, setCatId] = useState<string | null>(null);
+  // Rayon en cours de renommage (toutes ses catégories changent d'onglet ensemble).
+  const [rayonEdite, setRayonEdite] = useState<{ ancien: string; nom: string } | null>(null);
   const [articleOuvert, setArticleOuvert] = useState<{ catId: string; article: Article; nouveau: boolean } | null>(null);
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [etat, setEtat] = useState<"" | "envoi" | "enregistre" | "conflit">("");
@@ -424,7 +426,26 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
           <h2>Catégories</h2>
           {rayons.map((rayon) => (
             <div key={rayon} className="editeur-rayon">
-              <h3>{rayon}</h3>
+              {rayonEdite?.ancien === rayon ? (
+                <form
+                  className="editeur-rayon-nom"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const nouveau = rayonEdite.nom.trim();
+                    if (nouveau && nouveau !== rayon) majCategories((cats) => cats.map((c) => (c.rayon === rayon ? { ...c, rayon: nouveau } : c)));
+                    setRayonEdite(null);
+                  }}
+                >
+                  <input value={rayonEdite.nom} maxLength={40} autoFocus aria-label={`Nouveau nom du rayon ${rayon}`} onChange={(e) => setRayonEdite({ ancien: rayon, nom: e.target.value })} />
+                  <BoutonIcone icone={Check} taille={18} variante="discret" libelle="Valider le nom du rayon" type="submit" />
+                  <BoutonIcone icone={X} taille={18} variante="discret" libelle="Annuler" onClick={() => setRayonEdite(null)} />
+                </form>
+              ) : (
+                <h3 className="editeur-rayon-titre">
+                  <span>{rayon}</span>
+                  <BoutonIcone icone={Pencil} taille={16} variante="discret" libelle={`Renommer le rayon ${rayon}`} onClick={() => setRayonEdite({ ancien: rayon, nom: rayon })} />
+                </h3>
+              )}
               {carte.categories
                 .map((c, i) => ({ c, i }))
                 .filter(({ c }) => c.rayon === rayon)

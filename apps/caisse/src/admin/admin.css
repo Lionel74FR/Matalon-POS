@@ -1476,3 +1476,30 @@ code.cle-api {
 .liste-articles-fournisseur small {
   color: var(--sable);
 }
+
+/* Éditeur de carte : renommer un rayon (onglet de la caisse) */
+.editeur-rayon-titre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.editeur-rayon-nom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.editeur-rayon-nom input {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--terre);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+}

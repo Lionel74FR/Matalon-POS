@@ -25,6 +25,7 @@ Dernière mise à jour : 15 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Éditeur de carte : renommer un rayon (onglet de la caisse) d'un toucher sur le crayon à côté de son titre, toutes ses catégories suivent ; scénario `carte` complété (rayon et catégorie renommés) |
 | 617d737 | Prise de commande sur iPad (demande de Lionel du 15 octobre) : rayons en colonne verticale collée à droite du ticket, catégories en haut sur plusieurs lignes si besoin ; teintes pour les rayons Cocktails, Cave et Bar. iPhone inchangé |
 | 8dea0c9 | Carte définitive du Moka (Lionel, 15 octobre) chargée dans l'administration de test (version 2 de `carte-automne-2026`, 121 articles) et gardée dans `docs/cartes/moka-2026-10-15.json` : rayons Boissons, Cocktails, Cave, Bar, Cuisine, À partager, Formules ; verre et bouteille en variantes, digestifs en variantes, sirops en suppléments ; identifiants de l'ancienne carte conservés pour les articles qui restent. La carte livrée avec le code (tests) n'est pas modifiée |
 | 35fbd9c | Mouvements d'un produit (demande de Lionel du 15 octobre) : sur l'iPad et l'iPhone (Stock › Stock et pièces, toucher un produit) et dans l'administration (Stock et pièces, ou fiche produit › Mouvements) : ventes avec ticket, réceptions avec fournisseur, commande et bon de livraison, inventaires, pertes, transferts, valeur et stock après chaque mouvement ; route `GET /api/caisse/stock/mouvements?produit=` |

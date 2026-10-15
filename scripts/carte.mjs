@@ -32,6 +32,17 @@ await a.locator("tr", { hasText: "Cortado" }).locator("input[type=checkbox]").un
 await a.screenshot({ path: `${sortie}/c01-editeur.png`, fullPage: true });
 await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistrée").waitFor();
+// Renommer un rayon (toutes ses catégories suivent) et une catégorie.
+await a.getByRole("button", { name: "Renommer le rayon Formules" }).click();
+await a.getByLabel("Nouveau nom du rayon Formules").fill("Menus");
+await a.getByRole("button", { name: "Valider le nom du rayon" }).click();
+await a.locator(".editeur-cat-nom", { hasText: "Viennoiseries" }).click();
+await a.locator(".editeur-cat-entete label.champ", { hasText: "Catégorie" }).first().locator("input").fill("Viennoiseries du matin");
+await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
+await a.getByText("Enregistrée").waitFor();
+const renommee = (await appel("GET", "/cartes/carte-automne-2026")).carte;
+await a.locator(".editeur-cat-nom", { hasText: "Cafés" }).click();
+const renommages = { menus: renommee.categories.filter((c) => c.rayon === "Menus").map((c) => c.id), formules: renommee.categories.filter((c) => c.rayon === "Formules").length, viennoiseries: renommee.categories.find((c) => c.id === "viennoiseries").nom };
 // Contrôle : un prix illisible est refusé avant l'envoi.
 await a.getByRole("button", { name: "Ristretto", exact: true }).click();
 await a.locator(".fiche-article label.champ", { hasText: "Prix TTC" }).locator("input").fill("2,5,0");
@@ -94,7 +105,7 @@ await p.locator(".tuile", { hasText: "2,80" }).first().waitFor({ timeout: 15000 
 const apres = await tuile("Espresso").textContent();
 
 await b.close();
-const resultat = { avant, apres, refusPrix: refusPrix > 0, varianteDouble, thesPurges, cafesInterdit, vinsFusionnes, erreurs };
+const resultat = { renommages, avant, apres, refusPrix: refusPrix > 0, varianteDouble, thesPurges, cafesInterdit, vinsFusionnes, erreurs };
 console.log(JSON.stringify(resultat, null, 2));
-const ok = avant.espresso.includes("2,70") && avant.ristretto === 1 && avant.cortado.includes("Indisponible") && apres.includes("2,80") && refusPrix && varianteDouble === 350 && thesPurges && cafesInterdit && vinsFusionnes === 5 && !erreurs.length;
+const ok = renommages.menus.join() === "formules" && renommages.formules === 0 && renommages.viennoiseries === "Viennoiseries du matin" && avant.espresso.includes("2,70") && avant.ristretto === 1 && avant.cortado.includes("Indisponible") && apres.includes("2,80") && refusPrix && varianteDouble === 350 && thesPurges && cafesInterdit && vinsFusionnes === 5 && !erreurs.length;
 if (!ok) process.exit(1);
