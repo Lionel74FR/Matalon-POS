@@ -278,3 +278,56 @@ describe("import des fiches techniques", () => {
     expect(fait.corps.stock.referentiel.recettes).toHaveLength(1);
   });
 });
+
+describe("inventaire d'un comptage passé", () => {
+  it("se compare au stock de ce jour-là ; les livraisons d'après s'y ajoutent ; se liste dans l'onglet Inventaire", async () => {
+    const { admin, bearer, lea, gin } = await preparer();
+    const stock = (await appel("GET", "/api/admin/stock", undefined, admin)).corps;
+    const prosecco = stock.referentiel.articles.find((a: any) => a.produitId === "prosecco").id as string;
+    // Une bouteille de prosecco livrée le 10, deux de gin livrées aujourd'hui (15 octobre).
+    expect((await appel("POST", "/api/caisse/stock/receptions", { utilisateurId: lea, fournisseur: "Caves du Mont", date: "2026-10-10", lignes: [{ articleId: prosecco, nombre: 1000, prixHT: 629 }] }, bearer)).statut).toBe(201);
+    expect((await appel("POST", "/api/caisse/stock/receptions", { utilisateurId: lea, fournisseur: "Caves du Mont", lignes: [{ articleId: gin, nombre: 2000, prixHT: 2049 }] }, bearer)).statut).toBe(201);
+
+    // Comptage du 12 : 0,7 bouteille de gin, 1,5 de prosecco.
+    const inv = await appel(
+      "POST",
+      "/api/caisse/stock/inventaires",
+      { utilisateurId: lea, zone: "Bar", date: "2026-10-12", lignes: [{ produitId: "bombay-sapphire", compte: 490 }, { produitId: "prosecco", compte: 1125 }] },
+      bearer,
+    );
+    expect(inv.statut).toBe(201);
+    expect(inv.corps.document.le).toBe("2026-10-12T12:00:00.000Z");
+    expect(inv.corps.document.contenu.date).toBe("2026-10-12");
+    const ligne = (d: any, p: string) => d.contenu.lignes.find((l: any) => l.produitId === p);
+    // Le gin livré le 15 n'est pas dans le théorique du 12 ; le prosecco du 10, si.
+    expect(ligne(inv.corps.document, "bombay-sapphire")).toMatchObject({ compte: 490, theorique: 0, ecart: 490, ouverture: true });
+    expect(ligne(inv.corps.document, "prosecco")).toMatchObject({ compte: 1125, theorique: 750, ecart: 375, ouverture: true });
+    const q = (etat: any, p: string) => etat.produits.find((x: any) => x.produitId === p).quantite;
+    expect(q(inv.corps.etat, "bombay-sapphire")).toBe(490 + 1400);
+    expect(q(inv.corps.etat, "prosecco")).toBe(1125);
+    const mvt = (await appel("GET", "/api/admin/stock/mouvements?etab=moka&produit=bombay-sapphire", undefined, admin)).corps.mouvements.find((m: any) => m.type === "inventaire");
+    expect(mvt).toMatchObject({ le: "2026-10-12T12:00:00.000Z", dateComptable: "2026-10-12", quantite: 490 });
+
+    // Inventaire du jour ensuite : comparé au stock actuel, ce n'est plus l'ouverture.
+    instant += 60_000;
+    const jour = await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, zone: "Bar", lignes: [{ produitId: "bombay-sapphire", compte: 1800 }] }, bearer);
+    expect(ligne(jour.corps.document, "bombay-sapphire")).toMatchObject({ theorique: 1890, ecart: -90 });
+    expect(ligne(jour.corps.document, "bombay-sapphire").ouverture).toBeUndefined();
+    expect(jour.corps.document.contenu.date).toBe("2026-10-15");
+
+    // Un comptage plus ancien ne s'insère plus avant un inventaire déjà fait.
+    const avant = await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, date: "2026-10-13", lignes: [{ produitId: "bombay-sapphire", compte: 700 }] }, bearer);
+    expect(avant.statut).toBe(409);
+    expect(avant.corps.code).toBe("INVENTAIRE_POSTERIEUR");
+    // Ni dans le futur, ni au-delà de 92 jours.
+    expect((await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, date: "2026-10-16", lignes: [{ produitId: "prosecco", compte: 0 }] }, bearer)).statut).toBe(400);
+    expect((await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, date: "2026-06-01", lignes: [{ produitId: "prosecco", compte: 0 }] }, bearer)).statut).toBe(400);
+    expect((await appel("POST", "/api/caisse/stock/inventaires", { utilisateurId: lea, date: "2026-13-45", lignes: [{ produitId: "prosecco", compte: 0 }] }, bearer)).statut).toBe(400);
+
+    // Liste de l'onglet Inventaire (caisse et administration), la plus récente d'abord.
+    const liste = await appel("GET", "/api/caisse/stock/documents?type=inventaire", undefined, bearer);
+    expect(liste.corps.documents.map((d: any) => d.contenu.date)).toEqual(["2026-10-15", "2026-10-12"]);
+    expect((await appel("GET", "/api/caisse/stock/documents?type=autre", undefined, bearer)).statut).toBe(400);
+    expect((await appel("GET", "/api/admin/stock/documents?etab=moka&type=inventaire", undefined, admin)).corps.documents).toHaveLength(2);
+  });
+});

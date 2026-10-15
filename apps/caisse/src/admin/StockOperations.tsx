@@ -4,7 +4,8 @@ import { ArrowRightLeft, Check, ChartPie, KeyRound, Plus, Receipt, RefreshCw, Tr
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Commandes, type AccesCommandes } from "../stock/Commandes";
 import { MouvementsProduit } from "../stock/MouvementsProduit";
-import { FormulaireInventaire, FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
+import { Inventaires } from "../stock/Inventaires";
+import { FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
 import { Modale } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api } from "./api";
@@ -88,6 +89,8 @@ export function OngletPiece(props: Proprietes & { type: "reception" | "inventair
   useEffect(() => {
     void api.etatStock(props.etab).then(setEtat);
   }, [props.etab]);
+  const { etab } = props;
+  const chargerInventaires = useCallback(async () => (await api.documentsStock(etab, "inventaire")).documents, [etab]);
   const envoyer = (type: "receptions" | "inventaires" | "pertes") => async (corps: Record<string, unknown>) => {
     const r = await api.operationStock(type, { ...corps, etablissementId: props.etab });
     setEtat(r.etat);
@@ -97,7 +100,7 @@ export function OngletPiece(props: Proprietes & { type: "reception" | "inventair
     <section className="admin-section">
       <p className="surtitre">{props.nomEtab}</p>
       {props.type === "reception" && <FormulaireReception referentiel={props.stock.referentiel} prix={props.stock.prix} etablissementId={props.etab} onEnregistrer={envoyer("receptions")} />}
-      {props.type === "inventaire" && (etat ? <FormulaireInventaire key={props.etab} referentiel={props.stock.referentiel} etat={etat} onEnregistrer={envoyer("inventaires")} /> : <p>Chargement…</p>)}
+      {props.type === "inventaire" && <Inventaires key={props.etab} referentiel={props.stock.referentiel} etat={etat} charger={chargerInventaires} onEnregistrer={envoyer("inventaires")} />}
       {props.type === "perte" && <FormulairePerte referentiel={props.stock.referentiel} couts={props.couts} onEnregistrer={envoyer("pertes")} />}
     </section>
   );

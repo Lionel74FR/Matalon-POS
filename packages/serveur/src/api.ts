@@ -1765,6 +1765,12 @@ async function stockCaisse(env: Environnement, requete: Request, chemin: string,
     const par = await responsableCaisse(env, c, corps.utilisateurId);
     return await operationStock(env, c.etablissement_id, p[1]!, corps, par);
   }
+  if (chemin === "/api/caisse/stock/documents" && m === "GET") {
+    // Pièces d'un type (liste des inventaires de l'onglet Inventaire), les plus récentes d'abord.
+    const type = new URL(requete.url).searchParams.get("type");
+    if (type !== null && !["reception", "inventaire", "perte", "transfert"].includes(type)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Type de pièce inconnu.");
+    return json(200, { documents: await documents(env.db, c.etablissement_id, type, 100) });
+  }
   if (chemin === "/api/caisse/stock/mouvements" && m === "GET") {
     // Mouvements d'un produit (lecture, tout appareil rattaché) : ventes, réceptions, inventaires, pertes, transferts.
     const produit = new URL(requete.url).searchParams.get("produit") ?? "";

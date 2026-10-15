@@ -13,7 +13,7 @@ import {
   type Referentiel,
 } from "@matalon/stock";
 import type { CommandeFournisseur, DocumentStock, EtatStock } from "@matalon/serveur/partage";
-import { Check, ClipboardList, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ClipboardList, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ChampQuantite, ChoixComposant, composants, euros, eurosMicro, type Composant } from "../admin/stock-commun";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
@@ -26,6 +26,8 @@ import "./stock.css";
  */
 
 const parUnite = (p: Pick<Produit, "unite">) => (p.unite === "piece" ? "pièce" : p.unite);
+/** « lundi 12 octobre 2026 » pour une journée AAAA-MM-JJ. */
+export const dateLongue = (jour: string) => new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Paris" });
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Saisie décimale à la française en millièmes (« 2,5 » → 2 500) ; null si vide ou illisible. */
@@ -57,12 +59,23 @@ function useEnvoi(onEnregistrer: (corps: Record<string, unknown>) => Promise<unk
  * en unités au détail ; seuls les produits saisis sont inventoriés. Le
  * théorique s'affiche pour repérer une erreur de comptage.
  */
-export function FormulaireInventaire(props: { referentiel: Referentiel; etat: EtatStock; onEnregistrer: (corps: Record<string, unknown>) => Promise<unknown> }) {
+export function FormulaireInventaire(props: {
+  referentiel: Referentiel;
+  etat: EtatStock;
+  onEnregistrer: (corps: Record<string, unknown>) => Promise<unknown>;
+  /** Inventaire enregistré (message de confirmation) : retour à la liste des inventaires. */
+  onFait?: (message: string) => void;
+  onRetour?: () => void;
+}) {
   const ref = props.referentiel;
   const zones = [...new Set(ref.produits.filter((p) => p.actif).map((p) => p.zone || "Sans zone"))].sort((a, b) => a.localeCompare(b, "fr"));
   const [zone, setZone] = useState(zones[0] ?? "");
   const [recherche, setRecherche] = useState("");
   const [saisies, setSaisies] = useState<Record<string, { colis: string; detail: string }>>({});
+  // Journée du service (bascule à 5 h) ; un comptage d'un jour passé se compare au stock de ce jour-là.
+  const aujourdhui = useMemo(() => journeeParis(new Date().toISOString()), []);
+  const [date, setDate] = useState(aujourdhui);
+  const passe = date !== aujourdhui;
   const { enCours, erreur, ok, envoyer } = useEnvoi(props.onEnregistrer);
   const theorique = new Map(props.etat.produits.map((p) => [p.produitId, p.quantite]));
   const n = normaliserNom(recherche);
@@ -86,10 +99,22 @@ export function FormulaireInventaire(props: { referentiel: Referentiel; etat: Et
 
   return (
     <section className="operation-stock">
-      <h2 className="titre-icone">
-        <AvecIcone icone={ClipboardList} taille={22}>Inventaire</AvecIcone>
-      </h2>
+      <div className="commandes-tete">
+        {props.onRetour && <BoutonIcone icone={ArrowLeft} variante="discret" libelle="Retour aux inventaires" onClick={props.onRetour} />}
+        <h2 className="titre-icone">
+          <AvecIcone icone={ClipboardList} taille={22}>Nouvel inventaire</AvecIcone>
+        </h2>
+      </div>
       <p className="explication">Comptez ce qui est en stock, zone par zone. Seuls les produits saisis sont inventoriés ; le compté remplace le stock théorique.</p>
+      <label className="champ operation-date">
+        <span>Date du comptage</span>
+        <input type="date" value={date} max={aujourdhui} onChange={(e) => setDate(e.target.value || aujourdhui)} />
+      </label>
+      {passe && (
+        <p className="explication avertissement">
+          Comptage du {dateLongue(date)} : l'écart se calcule sur le stock théorique de ce jour-là ; les livraisons et les ventes d'après s'y ajoutent. Un produit déjà inventorié depuis est refusé.
+        </p>
+      )}
       <div className="operation-filtres">
         <div className="options" role="tablist" aria-label="Zone">
           {zones.map((z) => (
@@ -113,7 +138,7 @@ export function FormulaireInventaire(props: { referentiel: Referentiel; etat: Et
             <li key={p.id} className={total != null ? "compte" : ""}>
               <span className="inventaire-nom">
                 <strong>{p.nom}</strong>
-                <small>Théorique : {formaterEnUnite(theorique.get(p.id) ?? 0, p.unite)}</small>
+                {!passe && <small>Théorique : {formaterEnUnite(theorique.get(p.id) ?? 0, p.unite)}</small>}
               </span>
               {c && (
                 <label className="inventaire-saisie">
@@ -139,9 +164,12 @@ export function FormulaireInventaire(props: { referentiel: Referentiel; etat: Et
         disabled={enCours || !comptes.length || illisibles.length > 0}
         onClick={() =>
           void envoyer(
-            { zone: recherche ? "" : zone, lignes: comptes.map(([p, c]) => ({ produitId: p.id, compte: c })) },
-            `Inventaire enregistré : ${comptes.length} produit${comptes.length > 1 ? "s" : ""}.`,
-            () => setSaisies({}),
+            { zone: recherche ? "" : zone, date, lignes: comptes.map(([p, c]) => ({ produitId: p.id, compte: c })) },
+            `Inventaire enregistré : ${comptes.length} produit${comptes.length > 1 ? "s" : ""}${passe ? `, compté le ${dateLongue(date)}` : ""}.`,
+            () => {
+              setSaisies({});
+              props.onFait?.(`Inventaire enregistré : ${comptes.length} produit${comptes.length > 1 ? "s" : ""}${passe ? `, compté le ${dateLongue(date)}` : ""}.`);
+            },
           )
         }
       >

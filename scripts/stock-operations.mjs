@@ -1,5 +1,5 @@
 // Stock en service (lots 4b à 4d) : les ventes de l'iPad décomptent le stock ; sur l'iPad, un responsable
-// fait un inventaire, une réception et une perte ; sur iPhone, même écran. Dans l'administration : stock
+// fait un inventaire (depuis la liste des inventaires), une réception et une perte ; sur iPhone, même écran. Dans l'administration : stock
 // théorique et mouvements, transfert vers un autre établissement, food cost théorique et réel, clé de
 // l'agent de factures, facture reçue et ligne rapprochée.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
@@ -60,6 +60,9 @@ const q = (etat, id) => etat.produits.find((x) => x.produitId === id)?.quantite;
 
 // ── 4c sur l'iPad : inventaire de la réserve (1 sac + 0,5 kg de café, 4 kg de sucre) ──
 await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Stock" }).click());
+// L'onglet Inventaire liste d'abord les inventaires (aucun encore), puis « Nouvel inventaire ».
+await p.getByText("Aucun inventaire pour l'instant.").waitFor();
+await clic("Nouvel inventaire");
 await p.getByRole("tab", { name: "Réserve" }).click();
 const theoriqueAffiche = (await p.locator(".inventaire-liste li", { hasText: "Café en grains" }).locator("small").first().textContent()).trim();
 await p.getByLabel("Café en grains : nombre de Sac 1 kg").fill("1");
@@ -67,7 +70,8 @@ await p.getByLabel("Café en grains : kg au détail").fill("0,5");
 await p.getByLabel("Sucre : kg au détail").fill("4");
 await p.screenshot({ path: `${sortie}/o01-inventaire-ipad.png` });
 await clic("Valider l'inventaire (2 produits)");
-await p.getByText("Inventaire enregistré : 2 produits.").waitFor();
+await p.locator(".inventaires .succes", { hasText: "Inventaire enregistré : 2 produits." }).waitFor();
+const inventairesIpad = await p.locator(".inventaires .commandes-liste li").count();
 
 // Réception Metro : 2 packs de lait au dernier prix (7,20 €), 1 sac de sucre payé 6,90 €.
 await p.getByRole("tab", { name: "Réception" }).click();
@@ -115,6 +119,24 @@ await a.locator(".tableau-stock tr", { hasText: "Lait entier" }).click();
 await a.locator(".mouvements-liste li").first().waitFor();
 const mouvementsLait = (await a.locator(".modale").textContent()).replace(/\s+/g, " ");
 await a.screenshot({ path: `${sortie}/o04-mouvements.png` });
+await a.getByRole("button", { name: "Fermer" }).click();
+
+// Inventaire d'un comptage d'hier (stock d'ouverture du lait) : comparé au stock d'hier, la livraison et les ventes du jour s'y ajoutent.
+const hier = new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(new Date(Date.now() - 86_400_000));
+await a.getByRole("tab", { name: "Inventaire" }).click();
+await a.locator(".inventaires .commandes-liste li").first().waitFor();
+await aclic("Nouvel inventaire");
+await a.getByLabel("Date du comptage").fill(hier);
+await a.getByText(/l'écart se calcule sur le stock théorique de ce jour-là/).waitFor();
+await a.getByLabel("Chercher un produit").fill("Lait");
+await a.getByLabel("Lait entier : L au détail").fill("2");
+await a.screenshot({ path: `${sortie}/o04b-inventaire-passe.png` });
+await aclic("Valider l'inventaire (1 produit)");
+await a.locator(".inventaires .succes", { hasText: /Inventaire enregistré : 1 produit, compté le/ }).waitFor();
+const inventairesAdmin = (await a.locator(".inventaires .commandes-liste").textContent()).replace(/\s+/g, " ");
+await a.locator(".inventaires .commande-carte").nth(1).click();
+const detailInventaire = (await a.locator(".modale").textContent()).replace(/\s+/g, " ");
+await a.screenshot({ path: `${sortie}/o04c-inventaire-detail.png` });
 await a.getByRole("button", { name: "Fermer" }).click();
 
 // Transfert de 1 kg de sucre au Chardon.
@@ -181,6 +203,9 @@ const resultat = {
   prixSucre: prixDe("sucre"),
   final: { cafe: q(final, "cafe-en-grains"), lait: q(final, "lait-entier"), sucre: q(final, "sucre") },
   sucreChardon: q(chardon, "sucre"),
+  inventairesIpad,
+  inventairesAdmin,
+  detailInventaire,
   erreurs,
 };
 console.log(JSON.stringify(resultat, null, 2));
@@ -203,7 +228,10 @@ const ok =
   resultat.prixLait?.prixHT === 744 &&
   resultat.prixSucre?.prixHT === 680 &&
   resultat.final.cafe === 1500 &&
-  resultat.final.lait === -300 + 12000 - 1000 &&
+  resultat.final.lait === 2000 - 300 + 12000 - 1000 &&
+  inventairesIpad === 1 &&
+  /Stock d'ouverture/.test(inventairesAdmin) && /Réserve · 2 produits/.test(inventairesAdmin) && /Produits choisis · 1 produit/.test(inventairesAdmin) &&
+  /Lait entier/.test(detailInventaire) && /stock d'ouverture/.test(detailInventaire) && /\+2 L/.test(detailInventaire) &&
   resultat.final.sucre === 4000 + 5000 - 1000 &&
   resultat.sucreChardon === 1000 &&
   erreurs.length === 0;

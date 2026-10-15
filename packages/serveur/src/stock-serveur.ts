@@ -320,42 +320,63 @@ export async function annulerReception(db: Db, etablissementId: string, id: stri
 }
 
 /** Stock théorique de l'établissement par produit (quantité et valeur), à l'instant. */
-async function theorique(db: Db, etablissementId: string): Promise<Map<string, { quantite: number; valeur: number }>> {
+/** Stock théorique par produit : somme des mouvements, ou de ceux d'avant un instant (inventaire d'un comptage passé). */
+async function theorique(db: Db, etablissementId: string, jusqua: string | null = null): Promise<Map<string, { quantite: number; valeur: number }>> {
   const lignes = await db.requete<{ produit_id: string; q: string; v: string | null }>(
-    "select produit_id, sum(quantite) as q, sum(valeur_micro) as v from stock_mouvements where etablissement_id = $1 group by produit_id",
-    [etablissementId],
+    "select produit_id, sum(quantite) as q, sum(valeur_micro) as v from stock_mouvements where etablissement_id = $1 and ($2::text is null or le <= $2) group by produit_id",
+    [etablissementId, jusqua],
   );
   return new Map(lignes.map((l) => [l.produit_id, { quantite: Number(l.q), valeur: Number(l.v ?? 0) }]));
 }
+
+/** Un comptage se saisit jusqu'à 92 jours après coup (stock d'ouverture compté avant la mise en service). */
+export const RECUL_INVENTAIRE_JOURS = 92;
 
 /**
  * Inventaire (d'une zone, ou de quelques produits) : le compté remplace le
  * théorique ; l'écart devient un mouvement, valorisé au coût du jour.
  * Les produits non comptés ne bougent pas.
+ *
+ * Comptage d'un jour passé (`date`) : comparé au stock théorique de ce
+ * jour-là (mouvements d'avant midi, comme toute pièce datée), les
+ * livraisons et ventes d'après s'y ajoutent. Refusé pour un produit déjà
+ * inventorié après cette date, dont l'écart a été calculé sans lui.
  */
 export async function inventorier(db: Db, etablissementId: string, corps: Record<string, unknown>, par: string, maintenant: string): Promise<DocumentStock> {
   const { referentiel, couts } = await contexteCouts(db, etablissementId);
   const zone = texteCourt(corps.zone, "Zone", 60);
+  const aujourdhui = journeeParis(maintenant);
+  const date = corps.date === undefined || corps.date === null || corps.date === "" ? aujourdhui : corps.date;
+  if (typeof date !== "string" || !DATE.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Date du comptage invalide.");
+  const recul = (Date.parse(`${aujourdhui}T12:00:00Z`) - Date.parse(`${date}T12:00:00Z`)) / 86_400_000;
+  if (recul < 0) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Un inventaire ne se date pas dans le futur.");
+  if (recul > RECUL_INVENTAIRE_JOURS) throw new ErreurHttp(400, "CHAMP_INVALIDE", `Un comptage se saisit dans les ${RECUL_INVENTAIRE_JOURS} jours.`);
+  const le = date === aujourdhui ? maintenant : horodatageDe(date, maintenant);
   const comptes = new Map<string, number>();
   for (const [i, l] of lignesDe(corps.lignes, 5000).entries()) {
     const p = referentiel.produits.find((x) => x.id === l.produitId);
     if (!p) throw new ErreurHttp(400, "CHAMP_INVALIDE", `Ligne ${i + 1} : produit inconnu.`);
     comptes.set(p.id, entier(l.compte, `« ${p.nom} » : quantité comptée`, 0, 1_000_000_000));
   }
-  const stock = await theorique(db, etablissementId);
+  const inventaires = await db.requete<{ produit_id: string; le: string }>(
+    "select produit_id, max(le) as le from stock_mouvements where etablissement_id = $1 and type = 'inventaire' and produit_id = any($2) group by produit_id",
+    [etablissementId, [...comptes.keys()]],
+  );
+  const posterieurs = inventaires.filter((x) => x.le > le);
+  if (posterieurs.length) {
+    const noms = posterieurs.slice(0, 3).map((x) => `« ${referentiel.produits.find((p) => p.id === x.produit_id)?.nom ?? x.produit_id} »`);
+    throw new ErreurHttp(
+      409,
+      "INVENTAIRE_POSTERIEUR",
+      `${noms.join(", ")}${posterieurs.length > 3 ? ` et ${posterieurs.length - 3} autre(s)` : ""} : déjà inventorié(s) après cette date. Un comptage plus ancien ne peut plus s'insérer avant.`,
+    );
+  }
+  const stock = await theorique(db, etablissementId, le === maintenant ? null : le);
   const theo = new Map([...comptes.keys()].map((pid) => [pid, stock.get(pid)?.quantite ?? 0]));
   const ecarts = ecartsInventaire(comptes, theo);
   // Premier inventaire d'un produit : son écart est le stock d'ouverture (inconnu jusque-là), pas une perte ni un gain.
-  const deja = new Set(
-    (
-      await db.requete<{ produit_id: string }>("select distinct produit_id from stock_mouvements where etablissement_id = $1 and type = 'inventaire' and produit_id = any($2)", [
-        etablissementId,
-        [...comptes.keys()],
-      ])
-    ).map((x) => x.produit_id),
-  );
+  const deja = new Set(inventaires.map((x) => x.produit_id));
   const id = nouvelId("inv");
-  const date = journeeParis(maintenant);
   const lignes = [...comptes].map(([produitId, compte]) => ({
     produitId,
     compte,
@@ -368,8 +389,8 @@ export async function inventorier(db: Db, etablissementId: string, corps: Record
     id,
     type: "inventaire",
     etablissementId,
-    contenu: { zone, lignes, valeurEcart: lignes.filter((l) => !l.ouverture).reduce((s, l) => s + (l.valeurEcart ?? 0), 0) },
-    le: maintenant,
+    contenu: { zone, date, lignes, valeurEcart: lignes.filter((l) => !l.ouverture).reduce((s, l) => s + (l.valeurEcart ?? 0), 0) },
+    le,
     creeLe: maintenant,
     par,
     annuleLe: null,
@@ -379,7 +400,7 @@ export async function inventorier(db: Db, etablissementId: string, corps: Record
     quantite: ecart,
     valeurMicro: valoriser(couts, produitId, ecart),
     type: "inventaire",
-    le: maintenant,
+    le,
     dateComptable: date,
     origine: { inventaire: id, zone, ...(deja.has(produitId) ? {} : { ouverture: true }) },
     cle: `inv:${id}:${produitId}`,

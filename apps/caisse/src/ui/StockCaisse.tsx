@@ -4,7 +4,8 @@ import { ClipboardList, Package, PackagePlus, RefreshCw, ShoppingCart, Trash2 } 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Commandes, type AccesCommandes } from "../stock/Commandes";
 import { MouvementsProduit } from "../stock/MouvementsProduit";
-import { FormulaireInventaire, FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
+import { Inventaires } from "../stock/Inventaires";
+import { FormulairePerte, FormulaireReception, ListePieces, TableauStock } from "../stock/OperationsStock";
 import { Vide } from "./communs";
 import { useCaisse } from "./contexte";
 import { AvecIcone, BoutonIcone } from "./icones";
@@ -13,8 +14,8 @@ import { messageServeur } from "./Reglages";
 type Onglet = "inventaire" | "commandes" | "reception" | "perte" | "stock";
 
 /**
- * Stock sur l'iPad ou l'iPhone (responsables, en ligne) : inventaire par
- * zone, commandes fournisseurs, réception d'une livraison, perte ; stock théorique et dernières
+ * Stock sur l'iPad ou l'iPhone (responsables, en ligne) : inventaires (liste,
+ * puis comptage par zone), commandes fournisseurs, réception d'une livraison, perte ; stock théorique et dernières
  * pièces. Les ventes décomptent le stock d'elles-mêmes, à la synchronisation.
  */
 export function StockCaisse() {
@@ -41,6 +42,13 @@ export function StockCaisse() {
   useEffect(() => {
     void charger();
   }, [charger]);
+  const chargerInventaires = useCallback(async () => {
+    try {
+      return (await caisse.client.documentsStock("inventaire")).documents;
+    } catch (e) {
+      throw new Error(messageServeur(e));
+    }
+  }, [caisse]);
   const couts = useMemo(() => (donnees ? new Couts(donnees.referentiel, donnees.prix, config.etablissementId) : null), [donnees, config.etablissementId]);
 
   const enregistrer = (type: "receptions" | "inventaires" | "pertes") => async (corps: Record<string, unknown>) => {
@@ -105,7 +113,7 @@ export function StockCaisse() {
               </button>
             ))}
           </div>
-          {onglet === "inventaire" && <FormulaireInventaire referentiel={donnees.referentiel} etat={donnees.etat} onEnregistrer={enregistrer("inventaires")} />}
+          {onglet === "inventaire" && <Inventaires referentiel={donnees.referentiel} etat={donnees.etat} charger={chargerInventaires} onEnregistrer={enregistrer("inventaires")} />}
           {onglet === "commandes" && (
             <Commandes referentiel={donnees.referentiel} prix={donnees.prix} etat={donnees.etat} etablissementId={config.etablissementId} acces={acces} onReception={() => void charger()} />
           )}
