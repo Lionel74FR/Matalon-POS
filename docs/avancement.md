@@ -25,7 +25,7 @@ Dernière mise à jour : 16 octobre 2026.
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Configuration de l'installation : les clés chiffrées (Resend) ne voyagent plus, chaque installation ayant sa propre `CLE_SECRETS` (celle du test n'a pas été conservée) ; la clé se ressaisit dans l'administration de la production |
+| 0363774 | Configuration de l'installation : les clés chiffrées (Resend) ne voyagent plus, chaque installation ayant sa propre `CLE_SECRETS` (celle du test n'a pas été conservée) ; la clé se ressaisit dans l'administration de la production |
 | a8aacde | Mise en service (demande de Lionel du 15 octobre) : noyau fiscal gelé en 1.0.0 (version citée par l'attestation, aucun changement de comportement) ; administration › « Configuration de l'installation » : export d'un fichier (établissements, équipe, plan, imprimante, cartes, stock sans les consommations des ventes, commandes fournisseurs, réservations à venir) et import dans une installation neuve, refusé dès que la base a servi (vente, appareil, équipe, stock) ; scénario `mise-en-service` (21 parcours) |
 | 6c9bb22 | Éditeur de carte (demande de Lionel du 15 octobre) : déplacer un rayon, flèches à côté de son nom ; l'ordre des onglets de la caisse suit (catégories regroupées par rayon, leur ordre dans chaque rayon gardé) ; scénario `carte` complété |
 | b592173 | Détail d'un inventaire (demande de Lionel du 15 octobre) : champ de recherche par nom de produit ; scénario `stock-operations` complété |
