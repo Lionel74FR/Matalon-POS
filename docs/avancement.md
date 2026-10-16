@@ -25,7 +25,7 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Commandes fournisseurs (retour de Lionel du 16 octobre : commandes reçues invisibles) : sans commande en cours, la liste montre les dernières commandes (reçues, soldées) au lieu d'une liste vide |
+| dfd7db9 | Commandes fournisseurs (retour de Lionel du 16 octobre : commandes reçues invisibles) : sans commande en cours, la liste montre les dernières commandes (reçues, soldées) au lieu d'une liste vide |
 | e319165 | Mise à jour de la caisse (retour de Lionel du 16 octobre : l'iPad restait sur l'ancienne version) : l'app ouverte cherche une nouvelle version toutes les 10 minutes et à chaque retour au premier plan ; le bandeau « Une nouvelle version de la caisse est prête » s'affiche pour toute personne connectée, plus seulement les responsables |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » en tête de la salle, le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. iPhone inchangé (la case reste, la barre n'a pas le bouton) |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » ; le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. Sur iPhone, la case reste (la barre n'a pas ce bouton) |
