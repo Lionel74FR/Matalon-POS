@@ -311,6 +311,8 @@ export interface AccesStatistiques {
   /** Appareil qui affiche l'écran : sa propre synchronisation n'est pas signalée. */
   appareilCourant?: string;
   messageErreur?: (e: unknown) => string;
+  /** Administration : les tickets d'une personne sur la période affichée. */
+  ouvrirServeur?: (serveurId: string, du: string, au: string) => void;
 }
 
 /** Recalcul automatique tant que la période va jusqu'à aujourd'hui : la journée seule, puis les périodes longues. */
@@ -608,7 +610,13 @@ export function TableauStatistiques(props: { acces: AccesStatistiques }) {
             titre="Équipe"
             colonnes={["Serveur", "Tickets", "CA TTC", "Ticket moyen", "Couverts", "Remises et offerts", "Annulations", "Retraits après envoi"]}
             lignes={s.serveurs.map((v) => [
-              v.nom,
+              acces.ouvrirServeur ? (
+                <button key="n" className="lien" title={`Voir les tickets de ${v.nom}`} aria-label={`Voir les tickets de ${v.nom}`} onClick={() => acces.ouvrirServeur!(v.id, s.du, s.au)}>
+                  {v.nom}
+                </button>
+              ) : (
+                v.nom
+              ),
               entier(v.tickets),
               euros(v.ttc),
               euros(v.ticketMoyen),

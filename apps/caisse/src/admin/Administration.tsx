@@ -12,6 +12,7 @@ import { api, ErreurAdmin, type AdresseImprimante, type CaisseAdmin, type Etabli
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
+import { TicketsAdmin, type FiltreTickets } from "./TicketsAdmin";
 import { Reservations } from "./Reservations";
 import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces";
 import { FenetreConfiguration } from "./Configuration";
@@ -37,6 +38,7 @@ import {
   LogOut,
   Plus,
   Printer,
+  ReceiptText,
   RotateCw,
   Save,
   ShieldCheck,
@@ -305,11 +307,14 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 // ───────── Tableau de bord ─────────
 
 /** Rubriques d'un établissement, dans le menu latéral (ordre d'usage). */
-type Rubrique = "statistiques" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
+type Rubrique = "statistiques" | "tickets" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
 const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: string; icone: LucideIcon; aide: string }> }> = [
   {
     groupe: "Activité",
-    liste: [{ id: "statistiques", libelle: "Statistiques", icone: ChartColumn, aide: "CA en direct, articles, équipe" }],
+    liste: [
+      { id: "statistiques", libelle: "Statistiques", icone: ChartColumn, aide: "CA en direct, articles, équipe" },
+      { id: "tickets", libelle: "Tickets", icone: ReceiptText, aide: "Par serveur, détail de chaque ticket" },
+    ],
   },
   {
     groupe: "Service",
@@ -364,6 +369,8 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const [rubrique, setRubrique] = useState<Rubrique>(initiale.rubrique);
   const [carteOuverte, setCarteOuverte] = useState<string | null>(null);
   const [carteModifiee, setCarteModifiee] = useState(false);
+  /** Tickets d'une personne, ouverts depuis les statistiques ; le menu les rouvre sans filtre. */
+  const [filtreTickets, setFiltreTickets] = useState<FiltreTickets | null>(null);
   /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
   const aller = (vue: { etab?: string; rubrique?: Rubrique; carte?: string | null }) => {
     if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return;
@@ -371,6 +378,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     if (vue.etab !== undefined) setChoisi(vue.etab);
     if (vue.rubrique !== undefined) setRubrique(vue.rubrique);
     setCarteOuverte(vue.carte ?? null);
+    setFiltreTickets(null);
   };
   const [erreur, setErreur] = useState("");
   const clesAcces = useClesAcces();
@@ -522,7 +530,18 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
               />
             )
           ) : (
-            <FicheEtablissement key={etablissement.id} e={etablissement} rubrique={rubrique} cartes={donnees.cartes} onChange={recharger} />
+            <FicheEtablissement
+              key={etablissement.id}
+              e={etablissement}
+              rubrique={rubrique}
+              cartes={donnees.cartes}
+              onChange={recharger}
+              filtreTickets={filtreTickets}
+              onTicketsServeur={(f) => {
+                aller({ rubrique: "tickets" });
+                setFiltreTickets(f);
+              }}
+            />
           )}
         </main>
       </div>
@@ -601,7 +620,15 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
 
 // ───────── Fiche établissement ─────────
 
-function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; cartes: Array<{ id: string; nom: string }>; onChange: () => Promise<void> }) {
+function FicheEtablissement(props: {
+  e: EtablissementAdmin;
+  rubrique: Rubrique;
+  cartes: Array<{ id: string; nom: string }>;
+  onChange: () => Promise<void>;
+  /** Tickets ouverts depuis les statistiques : une personne, une période. */
+  filtreTickets: FiltreTickets | null;
+  onTicketsServeur: (f: FiltreTickets) => void;
+}) {
   const { e, rubrique } = props;
   const responsable = e.utilisateurs.some((u) => u.role === "responsable" && u.actif);
   return (
@@ -617,7 +644,8 @@ function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; 
           <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
         </>
       )}
-      {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} etablissementId={e.id} onAlerte={props.onChange} />}
+      {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} etablissementId={e.id} onAlerte={props.onChange} onServeur={props.onTicketsServeur} />}
+      {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
       {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
       {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
       {rubrique === "imprimantes" && (
@@ -645,8 +673,10 @@ function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; 
 }
 
 /** Statistiques de l'établissement, mêmes calculs et même écran que sur la caisse, recalculés en direct. */
-function StatistiquesAdmin(props: { etablissementId: string; onAlerte: () => Promise<void> }) {
+function StatistiquesAdmin(props: { etablissementId: string; onAlerte: () => Promise<void>; onServeur: (f: FiltreTickets) => void }) {
   const { etablissementId } = props;
+  const onServeur = useRef(props.onServeur);
+  onServeur.current = props.onServeur;
   // Le rechargement de l'administration change de fonction à chaque rendu : l'écran ne doit pas tout recalculer pour autant.
   const onAlerte = useRef(props.onAlerte);
   onAlerte.current = props.onAlerte;
@@ -659,6 +689,7 @@ function StatistiquesAdmin(props: { etablissementId: string; onAlerte: () => Pro
         await onAlerte.current();
         return true;
       },
+      ouvrirServeur: (serveur, du, au) => onServeur.current({ serveur, du, au }),
     }),
     [etablissementId],
   );

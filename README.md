@@ -83,6 +83,7 @@ URL=… node scripts/commandes-fournisseurs.mjs captures # commandes fournisseur
 URL=… node scripts/edition-ipad.mjs captures      # carte et fiches techniques sur l'iPad (responsable) : prix changé, recette créée, tuile à jour, entrée absente pour un serveur
 URL=… node scripts/division-note.mjs captures     # division de la note : par articles sur l'iPad, part en espèces sur l'iPhone (acompte, rendu), Z refusée, montant libre rendu, ticket final avec l'acompte, espresso offert soldé à 0,00 €
 URL=… node scripts/statistiques-admin.mjs captures # statistiques dans l'administration, en direct : table ouverte sur l'iPad visible « En salle maintenant », puis la vente dans le CA, sans recharger la page
+URL=… node scripts/tickets-admin.mjs captures      # tickets dans l'administration : deux serveurs sur l'iPad, résumé par serveur, liste filtrée, détail d'un ticket, lien depuis Statistiques › Équipe, iPhone
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

@@ -1,6 +1,6 @@
 import { genererPaireCles, Registre, signataireDepuis, StockageMemoire } from "@matalon/noyau-fiscal";
 import { describe, expect, it } from "vitest";
-import { FILTRES_VIDES, filtrerTickets, lireMontant, nombreFiltres, totaliser, type FiltresTickets } from "../src/metier/filtres-tickets";
+import { FILTRES_VIDES, filtrerTickets, lireMontant, nombreFiltres, parServeur, totaliser, type FiltresTickets } from "../src/metier/filtres-tickets";
 
 const CAFE = { articleId: "cafe", libelle: "Cappuccino", quantite: 1, prixUnitaireTTC: 400, tauxTVA: 1000 };
 const PLAT = { articleId: "plat", libelle: "Croque", quantite: 1, prixUnitaireTTC: 1250, tauxTVA: 1000 };
@@ -55,6 +55,15 @@ describe("filtres de l'écran Tickets", () => {
     expect(t.ventesTTC).toBe(2900);
     // CB : 4 € puis remboursés ; espèces : 12,50 net du rendu + 16,50 corrigés.
     expect(t.parMode).toEqual({ CB: 0, ESPECES: 2900 });
+  });
+
+  it("résume l'activité par serveur : ventes gardées, ticket moyen, ventes annulées à part", async () => {
+    const { tous } = await journee();
+    expect(parServeur(tous, tous)).toEqual([
+      // Léa : t3 (16,50 €) gardé, t1 (4 €) annulé ; la correction et l'annulation ne sont pas des ventes.
+      { operateurId: "u-lea", ventes: 1, ttc: 1650, ticketMoyen: 1650, couverts: 0, remisesTTC: 0, annulees: 1, montantAnnule: 400 },
+      { operateurId: "u-tom", ventes: 1, ttc: 1250, ticketMoyen: 1250, couverts: 0, remisesTTC: 0, annulees: 0, montantAnnule: 0 },
+    ]);
   });
 
   it("lit un montant saisi", () => {

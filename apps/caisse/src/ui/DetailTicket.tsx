@@ -1,17 +1,23 @@
 import { paiementsEffectifs, type Ticket } from "@matalon/noyau-fiscal";
 import { LIBELLES_PAIEMENT } from "../impression/gabarits";
-import { euros, useCaisse } from "./contexte";
+import { euros } from "./contexte";
 
 const listePaiements = (l: Ticket["paiements"]) => l.map((p) => `${LIBELLES_PAIEMENT[p.mode]} ${euros(p.montant)}`).join(", ");
 
 /**
  * Contenu d'un ticket : lignes, moyens de paiement (corrections comprises),
- * compte client, règlement. `tickets` : les tickets connus de cette caisse,
- * pour retrouver les corrections d'une vente (vide pour une autre caisse).
+ * compte client, règlement. `tickets` : les tickets connus, pour retrouver
+ * les corrections d'une vente. Affiché sur la caisse et dans l'administration.
  */
-export function DetailTicket(props: { ticket: Ticket; tickets: Ticket[] }) {
-  const { config } = useCaisse();
+export function DetailTicket(props: {
+  ticket: Ticket;
+  tickets: Ticket[];
+  /** Appareil qui affiche le ticket : une note réglée qui vient d'ailleurs porte le nom de son appareil. */
+  appareilCourant?: string;
+  nomAppareil?: (caisseId: string) => string;
+}) {
   const t = props.ticket;
+  const appareil = props.nomAppareil ?? ((id: string) => id);
   const corrections = props.tickets.filter((x) => x.type === "CORRECTION" && x.ticketOrigine?.numero === t.numero && x.ticketOrigine.hash === t.hash);
 
   if (t.type === "CORRECTION") {
@@ -51,7 +57,7 @@ export function DetailTicket(props: { ticket: Ticket; tickets: Ticket[] }) {
               <li key={`${i.caisseId}-${i.numero}`}>
                 <span>
                   Note n° {i.numero}
-                  {i.caisseId !== config.caisseId && <small> · {i.caisseId}</small>}
+                  {i.caisseId !== props.appareilCourant && <small> · {appareil(i.caisseId)}</small>}
                 </span>
                 <span>{euros(i.montantTTC)}</span>
               </li>

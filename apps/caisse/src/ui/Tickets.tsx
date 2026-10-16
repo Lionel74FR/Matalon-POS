@@ -524,7 +524,7 @@ export function Tickets() {
           {annules.has(cle(choisi)) && <p className="erreur">Ce ticket a été annulé.</p>}
           {choisi.motif && <p className="explication">Motif : {choisi.motif}</p>}
           {locale(choisi) && factures.has(choisi.numero) && <p className="explication">Facturé : n° {factures.get(choisi.numero)}</p>}
-          <DetailTicket ticket={choisi} tickets={tous} />
+          <DetailTicket ticket={choisi} tickets={tous} appareilCourant={config.caisseId} />
         </Modale>
       )}
 

@@ -2848,6 +2848,17 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/statistiques$/.exec(chemin);
       if (p && m === "GET") return await statistiques(env, (await etablissement(env.db, p[1]!)).id, requete);
+      // Tickets d'une période, toutes caisses : consultation (par serveur, détail d'un ticket).
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/tickets$/.exec(chemin);
+      if (p && m === "GET") {
+        const id = (await etablissement(env.db, p[1]!)).id;
+        const du = url.searchParams.get("du") ?? "";
+        const au = url.searchParams.get("au") ?? "";
+        if (!DATE_VALIDE.test(du) || !DATE_VALIDE.test(au) || au < du || joursEntre(du, au) > JOURS_MAX_STATISTIQUES) {
+          throw new ErreurHttp(400, "PERIODE_INVALIDE", `Période invalide (du ≤ au, ${JOURS_MAX_STATISTIQUES} jours au plus).`);
+        }
+        return await ticketsEtablissement(env, id, 150, { du, au });
+      }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/alertes$/.exec(chemin);
       if (p && m === "GET") return await listeAlertes(env, (await etablissement(env.db, p[1]!)).id, new URL(requete.url).searchParams.get("toutes") === "1");
       p = /^\/api\/admin\/alertes\/(\d{1,15})\/vue$/.exec(chemin);

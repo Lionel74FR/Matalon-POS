@@ -147,3 +147,47 @@ export function totaliser(liste: Ticket[], tous: Ticket[]): TotauxTickets {
   }
   return { nombre: liste.length, ventesTTC, parMode };
 }
+
+/** Activité d'une personne sur une liste de tickets : ses ventes encaissées. */
+export interface ResumeServeur {
+  operateurId: string;
+  /** Ventes non annulées. */
+  ventes: number;
+  /** Leur total TTC. */
+  ttc: number;
+  ticketMoyen: number;
+  couverts: number;
+  /** Remises et offerts de ces ventes. */
+  remisesTTC: number;
+  /** Ventes encaissées puis annulées, et leur montant. */
+  annulees: number;
+  montantAnnule: number;
+}
+
+/**
+ * Résumé par personne qui a encaissé, CA décroissant. Une vente annulée reste
+ * attribuée à qui l'avait encaissée, comptée à part ; règlements de compte et
+ * corrections ne sont pas des ventes.
+ */
+export function parServeur(liste: Ticket[], tous: Ticket[]): ResumeServeur[] {
+  const annulees = ventesAnnulees(tous);
+  const parId = new Map<string, ResumeServeur>();
+  for (const t of liste) {
+    if (t.type !== "VENTE" || t.reglement) continue;
+    const id = t.operateurId ?? "";
+    const r = parId.get(id) ?? { operateurId: id, ventes: 0, ttc: 0, ticketMoyen: 0, couverts: 0, remisesTTC: 0, annulees: 0, montantAnnule: 0 };
+    if (annulees.has(cle(t.caisseId, t.numero))) {
+      r.annulees++;
+      r.montantAnnule += t.totalTTC;
+    } else {
+      r.ventes++;
+      r.ttc += t.totalTTC;
+      r.couverts += t.couverts ?? 0;
+      r.remisesTTC += t.lignes.reduce((s, l) => s + l.remiseTTC, 0);
+    }
+    parId.set(id, r);
+  }
+  return [...parId.values()]
+    .map((r) => ({ ...r, ticketMoyen: r.ventes ? Math.round(r.ttc / r.ventes) : 0 }))
+    .sort((a, b) => b.ttc - a.ttc || a.operateurId.localeCompare(b.operateurId));
+}

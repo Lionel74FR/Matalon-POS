@@ -480,6 +480,23 @@ describe("commandes en cours partagées", () => {
     expect((await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
   });
 
+  it("l'administration lit les tickets d'une période, toutes caisses", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const b = await caisseRattachee(cookie, "ipad-1111aaaa");
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await b.registre.enregistrerVente({ lignes: [SPRITZ], paiements: [{ mode: "ESPECES", montant: 1100 }], operateurId: "u-tom" });
+    expect((await a.synchro()).statut).toBe(200);
+    expect((await b.synchro()).statut).toBe(200);
+    const r = await appel("GET", "/api/admin/etablissements/moka/tickets?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie });
+    expect(r.statut).toBe(200);
+    expect(r.corps.tickets.map((t: { operateurId: string; totalTTC: number }) => `${t.operateurId}:${t.totalTTC}`).sort()).toEqual(["u-lea:400", "u-tom:1100"]);
+    expect(Object.keys(r.corps.appareils)).toHaveLength(2);
+    expect((await appel("GET", "/api/admin/etablissements/moka/tickets?du=2026-10-14&au=2026-10-14", undefined, { Cookie: cookie })).corps.tickets).toEqual([]);
+    expect((await appel("GET", "/api/admin/etablissements/moka/tickets?du=2026-10-15&au=2026-10-01", undefined, { Cookie: cookie })).statut).toBe(400);
+    expect((await appel("GET", "/api/admin/etablissements/moka/tickets?du=2026-10-15&au=2026-10-15")).statut).toBe(401);
+  });
+
   it("les statistiques du jour montrent la salle en cours ; une période passée non", async () => {
     const cookie = await adminConnecte();
     const a = await caisseRattachee(cookie);

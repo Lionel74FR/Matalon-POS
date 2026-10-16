@@ -815,3 +815,84 @@ code.cle-api {
 .configuration-bloc .bouton {
   justify-self: start;
 }
+
+/* ───────── Tickets (consultation) ───────── */
+
+.tickets-admin-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tickets-admin .filtres-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.tickets-serveurs h3 {
+  margin: 18px 0 8px;
+}
+
+.tickets-serveurs ul,
+.tickets-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.tickets-serveur,
+.ticket-admin {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+  text-align: left;
+  min-height: 56px;
+}
+
+.tickets-serveur.actif {
+  outline: 2px solid var(--terre);
+}
+
+.tickets-serveur-nom,
+.ticket-admin-texte {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tickets-serveur-nom small,
+.ticket-admin-texte small {
+  color: var(--sable);
+}
+
+.tickets-montant {
+  font-family: var(--police-chiffres);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ticket-admin.nature-vente_annulee .ticket-admin-texte strong,
+.ticket-admin.nature-vente_annulee .tickets-montant {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.ticket-admin.nature-annulation .tickets-montant,
+.ticket-admin.nature-correction .tickets-montant {
+  color: var(--sable);
+}
+
+.ticket-admin-empreinte {
+  font-size: 0.85rem;
+  word-break: break-all;
+}

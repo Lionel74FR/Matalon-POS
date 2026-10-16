@@ -422,7 +422,7 @@ function ModaleNoteCompte(props: { vente: VenteOuverte; onFermer: () => void }) 
       ) : "erreur" in etat ? (
         <p className="erreur">{etat.erreur}</p>
       ) : (
-        <DetailTicket ticket={etat.ticket} tickets={etat.tickets} />
+        <DetailTicket ticket={etat.ticket} tickets={etat.tickets} appareilCourant={config.caisseId} />
       )}
     </Modale>
   );
