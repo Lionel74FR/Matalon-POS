@@ -80,6 +80,7 @@ URL=… node scripts/imprimante-partagee.mjs captures # imprimante des tickets c
 URL=… node scripts/commandes-partagees.mjs captures # tables partagées : ouverte sur l'iPad, vue et complétée sur l'iPhone, encaissée sur l'un, refusée sur l'autre, un seul ticket
 URL=… node scripts/mise-en-service.mjs captures   # configuration exportée de l'administration de test, importée dans une installation neuve (second serveur local), sans les ventes ; second import refusé
 URL=… node scripts/commandes-fournisseurs.mjs captures # commandes fournisseurs : fiches techniques importées, fiche fournisseur, réglages d'envoi, bon saisi et envoyé par e-mail depuis l'iPad, réception partielle puis solde, bon marqué envoyé, iPhone
+URL=… node scripts/edition-ipad.mjs captures      # carte et fiches techniques sur l'iPad (responsable) : prix changé, recette créée, tuile à jour, entrée absente pour un serveur
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

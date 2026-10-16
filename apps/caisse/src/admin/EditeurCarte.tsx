@@ -21,7 +21,9 @@ import { Couts, foodCost } from "@matalon/stock";
 import { EditeurFiche, pourcent } from "./stock-commun";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { centimesDepuisSaisie, saisieDepuisCentimes } from "../ui/communs";
-import { api, ErreurAdmin } from "./api";
+import { api } from "./api";
+import { useAccesEdition } from "./acces-edition";
+import "./edition.css";
 
 const TAUX = [
   { valeur: 1000, libelle: "10 % (sur place)" },
@@ -157,7 +159,8 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
  * ordre), articles (prix, TVA, disponibilité), variantes, suppléments,
  * formules. Les contrôles sont ceux du serveur, appliqués avant l'envoi.
  */
-export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregistre: () => void; onModifiee?: (modifiee: boolean) => void }) {
+export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregistre: () => void; onModifiee?: (modifiee: boolean) => void; libelleRetour?: string }) {
+  const acces = useAccesEdition();
   const [origine, setOrigine] = useState<{ carte: Catalogue; version: number } | null>(null);
   const [carte, setCarte] = useState<Catalogue | null>(null);
   const [catId, setCatId] = useState<string | null>(null);
@@ -173,20 +176,20 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
   const [ventes, setVentes] = useState<ReponseVentesCarte | null>(null);
   const [etab, setEtab] = useState("");
   useEffect(() => {
-    api
+    acces
       .stock()
       .then((s) => {
         setStock(s);
         setEtab(s.etablissements.find((e) => e.carteId === props.id)?.id ?? s.etablissements[0]?.id ?? "");
       })
       .catch(() => setStock(null));
-    api.ventesCarte(props.id).then(setVentes, () => setVentes(null));
-  }, [props.id]);
+    acces.ventesCarte(props.id).then(setVentes, () => setVentes(null));
+  }, [props.id, acces]);
   const couts = useMemo(() => (stock ? new Couts(stock.referentiel, stock.prix, etab) : null), [stock, etab]);
   const nomEtab = stock?.etablissements.find((e) => e.id === etab)?.enseigne ?? "";
 
   const charger = async () => {
-    const r = await api.carte(props.id);
+    const r = await acces.carte(props.id);
     setOrigine(r);
     setCarte(structuredClone(r.carte));
     setCatId((c) => c ?? r.carte.categories[0]?.id ?? null);
@@ -245,13 +248,13 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
     if (problemes.length) return;
     setEtat("envoi");
     try {
-      const r = await api.enregistrerCarte(props.id, lu.catalogue!, surVersion);
+      const r = await acces.enregistrerCarte(props.id, lu.catalogue!, surVersion);
       setOrigine(r);
       setCarte(structuredClone(r.carte));
       setEtat("enregistre");
       props.onEnregistre();
     } catch (e) {
-      if (e instanceof ErreurAdmin && e.code === "VERSION_DEPASSEE") setEtat("conflit");
+      if ((e as { code?: string }).code === "VERSION_DEPASSEE") setEtat("conflit");
       else {
         setEtat("");
         setErreurs([message(e)]);
@@ -360,7 +363,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
       <header className="admin-fiche-tete editeur-tete">
         <div>
           <button className="bouton discret" onClick={props.onRetour}>
-            <AvecIcone icone={ArrowLeft}>Cartes</AvecIcone>
+            <AvecIcone icone={ArrowLeft}>{props.libelleRetour ?? "Cartes"}</AvecIcone>
           </button>
           <p className="surtitre">
             {carte.id} · version {origine.version}
@@ -393,7 +396,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
             onClick={() =>
               void (async () => {
                 if (!window.confirm("Remplacer la carte enregistrée par votre version ? Les modifications de l'autre personne seront perdues.")) return;
-                const derniere = await api.carte(props.id);
+                const derniere = await acces.carte(props.id);
                 await enregistrer(derniere.version);
               })()
             }

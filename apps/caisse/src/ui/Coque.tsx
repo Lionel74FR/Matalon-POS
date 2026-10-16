@@ -1,5 +1,6 @@
 import {
   Archive,
+  BookOpen,
   Ban,
   CloudCheck,
   CloudOff,
@@ -37,6 +38,7 @@ import type { EtatSynchro } from "../serveur/synchro";
 import { etatJournee } from "../metier/tresorerie";
 import { Statistiques } from "./Statistiques";
 import { StockCaisse } from "./StockCaisse";
+import { EditionCaisse } from "./EditionCaisse";
 import { ModaleFondDeCaisse } from "./modales/ModaleFondDeCaisse";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Clotures } from "./Clotures";
@@ -48,7 +50,7 @@ import type { Reservation } from "@matalon/reservations";
 import { Salle } from "./Salle";
 import { Tickets } from "./Tickets";
 
-type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "comptes" } | { nom: "clotures" } | { nom: "statistiques" } | { nom: "stock" } | { nom: "reglages" };
+type Vue = { nom: "salle" } | { nom: "commande"; tableId: string } | { nom: "tickets" } | { nom: "comptes" } | { nom: "clotures" } | { nom: "statistiques" } | { nom: "stock" } | { nom: "edition" } | { nom: "reglages" };
 
 const LIBELLES_SYNCHRO: Record<EtatSynchro["statut"], string> = {
   synchronise: "Synchronisé",
@@ -258,6 +260,7 @@ export function Coque() {
     { vue: "clotures", libelle: "Clôtures", icone: Archive, menu: true },
     { vue: "statistiques", libelle: "Stats", icone: ChartColumn, responsable: true, menu: true },
     { vue: "stock", libelle: "Stock", icone: Package, responsable: true, menu: true },
+    { vue: "edition", libelle: "Carte et fiches", icone: BookOpen, responsable: true, menu: true },
     { vue: "reglages", libelle: "Réglages", icone: Settings, responsable: true, menu: true },
   ] satisfies Onglet[] as Onglet[]).filter((o) => !o.responsable || utilisateur.role === "responsable");
 
@@ -375,6 +378,7 @@ export function Coque() {
         {vue.nom === "clotures" && <Clotures commandesOuvertes={commandes.size} />}
         {vue.nom === "statistiques" && <Statistiques />}
         {vue.nom === "stock" && <StockCaisse />}
+        {vue.nom === "edition" && <EditionCaisse onRetour={() => setVue({ nom: "salle" })} />}
         {vue.nom === "reglages" && <Reglages onAssistant={() => setAssistant(true)} />}
       </main>
       {fondADeclarer && !blocage && (

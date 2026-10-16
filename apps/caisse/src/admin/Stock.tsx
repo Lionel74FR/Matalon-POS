@@ -42,6 +42,8 @@ import {
 import { OngletFournisseurs } from "./StockFournisseurs";
 import { MouvementsAdmin, OngletCommandes, OngletEtat, OngletFactures, OngletFoodCost, OngletPiece, OngletTransfert } from "./StockOperations";
 import { lireFichierTableau } from "./tableur";
+import "./edition.css";
+import { useAccesEdition } from "./acces-edition";
 
 /** « 1 produit créé », « 5 produits créés », « 2 prix à enregistrer ». */
 function nombre(n: number, nom: string, participe: string): string {
@@ -158,7 +160,7 @@ export function Stock(props: { etablissementId?: string } = {}) {
   );
 }
 
-interface ProprietesOnglet {
+export interface ProprietesOnglet {
   stock: ReponseStock;
   couts: Couts;
   nomEtab: string;
@@ -548,7 +550,7 @@ function PrixModifiable(props: { prix: number | null; le?: string | undefined; o
 
 // ───────── Recettes ─────────
 
-function Recettes(props: ProprietesOnglet) {
+export function Recettes(props: ProprietesOnglet) {
   const ref = props.stock.referentiel;
   const [recherche, setRecherche] = useState("");
   const [archives, setArchives] = useState(false);
@@ -631,6 +633,7 @@ interface LigneEdition {
 }
 
 function ModaleRecette(props: ProprietesOnglet & { recette: Recette; onEnregistre: (s: ReponseStock, id: string) => void; onFermer: () => void }) {
+  const acces = useAccesEdition();
   const ref = props.stock.referentiel;
   const nouvelle = !props.recette.id;
   const liste = composants(ref, props.recette.id || undefined);
@@ -681,7 +684,7 @@ function ModaleRecette(props: ProprietesOnglet & { recette: Recette; onEnregistr
     const id = r.id || identifiantStock(r.nom, [...ref.recettes.map((x) => x.id), ...ref.produits.map((x) => x.id)]);
     setEnCours(true);
     try {
-      const s = await api.enregistrerRecette({ ...apercu, id });
+      const s = await acces.enregistrerRecette({ ...apercu, id });
       setErreur("");
       props.onEnregistre(s, id);
     } catch (e) {

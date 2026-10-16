@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 64, copiée le 16 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 66, copiée le 16 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -162,6 +162,7 @@ Le module lit les ventes du noyau fiscal mais n'y écrit jamais : il reste hors 
 - **Food cost** (administration), sur une période : théorique = coût des fiches des articles vendus / CA HT ; réel = théorique + pertes + écarts d'inventaire / CA HT, qui suppose un inventaire en début et en fin de période ; détail par article et par famille, plus gros écarts.
 - **Agent de factures** : dépose les lignes d'une facture par une clé d'accès créée dans l'administration (empreinte seule gardée, révocable). Une ligne reconnue (fournisseur et référence, ou libellé déjà rapproché) devient un prix d'achat ; les autres attendent un rapprochement, retenu pour la fois suivante.
 - **En caisse** : onglet Stock réservé aux responsables, en ligne (inventaire, réception, perte, stock théorique et dernières pièces).
+- **Carte et fiches sur l'iPad** (16 octobre 2026) : un responsable modifie la carte de son établissement (prix, articles, catégories, rayons, disponibilité, fiches liées) et les fiches techniques depuis le menu de la caisse, en ligne, avec le même éditeur que l'administration. Rôle de la personne connectée vérifié par le serveur, sur un appareil rattaché à l'établissement ; une modification faite ailleurs entre-temps est refusée plutôt qu'écrasée ; chaque enregistrement est tracé au journal avec son auteur. Les produits et prix d'achat restent dans l'administration. La carte parvient aux autres appareils à leur synchronisation.
 
 ### Commandes fournisseurs (15 octobre 2026)
 

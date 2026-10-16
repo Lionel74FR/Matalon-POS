@@ -71,6 +71,7 @@ await p.getByLabel("Sucre : kg au détail").fill("4");
 await p.screenshot({ path: `${sortie}/o01-inventaire-ipad.png` });
 await clic("Valider l'inventaire (2 produits)");
 await p.locator(".inventaires .succes", { hasText: "Inventaire enregistré : 2 produits." }).waitFor();
+await p.locator(".inventaires .commandes-liste li").first().waitFor({ timeout: 10000 }).catch(() => {});
 const inventairesIpad = await p.locator(".inventaires .commandes-liste li").count();
 
 // Réception Metro : 2 packs de lait au dernier prix (7,20 €), 1 sac de sucre payé 6,90 €.

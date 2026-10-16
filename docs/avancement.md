@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 16 octobre 2026 (mise en service).
+Dernière mise à jour : 16 octobre 2026 (carte et fiches sur l'iPad).
 
 ## Règle de conduite
 
@@ -25,9 +25,9 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Carte et fiches techniques sur l'iPad (demande de Lionel du 16 octobre) : menu ☰ › « Carte et fiches », réservé aux responsables, en ligne : l'éditeur de carte de l'administration (carte de l'établissement seulement) et les fiches techniques avec leur coût ; produits et prix d'achat restent dans l'administration. Enregistrement conditionnel par version, journal avec l'auteur (« Bar · Léa ») ; la caisse se resynchronise aussitôt. Scénario `edition-ipad` (22 parcours) |
 | dfd7db9 | Commandes fournisseurs (retour de Lionel du 16 octobre : commandes reçues invisibles) : sans commande en cours, la liste montre les dernières commandes (reçues, soldées) au lieu d'une liste vide |
 | e319165 | Mise à jour de la caisse (retour de Lionel du 16 octobre : l'iPad restait sur l'ancienne version) : l'app ouverte cherche une nouvelle version toutes les 10 minutes et à chaque retour au premier plan ; le bandeau « Une nouvelle version de la caisse est prête » s'affiche pour toute personne connectée, plus seulement les responsables |
-| 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » en tête de la salle, le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. iPhone inchangé (la case reste, la barre n'a pas le bouton) |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » ; le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. Sur iPhone, la case reste (la barre n'a pas ce bouton) |
 | 0363774 | Configuration de l'installation : les clés chiffrées (Resend) ne voyagent plus, chaque installation ayant sa propre `CLE_SECRETS` (celle du test n'a pas été conservée) ; la clé se ressaisit dans l'administration de la production |
 | a8aacde | Mise en service (demande de Lionel du 15 octobre) : noyau fiscal gelé en 1.0.0 (version citée par l'attestation, aucun changement de comportement) ; administration › « Configuration de l'installation » : export d'un fichier (établissements, équipe, plan, imprimante, cartes, stock sans les consommations des ventes, commandes fournisseurs, réservations à venir) et import dans une installation neuve, refusé dès que la base a servi (vente, appareil, équipe, stock) ; scénario `mise-en-service` (21 parcours) |
@@ -81,6 +81,7 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 ## Décisions techniques à ne pas défaire
 
+- Édition sur l'iPad (16 octobre) : routes `/api/caisse/edition/…` sous le jeton d'appareil, la personne connectée (`utilisateurId`) doit être un responsable actif de l'établissement (403 `RESPONSABLE_REQUIS`), et la carte celle de l'établissement (403 `CARTE_AUTRE`). Mêmes fonctions d'écriture que l'administration (`enregistrerCarteDe`, `enregistrerStockDe`) ; le référentiel renvoyé à la caisse est réduit aux prix et documents de l'établissement. Les composants d'édition prennent leurs appels par `useAccesEdition()` (administration par défaut) ; leurs styles sont dans `admin/edition.css`, sans règle globale, pour être chargés dans la caisse.
 - Inventaire daté (15 octobre) : un comptage d'un jour passé est horodaté à midi ce jour-là, comme toute pièce datée ; son écart se calcule sur les mouvements d'avant cet instant (le théorique de ce jour-là), et ses mouvements portent cet horodatage, donc la somme des mouvements donne bien le stock actuel. Refusé pour un produit qui a un inventaire plus récent (son écart a été calculé sans lui) : un inventaire ne s'annule pas et ne s'insère jamais avant un autre.
 - Production et test (16 octobre, décision de Lionel) : deux projets Vercel et deux bases Neon, la production sur matalon-pos.app, le test sur matalon-pos-test.vercel.app (mode test, notes « sans valeur »). Les ventes de test ne sont jamais effacées (enregistrements en ajout seul) : la production part d'une base neuve, qui reçoit la configuration par `GET`/`POST /api/admin/configuration` (format `matalon-configuration/1`). Import d'un seul bloc, seulement si aucune vente, aucun appareil, aucune équipe, aucun stock ; l'établissement créé d'office au démarrage est remplacé ; carte et référentiel remplacés ; séquences recalées. Chaque installation a sa `CLE_SECRETS` : les clés chiffrées (Resend) ne voyagent pas, elles se ressaisissent dans l'administration. Les appareils se rattachent avec des codes neufs ; les clés d'accès de l'administration sont à recréer sur le nouveau domaine.
 - Dépenses en espèces (15 octobre) : déclarées au comptage de clôture, dans les détails de l'événement `COMPTAGE_CAISSE` (texte JSON, valeurs simples seulement dans un événement) ; pas de modification du noyau fiscal (le contenu des détails est libre). Espèces attendues = fond + espèces encaissées − dépenses ; la remise en banque reste comptées − fond laissé.
@@ -148,4 +149,4 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 21 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 22 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

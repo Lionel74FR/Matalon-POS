@@ -1405,7 +1405,13 @@ function carteValide(v: unknown, id: string): Catalogue {
  */
 async function enregistrerCarte(env: Environnement, requete: Request, admin: { id: string; identifiant: string }, id: string): Promise<Response> {
   controlerOrigine(requete);
-  const corps = await lireJson<{ carte?: unknown; version?: unknown }>(requete);
+  return json(200, await enregistrerCarteDe(env, await lireJson<{ carte?: unknown; version?: unknown }>(requete), admin, id));
+}
+
+/** Auteur d'une modification : un administrateur, ou un responsable sur une caisse (`id` nul, « iPad Caisse · Léa »). */
+type Auteur = { id: string | null; identifiant: string };
+
+async function enregistrerCarteDe(env: Environnement, corps: { carte?: unknown; version?: unknown }, admin: Auteur, id: string): Promise<ReponseCarte> {
   if (typeof corps.version !== "number" || !Number.isSafeInteger(corps.version)) {
     throw new ErreurHttp(400, "CHAMP_INVALIDE", "Version de la carte manquante : rechargez la carte.");
   }
@@ -1422,9 +1428,8 @@ async function enregistrerCarte(env: Environnement, requete: Request, admin: { i
     });
     throw new ErreurHttp(409, "VERSION_DEPASSEE", "La carte a été modifiée entre-temps : rechargez-la avant d'enregistrer.");
   }
-  await journaliserAdmin(env, admin.id, "carte_enregistree", { carte: id, version: maj.version, articles: nombreArticles(carte) });
-  const reponse: ReponseCarte = { carte, version: maj.version };
-  return json(200, reponse);
+  await journaliserAdmin(env, admin.id, "carte_enregistree", { carte: id, version: maj.version, articles: nombreArticles(carte), ...(admin.id ? {} : { par: admin.identifiant }) });
+  return { carte, version: maj.version };
 }
 
 /** Nouvelle carte, vide ou copiée d'une autre (carte de saison, autre établissement). */
@@ -1485,7 +1490,7 @@ async function reponseStock(env: Environnement): Promise<ReponseStock> {
  */
 async function modifierReferentiel(
   env: Environnement,
-  admin: { id: string; identifiant: string },
+  admin: Auteur,
   f: (ref: Referentiel) => Referentiel,
   action: string,
   details: Record<string, unknown>,
@@ -1500,7 +1505,7 @@ async function modifierReferentiel(
       [JSON.stringify(suivant), horloge(env).toISOString(), admin.identifiant, version],
     );
     if (maj) {
-      await journaliserAdmin(env, admin.id, action, { ...details, version: maj.version });
+      await journaliserAdmin(env, admin.id, action, { ...details, version: maj.version, ...(admin.id ? {} : { par: admin.identifiant }) });
       return;
     }
   }
@@ -1520,11 +1525,15 @@ function lu<T>(r: { erreurs: string[] } & Record<string, unknown>, cle: string, 
 async function enregistrerStock(
   env: Environnement,
   requete: Request,
-  admin: { id: string; identifiant: string },
+  admin: Auteur,
   genre: "produits" | "articles" | "recettes" | "fournisseurs",
   id: string,
 ): Promise<Response> {
-  const corps = await lireJson<Record<string, unknown>>(requete);
+  await enregistrerStockDe(env, await lireJson<Record<string, unknown>>(requete), admin, genre, id);
+  return json(200, await reponseStock(env));
+}
+
+async function enregistrerStockDe(env: Environnement, corps: Record<string, unknown>, admin: Auteur, genre: "produits" | "articles" | "recettes" | "fournisseurs", id: string): Promise<void> {
   if (genre === "fournisseurs") {
     const f = lu<Fournisseur>(lireFournisseur(corps.fournisseur), "fournisseur", id);
     await modifierReferentiel(env, admin, (r) => enregistrerFournisseur(r, f), "stock_fournisseur", { fournisseur: id, nom: f.nom, actif: f.actif, courriel: f.courriel ?? null });
@@ -1538,7 +1547,6 @@ async function enregistrerStock(
     const recette = lu<Recette>(lireRecette(corps.recette), "recette", id);
     await modifierReferentiel(env, admin, (r) => ({ ...r, recettes: remplacer(r.recettes, recette) }), "stock_recette", { recette: id, nom: recette.nom, lignes: recette.lignes.length });
   }
-  return json(200, await reponseStock(env));
 }
 
 /** Nouveau prix d'achat d'un article dans un établissement (l'historique ne se modifie jamais). */
@@ -1689,12 +1697,12 @@ async function operationStock(env: Environnement, etablissementId: string, type:
 }
 
 /** Responsable actif de l'établissement de la caisse, pour les opérations de stock faites sur l'appareil. */
-async function responsableCaisse(env: Environnement, c: LigneCaisse, id: unknown): Promise<string> {
+async function responsableCaisse(env: Environnement, c: LigneCaisse, id: unknown, refus = "Le stock se gère par un responsable."): Promise<string> {
   const [u] = await env.db.requete<{ nom: string; role: string; actif: boolean }>("select nom, role, actif from utilisateurs where id = $1 and etablissement_id = $2", [
     String(id ?? ""),
     c.etablissement_id,
   ]);
-  if (!u || u.role !== "responsable" || !u.actif) throw new ErreurHttp(403, "RESPONSABLE_REQUIS", "Le stock se gère par un responsable.");
+  if (!u || u.role !== "responsable" || !u.actif) throw new ErreurHttp(403, "RESPONSABLE_REQUIS", refus);
   return `${c.nom} · ${u.nom}`;
 }
 
@@ -1746,6 +1754,43 @@ async function routeCommandes(
     return json(200, { commande: c });
   }
   return null;
+}
+
+/**
+ * Édition de la carte et des fiches techniques sur l'iPad (responsables) : la
+ * carte de l'établissement de l'appareil seulement, les recettes du
+ * référentiel commun ; mêmes contrôles et même journal que l'administration,
+ * l'auteur étant « appareil · responsable ».
+ */
+async function editionCaisse(env: Environnement, requete: Request, chemin: string, m: string): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const e = await etablissement(env.db, c.etablissement_id);
+  if (chemin === "/api/caisse/edition/stock" && m === "GET") {
+    const r = await reponseStock(env);
+    const reponse: ReponseStock = { ...r, prix: r.prix.filter((p) => p.etablissementId === e.id), etablissements: r.etablissements.filter((x) => x.id === e.id) };
+    return json(200, reponse);
+  }
+  const pc = /^\/api\/caisse\/edition\/cartes\/([a-z0-9-]+)(\/ventes)?$/.exec(chemin);
+  if (pc) {
+    if (pc[1] !== e.carteId) throw new ErreurHttp(403, "CARTE_AUTRE", "Seule la carte de l'établissement se modifie depuis l'appareil.");
+    if (m === "GET" && pc[2]) return await ventesCarte(env, e.carteId);
+    if (m === "GET") return await lireCarteAdmin(env, e.carteId);
+    if (m === "PUT") {
+      const corps = await lireJson<{ carte?: unknown; version?: unknown; utilisateurId?: unknown }>(requete);
+      const par = await responsableCaisse(env, c, corps.utilisateurId, "La carte se modifie par un responsable.");
+      return json(200, await enregistrerCarteDe(env, corps, { id: null, identifiant: par }, e.carteId));
+    }
+  }
+  const pr = /^\/api\/caisse\/edition\/recettes\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
+  if (pr && m === "PUT") {
+    const corps = await lireJson<Record<string, unknown>>(requete);
+    const par = await responsableCaisse(env, c, corps.utilisateurId, "Les fiches techniques se modifient par un responsable.");
+    await enregistrerStockDe(env, corps, { id: null, identifiant: par }, "recettes", pr[1]!);
+    const r = await reponseStock(env);
+    const reponse: ReponseStock = { ...r, prix: r.prix.filter((p) => p.etablissementId === e.id), etablissements: r.etablissements.filter((x) => x.id === e.id) };
+    return json(200, reponse);
+  }
+  return json(404, { code: "INTROUVABLE", message: "Route inconnue." });
 }
 
 async function stockCaisse(env: Environnement, requete: Request, chemin: string, m: string): Promise<Response> {
@@ -2615,6 +2660,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/caisse/etat" && m === "GET") return await etatCaisse(env, requete);
     if (chemin === "/api/caisse/synchro" && m === "POST") return await synchroniser(env, requete);
     if (chemin === "/api/caisse/stock" || chemin.startsWith("/api/caisse/stock/")) return await stockCaisse(env, requete, chemin, m);
+    if (chemin.startsWith("/api/caisse/edition/")) return await editionCaisse(env, requete, chemin, m);
     if (chemin === "/api/stock/factures" && m === "POST") return await factureAgent(env, requete);
     if (chemin === "/api/caisse/utilisateurs" && m === "PUT") return await majUtilisateursCaisse(env, requete);
     if (chemin === "/api/caisse/etablissement" && m === "PUT") return await majEtablissementCaisse(env, requete);

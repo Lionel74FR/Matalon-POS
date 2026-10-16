@@ -6,6 +6,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "../styles.css";
 import "./admin.css";
+import "./edition.css";
 import { Administration } from "./Administration";
 import { etiqueterTableaux } from "./etiquettes";
 

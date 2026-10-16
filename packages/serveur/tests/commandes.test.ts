@@ -331,3 +331,36 @@ describe("inventaire d'un comptage passé", () => {
     expect((await appel("GET", "/api/admin/stock/documents?etab=moka&type=inventaire", undefined, admin)).corps.documents).toHaveLength(2);
   });
 });
+
+describe("édition de la carte et des fiches sur l'iPad", () => {
+  it("par un responsable : carte de l'établissement et recettes, mêmes contrôles que l'administration", async () => {
+    const { admin, bearer, lea, tom } = await preparer();
+    const stock = await appel("GET", "/api/caisse/edition/stock", undefined, bearer);
+    expect(stock.statut).toBe(200);
+    expect(stock.corps.etablissements.map((e: any) => e.id)).toEqual(["moka"]);
+    expect(stock.corps.prix.every((p: any) => p.etablissementId === "moka")).toBe(true);
+    const lue = await appel("GET", "/api/caisse/edition/cartes/carte-automne-2026", undefined, bearer);
+    expect(lue.statut).toBe(200);
+    expect((await appel("GET", "/api/caisse/edition/cartes/carte-automne-2026/ventes", undefined, bearer)).statut).toBe(200);
+    const carte = { ...lue.corps.carte, nom: "Carte modifiée sur l'iPad" };
+    // Un serveur ne modifie pas la carte ; une autre carte que celle de l'établissement non plus.
+    expect((await appel("PUT", "/api/caisse/edition/cartes/carte-automne-2026", { carte, version: lue.corps.version, utilisateurId: tom }, bearer)).statut).toBe(403);
+    expect((await appel("GET", "/api/caisse/edition/cartes/autre-carte", undefined, bearer)).statut).toBe(403);
+    const ok = await appel("PUT", "/api/caisse/edition/cartes/carte-automne-2026", { carte, version: lue.corps.version, utilisateurId: lea }, bearer);
+    expect(ok.statut).toBe(200);
+    expect(ok.corps.version).toBe(lue.corps.version + 1);
+    // Version dépassée : refusée plutôt qu'écrasée ; carte invalide : refusée.
+    expect((await appel("PUT", "/api/caisse/edition/cartes/carte-automne-2026", { carte, version: lue.corps.version, utilisateurId: lea }, bearer)).statut).toBe(409);
+    expect((await appel("PUT", "/api/caisse/edition/cartes/carte-automne-2026", { carte: { ...carte, categories: "x" }, version: ok.corps.version, utilisateurId: lea }, bearer)).statut).toBe(400);
+    expect((await appel("GET", "/api/admin/cartes/carte-automne-2026", undefined, admin)).corps.carte.nom).toBe("Carte modifiée sur l'iPad");
+
+    // Fiche technique créée sur l'iPad.
+    const recette = { id: "gin-tonic", nom: "Gin tonic", unite: "piece", rendement: 1000, lignes: [{ type: "produit", id: "bombay-sapphire", quantite: { valeur: 40, unite: "mL" } }], actif: true };
+    expect((await appel("PUT", "/api/caisse/edition/recettes/gin-tonic", { recette, utilisateurId: tom }, bearer)).statut).toBe(403);
+    const r = await appel("PUT", "/api/caisse/edition/recettes/gin-tonic", { recette, utilisateurId: lea }, bearer);
+    expect(r.statut).toBe(200);
+    expect(r.corps.referentiel.recettes.map((x: any) => x.id)).toContain("gin-tonic");
+    const journal = (await db.requete<{ action: string; details: any }>("select action, details from journal_admin where action in ('carte_enregistree', 'stock_recette') order by id")).map((l) => `${l.action}:${l.details.par}`);
+    expect(journal).toEqual(["carte_enregistree:Bar · Léa", "stock_recette:Bar · Léa"]);
+  });
+});

@@ -1,5 +1,7 @@
 import type { Reservation } from "@matalon/reservations";
 import type { Ticket } from "@matalon/noyau-fiscal";
+import type { Catalogue } from "@matalon/catalogue";
+import type { Recette } from "@matalon/stock";
 import type {
   CommandePartagee,
   CommandeFournisseur,
@@ -9,6 +11,8 @@ import type {
   EtatStock,
   ReponseCommandes,
   ReponseStockCaisse,
+  ReponseStock,
+  ReponseVentesCarte,
   ClientApi as FicheClient,
   EntreeSynchro,
   ReponseComptes,
@@ -156,6 +160,29 @@ export class ClientApi {
   /** Réception, inventaire ou perte saisi sur l'appareil par un responsable. */
   operationStock(type: "receptions" | "inventaires" | "pertes", corps: Record<string, unknown>) {
     return this.appel<{ document: DocumentStock; etat: EtatStock }>("POST", `/api/caisse/stock/${type}`, corps);
+  }
+
+  /** Édition sur l'appareil (responsables) : référentiel et prix de l'établissement. */
+  editionStock() {
+    return this.appel<ReponseStock>("GET", "/api/caisse/edition/stock");
+  }
+
+  /** Carte de l'établissement, pour l'éditeur (avec sa version). */
+  editionCarte(id: string) {
+    return this.appel<ReponseCarte>("GET", `/api/caisse/edition/cartes/${id}`);
+  }
+
+  editionVentesCarte(id: string) {
+    return this.appel<ReponseVentesCarte>("GET", `/api/caisse/edition/cartes/${id}/ventes`);
+  }
+
+  /** Enregistre la carte entière, sur la version lue (409 si elle a changé entre-temps). */
+  enregistrerCarteEdition(id: string, carte: Catalogue, version: number, utilisateurId: string) {
+    return this.appel<ReponseCarte>("PUT", `/api/caisse/edition/cartes/${id}`, { carte, version, utilisateurId });
+  }
+
+  enregistrerRecetteEdition(recette: Recette, utilisateurId: string) {
+    return this.appel<ReponseStock>("PUT", `/api/caisse/edition/recettes/${recette.id}`, { recette, utilisateurId });
   }
 
   /** Pièces d'un type (inventaires de l'onglet Inventaire), 100 dernières. */
