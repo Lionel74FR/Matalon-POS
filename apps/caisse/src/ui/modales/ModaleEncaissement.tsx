@@ -110,7 +110,8 @@ export function ModaleEncaissement(props: {
   const especes = paiements.filter((p) => p.mode === "ESPECES").reduce((s, p) => s + p.montant, 0);
   const excedent = paye - aPayer;
   const tropPercu = resteTable < 0 || (total === 0 && dejaRegle > 0);
-  const valide = !tropPercu && paye >= aPayer && excedent <= especes && (aPayer > 0 || (solde && total > 0));
+  // Rien à payer (articles tous offerts, ou acomptes égaux au reste) : le ticket se scelle sans nouveau paiement.
+  const valide = !tropPercu && lignesTicket.length > 0 && paye >= aPayer && excedent <= especes;
   /** Montant libre : une partie payée, le reste demeure sur la table. */
   const acompteLibre = surTable && solde && paye > 0 && paye < resteTable && !paiements.some((p) => p.mode === "EN_COMPTE");
 

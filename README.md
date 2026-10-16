@@ -81,7 +81,7 @@ URL=… node scripts/commandes-partagees.mjs captures # tables partagées : ouve
 URL=… node scripts/mise-en-service.mjs captures   # configuration exportée de l'administration de test, importée dans une installation neuve (second serveur local), sans les ventes ; second import refusé
 URL=… node scripts/commandes-fournisseurs.mjs captures # commandes fournisseurs : fiches techniques importées, fiche fournisseur, réglages d'envoi, bon saisi et envoyé par e-mail depuis l'iPad, réception partielle puis solde, bon marqué envoyé, iPhone
 URL=… node scripts/edition-ipad.mjs captures      # carte et fiches techniques sur l'iPad (responsable) : prix changé, recette créée, tuile à jour, entrée absente pour un serveur
-URL=… node scripts/division-note.mjs captures     # division de la note : par articles sur l'iPad, part en espèces sur l'iPhone (acompte, rendu), Z refusée, montant libre rendu, ticket final avec l'acompte
+URL=… node scripts/division-note.mjs captures     # division de la note : par articles sur l'iPad, part en espèces sur l'iPhone (acompte, rendu), Z refusée, montant libre rendu, ticket final avec l'acompte, espresso offert soldé à 0,00 €
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

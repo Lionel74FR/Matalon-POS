@@ -1,7 +1,7 @@
 // Division de la note (demande de Lionel du 16 octobre) : sur l'iPad, une personne règle ses articles
 // (un ticket, le reste demeure sur la table) ; sur l'iPhone, une autre verse sa part en espèces (acompte,
 // rendu monnaie) ; la Z est refusée tant que la table porte un acompte ; un montant libre est pris puis
-// rendu ; le dernier paiement édite le ticket final, qui reprend l'acompte. Deux tickets, 18,00 € en tout.
+// rendu ; le dernier paiement édite le ticket final, qui reprend l'acompte. Au comptoir, un espresso offert se solde à 0,00 €. Trois tickets, 18,00 € en tout.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/division-note.mjs [dossier-captures]
 import { chromium } from "playwright";
@@ -129,7 +129,20 @@ await ipad.p.getByRole("button", { name: /^Valider l'encaissement/ }).click();
 await ipad.clic("Terminé");
 await ipad.p.getByRole("button", { name: /^Table 6, libre/ }).waitFor({ timeout: 10000 });
 
-// ── Serveur : deux tickets, 18,00 €, 3 couverts (sur le ticket final), espèces nettes du rendu ──
+// ── Comptoir : un espresso offert se solde à 0,00 €, sans paiement (régression du 16 octobre) ──
+await ipad.p.getByRole("button", { name: /Vente comptoir/ }).click();
+await ajouter(ipad, "Espresso");
+await ipad.p.locator(".ticket-ligne", { hasText: "Espresso" }).click();
+await ipad.clic("Offert");
+await ipad.clic("Offert maison");
+await ipad.p.getByRole("button", { name: /^Valider/ }).click();
+await ipad.clic("Encaisser");
+r.boutonOffert = await texte(ipad.p.getByRole("button", { name: /^Valider l'encaissement/ }));
+await ipad.p.getByRole("button", { name: /^Valider l'encaissement/ }).click();
+await ipad.clic("Terminé");
+await ipad.p.locator(".salle").waitFor();
+
+// ── Serveur : trois tickets (dont l'offert), 18,00 €, 3 couverts (sur le ticket final), espèces nettes du rendu ──
 await ipad.p.locator(".puce-synchro").click();
 await ipad.p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 await iphone.p.getByRole("button", { name: /^Table 6, libre/ }).waitFor({ timeout: 15000 });
@@ -158,7 +171,8 @@ const ok =
   r.resteApresLibre === "3,25 €" &&
   /rendez 2,00 €/.test(r.rendu) &&
   /5,25 €/.test(r.boutonFinal) &&
-  r.serveur.nbVentes === 2 &&
+  r.serveur.nbVentes === 3 &&
+  /0,00 €/.test(r.boutonOffert) &&
   r.serveur.caTTC === 1800 &&
   r.serveur.couverts === 3 &&
   r.serveur.paiements.CB === 1275 &&
