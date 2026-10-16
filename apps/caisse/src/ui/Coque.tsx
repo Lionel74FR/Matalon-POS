@@ -41,7 +41,7 @@ import { ModaleFondDeCaisse } from "./modales/ModaleFondDeCaisse";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Clotures } from "./Clotures";
 import { Comptes } from "./Comptes";
-import { useCaisse } from "./contexte";
+import { euros, useCaisse } from "./contexte";
 import { PriseCommande } from "./PriseCommande";
 import { messageServeur, Reglages } from "./Reglages";
 import type { Reservation } from "@matalon/reservations";
@@ -282,8 +282,9 @@ export function Coque() {
                 <AvecIcone icone={o.icone}>{o.libelle}</AvecIcone>
               </button>
             ))}
+          {/* Seule entrée du comptoir : une vente en cours y montre son total. */}
           <button className="onglet comptoir" onClick={() => ouvrirTable(ID_COMPTOIR)}>
-            <AvecIcone icone={Coffee}>Vente comptoir</AvecIcone>
+            <AvecIcone icone={Coffee}>{commandes.get(ID_COMPTOIR)?.lignes.length ? `Vente comptoir · ${euros(totauxCommande(commandes.get(ID_COMPTOIR)!).totalTTC)}` : "Vente comptoir"}</AvecIcone>
           </button>
         </div>
         <MenuOnglets entrees={onglets.filter((o) => o.menu)} active={vue.nom} onChoisir={(v) => setVue({ nom: v } as Vue)} />

@@ -179,6 +179,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
           <BoutonIcone icone={PencilRuler} variante="discret" libelle="Modifier le plan de salle" onClick={() => void modifierPlan()} />
         </div>
       </header>
+      {/* Case Comptoir : sur iPhone seulement, où la barre du haut n'a pas « Vente comptoir » (masquée sur iPad, styles.css). */}
       <button className={`table comptoir${comptoir ? " occupee" : ""}`} onClick={() => props.onOuvrir(ID_COMPTOIR)}>
         <span className="table-nom">
           <AvecIcone icone={Coffee} taille={22}>Comptoir</AvecIcone>

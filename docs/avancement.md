@@ -25,6 +25,8 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » en tête de la salle, le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. iPhone inchangé (la case reste, la barre n'a pas le bouton) |
+| (ce commit) | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » ; le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. Sur iPhone, la case reste (la barre n'a pas ce bouton) |
 | 0363774 | Configuration de l'installation : les clés chiffrées (Resend) ne voyagent plus, chaque installation ayant sa propre `CLE_SECRETS` (celle du test n'a pas été conservée) ; la clé se ressaisit dans l'administration de la production |
 | a8aacde | Mise en service (demande de Lionel du 15 octobre) : noyau fiscal gelé en 1.0.0 (version citée par l'attestation, aucun changement de comportement) ; administration › « Configuration de l'installation » : export d'un fichier (établissements, équipe, plan, imprimante, cartes, stock sans les consommations des ventes, commandes fournisseurs, réservations à venir) et import dans une installation neuve, refusé dès que la base a servi (vente, appareil, équipe, stock) ; scénario `mise-en-service` (21 parcours) |
 | 6c9bb22 | Éditeur de carte (demande de Lionel du 15 octobre) : déplacer un rayon, flèches à côté de son nom ; l'ordre des onglets de la caisse suit (catégories regroupées par rayon, leur ordre dans chaque rayon gardé) ; scénario `carte` complété |
@@ -91,6 +93,7 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 - Administration (demande de Lionel du 11 octobre) : l'établissement se choisit dans l'en-tête, chaque rubrique a sa page au menu latéral. Stock et Réservations reçoivent l'établissement de l'en-tête (plus de sélecteur interne). Ne pas revenir à une page unique.
 - Montants en centimes entiers ; TVA en points de base.
 - Le noyau fiscal tient une chaîne par caisse, signée par une clé ECDSA propre à l'iPad. Le serveur vérifie et réplique, mais ne signe jamais.
+- Comptoir (Lionel, 16 octobre) : sur iPad, une seule entrée, « Vente comptoir » dans la barre du haut (avec le total d'une vente en cours) ; sur iPhone, la case Comptoir de la salle, la barre n'ayant pas ce bouton.
 - Prise de commande sur iPad (Lionel, 15 octobre) : rayons en colonne à droite du ticket, catégories en pastilles en haut ; sur iPhone, rayons et catégories restent en bandes horizontales.
 - Barre de la caisse (demande de Lionel du 9 octobre) : les onglets du service (Salle, Tickets, Comptes) et Vente comptoir dans la barre ; le reste (Clôtures, Stats, Stock, Réglages) dans le menu ☰, qui montre le nom de l'écran ouvert. Sur iPhone, l'en-tête aligne à droite : prénom, synchronisation, menu ☰, déconnexion ; les onglets passent dessous.
 - Administration sur iPhone (demande de Lionel du 9 octobre) : rien ne dépasse la largeur de l'écran. Tableaux en fiches (chaque valeur sous le titre de sa colonne, recopié par `etiqueterTableaux`), navigation en pastilles, rubriques du stock et catégorie de l'éditeur dans une liste déroulante, champs pleine largeur.
