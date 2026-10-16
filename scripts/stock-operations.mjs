@@ -46,7 +46,7 @@ await clic("Plus tard");
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 
 // ── 4b : deux cappuccinos vendus au comptoir ──
-await clic("Vente comptoir");
+await clic("Vente Directe");
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await clic("Encaisser");

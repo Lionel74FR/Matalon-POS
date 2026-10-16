@@ -51,7 +51,7 @@ await table(ipad, 5).click();
 await ajouter(ipad, "Cappuccino");
 await ipad.p.getByRole("button", { name: "Retour à la salle" }).click();
 // Comptoir de l'iPad : il ne doit pas apparaître sur l'iPhone.
-await ipad.p.getByRole("button", { name: /Vente comptoir/ }).click();
+await ipad.p.getByRole("button", { name: /Vente Directe/ }).click();
 await ajouter(ipad, "Cappuccino");
 await ipad.p.getByRole("button", { name: "Retour à la salle" }).click();
 

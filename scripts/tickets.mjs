@@ -43,7 +43,7 @@ for (const [articles, mode] of [
   [["Espresso"], "Espèces"],
   [["Flat white", "Cappuccino"], "Carte bancaire"],
 ]) {
-  await clic("Vente comptoir");
+  await clic("Vente Directe");
   for (const a of articles) await p.locator(".tuile", { hasText: a }).first().click();
   await encaisser(mode);
 }
@@ -129,7 +129,7 @@ await p.getByLabel("Imprimer la note d'office à partir de ce montant").uncheck(
 await clic("Enregistrer les réglages");
 await p.getByText("partagés avec les autres caisses").waitFor();
 await p.getByRole("tab", { name: "Salle" }).click();
-await clic("Vente comptoir");
+await clic("Vente Directe");
 await p.locator(".tuile", { hasText: "Flat white" }).first().click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await clic("Encaisser");

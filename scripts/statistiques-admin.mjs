@@ -1,6 +1,7 @@
 // Statistiques dans l'administration (demande de Lionel du 16 octobre), en direct : la page reste ouverte
 // sur l'ordinateur, l'iPad ouvre une table puis l'encaisse ; sans rechargement, « En salle maintenant »
 // montre la table ouverte, puis le chiffre d'affaires prend la vente et la table quitte la salle.
+// Le CA par heure suit la journée de service (8 h → 3 h du matin).
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/statistiques-admin.mjs [dossier-captures]
 import { chromium } from "playwright";
@@ -63,6 +64,8 @@ r.delaiCaMs = Date.now() - t0;
 await salle.filter({ hasText: "Aucune table ouverte" }).waitFor({ timeout: 40000 });
 r.sansRechargement = await admin.evaluate(() => window.__sansRechargement === true);
 r.direct = await texte(admin.locator(".stat-direct"));
+// CA par heure dans l'ordre du service : de 8 h à 3 h du matin, minuit passé après 23 h.
+r.heures = await admin.locator(".stat-carte", { hasText: "CA par heure" }).locator(".stat-col").evaluateAll((cols) => cols.map((c) => c.getAttribute("aria-label").split(" h")[0]));
 await admin.screenshot({ path: `${sortie}/sa02-admin-vente.png`, fullPage: true });
 // Une période passée n'est pas « en direct » et n'a pas de salle en cours.
 await admin.getByRole("button", { name: "Hier", exact: true }).click();
@@ -80,5 +83,8 @@ const ok =
   r.sansRechargement &&
   /En direct · mis à jour à \d\d:\d\d:\d\d/.test(r.direct) &&
   r.hierSansSalle &&
+  r.heures[0] === "8" &&
+  r.heures.indexOf("23") + 1 === r.heures.indexOf("0") &&
+  r.heures.at(-1) === "2" &&
   !erreurs.length;
 if (!ok) process.exit(1);

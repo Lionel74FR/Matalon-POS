@@ -1984,7 +1984,7 @@ a.bouton {
 
 /* iPad et ordinateur : les rayons en colonne, collés à droite du ticket ; les catégories restent en haut. */
 @media (min-width: 701px) {
-  /* iPad : le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, pas de case dans la salle. */
+  /* iPad : le comptoir s'ouvre par « Vente Directe » dans la barre du haut, pas de case dans la salle. */
   .table.comptoir {
     display: none;
   }

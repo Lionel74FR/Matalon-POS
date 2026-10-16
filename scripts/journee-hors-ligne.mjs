@@ -33,7 +33,7 @@ await champ("Fond de caisse").fill("150");
 await clic("Enregistrer le fond");
 const articles = ["Espresso", "Cappuccino", "Flat white", "Latte"];
 for (let i = 0; i < VENTES; i++) {
-  await clic("Vente comptoir");
+  await clic("Vente Directe");
   await p.locator(".tuile", { hasText: articles[i % articles.length] }).first().click();
   if (i % 5 === 0) await p.locator(".tuile", { hasText: "Espresso" }).first().click();
   await clic("Encaisser");

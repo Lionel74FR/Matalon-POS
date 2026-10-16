@@ -36,7 +36,7 @@ const ipad = await appareil({ viewport: { width: 1180, height: 820 } }, code, "R
 await ipad.getByRole("dialog", { name: "Fond de caisse" }).waitFor();
 await champ(ipad, "Fond de caisse").fill("150");
 await clic(ipad, "Enregistrer le fond");
-await clic(ipad, "Vente comptoir");
+await clic(ipad, "Vente Directe");
 await ipad.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await clic(ipad, "Encaisser");
 await ipad.locator(".mode", { hasText: "Carte bancaire" }).click();

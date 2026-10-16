@@ -51,6 +51,16 @@ function periodeDe(p: Preset, aujourdhui: string): { du: string; au: string } {
   }
 }
 
+/**
+ * Journée de service : de 8 h à 3 h du matin (consigne de Lionel du 17 octobre). Les heures
+ * d'après minuit s'affichent après 23 h : elles appartiennent à la journée comptable de la
+ * veille, qui ne bascule qu'à HEURE_BASCULE (5 h). Une vente hors de ces heures élargit l'axe.
+ */
+const OUVERTURE = 8;
+const FERMETURE = 3;
+/** Position d'une heure dans la journée comptable (0 = l'heure de bascule). */
+const rangHeure = (h: number) => (h - HEURE_BASCULE + 24) % 24;
+
 const dateCourte = (jour: string) => new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
 const dateLongue = (jour: string) =>
   new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
@@ -433,12 +443,14 @@ export function TableauStatistiques(props: { acces: AccesStatistiques }) {
   const s = stats;
   const graphiques = useMemo(() => {
     if (!s) return null;
-    const actives = s.parHeure.filter((h) => h.ttc !== 0 || h.tickets > 0);
-    const premiere = Math.min(...actives.map((h) => h.heure), 8);
-    const derniere = Math.max(...actives.map((h) => h.heure), 20);
-    const heures: Point[] = s.parHeure
-      .filter((h) => h.heure >= premiere && h.heure <= derniere)
-      .map((h) => ({ cle: String(h.heure), libelle: `${h.heure} h – ${h.heure + 1} h`, axe: h.heure % 2 === 0 ? `${h.heure}h` : "", valeur: h.ttc, detail: `${h.tickets} ticket${h.tickets > 1 ? "s" : ""}` }));
+    // Heures dans l'ordre du service : de l'ouverture à la nuit, minuit passé après 23 h.
+    const ordre = [...s.parHeure].sort((a, b) => rangHeure(a.heure) - rangHeure(b.heure));
+    const actives = ordre.filter((h) => h.ttc !== 0 || h.tickets > 0).map((h) => rangHeure(h.heure));
+    const premiere = Math.min(...actives, rangHeure(OUVERTURE));
+    const derniere = Math.max(...actives, rangHeure(FERMETURE - 1));
+    const heures: Point[] = ordre
+      .filter((h) => rangHeure(h.heure) >= premiere && rangHeure(h.heure) <= derniere)
+      .map((h) => ({ cle: String(h.heure), libelle: `${h.heure} h – ${(h.heure + 1) % 24} h`, axe: h.heure % 2 === 0 ? `${h.heure}h` : "", valeur: h.ttc, detail: `${h.tickets} ticket${h.tickets > 1 ? "s" : ""}` }));
     // Plus de deux mois : un point par mois, sinon un par jour.
     const parMois = s.jours > 62;
     const jours: Point[] = parMois
@@ -544,7 +556,7 @@ export function TableauStatistiques(props: { acces: AccesStatistiques }) {
               points={graphiques.heures}
               resume={(() => {
                 const top = [...s.parHeure].sort((a, b) => b.ttc - a.ttc)[0];
-                return top && top.ttc > 0 ? `Heure la plus forte : ${top.heure} h – ${top.heure + 1} h (${euros(top.ttc)}).` : "Aucune vente sur la période.";
+                return top && top.ttc > 0 ? `Heure la plus forte : ${top.heure} h – ${(top.heure + 1) % 24} h (${euros(top.ttc)}).` : "Aucune vente sur la période.";
               })()}
             />
             {s.jours > 1 && <Colonnes titre={graphiques.parMois ? "CA par mois" : "CA par jour"} points={graphiques.jours} />}

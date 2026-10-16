@@ -96,7 +96,7 @@ await p.evaluate(async () => {
 });
 await recharger();
 await connecter();
-await clic("Vente comptoir");
+await clic("Vente Directe");
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await clic("Encaisser");
 await p.locator(".mode", { hasText: "Carte bancaire" }).click();

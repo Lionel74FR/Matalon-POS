@@ -130,7 +130,7 @@ await ipad.clic("Terminé");
 await ipad.p.getByRole("button", { name: /^Table 6, libre/ }).waitFor({ timeout: 10000 });
 
 // ── Comptoir : un espresso offert se solde à 0,00 €, sans paiement (régression du 16 octobre) ──
-await ipad.p.getByRole("button", { name: /Vente comptoir/ }).click();
+await ipad.p.getByRole("button", { name: /Vente Directe/ }).click();
 await ajouter(ipad, "Espresso");
 await ipad.p.locator(".ticket-ligne", { hasText: "Espresso" }).click();
 await ipad.clic("Offert");

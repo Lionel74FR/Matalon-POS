@@ -63,7 +63,7 @@ await p.getByText("Imprimantes de production enregistrées").waitFor();
 
 // ── Comptoir : pas de suites ──
 await p.getByRole("tab", { name: "Salle" }).click();
-await clic("Vente comptoir");
+await clic("Vente Directe");
 const selecteurComptoir = await p.locator(".selecteur-suite").count();
 await p.getByRole("button", { name: "Retour à la salle" }).click();
 

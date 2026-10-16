@@ -67,7 +67,7 @@ const recettes = (await appel("GET", "/stock")).referentiel.recettes.map((r) => 
 // ── La caisse vend l'Espresso au nouveau prix après synchronisation ──
 await p.locator(".puce-synchro").click();
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 20000 });
-await clic("Vente comptoir");
+await clic("Vente Directe");
 const tuileEspresso = (await p.locator(".tuile", { hasText: "Espresso" }).first().textContent()).replace(/\s+/g, " ");
 
 // ── Un serveur n'a pas l'écran Carte et fiches ──

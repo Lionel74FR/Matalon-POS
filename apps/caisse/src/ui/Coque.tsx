@@ -289,7 +289,7 @@ export function Coque() {
             ))}
           {/* Seule entrée du comptoir : une vente en cours y montre son total. */}
           <button className="onglet comptoir" onClick={() => ouvrirTable(ID_COMPTOIR)}>
-            <AvecIcone icone={Coffee}>{commandes.get(ID_COMPTOIR)?.lignes.length ? `Vente comptoir · ${euros(totauxCommande(commandes.get(ID_COMPTOIR)!).totalTTC)}` : "Vente comptoir"}</AvecIcone>
+            <AvecIcone icone={Coffee}>{commandes.get(ID_COMPTOIR)?.lignes.length ? `Vente Directe · ${euros(totauxCommande(commandes.get(ID_COMPTOIR)!).totalTTC)}` : "Vente Directe"}</AvecIcone>
           </button>
         </div>
         <MenuOnglets entrees={onglets.filter((o) => o.menu)} active={vue.nom} onChoisir={(v) => setVue({ nom: v } as Vue)} />

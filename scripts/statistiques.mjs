@@ -49,7 +49,7 @@ for (const [articles, mode] of [
   [["Espresso"], "Espèces"],
   [["Flat white", "Cappuccino"], "Carte bancaire"],
 ]) {
-  await clic("Vente comptoir");
+  await clic("Vente Directe");
   for (const a of articles) await p.locator(".tuile", { hasText: a }).first().click();
   await encaisser(mode);
 }
