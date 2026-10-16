@@ -146,7 +146,10 @@ export function Commandes(props: {
     );
   }
 
-  const liste = donnees.commandes.filter((c) => toutes || etatCommande(c).enCours);
+  const enCours = donnees.commandes.filter((c) => etatCommande(c).enCours);
+  // Rien en cours : les dernières commandes (reçues, soldées) restent visibles plutôt qu'une liste vide.
+  const repli = !toutes && !enCours.length && donnees.commandes.length > 0;
+  const liste = toutes || repli ? donnees.commandes : enCours;
   return (
     <section className="operation-stock commandes">
       <div className="commandes-tete">
@@ -160,12 +163,13 @@ export function Commandes(props: {
       {erreur && <p className="erreur">{erreur}</p>}
       <div className="options" role="tablist">
         <button role="tab" aria-selected={!toutes} className={`option${!toutes ? " active" : ""}`} onClick={() => setToutes(false)}>
-          En cours ({donnees.commandes.filter((c) => etatCommande(c).enCours).length})
+          En cours ({enCours.length})
         </button>
         <button role="tab" aria-selected={toutes} className={`option${toutes ? " active" : ""}`} onClick={() => setToutes(true)}>
           Toutes
         </button>
       </div>
+      {repli && <p className="explication">Aucune commande en cours. Dernières commandes :</p>}
       {!liste.length ? (
         <p className="explication">{toutes ? "Aucune commande pour l'instant." : "Aucune commande en cours : brouillons et commandes envoyées pas encore reçues s'affichent ici."}</p>
       ) : (
