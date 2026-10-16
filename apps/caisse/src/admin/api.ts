@@ -1,7 +1,7 @@
 import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, Fournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
-import type { CommandeFournisseur, EtatEnvoi, ReponseCommandes } from "@matalon/serveur/partage";
+import type { CommandeFournisseur, EtatEnvoi, ReponseCommandes, ReponseStatistiques } from "@matalon/serveur/partage";
 import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
@@ -113,6 +113,8 @@ export const api = {
   verifier: (caisseId: string) => appel<RapportVerification>("GET", `/caisses/${caisseId}/verification`),
   alertes: (etablissementId: string, toutes = false) => appel<{ alertes: AlerteApi[] }>("GET", `/etablissements/${etablissementId}/alertes${toutes ? "?toutes=1" : ""}`),
   marquerAlerteVue: (id: string) => appel("POST", `/alertes/${id}/vue`, {}),
+  statistiques: (etablissementId: string, du: string, au: string) =>
+    appel<ReponseStatistiques>("GET", `/etablissements/${etablissementId}/statistiques?du=${du}&au=${au}`),
   verifierEtablissement: (etablissementId: string) => appel<RapportVerification>("GET", `/etablissements/${etablissementId}/verification`),
   cartes: () => appel<{ cartes: ResumeCarte[] }>("GET", "/cartes"),
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),

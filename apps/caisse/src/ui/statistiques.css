@@ -399,3 +399,47 @@
 .stat-col:last-child .stat-col-valeur {
   right: 0;
 }
+
+/* En direct : la période va jusqu'à aujourd'hui, l'écran se recalcule tout seul. */
+.stat-direct {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  color: var(--sable);
+  font-size: 0.92rem;
+}
+
+.stat-direct-point {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #8fbf7a;
+  animation: stat-pouls 2s ease-in-out infinite;
+}
+
+@keyframes stat-pouls {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-direct-point {
+    animation: none;
+  }
+}
+
+.stat-en-salle-corps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 24px;
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-en-salle-corps strong {
+  font-family: var(--police-chiffres);
+  font-size: 1.35rem;
+}

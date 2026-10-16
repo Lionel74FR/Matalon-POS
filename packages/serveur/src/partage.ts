@@ -515,12 +515,29 @@ export interface StatServeur {
   montantRetire?: number;
 }
 
+/**
+ * Salle en ce moment : tables ouvertes (commandes partagées entre appareils), ce qu'elles
+ * portent et ce qui reste à encaisser. Le comptoir, propre à chaque appareil, n'y est pas.
+ */
+export interface SalleEnCours {
+  tables: number;
+  couverts: number;
+  /** Articles à payer (ni retirés ni déjà réglés à part), TTC. */
+  montantTTC: number;
+  /** Acomptes déjà versés sur ces tables. */
+  acomptesTTC: number;
+  /** Ouverture de la plus ancienne table. */
+  plusAncienne: string | null;
+}
+
 export interface ReponseStatistiques {
   du: string;
   au: string;
   jours: number;
   precedente: { du: string; au: string };
   calculeLe: string;
+  /** Présent quand la période va jusqu'à aujourd'hui. */
+  enCours?: SalleEnCours;
   indicateurs: IndicateursPeriode;
   indicateursPrecedents: IndicateursPeriode;
   /** CA net par heure de la journée (heure de Paris, 0 à 23). */

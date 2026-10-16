@@ -1,6 +1,6 @@
 import { afficherCode, ID_ETABLISSEMENT_VALIDE, PIN_VALIDE, type IdentiteEtablissement, type Role, type UtilisateurApi } from "@matalon/serveur/partage";
 import QRCode from "qrcode";
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { genererTables } from "../donnees/configuration";
 import type { ClientApi, PostesProduction, ReponseComptes, ResumeCarte } from "@matalon/serveur/partage";
 import { postesDeLaCarte } from "@matalon/catalogue";
@@ -11,6 +11,7 @@ import type { AlerteApi } from "@matalon/serveur/partage";
 import { api, ErreurAdmin, type AdresseImprimante, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
+import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
 import { Reservations } from "./Reservations";
 import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces";
 import { FenetreConfiguration } from "./Configuration";
@@ -23,6 +24,7 @@ import {
   History,
   BookOpen,
   CalendarCheck,
+  ChartColumn,
   FileJson,
   Fingerprint,
   FileSpreadsheet,
@@ -303,8 +305,12 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 // ───────── Tableau de bord ─────────
 
 /** Rubriques d'un établissement, dans le menu latéral (ordre d'usage). */
-type Rubrique = "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
+type Rubrique = "statistiques" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
 const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: string; icone: LucideIcon; aide: string }> }> = [
+  {
+    groupe: "Activité",
+    liste: [{ id: "statistiques", libelle: "Statistiques", icone: ChartColumn, aide: "CA en direct, articles, équipe" }],
+  },
   {
     groupe: "Service",
     liste: [
@@ -611,6 +617,7 @@ function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; 
           <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
         </>
       )}
+      {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} etablissementId={e.id} onAlerte={props.onChange} />}
       {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
       {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
       {rubrique === "imprimantes" && (
@@ -635,6 +642,27 @@ function FicheEtablissement(props: { e: EtablissementAdmin; rubrique: Rubrique; 
       )}
     </>
   );
+}
+
+/** Statistiques de l'établissement, mêmes calculs et même écran que sur la caisse, recalculés en direct. */
+function StatistiquesAdmin(props: { etablissementId: string; onAlerte: () => Promise<void> }) {
+  const { etablissementId } = props;
+  // Le rechargement de l'administration change de fonction à chaque rendu : l'écran ne doit pas tout recalculer pour autant.
+  const onAlerte = useRef(props.onAlerte);
+  onAlerte.current = props.onAlerte;
+  const acces = useMemo<AccesStatistiques>(
+    () => ({
+      charger: (du, au) => api.statistiques(etablissementId, du, au),
+      marquerVue: async (a) => {
+        await api.marquerAlerteVue(a.id);
+        // Le compteur d'alertes du menu suit.
+        await onAlerte.current();
+        return true;
+      },
+    }),
+    [etablissementId],
+  );
+  return <TableauStatistiques acces={acces} />;
 }
 
 const LIBELLES_ALERTE: Record<AlerteApi["type"], string> = {

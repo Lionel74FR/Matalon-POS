@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 16 octobre 2026 (division de la note).
+Dernière mise à jour : 16 octobre 2026 (statistiques dans l'administration).
 
 ## Règle de conduite
 
@@ -25,6 +25,7 @@ Dernière mise à jour : 16 octobre 2026 (division de la note).
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Statistiques dans l'administration (demande de Lionel du 16 octobre) : rubrique « Statistiques » en tête du menu, même écran et mêmes calculs que la caisse. En direct tant que la période va jusqu'à aujourd'hui (recalcul toutes les 10 s pour la journée, chaque minute au-delà, pastille « En direct · mis à jour à … ») ; tuile « En salle maintenant » (tables ouvertes, couverts, reste à encaisser, acomptes déduits), aussi sur la caisse. Scénario `statistiques-admin` (24 parcours) ; `admin-navigation` passe par la nouvelle rubrique |
 | cb38751 | Correctif (retour de Lionel du 16 octobre) : un ticket entièrement offert (0,00 €) ne se soldait plus depuis 46d7c4e, la validation exigeant un montant à payer. Il se scelle de nouveau sans paiement, comme avant ; scénario `division-note` complété (espresso offert au comptoir) |
 | 46d7c4e | Division de la note (demande de Lionel du 16 octobre) : « Diviser » sur une table. Par articles : les articles choisis (ou une partie d'une quantité) font un ticket, le reste demeure sur la table, les lignes payées affichées « Réglé ». En parts égales (2 à 6 d'un geste, puis + ; la dernière prend les centimes) ou montant libre : acompte sur la table, en ligne, rendu monnaie compris ; le dernier paiement édite le ticket unique avec les acomptes. Acompte rendu par un responsable ; salle et addition au reste à payer ; Z refusée tant qu'une table porte un acompte. Noyau fiscal inchangé (1.0.0). Scénario `division-note` (23 parcours) |
 | 448d8e8 | Carte et fiches techniques sur l'iPad (demande de Lionel du 16 octobre) : menu ☰ › « Carte et fiches », réservé aux responsables, en ligne : l'éditeur de carte de l'administration (carte de l'établissement seulement) et les fiches techniques avec leur coût ; produits et prix d'achat restent dans l'administration. Enregistrement conditionnel par version, journal avec l'auteur (« Bar · Léa ») ; la caisse se resynchronise aussitôt. Scénario `edition-ipad` (22 parcours) |
@@ -83,6 +84,7 @@ Dernière mise à jour : 16 octobre 2026 (division de la note).
 
 ## Décisions techniques à ne pas défaire
 
+- Statistiques en direct (16 octobre) : un seul écran, `TableauStatistiques`, qui reçoit ses appels par `AccesStatistiques` (caisse : jeton d'appareil et code responsable pour une alerte ; administration : session). « En direct » = recalcul périodique tant que `au` ≥ aujourd'hui, l'écran visible ; pas de canal poussé (Edge sans connexion durable), les tickets arrivant au serveur ~1,5 s après l'écriture. `enCours` (`SalleEnCours`) n'est calculé que si la période va jusqu'à aujourd'hui, depuis `commandes_ouvertes` : hors fiscal, hors comptoir.
 - Division de la note (16 octobre, choix de Lionel : acomptes et ticket unique, noyau inchangé) : `LigneCommande.reglee` (ligne encaissée à part, gardée pour le service et la production, exclue de `lignesDues`/`totauxCommande`) et `Commande.acomptes` (hors fiscal jusqu'au ticket final, qui les reprend en `paiements`, espèces nettes du rendu). Toute partie payée passe par `PartageCommandes.engager` : écriture conditionnelle de la commande restante, sans fusion ; un acompte refuse le hors-ligne (les autres appareils et la Z doivent le voir), la division par articles l'accepte comme l'encaissement. La fusion ne perd jamais un paiement : une ligne réglée l'emporte, les acomptes se réunissent par identifiant (l'annulation l'emporte) et un acompte reçu survit à la fermeture de l'autre côté. Pas d'acompte au comptoir (propre à l'appareil). Z : refus local et 409 `ACOMPTES_EN_ATTENTE` au verrou de clôture. Couverts sur le seul ticket qui ferme la table.
 - Édition sur l'iPad (16 octobre) : routes `/api/caisse/edition/…` sous le jeton d'appareil, la personne connectée (`utilisateurId`) doit être un responsable actif de l'établissement (403 `RESPONSABLE_REQUIS`), et la carte celle de l'établissement (403 `CARTE_AUTRE`). Mêmes fonctions d'écriture que l'administration (`enregistrerCarteDe`, `enregistrerStockDe`) ; le référentiel renvoyé à la caisse est réduit aux prix et documents de l'établissement. Les composants d'édition prennent leurs appels par `useAccesEdition()` (administration par défaut) ; leurs styles sont dans `admin/edition.css`, sans règle globale, pour être chargés dans la caisse.
 - Inventaire daté (15 octobre) : un comptage d'un jour passé est horodaté à midi ce jour-là, comme toute pièce datée ; son écart se calcule sur les mouvements d'avant cet instant (le théorique de ce jour-là), et ses mouvements portent cet horodatage, donc la somme des mouvements donne bien le stock actuel. Refusé pour un produit qui a un inventaire plus récent (son écart a été calculé sans lui) : un inventaire ne s'annule pas et ne s'insère jamais avant un autre.
@@ -152,4 +154,4 @@ Dernière mise à jour : 16 octobre 2026 (division de la note).
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 23 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 24 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

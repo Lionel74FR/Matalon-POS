@@ -32,6 +32,7 @@ import {
   verifierEtablissement,
   cleRef,
   couvertures,
+  dateComptable,
   premierJourMoisSuivant,
   tete,
   unir,
@@ -71,6 +72,7 @@ import {
   type ReponseClotures,
   type ReponseJournee,
   type ReponseStatistiques,
+  type SalleEnCours,
   type EtablissementApi,
   type IdentiteEtablissement,
   type ReponseEtat,
@@ -1222,8 +1224,28 @@ async function statistiques(env: Environnement, etablissementId: string, requete
       retraits,
     }),
     alertes: alertes.alertes,
+    ...(au >= dateComptable(horloge(env)) ? { enCours: await salleEnCours(env, etablissementId) } : {}),
   };
   return json(200, reponse);
+}
+
+/** Tables ouvertes en ce moment, lues sur les commandes partagées (hors fiscal). */
+async function salleEnCours(env: Environnement, etablissementId: string): Promise<SalleEnCours> {
+  type LigneOuverte = { quantite?: number; prixUnitaireTTC?: number; remise?: { montantTTC?: number }; retiree?: unknown; reglee?: unknown };
+  const commandes = await env.db.requete<{ contenu: { couverts?: number | null; ouverteLe?: string; lignes?: LigneOuverte[]; acomptes?: Array<{ montant?: number; annule?: unknown }> } }>(
+    "select contenu from commandes_ouvertes where etablissement_id = $1 and contenu is not null",
+    [etablissementId],
+  );
+  const n = (v: unknown) => (Number.isSafeInteger(v) ? (v as number) : 0);
+  const salle: SalleEnCours = { tables: 0, couverts: 0, montantTTC: 0, acomptesTTC: 0, plusAncienne: null };
+  for (const { contenu: c } of commandes) {
+    salle.tables++;
+    salle.couverts += n(c.couverts);
+    for (const l of c.lignes ?? []) if (!l.retiree && !l.reglee) salle.montantTTC += n(l.quantite) * n(l.prixUnitaireTTC) - n(l.remise?.montantTTC);
+    for (const a of c.acomptes ?? []) if (!a.annule) salle.acomptesTTC += n(a.montant);
+    if (c.ouverteLe && (!salle.plusAncienne || c.ouverteLe < salle.plusAncienne)) salle.plusAncienne = c.ouverteLe;
+  }
+  return salle;
 }
 
 /** Alerte marquée vue depuis une caisse : code d'un responsable vérifié par le serveur. */

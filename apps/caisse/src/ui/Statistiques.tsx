@@ -1,6 +1,6 @@
 import { dateComptable } from "@matalon/noyau-fiscal";
-import type { AlerteApi, IndicateursPeriode, LigneStat, ReponseStatistiques } from "@matalon/serveur/partage";
-import { Bell, Check, RefreshCw, TrendingDown, TrendingUp } from "lucide-react";
+import type { AlerteApi, IndicateursPeriode, LigneStat, ReponseStatistiques, SalleEnCours } from "@matalon/serveur/partage";
+import { Bell, Check, RefreshCw, TrendingDown, TrendingUp, Utensils } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { fraicheur } from "../fiscal/journee";
@@ -293,14 +293,84 @@ const LIBELLES_ALERTE: Record<AlerteApi["type"], string> = {
   PIN_BLOQUE: "Code PIN bloqué",
 };
 
+/** Ce que l'écran demande à son hôte : la caisse (jeton d'appareil) ou l'administration (session). */
+export interface AccesStatistiques {
+  charger(du: string, au: string): Promise<ReponseStatistiques>;
+  /** Marque une alerte vue ; faux si la personne a renoncé (code non saisi). */
+  marquerVue(a: AlerteApi): Promise<boolean>;
+  /** Appareil qui affiche l'écran : sa propre synchronisation n'est pas signalée. */
+  appareilCourant?: string;
+  messageErreur?: (e: unknown) => string;
+}
+
+/** Recalcul automatique tant que la période va jusqu'à aujourd'hui : la journée seule, puis les périodes longues. */
+const DIRECT_JOUR_MS = 10_000;
+const DIRECT_PERIODE_MS = 60_000;
+const heureCourte = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+/** Statistiques sur la caisse : réservées aux responsables, alerte lue avec le code d'un responsable. */
+export function Statistiques() {
+  const ctx = useCaisse();
+  const { caisse, config } = ctx;
+  // Le contexte change à chaque synchronisation : l'écran ne se recalcule pas pour autant.
+  const courant = useRef(ctx);
+  courant.current = ctx;
+  const acces = useMemo<AccesStatistiques>(
+    () => ({
+      charger: (du, au) => caisse.client.statistiques(du, au),
+      marquerVue: async (a) => {
+        const responsable = await courant.current.demanderPinResponsable(`Alerte lue : ${LIBELLES_ALERTE[a.type]}.`);
+        if (!responsable) return false;
+        await caisse.client.marquerAlerteVue(a.id, responsable);
+        courant.current.notifier("Alerte marquée comme vue.");
+        return true;
+      },
+      appareilCourant: config.caisseId,
+      messageErreur: messageServeur,
+    }),
+    [caisse.client, config.caisseId],
+  );
+  return <TableauStatistiques acces={acces} />;
+}
+
+/** Tables ouvertes en ce moment : ce qui sera encaissé, en plus du CA déjà fait. */
+function EnSalle(props: { salle: SalleEnCours }) {
+  const { salle } = props;
+  return (
+    <section className="stat-carte stat-large stat-en-salle" aria-label="En salle maintenant">
+      <h2>
+        <AvecIcone icone={Utensils}>En salle maintenant</AvecIcone>
+      </h2>
+      {salle.tables === 0 ? (
+        <p className="explication">Aucune table ouverte.</p>
+      ) : (
+        <div className="stat-en-salle-corps">
+          <span>
+            <strong>{pl(salle.tables, "table")}</strong> ouverte{salle.tables > 1 ? "s" : ""}
+            {salle.couverts ? ` · ${pl(salle.couverts, "couvert")}` : ""}
+            {salle.plusAncienne ? ` · la plus ancienne depuis ${heureCourte(salle.plusAncienne).slice(0, 5)}` : ""}
+          </span>
+          <span>
+            À encaisser <strong>{euros(salle.montantTTC - salle.acomptesTTC)}</strong>
+            {salle.acomptesTTC > 0 ? ` (sur ${euros(salle.montantTTC)}, ${euros(salle.acomptesTTC)} d'acomptes déjà versés)` : ""}
+          </span>
+        </div>
+      )}
+      <small className="stat-detail">Hors comptoir, propre à chaque appareil. Pas encore dans le chiffre d'affaires : il y entre à l'encaissement.</small>
+    </section>
+  );
+}
+
 /**
  * Statistiques de l'établissement (toutes les caisses, copie du serveur) :
  * indicateurs comparés à la période précédente, heures, jours, moyens de
  * paiement, catégories, articles, serveurs, salle, remises, annulations, TVA,
- * et les alertes à lire. Réservé aux responsables.
+ * et les alertes à lire. Même écran sur la caisse et dans l'administration ;
+ * tant que la période va jusqu'à aujourd'hui, il se recalcule tout seul
+ * (chaque vente arrive au serveur quelques secondes après l'encaissement).
  */
-export function Statistiques() {
-  const { caisse, config, notifier, demanderPinResponsable } = useCaisse();
+export function TableauStatistiques(props: { acces: AccesStatistiques }) {
+  const { acces } = props;
   const aujourdhui = dateComptable(new Date(), HEURE_BASCULE);
   const [preset, setPreset] = useState<Preset | null>("aujourdhui");
   const [periode, setPeriode] = useState(() => periodeDe("aujourdhui", aujourdhui));
@@ -308,19 +378,36 @@ export function Statistiques() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(false);
   const [articles, setArticles] = useState<"meilleurs" | "moins" | "tous">("meilleurs");
+  const message = acces.messageErreur ?? ((e: unknown) => (e instanceof Error ? e.message : String(e)));
+  const enDirect = periode.au >= aujourdhui;
 
-  const charger = useCallback(async () => {
-    setChargement(true);
-    try {
-      setStats(await caisse.client.statistiques(periode.du, periode.au));
-      setErreur(null);
-    } catch (e) {
-      setErreur(messageServeur(e));
-    } finally {
-      setChargement(false);
-    }
-  }, [caisse.client, periode]);
+  /** `discret` : recalcul automatique, sans assombrir l'écran ni effacer une erreur affichée par une action. */
+  const charger = useCallback(
+    async (discret = false) => {
+      if (!discret) setChargement(true);
+      try {
+        setStats(await acces.charger(periode.du, periode.au));
+        setErreur(null);
+      } catch (e) {
+        setErreur(message(e));
+      } finally {
+        if (!discret) setChargement(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [acces, periode],
+  );
   useEffect(() => void charger(), [charger]);
+  useEffect(() => {
+    if (!enDirect) return;
+    const tic = () => document.visibilityState === "visible" && void charger(true);
+    const minuterie = setInterval(tic, periode.du === periode.au ? DIRECT_JOUR_MS : DIRECT_PERIODE_MS);
+    document.addEventListener("visibilitychange", tic);
+    return () => {
+      clearInterval(minuterie);
+      document.removeEventListener("visibilitychange", tic);
+    };
+  }, [enDirect, charger, periode]);
 
   const choisir = (p: Preset) => {
     setPreset(p);
@@ -336,14 +423,10 @@ export function Statistiques() {
   };
 
   const alerteVue = async (a: AlerteApi) => {
-    const responsable = await demanderPinResponsable(`Alerte lue : ${LIBELLES_ALERTE[a.type]}.`);
-    if (!responsable) return;
     try {
-      await caisse.client.marquerAlerteVue(a.id, responsable);
-      await charger();
-      notifier("Alerte marquée comme vue.");
+      if (await acces.marquerVue(a)) await charger();
     } catch (e) {
-      notifier(messageServeur(e), "erreur");
+      setErreur(message(e));
     }
   };
 
@@ -395,6 +478,11 @@ export function Statistiques() {
       <header className="page-tete">
         <h1>Statistiques</h1>
         <p>{s ? `Tous les appareils · ${libellePeriode(s.du, s.au)}, comparé ${libellePeriode(s.precedente.du, s.precedente.au)}` : "Tous les appareils de l'établissement"}</p>
+        {s && enDirect && (
+          <p className="stat-direct" role="status">
+            <span className="stat-direct-point" aria-hidden="true" /> En direct · mis à jour à {heureCourte(s.calculeLe)}
+          </p>
+        )}
       </header>
 
       <div className="stat-filtres">
@@ -445,6 +533,8 @@ export function Statistiques() {
               </ul>
             </section>
           )}
+
+          {s.enCours && enDirect && <EnSalle salle={s.enCours} />}
 
           <Indicateurs i={s.indicateurs} p={s.indicateursPrecedents} />
 
@@ -562,7 +652,7 @@ export function Statistiques() {
             paiement {s.indicateurs.nbCorrections}. CA net des annulations, comme les Z ; les ventes d'un appareil pas encore synchronisé n'y sont pas
             {Object.keys(s.synchros).length > 1
               ? ` (${Object.entries(s.synchros)
-                  .filter(([id]) => id !== config.caisseId)
+                  .filter(([id]) => id !== acces.appareilCourant)
                   .map(([id, iso]) => `${s.nomsAppareils[id] ?? id} ${fraicheur(iso)}`)
                   .join(", ")})`
               : ""}

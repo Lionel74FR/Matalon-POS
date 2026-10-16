@@ -479,6 +479,22 @@ describe("commandes en cours partagées", () => {
     expect((await appel("PUT", "/api/caisse/commandes/t9", { commande: null, version: 3, stricte: true }, a.bearer)).corps.ok).toBe(true);
     expect((await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
   });
+
+  it("les statistiques du jour montrent la salle en cours ; une période passée non", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const t1 = commande("t1", ["cafe", "the", "jus"]); // 3 × 4,00 €
+    t1.lignes[1] = { ...t1.lignes[1]!, retiree: { le: "x", par: "u1" } } as (typeof t1.lignes)[number];
+    t1.lignes[2] = { ...t1.lignes[2]!, reglee: { le: "x", par: "u1", caisseId: "ipad" } } as (typeof t1.lignes)[number];
+    const avecAcompte = { ...commande("t2", ["cafe", "cafe2"]), ouverteLe: "2026-10-15T07:30:00Z", acomptes: [{ id: "a1", mode: "CB", montant: 300, le: "x", par: "u1", caisseId: "ipad" }] };
+    await appel("PUT", "/api/caisse/commandes/t1", { commande: t1, version: 0 }, a.bearer);
+    await appel("PUT", "/api/caisse/commandes/t2", { commande: avecAcompte, version: 0 }, a.bearer);
+    const jour = await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie });
+    expect(jour.corps.enCours).toEqual({ tables: 2, couverts: 4, montantTTC: 1200, acomptesTTC: 300, plusAncienne: "2026-10-15T07:30:00Z" });
+    // Même calcul pour la caisse ; une période terminée hier n'en a pas.
+    expect((await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-15", undefined, a.bearer)).corps.enCours.tables).toBe(2);
+    expect((await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-14&au=2026-10-14", undefined, { Cookie: cookie })).corps.enCours).toBeUndefined();
+  });
 });
 
 describe("tickets partagés", () => {
