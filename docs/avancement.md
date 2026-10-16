@@ -25,6 +25,7 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Mise à jour de la caisse (retour de Lionel du 16 octobre : l'iPad restait sur l'ancienne version) : l'app ouverte cherche une nouvelle version toutes les 10 minutes et à chaque retour au premier plan ; le bandeau « Une nouvelle version de la caisse est prête » s'affiche pour toute personne connectée, plus seulement les responsables |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » en tête de la salle, le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. iPhone inchangé (la case reste, la barre n'a pas le bouton) |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » ; le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. Sur iPhone, la case reste (la barre n'a pas ce bouton) |
 | 0363774 | Configuration de l'installation : les clés chiffrées (Resend) ne voyagent plus, chaque installation ayant sa propre `CLE_SECRETS` (celle du test n'a pas été conservée) ; la clé se ressaisit dans l'administration de la production |
@@ -94,6 +95,7 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 - Montants en centimes entiers ; TVA en points de base.
 - Le noyau fiscal tient une chaîne par caisse, signée par une clé ECDSA propre à l'iPad. Le serveur vérifie et réplique, mais ne signe jamais.
 - Comptoir (Lionel, 16 octobre) : sur iPad, une seule entrée, « Vente comptoir » dans la barre du haut (avec le total d'une vente en cours) ; sur iPhone, la case Comptoir de la salle, la barre n'ayant pas ce bouton.
+- Mises à jour de la caisse (16 octobre) : jamais appliquées d'office pendant le service ; détectées toutes les 10 minutes et au retour au premier plan, proposées par un bandeau à quiconque est connecté (le rechargement garde les commandes en cours, stockées sur l'appareil).
 - Prise de commande sur iPad (Lionel, 15 octobre) : rayons en colonne à droite du ticket, catégories en pastilles en haut ; sur iPhone, rayons et catégories restent en bandes horizontales.
 - Barre de la caisse (demande de Lionel du 9 octobre) : les onglets du service (Salle, Tickets, Comptes) et Vente comptoir dans la barre ; le reste (Clôtures, Stats, Stock, Réglages) dans le menu ☰, qui montre le nom de l'écran ouvert. Sur iPhone, l'en-tête aligne à droite : prénom, synchronisation, menu ☰, déconnexion ; les onglets passent dessous.
 - Administration sur iPhone (demande de Lionel du 9 octobre) : rien ne dépasse la largeur de l'écran. Tableaux en fiches (chaque valeur sous le titre de sa colonne, recopié par `etiqueterTableaux`), navigation en pastilles, rubriques du stock et catégorie de l'éditeur dans une liste déroulante, champs pleine largeur.

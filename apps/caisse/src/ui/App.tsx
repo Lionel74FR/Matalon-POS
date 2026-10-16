@@ -62,7 +62,18 @@ export function App() {
   const {
     needRefresh: [majDisponible],
     updateServiceWorker,
-  } = useRegisterSW();
+  } = useRegisterSW({
+    // Une app ouverte toute la journée ne recharge jamais la page : on cherche une nouvelle version
+    // toutes les 10 minutes et à chaque retour au premier plan, sinon une mise à jour attend le prochain lancement.
+    onRegisteredSW(_url, enregistrement) {
+      if (!enregistrement) return;
+      const verifier = () => void enregistrement.update().catch(() => undefined);
+      setInterval(verifier, 10 * 60_000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") verifier();
+      });
+    },
+  });
 
   if ("caisse" in phase) caisseCourante.current = phase.caisse;
 
@@ -299,7 +310,8 @@ export function App() {
   return (
     <>
       {contenu}
-      {majDisponible && phase.nom === "caisse" && phase.utilisateur.role === "responsable" && (
+      {/* Proposée à toute personne connectée : les commandes en cours sont gardées sur l'appareil, le rechargement ne perd rien. */}
+      {majDisponible && phase.nom === "caisse" && (
         <div className="bandeau-maj">
           Une nouvelle version de la caisse est prête.
           <button className="bouton" onClick={() => void updateServiceWorker(true)}>
