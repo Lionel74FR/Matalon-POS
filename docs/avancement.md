@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 16 octobre 2026.
+Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 ## Règle de conduite
 
@@ -128,7 +128,7 @@ Dernière mise à jour : 16 octobre 2026.
 - [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
 - [x] Geler le noyau en 1.0.0 (fait le 16 octobre ; reste le tag `noyau-fiscal-v1.0.0` sur a8aacde, version citée par l'attestation).
-- [ ] Mise en service sur matalon-pos.app : projet Vercel `matalon-pos` et base Neon créés le 16 octobre, domaine relié ; reste `CLE_SECRETS` propre à la production (openssl rand -base64 32, gardée dans un coffre), restauration Neon sur 7 jours ; créer l'administrateur, importer la configuration ; ressaisir la clé Resend (Réservations › Services et réglages) ; recréer la clé d'accès ; rattacher chaque appareil depuis matalon-pos.app et accepter le certificat de l'imprimante ; mettre à jour la balise des réservations sur le site du Moka ; ajouter les vrais comptes de l'équipe ; recréer la clé de l'agent de factures si besoin.
+- [ ] Mise en service sur matalon-pos.app : faits le 16 octobre, projet Vercel `matalon-pos`, base Neon (Francfort), domaine, `CLE_SECRETS` propre à la production, administrateur, configuration importée (établissement, équipe, carte version 8, stock valorisé 5 060,75 € HT, 2 commandes, 3 pièces, la réservation du 17 octobre) ; reste la restauration Neon sur 7 jours ; ressaisir la clé Resend (Réservations › Services et réglages) ; recréer la clé d'accès ; rattacher chaque appareil depuis matalon-pos.app et accepter le certificat de l'imprimante ; mettre à jour la balise des réservations sur le site du Moka ; ajouter les vrais comptes de l'équipe ; recréer la clé de l'agent de factures si besoin.
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
 - [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
 - [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.
