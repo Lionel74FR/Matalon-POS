@@ -1,4 +1,4 @@
-import { Banknote, Check, CreditCard, NotebookPen, Printer, Ticket as TicketPapier, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
+import { Banknote, Check, CreditCard, Hourglass, NotebookPen, Printer, Ticket as TicketPapier, Trash2, Undo2, X, type LucideIcon } from "lucide-react";
 import type { Reservation } from "../../donnees/partage";
 import { AvecIcone } from "../icones";
 import { ErreurFiscale, type ClientCompte, type ModePaiement, type Paiement, type Ticket } from "@matalon/noyau-fiscal";
@@ -7,7 +7,20 @@ import { carteDe, ID_COMPTOIR } from "../../donnees/configuration";
 import { MODE_TEST } from "../../fiscal/caisse";
 import { gabaritNote, LIBELLES_PAIEMENT } from "../../impression/gabarits";
 import { Recu } from "../../impression/recu";
-import { lignesActives, totauxCommande, versSaisie, type Commande } from "../../metier/commande";
+import {
+  acomptesActifs,
+  ajouterAcompte,
+  annulerAcompte,
+  lignesDues,
+  montantLigne,
+  montantPart,
+  paiementsAcomptes,
+  versSaisie,
+  type Acompte,
+  type Commande,
+  type LigneCommande,
+  type ModeAcompte,
+} from "../../metier/commande";
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
@@ -25,51 +38,92 @@ const ICONES_PAIEMENT: Record<ModePaiement, LucideIcon> = {
   AUTRE: Banknote,
 };
 const BILLETS = [500, 1000, 2000, 5000];
+/** Parts égales proposées d'un geste ; au-delà, le bouton « + » ajoute une part. */
+const PARTS = [2, 3, 4, 5, 6];
 /** Somme réellement encaissée sur une vente (hors part portée en compte). */
 const encaisseVente = (t: Ticket) => t.totalTTC - t.paiements.filter((p) => p.mode === "EN_COMPTE").reduce((s, p) => s + p.montant, 0);
 /** Au-delà de ce rendu (centimes), la caisse demande confirmation : faute de frappe probable. */
 const RENDU_A_CONFIRMER = 2000;
+const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" });
 
-/** Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir. */
+/**
+ * Encaissement d'une commande : un ou plusieurs moyens de paiement, puis note et tiroir.
+ *
+ * La note se divise de trois façons. Par articles (`partie`) : les lignes choisies font un
+ * ticket à elles seules, le reste demeure sur la table. En parts égales ou d'un montant libre :
+ * ce qui est payé devient un acompte sur la table, qui reste ouverte ; le ticket, unique, est
+ * scellé au dernier paiement et reprend chaque acompte comme paiement.
+ */
 export function ModaleEncaissement(props: {
+  /** Commande de la table, telle qu'affichée. */
   commande: Commande;
+  /** Division par articles : lignes payées maintenant et commande qui restera sur la table. */
+  partie?: { lignes: LigneCommande[]; restante: Commande };
+  /** Ouvre la répartition en parts égales. */
+  parts?: boolean;
+  /** Table soldée : la commande se ferme. */
   onTermine: () => void;
+  /** Une partie réglée (articles, acompte, acompte rendu) : la table reste ouverte avec cette commande. */
+  onPartie?: (restante: Commande) => void;
   onFermer: () => void;
   /** Ferme la table sur le serveur avant d'encaisser (deux appareils n'encaissent pas la même table). */
   reserver?: (c: Commande) => Promise<Reservation>;
   /** Encaissement impossible après la réservation : la table se rouvre. */
   liberer?: (tableId: string) => void;
+  /** Écrit sur le serveur la commande qui restera, sans fusion (partie payée, acompte). */
+  engager?: (affichee: Commande, restante: Commande) => Promise<Reservation>;
 }) {
   const { caisse, config, majConfig, utilisateur, notifier, imprimer, imprimanteConfiguree, blocage, demanderResponsable } = useCaisse();
+  const c = props.commande;
+  const partie = props.partie ?? null;
+  /** Acomptes et parts : sur une table seulement (le comptoir reste propre à l'appareil, la Z ne le verrait pas d'ailleurs). */
+  const surTable = c.tableId !== ID_COMPTOIR && !!props.engager && !!props.onPartie;
   /** Client au compte duquel une partie est portée (une vente, un seul client). */
   const [client, setClient] = useState<ClientCompte | null>(null);
   const [choixClient, setChoixClient] = useState<number | null>(null);
   const [noteImprimee, setNoteImprimee] = useState(false);
   const envoyerProduction = useEnvoiProduction();
-  const total = totauxCommande(props.commande).totalTTC;
+
+  const lignesTicket = partie ? partie.lignes : lignesDues(c);
+  const total = lignesTicket.reduce((s, l) => s + montantLigne(l), 0);
+  const acomptes = partie ? [] : acomptesActifs(c);
+  const dejaRegle = acomptes.reduce((s, a) => s + a.montant, 0);
+  /** Ce qui reste dû sur la table ; négatif : les acomptes dépassent la note (trop-perçu). */
+  const resteTable = total - dejaRegle;
+  const [parts, setParts] = useState<number | null>(surTable && !partie ? (c.parts ?? (props.parts ? 2 : null)) : null);
+  /** Montant à encaisser maintenant : une part, ou tout le reste de la table. */
+  const aPayer = parts ? montantPart(total, parts, resteTable) : resteTable;
+  /** Ce paiement solde la table : ticket. Sinon : acompte. */
+  const solde = aPayer >= resteTable;
+
   const [paiements, setPaiements] = useState<Paiement[]>([]);
   const paye = paiements.reduce((s, p) => s + p.montant, 0);
-  const reste = Math.max(0, total - paye);
+  const reste = Math.max(0, aPayer - paye);
   const [saisie, setSaisie] = useState<number | null>(null);
   const montant = saisie ?? reste;
   const [ticket, setTicket] = useState<Ticket | null>(null);
+  const [acompteFait, setAcompteFait] = useState<{ montant: number; rendu: number; reste: number } | null>(null);
   const [enCours, setEnCours] = useState(false);
   /** Paiement en espèces qui laisserait un gros rendu, en attente de confirmation. */
   const [renduAConfirmer, setRenduAConfirmer] = useState<{ montant: number; rendu: number } | null>(null);
 
   const especes = paiements.filter((p) => p.mode === "ESPECES").reduce((s, p) => s + p.montant, 0);
-  const excedent = paye - total;
-  const valide = paye >= total && excedent <= especes;
+  const excedent = paye - aPayer;
+  const tropPercu = resteTable < 0 || (total === 0 && dejaRegle > 0);
+  const valide = !tropPercu && paye >= aPayer && excedent <= especes && (aPayer > 0 || (solde && total > 0));
+  /** Montant libre : une partie payée, le reste demeure sur la table. */
+  const acompteLibre = surTable && solde && paye > 0 && paye < resteTable && !paiements.some((p) => p.mode === "EN_COMPTE");
 
   const ajouter = (mode: ModePaiement, m = montant) => {
     if (m <= 0) return;
-    if (reste === 0) return notifier("Le total est déjà réglé : retirez un paiement pour en changer.", "erreur");
-    if (mode !== "ESPECES" && paye + m > total) {
+    if (reste === 0) return notifier("Le montant est déjà réglé : retirez un paiement pour en changer.", "erreur");
+    if (mode !== "ESPECES" && paye + m > aPayer) {
       return notifier(`${LIBELLES_PAIEMENT[mode]} : le montant dépasse le reste à payer. Seules les espèces donnent lieu à un rendu.`, "erreur");
     }
     if (mode === "ESPECES" && m - reste > RENDU_A_CONFIRMER && !renduAConfirmer) {
       return setRenduAConfirmer({ montant: m, rendu: m - reste });
     }
+    if (mode === "EN_COMPTE" && !solde) return notifier("Une part ne se porte pas en compte : touchez « Tout » pour mettre le reste au compte d'un client.", "erreur");
     // Chaque somme portée en compte est un crédit accordé : toujours l'accord d'un responsable.
     if (mode === "EN_COMPTE") return client ? void mettreEnCompte(client, m) : setChoixClient(m);
     setRenduAConfirmer(null);
@@ -78,16 +132,16 @@ export function ModaleEncaissement(props: {
   };
 
   /** Mise en compte : le client choisi, puis l'accord d'un responsable (c'est un crédit accordé). */
-  const mettreEnCompte = async (c: ClientCompte | ClientApi, m: number, nouveau = false) => {
+  const mettreEnCompte = async (cl: ClientCompte | ClientApi, m: number, nouveau = false) => {
     setChoixClient(null);
-    const responsable = await demanderResponsable(`${euros(m)} au compte de ${c.nom}.`);
+    const responsable = await demanderResponsable(`${euros(m)} au compte de ${cl.nom}.`);
     if (!responsable) return;
-    if (nouveau && "telephone" in c) {
+    if (nouveau && "telephone" in cl) {
       // Fiche enregistrée seulement une fois la mise en compte accordée ; le serveur la reçoit en ligne, ou par le ticket.
-      await majConfig({ ...config, clients: [...(config.clients ?? []), c] });
-      void caisse.client.enregistrerClient(c).catch(() => undefined);
+      await majConfig({ ...config, clients: [...(config.clients ?? []), cl] });
+      void caisse.client.enregistrerClient(cl).catch(() => undefined);
     }
-    setClient({ id: c.id, nom: c.nom });
+    setClient({ id: cl.id, nom: cl.nom });
     setPaiements((l) => [...l, { mode: "EN_COMPTE", montant: m }]);
     setSaisie(null);
   };
@@ -99,11 +153,21 @@ export function ModaleEncaissement(props: {
       return suite;
     });
 
+  const choisirParts = (n: number | null) => {
+    setParts(n);
+    setSaisie(null);
+    setRenduAConfirmer(null);
+  };
+
   const encaisser = async () => {
     if (blocage) return notifier(blocage, "erreur");
     setEnCours(true);
     try {
-      const reservation = props.reserver ? await props.reserver(props.commande) : ({ ok: true } as const);
+      const reservation = partie
+        ? await props.engager!(c, partie.restante)
+        : props.reserver
+          ? await props.reserver(c)
+          : ({ ok: true } as const);
       if (!reservation.ok) {
         notifier(reservation.raison, "erreur");
         return props.onFermer();
@@ -111,21 +175,28 @@ export function ModaleEncaissement(props: {
       let t: Ticket;
       try {
         t = await caisse.registre.enregistrerVente({
-          lignes: lignesActives(props.commande).map(versSaisie),
-          paiements,
+          lignes: lignesTicket.map(versSaisie),
+          paiements: [...(partie ? [] : paiementsAcomptes(c)), ...paiements],
           operateurId: utilisateur.id,
-          tableId: props.commande.tableId === ID_COMPTOIR ? null : props.commande.tableId,
-          couverts: props.commande.couverts,
+          tableId: c.tableId === ID_COMPTOIR ? null : c.tableId,
+          // Les couverts vont au ticket qui ferme la table : comptés une fois dans les statistiques.
+          couverts: partie ? null : c.couverts,
           ...(client && paiements.some((p) => p.mode === "EN_COMPTE") ? { client } : {}),
         });
       } catch (e) {
-        props.liberer?.(props.commande.tableId);
+        props.liberer?.(c.tableId);
         throw e;
       }
       setTicket(t);
-      // Ce qui n'a pas été envoyé en production part maintenant (la commande se ferme : rien à marquer).
+      // Ce qui n'a pas été envoyé en production part maintenant.
       const carte = carteDe(config);
-      if (carte && productionActive(config)) void envoyerProduction(props.commande, carte);
+      if (partie) {
+        // Les lignes payées restent sur la table : elles gardent la trace de leur envoi.
+        const marquer = carte && productionActive(config) ? await envoyerProduction({ ...c, lignes: partie.lignes }, carte) : null;
+        props.onPartie!(marquer ? marquer(partie.restante) : partie.restante);
+      } else if (carte && productionActive(config)) {
+        void envoyerProduction(c, carte);
+      }
       // Sans imprimante, rien ne sort : la note passe par le QR code.
       if (imprimanteConfiguree) {
         const avecEspeces = paiements.some((p) => p.mode === "ESPECES");
@@ -133,7 +204,7 @@ export function ModaleEncaissement(props: {
           await imprimerNote(t, avecEspeces);
           setNoteImprimee(true);
         } else if (avecEspeces) {
-          await ouvrirTiroir(t);
+          await ouvrirTiroir({ ticket: t.numero });
         }
       }
     } catch (e) {
@@ -143,9 +214,57 @@ export function ModaleEncaissement(props: {
     }
   };
 
-  const ouvrirTiroir = async (t: Ticket) => {
+  /**
+   * Part ou montant libre : ce qui est payé devient un acompte sur la table, écrit sur le
+   * serveur avant de rendre la monnaie (deux appareils voient le même reste). En ligne seulement.
+   */
+  const prendreAcompte = async () => {
+    if (blocage) return notifier(blocage, "erreur");
+    setEnCours(true);
+    try {
+      const rendu = Math.max(0, paye - aPayer);
+      const le = new Date().toISOString();
+      const parMode = new Map<ModeAcompte, number>();
+      for (const p of paiements) if (p.mode !== "EN_COMPTE") parMode.set(p.mode, (parMode.get(p.mode) ?? 0) + p.montant);
+      if (rendu) parMode.set("ESPECES", (parMode.get("ESPECES") ?? 0) - rendu);
+      let restante: Commande = c;
+      for (const [mode, m] of parMode) if (m > 0) restante = ajouterAcompte(restante, { mode, montant: m, le, par: utilisateur.id, caisseId: config.caisseId });
+      const { parts: _, ...sansParts } = restante;
+      restante = parts ? { ...sansParts, parts } : sansParts;
+      const r = await props.engager!(c, restante);
+      if (!r.ok) {
+        notifier(r.raison, "erreur");
+        return props.onFermer();
+      }
+      if (r.horsLigne) {
+        return notifier("Acompte impossible hors ligne : les autres appareils doivent voir ce qui a été payé. Encaissez la note entière, ou par articles.", "erreur");
+      }
+      const verse = paye - rendu;
+      props.onPartie!(restante);
+      if (imprimanteConfiguree && especes > 0) await ouvrirTiroir({ table: c.tableId, acompte: verse });
+      setAcompteFait({ montant: verse, rendu, reste: resteTable - verse });
+    } catch (e) {
+      notifier(`Acompte impossible : ${String(e)}`, "erreur");
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  /** Acompte saisi par erreur : rendu au client, avec l'accord d'un responsable. Il reste affiché, barré. */
+  const rendreAcompte = async (a: Acompte) => {
+    const responsable = await demanderResponsable(`Rendre l'acompte de ${euros(a.montant)} (${LIBELLES_PAIEMENT[a.mode]}) au client.`);
+    if (!responsable) return;
+    const restante = annulerAcompte(c, a.id, { le: new Date().toISOString(), par: responsable, motif: "Rendu au client" });
+    const r = await props.engager!(c, restante);
+    if (!r.ok) return notifier(r.raison, "erreur");
+    if (r.horsLigne) return notifier("Annulation impossible hors ligne : réessayez une fois l'appareil connecté.", "erreur");
+    props.onPartie!(restante);
+    notifier(`Acompte annulé : rendez ${euros(a.montant)} au client (${LIBELLES_PAIEMENT[a.mode]}).`);
+  };
+
+  const ouvrirTiroir = async (details: Record<string, string | number>) => {
     await imprimer(new Recu().ouvrirTiroir(), "Tiroir-caisse");
-    await caisse.registre.journaliser("OUVERTURE_TIROIR", { ticket: t.numero }, utilisateur.id);
+    await caisse.registre.journaliser("OUVERTURE_TIROIR", details, utilisateur.id);
   };
 
   const imprimerNote = async (t: Ticket, tiroir: boolean) => {
@@ -160,15 +279,50 @@ export function ModaleEncaissement(props: {
     if (tiroir) await caisse.registre.journaliser("OUVERTURE_TIROIR", { ticket: t.numero }, utilisateur.id);
   };
 
+  if (acompteFait) {
+    return (
+      <Modale
+        titre="Acompte enregistré"
+        onFermer={props.onFermer}
+        pied={
+          <button className="bouton principal" onClick={props.onFermer}>
+            <AvecIcone icone={Check}>Terminé</AvecIcone>
+          </button>
+        }
+      >
+        <div className="fin-encaissement">
+          {acompteFait.rendu > 0 && (
+            <div className="rendu">
+              <span>Rendu monnaie</span>
+              <strong>{euros(acompteFait.rendu)}</strong>
+            </div>
+          )}
+          <div className="rendu calme">
+            <span>Acompte</span>
+            <strong>{euros(acompteFait.montant)}</strong>
+          </div>
+          <div className="rendu calme">
+            <span>Reste sur la table</span>
+            <strong>{euros(acompteFait.reste)}</strong>
+          </div>
+        </div>
+        <p className="explication">
+          La table reste ouverte. Le ticket sera édité au dernier paiement, avec tous les acomptes ; la Z attend qu'elle soit soldée.
+        </p>
+      </Modale>
+    );
+  }
+
   if (ticket) {
     const auDelaSeuil = ticket.totalTTC >= config.seuilNoteAutomatique;
     /** Note due mais pas imprimée d'office (réglage) : la remettre, sur papier ou par le QR code. */
     const noteARemettre = auDelaSeuil && config.noteAutomatique === false && !noteImprimee;
+    const fin = partie ? props.onFermer : props.onTermine;
     return (
       <Modale
         titre={`Ticket n° ${ticket.numero} encaissé`}
         large
-        onFermer={props.onTermine}
+        onFermer={fin}
         pied={
           <>
             {!noteImprimee && (
@@ -179,8 +333,8 @@ export function ModaleEncaissement(props: {
                 <AvecIcone icone={Printer}>{imprimanteConfiguree ? "Imprimer la note" : "Voir la note"}</AvecIcone>
               </button>
             )}
-            <button className="bouton principal" onClick={props.onTermine}>
-              <AvecIcone icone={Check}>Terminé</AvecIcone>
+            <button className="bouton principal" onClick={fin}>
+              <AvecIcone icone={Check}>{partie ? "Retour à la table" : "Terminé"}</AvecIcone>
             </button>
           </>
         }
@@ -207,6 +361,7 @@ export function ModaleEncaissement(props: {
           )}
           <QrNote url={urlNoteTicket(ticket, config)} />
         </div>
+        {partie && <p className="explication">Le reste de la commande demeure sur la table.</p>}
         {noteImprimee && <p className="explication">La note a été imprimée (montant de {euros(config.seuilNoteAutomatique)} ou plus).</p>}
         {noteARemettre && (
           <p className="note-a-remettre" role="alert">
@@ -224,9 +379,19 @@ export function ModaleEncaissement(props: {
     );
   }
 
+  const libelleValider = blocage
+    ? "Encaissement bloqué"
+    : enCours
+      ? "Enregistrement…"
+      : !valide
+        ? `Reste ${euros(reste)}`
+        : solde
+          ? `Valider l'encaissement de ${euros(resteTable)}`
+          : `Valider la part de ${euros(aPayer)}`;
+
   return (
     <Modale
-      titre="Encaissement"
+      titre={partie ? "Encaissement de la sélection" : "Encaissement"}
       large
       onFermer={props.onFermer}
       pied={
@@ -263,20 +428,87 @@ export function ModaleEncaissement(props: {
             >
               <AvecIcone icone={Trash2}>Effacer les paiements</AvecIcone>
             </button>
-            <button className="bouton principal grand" disabled={!valide || enCours || !!blocage} onClick={() => void encaisser()}>
-              <AvecIcone icone={Check}>{blocage ? "Encaissement bloqué" : enCours ? "Enregistrement…" : valide ? `Valider l'encaissement de ${euros(total)}` : `Reste ${euros(reste)}`}</AvecIcone>
+            {acompteLibre && (
+              <button className="bouton" disabled={enCours || !!blocage} onClick={() => void prendreAcompte()}>
+                <AvecIcone icone={Hourglass}>Acompte de {euros(paye)}, le reste sur la table</AvecIcone>
+              </button>
+            )}
+            <button
+              className="bouton principal grand"
+              disabled={!valide || enCours || !!blocage}
+              onClick={() => void (solde ? encaisser() : prendreAcompte())}
+            >
+              <AvecIcone icone={Check}>{libelleValider}</AvecIcone>
             </button>
           </>
         )
       }
     >
       {blocage && <p className="erreur">{blocage}</p>}
+      {tropPercu && (
+        <p className="erreur" role="alert">
+          Les acomptes dépassent la note de {euros(dejaRegle - total)} : un responsable annule l'acompte saisi par erreur (croix à côté), puis
+          encaissez.
+        </p>
+      )}
+      {surTable && resteTable > 0 && (
+        <div className="parts" role="radiogroup" aria-label="Parts égales">
+          <span className="parts-titre">Parts égales</span>
+          <button role="radio" aria-checked={parts == null} className={`option${parts == null ? " active" : ""}`} onClick={() => choisirParts(null)}>
+            Tout
+          </button>
+          {PARTS.map((n) => (
+            <button key={n} role="radio" aria-checked={parts === n} className={`option${parts === n ? " active" : ""}`} onClick={() => choisirParts(n)}>
+              {n}
+            </button>
+          ))}
+          <button
+            role="radio"
+            aria-checked={parts != null && parts > PARTS.at(-1)!}
+            aria-label="Une part de plus"
+            className={`option${parts != null && parts > PARTS.at(-1)! ? " active" : ""}`}
+            onClick={() => choisirParts(Math.max(parts ?? 0, PARTS.at(-1)!) + 1)}
+          >
+            {parts != null && parts > PARTS.at(-1)! ? parts : `${PARTS.at(-1)! + 1}+`}
+          </button>
+        </div>
+      )}
       <div className="encaissement">
         <div className="encaissement-etat">
           <div className="ligne-montant">
-            <span>Total</span>
+            <span>{partie ? "Sélection" : "Total"}</span>
             <strong>{euros(total)}</strong>
           </div>
+          {(c.acomptes ?? []).length > 0 && !partie &&
+            (c.acomptes ?? []).map((a) => (
+              <div key={a.id} className={`ligne-montant paiement acompte${a.annule ? " annule" : ""}`}>
+                <span className="acompte-libelle">
+                  Acompte {LIBELLES_PAIEMENT[a.mode].toLowerCase()}
+                  <small>{a.annule ? `rendu à ${heure(a.annule.le)}` : `à ${heure(a.le)}`}</small>
+                </span>
+                <span className="acompte-montant">
+                  {euros(-a.montant)}
+                  {!a.annule && surTable && (
+                    <button
+                      className="bouton discret"
+                      aria-label={`Rendre l'acompte ${LIBELLES_PAIEMENT[a.mode]} de ${euros(a.montant)}`}
+                      title="Rendre l'acompte (responsable)"
+                      onClick={() => void rendreAcompte(a)}
+                    >
+                      <X className="icone" size={20} aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
+              </div>
+            ))}
+          {!solde && (
+            <div className="ligne-montant part">
+              <span>
+                Part ({parts} parts) · reste ensuite {euros(resteTable - aPayer)}
+              </span>
+              <strong>{euros(aPayer)}</strong>
+            </div>
+          )}
           {paiements.map((p, i) => (
             <div key={i} className="ligne-montant paiement">
               <span>
@@ -297,7 +529,7 @@ export function ModaleEncaissement(props: {
             </div>
           ))}
           <div className={`ligne-montant reste${reste === 0 ? " solde" : ""}`}>
-            <span>{excedent > 0 ? "À rendre" : "Reste à payer"}</span>
+            <span>{excedent > 0 ? "À rendre" : solde ? "Reste à payer" : "Reste de la part"}</span>
             <strong>{euros(excedent > 0 ? excedent : reste)}</strong>
           </div>
         </div>
@@ -309,7 +541,7 @@ export function ModaleEncaissement(props: {
         </div>
         <div className="encaissement-modes">
           {MODES.map((m) => (
-            <button key={m} className={`mode mode-${m.toLowerCase()}`} disabled={montant <= 0} onClick={() => ajouter(m)}>
+            <button key={m} className={`mode mode-${m.toLowerCase()}`} disabled={montant <= 0 || (m === "EN_COMPTE" && !solde)} onClick={() => ajouter(m)}>
               <AvecIcone icone={ICONES_PAIEMENT[m]} taille={26}>
                 {m === "EN_COMPTE" && client ? `Compte ${client.nom}` : LIBELLES_PAIEMENT[m]}
               </AvecIcone>
@@ -328,7 +560,7 @@ export function ModaleEncaissement(props: {
       {choixClient != null && (
         <ModaleClient
           titre={`${euros(choixClient)} en compte : quel client ?`}
-          onChoisir={(c, nouveau) => void mettreEnCompte(c, choixClient, nouveau)}
+          onChoisir={(cl, nouveau) => void mettreEnCompte(cl, choixClient, nouveau)}
           onFermer={() => setChoixClient(null)}
         />
       )}

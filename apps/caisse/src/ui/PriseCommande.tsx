@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, Split, StickyNote, Users } from "lucide-react";
 import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
@@ -7,9 +7,11 @@ import { useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
 import {
+  acomptesActifs,
   ajouterLigne,
   commandeAGarder,
-  lignesActives,
+  diviserParArticles,
+  lignesDues,
   lignesParSuite,
   modifierLigne,
   montantLigne,
@@ -18,6 +20,7 @@ import {
   reclameDe,
   SUITES,
   suitesAReclamer,
+  totalAcomptes,
   totauxCommande,
   type Commande,
   type LigneCommande,
@@ -28,6 +31,7 @@ import { Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { ModaleArticle } from "./modales/ModaleArticle";
 import { ModaleCouverts } from "./modales/ModaleCouverts";
+import { ModaleDivision } from "./modales/ModaleDivision";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
 import { ModaleLigne } from "./modales/ModaleLigne";
 import { ModaleAssembler, ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
@@ -63,6 +67,8 @@ interface ProprietesCommande {
   /** Réservation de la table sur le serveur avant d'encaisser (commandes partagées). */
   reserver?: (c: Commande) => Promise<Reservation>;
   liberer?: (tableId: string) => void;
+  /** Partie de la table payée (articles, acompte) : la commande qui reste, écrite sur le serveur sans fusion. */
+  engager?: (affichee: Commande, restante: Commande) => Promise<Reservation>;
 }
 
 /** La carte vient de l'établissement (référentiel serveur). */
@@ -97,7 +103,9 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const [articleOuvert, setArticleOuvert] = useState<Article | null>(null);
   const [ligneOuverte, setLigneOuverte] = useState<LigneCommande | null>(null);
   const [couvertsOuvert, setCouvertsOuvert] = useState(false);
-  const [encaissement, setEncaissement] = useState(false);
+  /** Encaissement ouvert : la table entière, une sélection d'articles, ou en parts. */
+  const [encaissement, setEncaissement] = useState<null | { partie?: { lignes: LigneCommande[]; restante: Commande }; parts?: boolean }>(null);
+  const [divisionOuverte, setDivisionOuverte] = useState(false);
   const [transfertOuvert, setTransfertOuvert] = useState(false);
   const [noteOuverte, setNoteOuverte] = useState(false);
   const [assemblageOuvert, setAssemblageOuvert] = useState(false);
@@ -105,8 +113,10 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const [ticketOuvert, setTicketOuvert] = useState(false);
   const totaux = totauxCommande(c);
   const estComptoir = c.tableId === ID_COMPTOIR;
-  /** Articles qui comptent (les lignes retirées restent affichées barrées). */
-  const nbActives = lignesActives(c).length;
+  /** Articles à payer (les lignes retirées restent affichées barrées, les lignes réglées à part « Réglé »). */
+  const nbActives = lignesDues(c).length;
+  const acomptes = acomptesActifs(c);
+  const verse = totalAcomptes(c);
   const production = productionActive(config);
   const envoyerProduction = useEnvoiProduction();
   const nbAEnvoyer = nbLignesAEnvoyer(c, production);
@@ -221,9 +231,9 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                 {g.lignes.map((l) => (
                   <li key={l.uid}>
                     <button
-                      className={`ticket-ligne${l.retiree ? " retiree" : ""}`}
-                      disabled={!!l.retiree}
-                      aria-label={l.retiree ? `${l.quantite} ${l.libelle}, retiré de la commande` : undefined}
+                      className={`ticket-ligne${l.retiree ? " retiree" : ""}${l.reglee ? " reglee" : ""}`}
+                      disabled={!!l.retiree || !!l.reglee}
+                      aria-label={l.retiree ? `${l.quantite} ${l.libelle}, retiré de la commande` : l.reglee ? `${l.quantite} ${l.libelle}, réglé` : undefined}
                       onClick={() => setLigneOuverte(l)}
                     >
                       <span className="qte">{l.quantite}</span>
@@ -232,6 +242,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                         {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
                         {l.note && <small className="note-ligne">{l.note}</small>}
                         {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
+                        {l.reglee && <small className="mention-reglee">Réglé à {heure(l.reglee.le)}</small>}
                         {l.envoyee && !l.retiree && <small className="mention-envoyee">Envoyé</small>}
                         {production && l.envoyee && l.retiree && !l.annulationEnvoyee && <small className="mention-envoyee">Annulation à envoyer</small>}
                         {l.remise && (
@@ -250,9 +261,16 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           ))}
         </ol>
         <footer className="ticket-pied">
+          {acomptes.length > 0 && (
+            <div className="ticket-acomptes">
+              <span>
+                Total {euros(totaux.totalTTC)} · {acomptes.length} acompte{acomptes.length > 1 ? "s" : ""} {euros(verse)}
+              </span>
+            </div>
+          )}
           <div className="ticket-total">
-            <span>Total</span>
-            <strong>{euros(totaux.totalTTC)}</strong>
+            <span>{acomptes.length ? "Reste à payer" : "Total"}</span>
+            <strong>{euros(totaux.totalTTC - verse)}</strong>
           </div>
           <div className="ticket-actions">
             <button className="bouton" disabled={nbAEnvoyer === 0 || envoiEnCours} onClick={() => void envoyer(c)}>
@@ -263,12 +281,17 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                 <AvecIcone icone={Printer}>Addition</AvecIcone>
               </button>
             )}
-            {nbActives === 0 && commandeAGarder(c) ? (
+            {!estComptoir && (
+              <button className="bouton" disabled={nbActives === 0} onClick={() => setDivisionOuverte(true)}>
+                <AvecIcone icone={Split}>Diviser</AvecIcone>
+              </button>
+            )}
+            {nbActives === 0 && !acomptes.length && commandeAGarder(c) ? (
               <button className="bouton" onClick={props.onTerminee}>
                 <AvecIcone icone={DoorOpen}>{estComptoir ? "Vider" : "Libérer la table"}</AvecIcone>
               </button>
             ) : (
-              <button className="bouton principal" disabled={nbActives === 0} onClick={() => setEncaissement(true)}>
+              <button className="bouton principal" disabled={nbActives === 0 && !acomptes.length} onClick={() => setEncaissement({})}>
                 <AvecIcone icone={CreditCard}>Encaisser</AvecIcone>
               </button>
             )}
@@ -403,13 +426,33 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           onFermer={() => setCouvertsOuvert(false)}
         />
       )}
+      {divisionOuverte && (
+        <ModaleDivision
+          commande={c}
+          onArticles={(selection) => {
+            setDivisionOuverte(false);
+            const d = diviserParArticles(c, selection, { le: new Date().toISOString(), par: utilisateur.id, caisseId: config.caisseId });
+            // Tout choisi : c'est l'encaissement de la table entière.
+            setEncaissement(d.tout ? {} : { partie: { lignes: d.payees, restante: d.restante } });
+          }}
+          onParts={() => {
+            setDivisionOuverte(false);
+            setEncaissement({ parts: true });
+          }}
+          onFermer={() => setDivisionOuverte(false)}
+        />
+      )}
       {encaissement && (
         <ModaleEncaissement
           commande={c}
+          {...(encaissement.partie ? { partie: encaissement.partie } : {})}
+          {...(encaissement.parts ? { parts: true } : {})}
           onTermine={props.onTerminee}
-          onFermer={() => setEncaissement(false)}
+          onPartie={props.onChange}
+          onFermer={() => setEncaissement(null)}
           reserver={props.reserver}
           liberer={props.liberer}
+          {...(props.engager ? { engager: props.engager } : {})}
         />
       )}
     </div>

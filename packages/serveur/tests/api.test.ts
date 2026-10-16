@@ -458,6 +458,27 @@ describe("commandes en cours partagées", () => {
     expect((await appel("PUT", "/api/caisse/commandes/t6", { commande: commande("t7", []), version: 0 }, a.bearer)).statut).toBe(400);
     expect((await appel("GET", "/api/caisse/commandes")).statut).toBe(401);
   });
+
+  it("une table qui porte des acomptes bloque la Z de l'établissement jusqu'à ce qu'elle soit soldée", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const acompte = { id: "a1", mode: "CB", montant: 400, le: "2026-10-16T21:00:00Z", par: "u1", caisseId: "ipad" };
+    const avec = { ...commande("t9", ["cafe", "the"]), acomptes: [acompte] };
+    expect((await appel("PUT", "/api/caisse/commandes/t9", { commande: avec, version: 0 }, a.bearer)).corps).toEqual({ ok: true, version: 1 });
+    const refus = await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer);
+    expect(refus.statut).toBe(409);
+    expect(refus.corps.code).toBe("ACOMPTES_EN_ATTENTE");
+    // Acompte rendu au client : il ne compte plus.
+    const rendu = { ...avec, acomptes: [{ ...acompte, annule: { le: "x", par: "resp", motif: "Rendu au client" } }] };
+    expect((await appel("PUT", "/api/caisse/commandes/t9", { commande: rendu, version: 1 }, a.bearer)).corps.ok).toBe(true);
+    expect((await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
+    expect((await appel("DELETE", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
+    // Un nouvel acompte, puis la table soldée (fermée) : la Z repasse.
+    expect((await appel("PUT", "/api/caisse/commandes/t9", { commande: avec, version: 2 }, a.bearer)).corps.ok).toBe(true);
+    expect((await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(409);
+    expect((await appel("PUT", "/api/caisse/commandes/t9", { commande: null, version: 3, stricte: true }, a.bearer)).corps.ok).toBe(true);
+    expect((await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
+  });
 });
 
 describe("tickets partagés", () => {

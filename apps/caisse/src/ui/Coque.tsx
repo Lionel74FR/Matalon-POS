@@ -29,6 +29,7 @@ import {
   nouvelleCommande,
   tablesDeCommande,
   totauxCommande,
+  acomptesActifs,
   transfererCommande,
   type Commande,
 } from "../metier/commande";
@@ -176,6 +177,7 @@ export function Coque() {
   }, [partage]);
   const reserverEncaissement = useCallback((c: Commande): Promise<ReservationTable> => partage.reserver(c.tableId, c), [partage]);
   const libererEncaissement = useCallback((tableId: string) => void partage.liberer(tableId), [partage]);
+  const engagerPartie = useCallback((affichee: Commande, restante: Commande) => partage.engager(affichee.tableId, affichee, restante), [partage]);
 
   // Une heure d'iPad antérieure au dernier ticket signale une horloge déréglée.
   useEffect(() => {
@@ -371,11 +373,17 @@ export function Coque() {
             onRetour={() => setVue({ nom: "salle" })}
             reserver={reserverEncaissement}
             liberer={libererEncaissement}
+            engager={engagerPartie}
           />
         )}
         {vue.nom === "tickets" && <Tickets />}
         {vue.nom === "comptes" && <Comptes />}
-        {vue.nom === "clotures" && <Clotures commandesOuvertes={commandes.size} />}
+        {vue.nom === "clotures" && (
+          <Clotures
+            commandesOuvertes={commandes.size}
+            tablesAvecAcomptes={[...commandes.values()].filter((c) => acomptesActifs(c).length).map((c) => nomTable(config, c.tableId))}
+          />
+        )}
         {vue.nom === "statistiques" && <Statistiques />}
         {vue.nom === "stock" && <StockCaisse />}
         {vue.nom === "edition" && <EditionCaisse onRetour={() => setVue({ nom: "salle" })} />}

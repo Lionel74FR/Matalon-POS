@@ -139,6 +139,41 @@ export class PartageCommandes {
     });
   }
 
+  /**
+   * Encaissement d'une partie de la table (articles, acompte) : écrit sur le serveur la commande
+   * qui restera, sans fusion. Refusé si un autre appareil a modifié ou encaissé la table entre-temps.
+   * L'appareil, lui, garde la commande affichée jusqu'à `modifier` (paiement fait) ou `liberer`
+   * (abandon : la commande affichée revient sur le serveur). Hors ligne : `horsLigne`, rien n'est écrit.
+   */
+  engager(tableId: string, affichee: Commande, restante: Commande): Promise<Reservation> {
+    if (!estPartagee(tableId)) return Promise.resolve({ ok: true });
+    return this.enFile(async (): Promise<Reservation> => {
+      try {
+        await this.envoyer(tableId);
+        const locale = this.commandes.get(tableId) ?? null;
+        if (!egales(locale, affichee)) {
+          return { ok: false, raison: `${this.nomTable(tableId)} vient d'être modifiée sur un autre appareil : vérifiez la commande puis recommencez.` };
+        }
+        const s = this.suivis.get(tableId) ?? { tableId, version: 0, base: null, aEnvoyer: false };
+        const r = await this.acces.ecrire(tableId, restante, s.version);
+        if (r.ok) {
+          await this.majSuivi({ tableId, version: r.version, base: restante, aEnvoyer: false });
+          return { ok: true };
+        }
+        const par = r.actuelle.majPar ? ` sur ${r.actuelle.majPar}` : " sur un autre appareil";
+        await this.appliquerConflit(tableId, r.actuelle, false);
+        return {
+          ok: false,
+          raison: r.actuelle.commande
+            ? `${this.nomTable(tableId)} vient d'être modifiée${par} : vérifiez la commande puis recommencez.`
+            : `${this.nomTable(tableId)} a déjà été encaissée${par}.`,
+        };
+      } catch {
+        return { ok: true, horsLigne: true };
+      }
+    });
+  }
+
   /** Encaissement abandonné après `reserver` : la table se rouvre sur le serveur. */
   async liberer(tableId: string): Promise<void> {
     if (!estPartagee(tableId)) return;

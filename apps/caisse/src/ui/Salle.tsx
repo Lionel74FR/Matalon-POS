@@ -1,7 +1,7 @@
 import { BellRing, CalendarCheck, Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ID_COMPTOIR, type Table } from "../donnees/configuration";
-import { nomCourtSuite, nomSuite, suitesDe, suiviSuites, tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
+import { nomCourtSuite, nomSuite, resteAPayer, suitesDe, suiviSuites, tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
 import { chaisesDe, placerTables, zonesDuPlan } from "../metier/plan";
 import { euros, useCaisse } from "./contexte";
 import { EditeurPlan, type PlanEditable } from "./EditeurPlan";
@@ -54,7 +54,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
   const zone = zones.find((z) => z.nom === zoneNom) ?? zones[0];
   const comptoir = props.commandes.get(ID_COMPTOIR);
   const occupees = [...props.commandes.values()].filter((c) => c.tableId !== ID_COMPTOIR);
-  const enCours = occupees.reduce((s, c) => s + totauxCommande(c).totalTTC, 0);
+  const enCours = occupees.reduce((s, c) => s + resteAPayer(c), 0);
   const tableParId = useMemo(() => new Map(config.tables.map((t) => [t.id, t])), [config.tables]);
   const nom = (id: string) => tableParId.get(id)?.nom ?? id;
 
@@ -88,7 +88,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
         continue;
       }
       const chaises = tablesDeCommande(c).reduce((s, id) => s + (tableParId.has(id) ? chaisesDe(tableParId.get(id)!) : 0), 0);
-      const total = euros(totauxCommande(c).totalTTC);
+      const total = euros(resteAPayer(c));
       const couverts = c.couverts ? `${c.couverts}/${chaises}` : null;
       const suivi = suiviTable(c);
       m.set(t.id, {
@@ -240,7 +240,7 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
             {horsPlan.map((c) => (
               <button key={c.tableId} className="table occupee" onClick={() => props.onOuvrir(c.tableId)}>
                 <span className="table-nom">{nom(c.tableId)}</span>
-                <span className="table-total">{euros(totauxCommande(c).totalTTC)}</span>
+                <span className="table-total">{euros(resteAPayer(c))}</span>
               </button>
             ))}
           </div>
@@ -279,7 +279,7 @@ function ListeTables(props: { tables: Table[]; commandeDe: Map<string, Commande>
                     <span className="table-nom">{t.nom}</span>
                     {c ? (
                       <>
-                        <span className="table-total">{euros(totauxCommande(c).totalTTC)}</span>
+                        <span className="table-total">{euros(resteAPayer(c))}</span>
                         <span className="table-meta">
                           {c.couverts ? (
                             <span title={`${c.couverts} couverts`}>

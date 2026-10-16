@@ -324,6 +324,18 @@
     <p class="attendu"><b>Attendu :</b> après la vente, le stock théorique des ingrédients baisse ; l'inventaire remplace le théorique des produits comptés (le premier fait le stock d'ouverture) ; un comptage daté d'un jour passé se compare au stock de ce jour-là, les livraisons d'après s'y ajoutent ; la réception augmente le stock et son prix devient le dernier prix ; la perte sort du stock avec sa valeur. Le food cost montre le théorique (fiches des ventes), le réel (pertes et écarts en plus) et les ventes sans fiche. Sur iPhone, l'écran tient en une colonne.</p>
   </section>
 
+  <section class="scenario" data-id="s6t">
+    <label><input type="checkbox">Diviser la note : par articles, en parts, montant libre</label>
+    <ol>
+      <li>Sur l'iPad, ouvrez une table : 3 cappuccinos, un cortado, un espresso. <span class="bouton">Diviser</span> › <b>Par articles</b> : touchez le cortado, puis <b>+</b> sur le cappuccino (1 sur 3), puis <span class="bouton">Encaisser la sélection</span> par carte. Retour à la table : les deux articles payés restent affichés « Réglé », le total baisse d'autant.</li>
+      <li>Sur l'iPhone, ouvrez la même table : <span class="bouton">Diviser</span> › <b>En parts égales ou montant libre</b>, choisissez <b>2</b>, touchez le billet de 10 €, puis <span class="bouton">Valider la part</span> : le rendu monnaie et le reste sur la table s'affichent.</li>
+      <li>Sur l'iPad, menu › Clôtures › <span class="bouton">Clôturer la journée (Z)</span> : refusée tant que la table porte l'acompte.</li>
+      <li>Sur l'iPad, <span class="bouton">Encaisser</span> la table : la part de 2 est proposée ; touchez <b>Tout</b>, tapez 2,00, carte bancaire, puis <span class="bouton">Acompte de 2,00 €, le reste sur la table</span>. Rouvrez l'encaissement et touchez la croix de cet acompte (responsable) : il est barré, « rendu ».</li>
+      <li>Encaissez le reste par carte : la table se libère sur les deux appareils. Onglet Tickets : deux tickets, le second porte l'acompte en espèces et la carte, avec les couverts.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la salle et l'addition montrent le reste à payer ; une table à acomptes ne se libère pas ; un acompte demande le réseau (hors ligne, la caisse le refuse et propose la note entière ou par articles) ; la Z repasse une fois la table soldée. Au comptoir, pas de bouton Diviser. Sur iPhone, l'écran tient sans défilement horizontal.</p>
+  </section>
+
   <section class="scenario" data-id="s6s">
     <label><input type="checkbox">Carte et fiches techniques sur l'iPad (responsable)</label>
     <ol>

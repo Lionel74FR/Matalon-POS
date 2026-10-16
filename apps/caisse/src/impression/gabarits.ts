@@ -11,7 +11,7 @@ import {
 } from "@matalon/noyau-fiscal";
 import type { Configuration } from "../donnees/configuration";
 import { MODE_TEST } from "../fiscal/caisse";
-import { lignesActives, nomSuite, reclameDe, totauxCommande, versSaisie, type Commande, type Suite } from "../metier/commande";
+import { acomptesActifs, lignesDues, nomSuite, reclameDe, totauxCommande, versSaisie, type Commande, type Suite } from "../metier/commande";
 import type { Bon } from "../metier/production";
 import { mentionsPaiement, natureOperation, prixUnitaireHT, type Facture } from "../metier/facture";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
@@ -163,13 +163,18 @@ export function gabaritAddition(commande: Commande, config: Configuration, opera
   r.colonnes(nomCommande(config, commande), dateHeure(new Date().toISOString()));
   if (commande.couverts) r.texte(`${commande.couverts} couvert(s) · servi par ${nomUtilisateur(config, operateurId)}`);
   r.filet();
-  for (const l of lignesActives(commande)) {
+  for (const l of lignesDues(commande)) {
     const s = versSaisie(l);
     r.colonnes(`${l.quantite} x ${s.libelle}`, formaterEuros(l.quantite * l.prixUnitaireTTC));
     if (l.remise) r.colonnes(`   Remise (${l.remise.motif})`, formaterEuros(-l.remise.montantTTC));
   }
   r.filet();
   r.colonnes("TOTAL TTC", `${formaterEuros(totaux.totalTTC)} EUR`, { gras: true, grand: true });
+  const acomptes = acomptesActifs(commande);
+  if (acomptes.length) {
+    for (const a of acomptes) r.colonnes(`Acompte ${LIBELLES_PAIEMENT[a.mode]}`, formaterEuros(-a.montant));
+    r.colonnes("RESTE A PAYER", `${formaterEuros(totaux.totalTTC - acomptes.reduce((x, a) => x + a.montant, 0))} EUR`, { gras: true, grand: true });
+  }
   r.saut();
   tableauTVA(r, totaux.ventilation);
   r.filet();

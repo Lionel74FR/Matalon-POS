@@ -146,7 +146,11 @@ export function datePeriode(identifiant: string): string {
 }
 
 /** Lecture X, clôtures, export comptable, archives et contrôle d'intégrité. */
-export function Clotures(props: { commandesOuvertes: number }) {
+export function Clotures(props: {
+  commandesOuvertes: number;
+  /** Tables qui portent des acomptes : la Z attend qu'elles soient soldées (l'argent reçu n'est sur aucun ticket). */
+  tablesAvecAcomptes: string[];
+}) {
   const { caisse, config, utilisateur, notifier, imprimer, demanderResponsable, imprimanteConfiguree, synchroniser } = useCaisse();
   /** Clôtures scellées sur cet appareil. */
   const [clotures, setClotures] = useState<Cloture[]>([]);
@@ -221,6 +225,13 @@ export function Clotures(props: { commandesOuvertes: number }) {
   const ouvrirZ = () =>
     executer(async () => {
       if (preparationZ) return;
+      if (props.tablesAvecAcomptes.length) {
+        const n = props.tablesAvecAcomptes.length;
+        return notifier(
+          `Z impossible : ${props.tablesAvecAcomptes.join(", ")} ${n > 1 ? "portent" : "porte"} des acomptes. Encaissez le reste (ou portez-le en compte), ou annulez les acomptes, puis clôturez.`,
+          "erreur",
+        );
+      }
       setPreparationZ(true);
       try {
         setZEnCours({ journee: await journeePourCloture(caisse, synchroniser) });

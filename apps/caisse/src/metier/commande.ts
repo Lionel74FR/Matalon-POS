@@ -1,4 +1,4 @@
-import { calculerLigne, ventiler, type SaisieLigne, type VentilationTVA } from "@matalon/noyau-fiscal";
+import { calculerLigne, ventiler, type ModePaiement, type Paiement, type SaisieLigne, type VentilationTVA } from "@matalon/noyau-fiscal";
 
 /**
  * Commande ouverte (table ou comptoir). Données de travail, hors périmètre
@@ -35,6 +35,34 @@ export interface LigneCommande {
   annulationEnvoyee?: boolean;
   /** Suite (« course ») : absente pour « En direct », 1 à 3 pour « À suivre » ; préparée quand elle est réclamée. */
   suite?: SuiteAttente;
+  /**
+   * Encaissée à part (division de la note par articles) : son ticket est
+   * scellé, elle reste affichée « Réglé » pour le service, ne compte plus
+   * dans le reste à payer et ne se modifie plus.
+   */
+  reglee?: { le: string; par: string; caisseId: string };
+}
+
+/** Moyens acceptés en acompte : la mise en compte se fait à l'encaissement final, avec le client. */
+export type ModeAcompte = Exclude<ModePaiement, "EN_COMPTE">;
+
+/**
+ * Acompte (part ou montant libre) versé sur une table qui reste ouverte. Hors
+ * périmètre fiscal tant que la table n'est pas soldée : le ticket, unique,
+ * est scellé au dernier paiement et reprend chaque acompte comme paiement.
+ * Une table qui porte des acomptes ne se libère pas et bloque la Z.
+ */
+export interface Acompte {
+  id: string;
+  mode: ModeAcompte;
+  /** Montant retenu sur la note (espèces : hors rendu monnaie). */
+  montant: number;
+  le: string;
+  par: string;
+  /** Appareil qui l'a reçu. */
+  caisseId: string;
+  /** Rendu au client (erreur de saisie), avec l'accord d'un responsable : ne compte plus, reste affiché. */
+  annule?: { le: string; par: string; motif: string };
 }
 
 /** « À suivre 1 » à « À suivre 3 » ; « En direct » est l'absence de suite. */
@@ -70,6 +98,10 @@ export interface Commande {
   jointes?: string[];
   /** Suites réclamées, dans l'ordre. */
   reclames?: Reclame[];
+  /** Acomptes versés, dans l'ordre (annulés compris). */
+  acomptes?: Acompte[];
+  /** Note partagée en parts égales : retenu pour la part suivante. */
+  parts?: number;
 }
 
 /** Tables qu'occupe une commande : la sienne, puis celles qui lui sont assemblées. */
@@ -115,9 +147,80 @@ export interface TotauxCommande {
   ventilation: VentilationTVA[];
 }
 
-/** Lignes qui comptent : celles qui n'ont pas été retirées. */
+/** Lignes servies : celles qui n'ont pas été retirées (réglées à part comprises, pour la production et les suites). */
 export function lignesActives(c: Commande): LigneCommande[] {
   return c.lignes.filter((l) => !l.retiree);
+}
+
+/** Lignes à payer : servies et pas encore réglées à part. Ce sont elles que porte le ticket. */
+export function lignesDues(c: Commande): LigneCommande[] {
+  return c.lignes.filter((l) => !l.retiree && !l.reglee);
+}
+
+export function acomptesActifs(c: Commande): Acompte[] {
+  return (c.acomptes ?? []).filter((a) => !a.annule);
+}
+
+export function totalAcomptes(c: Commande): number {
+  return acomptesActifs(c).reduce((s, a) => s + a.montant, 0);
+}
+
+/** Total dû moins les acomptes ; négatif si les acomptes dépassent ce qui reste (trop-perçu). */
+export function resteAPayer(c: Commande): number {
+  return totauxCommande(c).totalTTC - totalAcomptes(c);
+}
+
+/** Acomptes repris comme paiements du ticket final. */
+export function paiementsAcomptes(c: Commande): Paiement[] {
+  return acomptesActifs(c).map((a) => ({ mode: a.mode, montant: a.montant }));
+}
+
+export function ajouterAcompte(c: Commande, a: Omit<Acompte, "id">): Commande {
+  return { ...c, acomptes: [...(c.acomptes ?? []), { ...a, id: uid() }] };
+}
+
+export function annulerAcompte(c: Commande, id: string, annule: NonNullable<Acompte["annule"]>): Commande {
+  return { ...c, acomptes: (c.acomptes ?? []).map((a) => (a.id === id && !a.annule ? { ...a, annule } : a)) };
+}
+
+/** Parts égales : la part courante ; la dernière prend les centimes restants. */
+export function montantPart(total: number, parts: number, reste: number): number {
+  if (parts < 1 || reste <= 0) return Math.max(0, reste);
+  const part = Math.floor(total / parts);
+  return reste - part < part || part === 0 ? reste : part;
+}
+
+/**
+ * Division par articles : `selection` donne, par ligne due, le nombre d'unités
+ * payées maintenant. Une ligne prise en entier est marquée réglée ; prise en
+ * partie, elle est coupée (les unités payées deviennent une ligne réglée, la
+ * remise suit au prorata). `payees` sont les lignes du ticket ; `restante` est
+ * la commande après paiement.
+ */
+export function diviserParArticles(
+  c: Commande,
+  selection: ReadonlyMap<string, number>,
+  reglee: NonNullable<LigneCommande["reglee"]>,
+): { payees: LigneCommande[]; restante: Commande; tout: boolean } {
+  const payees: LigneCommande[] = [];
+  const lignes: LigneCommande[] = [];
+  let tout = true;
+  for (const l of c.lignes) {
+    const q = l.retiree || l.reglee ? 0 : Math.min(l.quantite, Math.max(0, Math.trunc(selection.get(l.uid) ?? 0)));
+    if (!l.retiree && !l.reglee && q < l.quantite) tout = false;
+    if (q === 0) {
+      lignes.push(l);
+    } else if (q === l.quantite) {
+      const p = { ...l, reglee };
+      payees.push(p);
+      lignes.push(p);
+    } else {
+      const p = { ...avecQuantite(l, q), uid: uid(), reglee };
+      lignes.push(avecQuantite(l, l.quantite - q), p);
+      payees.push(p);
+    }
+  }
+  return { payees, restante: { ...c, lignes }, tout: tout && !acomptesActifs(c).length };
 }
 
 /**
@@ -126,7 +229,7 @@ export function lignesActives(c: Commande): LigneCommande[] {
  * de commander) ou une note. « Libérer la table » la ferme explicitement.
  */
 export function commandeAGarder(c: Commande | null): c is Commande {
-  return !!c && (c.lignes.length > 0 || c.couverts != null || !!c.note);
+  return !!c && (c.lignes.length > 0 || c.couverts != null || !!c.note || acomptesActifs(c).length > 0);
 }
 
 /**
@@ -163,7 +266,7 @@ export function modifierLigne(
 
 /** Totaux calculés exactement comme le noyau fiscal les calculera. */
 export function totauxCommande(c: Commande): TotauxCommande {
-  const actives = lignesActives(c);
+  const actives = lignesDues(c);
   const lignes = actives.map((l) => calculerLigne(versSaisie(l)));
   return {
     totalTTC: lignes.reduce((s, l) => s + l.montantTTC, 0),
@@ -192,6 +295,7 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
   const identique = c.lignes.find(
     (x) =>
       !x.retiree &&
+      !x.reglee &&
       !x.envoyee &&
       x.articleId === l.articleId &&
       x.prixUnitaireTTC === l.prixUnitaireTTC &&
@@ -234,6 +338,7 @@ export function fusionnerCommandes(cible: Commande, source: Commande): Commande 
     ...(notes.length ? { note: notes.join(" · ") } : {}),
     ...(jointesFusion(cible, source).length ? { jointes: jointesFusion(cible, source) } : {}),
     ...(reclamesFusion(cible, source).length ? { reclames: reclamesFusion(cible, source) } : {}),
+    ...(cible.acomptes?.length || source.acomptes?.length ? { acomptes: [...(cible.acomptes ?? []), ...(source.acomptes ?? [])] } : {}),
   };
 }
 

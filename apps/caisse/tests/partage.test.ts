@@ -209,3 +209,63 @@ describe("commandes partagées entre appareils", () => {
     expect(s.tables.get("t5")!.commande!.lignes.map((l) => l.uid)).toEqual(["cafe"]);
   });
 });
+
+describe("partie d'une table payée (articles, acompte)", () => {
+  const acompte = { id: "a1", mode: "CB" as const, montant: 400, le: "x", par: "u1", caisseId: "ipad" };
+
+  it("en ligne : la commande restante est écrite sans fusion, puis l'autre appareil la reçoit", async () => {
+    const s = new Serveur();
+    const a = appareil(s, "iPad");
+    const b = appareil(s, "iPhone");
+    await a.p.charger();
+    await b.p.charger();
+    await a.p.modifier("t6", commande("t6", [ligne("cafe"), ligne("the")]));
+    await a.p.synchroniser();
+    await b.p.synchroniser();
+    const affichee = a.p.commandes.get("t6")!;
+    const restante = { ...affichee, acomptes: [acompte] };
+    expect(await a.p.engager("t6", affichee, restante)).toEqual({ ok: true });
+    expect(s.tables.get("t6")!.commande!.acomptes).toEqual([acompte]);
+    await a.p.modifier("t6", restante);
+    await b.p.synchroniser();
+    expect(b.p.commandes.get("t6")!.acomptes).toEqual([acompte]);
+  });
+
+  it("refusé si la table a changé ailleurs ; hors ligne, rien n'est écrit", async () => {
+    const s = new Serveur();
+    const a = appareil(s, "iPad");
+    const b = appareil(s, "iPhone");
+    await a.p.charger();
+    await b.p.charger();
+    await a.p.modifier("t7", commande("t7", [ligne("cafe")]));
+    await a.p.synchroniser();
+    await b.p.synchroniser();
+    const vueIpad = a.p.commandes.get("t7")!;
+    await b.p.modifier("t7", commande("t7", [ligne("cafe"), ligne("dessert")]));
+    await b.p.synchroniser();
+    expect(await a.p.engager("t7", vueIpad, { ...vueIpad, acomptes: [acompte] })).toMatchObject({
+      ok: false,
+      raison: "Table 7 vient d'être modifiée sur iPhone : vérifiez la commande puis recommencez.",
+    });
+    // L'iPad voit maintenant le dessert.
+    expect(a.p.commandes.get("t7")!.lignes.map((l) => l.uid)).toEqual(["cafe", "dessert"]);
+    s.horsLigne = true;
+    const vue = a.p.commandes.get("t7")!;
+    expect(await a.p.engager("t7", vue, { ...vue, acomptes: [acompte] })).toEqual({ ok: true, horsLigne: true });
+    expect(s.tables.get("t7")!.commande!.acomptes).toBeUndefined();
+  });
+
+  it("ticket impossible après l'écriture : la commande affichée revient sur le serveur", async () => {
+    const s = new Serveur();
+    const a = appareil(s, "iPad");
+    await a.p.charger();
+    await a.p.modifier("t8", commande("t8", [ligne("cafe"), ligne("the")]));
+    await a.p.synchroniser();
+    const affichee = a.p.commandes.get("t8")!;
+    const restante = { ...affichee, lignes: [affichee.lignes[0]!, { ...affichee.lignes[1]!, reglee: { le: "x", par: "u1", caisseId: "ipad" } }] };
+    expect(await a.p.engager("t8", affichee, restante)).toEqual({ ok: true });
+    await a.p.liberer("t8");
+    await a.p.synchroniser();
+    expect(s.tables.get("t8")!.commande!.lignes.some((l) => l.reglee)).toBe(false);
+  });
+});

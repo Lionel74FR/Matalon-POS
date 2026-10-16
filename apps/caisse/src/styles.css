@@ -972,6 +972,18 @@ code {
   font-style: italic;
 }
 
+/* Ligne réglée à part (division par articles) : servie et payée, sans effet sur le reste à payer. */
+.ticket-ligne.reglee,
+.ticket-ligne.reglee:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ticket-ligne .mention-reglee {
+  color: var(--vert);
+  font-weight: 600;
+}
+
 .ticket-ligne:active {
   background: var(--papier-ombre);
 }
@@ -1006,6 +1018,11 @@ code {
   gap: 12px;
 }
 
+.ticket-acomptes {
+  color: var(--encre-douce);
+  font-variant-numeric: tabular-nums;
+}
+
 .ticket-total {
   display: flex;
   justify-content: space-between;
@@ -1037,6 +1054,15 @@ code {
 
 .ticket-actions:has(> :nth-child(3)) > :last-child {
   grid-column: 1 / -1;
+}
+
+/* Envoyer et Addition, puis Diviser et Encaisser. */
+.ticket-actions:has(> :nth-child(4)) > :last-child {
+  grid-column: auto;
+}
+
+.ticket-actions > .bouton {
+  min-width: 0;
 }
 
 .ticket-ligne .mention-envoyee {
@@ -1362,6 +1388,119 @@ code {
 .ligne-montant.paiement {
   color: var(--sable);
   border-top: 1px solid var(--espresso-3);
+}
+
+.acompte-libelle {
+  display: grid;
+}
+
+.acompte-libelle small {
+  font-size: 0.85rem;
+}
+
+.acompte-montant {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.ligne-montant.acompte.annule .acompte-libelle,
+.ligne-montant.acompte.annule .acompte-montant {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.ligne-montant.part {
+  color: var(--mousse);
+  border-top: 1px solid var(--espresso-3);
+}
+
+/* Parts égales : Tout, 2 à 6, puis une de plus à chaque touche. */
+.parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.parts-titre {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.parts .option {
+  min-width: 52px;
+  min-height: 48px;
+}
+
+.division-choix {
+  display: grid;
+  gap: 12px;
+}
+
+.division-choix .bouton {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  min-height: 96px;
+  padding: 14px 18px;
+  text-align: left;
+}
+
+.division-choix small {
+  color: var(--sable);
+  font-weight: 400;
+  font-size: 0.92rem;
+}
+
+.division-lignes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.division-lignes li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-3);
+  padding: 4px 12px 4px 4px;
+}
+
+.division-lignes li.choisie {
+  outline: 2px solid var(--terre);
+}
+
+.division-libelle {
+  display: grid;
+  text-align: left;
+  min-height: 52px;
+  padding: 6px 10px;
+  border-radius: var(--rayon-petit);
+}
+
+.division-libelle small {
+  color: var(--sable);
+}
+
+.division-qte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.division-lignes .montant {
+  font-family: var(--police-chiffres);
+  font-variant-numeric: tabular-nums;
+  min-width: 72px;
+  text-align: right;
 }
 
 .ligne-montant.reste {

@@ -709,6 +709,19 @@ async function journeeCaisse(env: Environnement, requete: Request): Promise<Resp
  */
 async function prendreVerrouCloture(env: Environnement, requete: Request): Promise<Response> {
   const c = await caisseAuthentifiee(env, requete);
+  // Acomptes versés sur une table encore ouverte : reçus, mais sur aucun ticket. La Z attend qu'elle soit soldée.
+  const avecAcomptes = await env.db.requete<{ table_id: string }>(
+    `select distinct o.table_id from commandes_ouvertes o, jsonb_array_elements(coalesce(o.contenu->'acomptes', '[]'::jsonb)) a
+     where o.etablissement_id = $1 and o.contenu is not null and a->'annule' is null order by o.table_id`,
+    [c.etablissement_id],
+  );
+  if (avecAcomptes.length) {
+    throw new ErreurHttp(
+      409,
+      "ACOMPTES_EN_ATTENTE",
+      `Z impossible : ${avecAcomptes.length} table${avecAcomptes.length > 1 ? "s portent" : " porte"} des acomptes. Encaissez le reste (ou portez-le en compte), ou annulez les acomptes, puis clôturez.`,
+    );
+  }
   const maintenant = horloge(env);
   const verrou = { caisseId: c.id, expireLe: new Date(maintenant.getTime() + DUREE_VERROU_MS).toISOString() };
   const pris = await env.db.requete<{ id: string }>(
