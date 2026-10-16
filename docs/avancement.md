@@ -25,7 +25,7 @@ Dernière mise à jour : 16 octobre 2026 (mise en service).
 
 | Commit | Contenu |
 | --- | --- |
-| (ce commit) | Mise à jour de la caisse (retour de Lionel du 16 octobre : l'iPad restait sur l'ancienne version) : l'app ouverte cherche une nouvelle version toutes les 10 minutes et à chaque retour au premier plan ; le bandeau « Une nouvelle version de la caisse est prête » s'affiche pour toute personne connectée, plus seulement les responsables |
+| e319165 | Mise à jour de la caisse (retour de Lionel du 16 octobre : l'iPad restait sur l'ancienne version) : l'app ouverte cherche une nouvelle version toutes les 10 minutes et à chaque retour au premier plan ; le bandeau « Une nouvelle version de la caisse est prête » s'affiche pour toute personne connectée, plus seulement les responsables |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » en tête de la salle, le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. iPhone inchangé (la case reste, la barre n'a pas le bouton) |
 | 5ad25db | Salle sur iPad (demande de Lionel du 16 octobre) : plus de case « Comptoir » ; le comptoir s'ouvre par « Vente comptoir » dans la barre du haut, qui affiche le total d'une vente en cours. Sur iPhone, la case reste (la barre n'a pas ce bouton) |
 | 0363774 | Configuration de l'installation : les clés chiffrées (Resend) ne voyagent plus, chaque installation ayant sa propre `CLE_SECRETS` (celle du test n'a pas été conservée) ; la clé se ressaisit dans l'administration de la production |
