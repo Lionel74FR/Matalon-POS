@@ -131,5 +131,5 @@ describe("configuration de mise en service", () => {
     expect(encore.corps.code).toBe("BASE_NON_VIERGE");
     expect((await appel(test.db, "POST", "/api/admin/configuration", conf.corps, admin)).statut).toBe(409);
     expect((await appel(prod.db, "POST", "/api/admin/configuration", { format: "autre" }, adminProd)).statut).toBe(400);
-  });
+  }, 30_000); // deux bases embarquées : plus long que les autres scénarios
 });

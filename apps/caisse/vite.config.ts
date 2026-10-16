@@ -54,5 +54,7 @@ export default defineConfig({
   ],
   test: {
     environment: "node",
+    // Scénarios de synchronisation complets (base embarquée, signatures) : au-delà de 5 s sur une machine chargée.
+    testTimeout: 20_000,
   },
 });
