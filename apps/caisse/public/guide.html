@@ -434,6 +434,16 @@
     <p class="attendu"><b>Attendu :</b> les créneaux complets sont barrés « Complet » ; la réservation arrive confirmée, avec un e-mail au client et une copie à l'établissement ; la plus petite table libre lui est donnée ; « Installer » ouvre la table avec 4 couverts et une note au nom du client ; l'annulation libère le créneau et la table. Au-delà du groupe maximum, le module invite à appeler.</p>
   </section>
 
+  <section class="scenario" data-id="s6u">
+    <label><input type="checkbox">Réservation de groupe sur plusieurs tables</label>
+    <ol>
+      <li>Administration › <span class="bouton">Réservations</span> › <span class="bouton">Nouvelle réservation</span> : 15 personnes, puis le bouton <b>Tables</b> (« Attribuée d'office ») : touchez trois tables de 4, lisez le total, ajoutez-en une quatrième, <span class="bouton">Valider</span>, complétez et enregistrez.</li>
+      <li>Dans la liste, touchez les tables de la réservation : retirez-en une, ajoutez-en une autre, validez.</li>
+      <li>Sur l'iPad, <span class="bouton">Réservations</span> › <span class="bouton">Nouvelle</span> : un groupe de 10 sur trois tables. Puis <span class="bouton">Installer</span> le groupe de 15.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
+  </section>
+
   <section class="scenario" data-id="s6h">
     <label><input type="checkbox">Z de l'établissement depuis l'iPhone</label>
     <ol>

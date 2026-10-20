@@ -1,11 +1,12 @@
 import { maintenantParis, REGLAGES_DEFAUT, validerReglages, type ReglagesReservation, type Reservation, type ServiceReservation, type StatutReservation } from "@matalon/reservations";
-import type { EtatEnvoi } from "@matalon/serveur/partage";
+import type { EtatEnvoi, Table } from "@matalon/serveur/partage";
 import { CalendarCheck, ChevronLeft, ChevronRight, Code, Copy, ExternalLink, KeyRound, Pencil, Plus, Save, Search, Send, Settings, Trash2, X } from "lucide-react";
 import { Modale } from "../ui/communs";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
 import { dateLongue, decaler, FicheReservation, JOURS_A_VENIR, LIBELLES_SOURCE, LIBELLES_STATUT } from "../ui/FicheReservation";
+import { ChoixTables } from "../ui/ChoixTables";
 
 type Onglet = "liste" | "reglages" | "site";
 const JOURS = ["L", "M", "M", "J", "V", "S", "D"];
@@ -120,8 +121,6 @@ function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation 
     await charger();
   };
 
-  const tables = etab.tables.filter((t) => !t.masquee);
-  const nomTables = (ids: string[]) => (ids.length ? ids.map((id) => etab.tables.find((t) => t.id === id)?.nom ?? id).join(" + ") : "À placer");
   const q = recherche
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -235,19 +234,17 @@ function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation 
                     </td>
                     <td className="nombre">{r.couverts}</td>
                     <td>
-                      <select
-                        aria-label={`Table de ${r.prenom} ${r.nom}`}
-                        value={r.tables.length === 1 ? r.tables[0] : r.tables.length ? "plusieurs" : ""}
-                        onChange={(e) => void modifier(r, { tables: e.target.value ? [e.target.value] : [] })}
-                      >
-                        <option value="">À placer</option>
-                        {r.tables.length > 1 && <option value="plusieurs">{nomTables(r.tables)}</option>}
-                        {tables.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.zone} · {t.nom} ({t.chaises ?? 4} pl.)
-                          </option>
-                        ))}
-                      </select>
+                      <ChoixTables
+                        tables={etab.tables}
+                        valeur={r.tables}
+                        couverts={r.couverts}
+                        vide="À placer"
+                        libelle={`Tables de ${r.prenom} ${r.nom}`}
+                        reservation={r}
+                        autres={(liste ?? []).filter((x) => x.date === r.date)}
+                        disabled={r.statut === "annulee"}
+                        onChange={(ids) => void modifier(r, { tables: ids })}
+                      />
                     </td>
                     <td>
                       <select aria-label={`Statut de ${r.prenom} ${r.nom}`} value={r.statut} onChange={(e) => void modifier(r, { statut: e.target.value })}>
@@ -288,13 +285,16 @@ function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation 
 }
 
 /** Réservation prise par l'équipe (téléphone, sur place) : pas tenue par le délai ni la taille de groupe du site. */
-export function Saisie(props: { etab: { id: string }; jour: string; onFaite: () => void; creer?: (corps: Record<string, unknown>) => Promise<unknown> }) {
+export function Saisie(props: { etab: { id: string; tables: Table[] }; jour: string; onFaite: () => void; creer?: (corps: Record<string, unknown>) => Promise<unknown> }) {
   const [erreur, setErreur] = useState("");
+  /** Tables choisies à la saisie (vide : la plus petite table libre, attribuée d'office). */
+  const [tables, setTables] = useState<string[]>([]);
+  const [couverts, setCouverts] = useState(2);
   const creer = props.creer ?? ((corps: Record<string, unknown>) => api.creerReservation(props.etab.id, corps));
   const envoyer = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    const corps = { ...f, couverts: Number(f.couverts), source: f.source || "telephone" };
+    const corps = { ...f, couverts: Number(f.couverts), source: f.source || "telephone", ...(tables.length ? { tables } : {}) };
     try {
       await creer(corps);
       props.onFaite();
@@ -321,8 +321,12 @@ export function Saisie(props: { etab: { id: string }; jour: string; onFaite: () 
       </label>
       <label className="champ">
         <span>Personnes</span>
-        <input name="couverts" type="number" min={1} max={200} defaultValue={2} required />
+        <input name="couverts" type="number" min={1} max={200} defaultValue={2} required onChange={(e) => setCouverts(Number(e.target.value) || 0)} />
       </label>
+      <div className="champ">
+        <span>Tables</span>
+        <ChoixTables tables={props.etab.tables} valeur={tables} couverts={couverts} vide="Attribuée d'office" libelle="Tables de la nouvelle réservation" onChange={setTables} />
+      </div>
       <label className="champ">
         <span>Prénom</span>
         <input name="prenom" required maxLength={60} />

@@ -2,6 +2,7 @@ import { maintenantParis, minutes, type Reservation, type StatutReservation } fr
 import { CalendarCheck, ChevronLeft, ChevronRight, Pencil, Phone, Plus, RefreshCw, Search, UserCheck, UserX, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Modale } from "./communs";
+import { ChoixTables } from "./ChoixTables";
 import { useCaisse } from "./contexte";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { messageServeur } from "./Reglages";
@@ -112,7 +113,9 @@ export function PanneauReservations(props: {
   const [toutes, setToutes] = useState(false);
   const [recherche, setRecherche] = useState("");
   const [fiche, setFiche] = useState<Reservation | null>(null);
-  const tables = config.tables.filter((t) => !t.masquee);
+  /** Saisie d'une réservation : tables choisies (vide : attribuée d'office) et personnes, pour comparer les places. */
+  const [tablesSaisie, setTablesSaisie] = useState<string[]>([]);
+  const [couvertsSaisie, setCouvertsSaisie] = useState(2);
   const nomTables = (ids: string[]) => ids.map((id) => config.tables.find((t) => t.id === id)?.nom ?? id).join(" + ");
 
   const chargerAutres = useCallback(async () => {
@@ -167,7 +170,7 @@ export function PanneauReservations(props: {
   const creer = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    const corps = { ...f, couverts: Number(f.couverts), par: utilisateur.id };
+    const corps = { ...f, couverts: Number(f.couverts), par: utilisateur.id, ...(tablesSaisie.length ? { tables: tablesSaisie } : {}) };
     try {
       await caisse.client.creerReservation(corps);
     } catch (err) {
@@ -181,6 +184,8 @@ export function PanneauReservations(props: {
     }
     notifier(`Réservation de ${f.prenom} ${f.nom} enregistrée.`);
     setSaisie(false);
+    setTablesSaisie([]);
+    setCouvertsSaisie(2);
     await recharger();
   };
 
@@ -237,8 +242,21 @@ export function PanneauReservations(props: {
           </label>
           <label className="champ">
             <span>Personnes</span>
-            <input name="couverts" type="number" inputMode="numeric" min={1} max={200} defaultValue={2} required />
+            <input
+              name="couverts"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={200}
+              defaultValue={2}
+              required
+              onChange={(e) => setCouvertsSaisie(Number(e.target.value) || 0)}
+            />
           </label>
+          <div className="champ">
+            <span>Tables</span>
+            <ChoixTables tables={config.tables} valeur={tablesSaisie} couverts={couvertsSaisie} vide="Attribuée d'office" libelle="Tables de la nouvelle réservation" onChange={setTablesSaisie} />
+          </div>
           <label className="champ">
             <span>Prénom</span>
             <input name="prenom" required maxLength={60} />
@@ -314,22 +332,19 @@ export function PanneauReservations(props: {
                       </span>
                       {r.commentaire && <em>{r.commentaire}</em>}
                     </div>
-                    <label className="resa-caisse-table">
-                      <span className="lecteur-ecran">Table de {nomClient(r)}</span>
-                      <select
-                        value={r.tables.length === 1 ? r.tables[0] : r.tables.length ? "plusieurs" : ""}
+                    <div className="resa-caisse-table">
+                      <ChoixTables
+                        tables={config.tables}
+                        valeur={r.tables}
+                        couverts={r.couverts}
+                        vide="À placer"
+                        libelle={`Tables de ${nomClient(r)}`}
+                        reservation={r}
+                        autres={source.filter((x) => x.date === r.date)}
                         disabled={props.horsLigne || r.statut === "annulee"}
-                        onChange={(e) => void modifier(r, { tables: e.target.value ? [e.target.value] : [] }, e.target.value ? `table ${nomTables([e.target.value])}` : "à placer")}
-                      >
-                        <option value="">À placer</option>
-                        {r.tables.length > 1 && <option value="plusieurs">{nomTables(r.tables)}</option>}
-                        {tables.map((t) => (
-                          <option key={t.id} value={t.id}>
-                            Table {t.nom} ({t.chaises ?? 4})
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        onChange={(ids) => void modifier(r, { tables: ids }, ids.length ? `table ${nomTables(ids)}` : "à placer")}
+                      />
+                    </div>
                     <div className="resa-caisse-actions">
                       {duJour && r.statut === "confirmee" && (
                         <>

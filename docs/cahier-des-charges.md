@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 74, copiée le 20 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 75, copiée le 20 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -186,7 +186,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 | Premier établissement | Moka (le plan de table n'existe que là où Matalon POS est la caisse) |
 | Capacité | Les trois plafonds par service : couverts du service, personnes à table en même temps (avec la durée), arrivées par créneau |
 | Confirmation | D'office, avec un e-mail au client (lien d'annulation) et une copie à l'établissement ; service d'envoi Resend, un compte par établissement, depuis son domaine (moka-annecy.com, déjà vérifié) |
-| Plan de table | Plus petite table libre qui convient attribuée d'office, modifiable par l'équipe |
+| Plan de table | Plus petite table libre qui convient attribuée d'office, modifiable par l'équipe ; un groupe reçoit plusieurs tables, choisies à la saisie ou dans la liste (20 octobre 2026) |
 
 ### Module du site
 
@@ -199,12 +199,12 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 - Services : nom, jours, première et dernière heure d'arrivée, couverts du service, personnes en même temps, arrivées par créneau, durée propre (facultatif). Deux services ne se chevauchent pas un même jour.
 - Règles : durée par défaut d'une réservation, écart entre créneaux (15 ou 30 min), délai minimum avant l'arrivée, réservation jusqu'à N jours à l'avance, groupe maximum en ligne, fermetures exceptionnelles, message d'accueil, téléphone, e-mail de l'établissement, liens des conditions et de la politique de confidentialité.
 - E-mails : chaque établissement a son compte Resend. Sa clé API se saisit dans l'administration, est chiffrée sur le serveur avec une clé maîtresse gardée hors de la base, et n'est plus jamais affichée (aperçu seulement). Adresse d'expédition propre (domaine vérifié dans ce compte), e-mail de l'établissement qui reçoit les réservations et les réponses, e-mail d'essai.
-- Réservations à venir (par jour, sur la fenêtre de réservation en ligne, au moins 60 jours) ou d'un jour par service (couverts réservés sur le plafond), recherche par nom, téléphone, e-mail ou note ; table et statut modifiables dans la liste ; fiche de réservation pour modifier date, heure, personnes, durée, coordonnées et note, annuler (client prévenu par e-mail) ou rétablir, avec l'historique ; saisie d'une réservation prise au téléphone ou sur place ; la balise à copier.
+- Réservations à venir (par jour, sur la fenêtre de réservation en ligne, au moins 60 jours) ou d'un jour par service (couverts réservés sur le plafond), recherche par nom, téléphone, e-mail ou note ; tables et statut modifiables dans la liste (une ou plusieurs tables, places comptées face aux personnes, tables déjà prises sur le créneau signalées ; 20 octobre 2026) ; fiche de réservation pour modifier date, heure, personnes, durée, coordonnées et note, annuler (client prévenu par e-mail) ou rétablir, avec l'historique ; saisie d'une réservation prise au téléphone ou sur place ; la balise à copier.
 
 ### Caisse
 
 - Plan de salle : table réservée (heure et nom), bord plein dans la demi-heure ; une table occupée affiche « Résa 20:00 » dans l'heure qui précède. Même indication dans la vue en liste.
-- Réservations du jour : installer (la table s'ouvre avec les couverts et une note au nom du client, tables assemblées comprises), placer sur une table, absent, annuler, remettre à venir, saisir au téléphone. Liste relue chaque minute ; hors ligne, la dernière copie du jour.
+- Réservations du jour : installer (la table s'ouvre avec les couverts et une note au nom du client, tables assemblées comprises), placer sur une ou plusieurs tables, absent, annuler, remettre à venir, saisir au téléphone. Liste relue chaque minute ; hors ligne, la dernière copie du jour.
 - Toutes les réservations depuis la caisse, comme dans l'administration : vues « Aujourd'hui », « À venir » (par jour, sur la fenêtre de réservation en ligne, au moins 60 jours) et « Par jour » (jour au choix) ; recherche par nom, téléphone, e-mail ou note ; fiche pour modifier date, heure, personnes, durée, coordonnées et note, annuler ou rétablir, avec l'historique ; saisie pour n'importe quel jour. Les jours suivants demandent une connexion. Ajouté le 14 octobre 2026.
 - L'équipe peut dépasser un plafond après confirmation (« Enregistrer quand même »), tracé dans l'historique de la réservation ; le client en ligne jamais.
 

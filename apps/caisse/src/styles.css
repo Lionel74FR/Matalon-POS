@@ -3117,9 +3117,8 @@ a.bouton {
   font-size: 0.9rem;
 }
 
-.resa-caisse-table select {
-  min-height: 44px;
-  max-width: 170px;
+.resa-caisse-table .choix-tables {
+  max-width: 260px;
 }
 
 .resa-caisse-actions {
@@ -3136,7 +3135,7 @@ a.bouton {
   .resa-caisse-actions {
     grid-column: 2;
   }
-  .resa-caisse-table select {
+  .resa-caisse-table .choix-tables {
     max-width: none;
     width: 100%;
   }
@@ -3239,4 +3238,86 @@ a.bouton {
   border-radius: var(--rayon-petit);
   border: 2px solid var(--terre);
   font-weight: 600;
+}
+
+/* Tables d'une réservation : une ou plusieurs, assemblées pour un groupe. */
+.choix-tables {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.choix-tables small {
+  color: var(--sable);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.choix-tables.manque,
+.choix-tables-total.manque {
+  color: #f0b27a;
+}
+
+.choix-tables.manque small {
+  color: inherit;
+}
+
+.choix-tables-total {
+  margin-right: auto;
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.choix-tables-zone h3 {
+  margin: 14px 0 8px;
+}
+
+.choix-tables-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.choix-table {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: 72px;
+  padding: 8px 6px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-3);
+  border: 2px solid transparent;
+  text-align: center;
+}
+
+.choix-table strong {
+  font-family: var(--police-chiffres);
+  font-size: 1.25rem;
+}
+
+.choix-table small {
+  color: var(--sable);
+  font-size: 0.8rem;
+}
+
+.choix-table.actif {
+  background: var(--terre);
+  border-color: var(--terre-fonce);
+}
+
+.choix-table.actif small {
+  color: #fbe3d8;
+}
+
+.choix-table.prise:not(.actif) {
+  border-color: #b98a4a;
+}
+
+.choix-table-prise {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
