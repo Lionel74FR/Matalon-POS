@@ -896,3 +896,37 @@ code.cle-api {
   font-size: 0.85rem;
   word-break: break-all;
 }
+
+/* ───────── Moments de la journée ───────── */
+
+.moments-liste {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.moments-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.moments-ligne .champ {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+@media (max-width: 700px) {
+  .moments-ligne {
+    grid-template-columns: 1fr 1fr auto;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--espresso-3);
+  }
+  .moments-ligne .champ:first-child {
+    grid-column: 1 / -1;
+  }
+}

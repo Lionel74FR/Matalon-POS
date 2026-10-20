@@ -58,6 +58,7 @@ import {
   type ClientApi,
   posteValide,
   problemePlan,
+  problemeMoments,
   type Derniers,
   type ElementDecor,
   type ZonePlan,
@@ -72,6 +73,7 @@ import {
   type ReponseClotures,
   type ReponseJournee,
   type ReponseStatistiques,
+  type MomentJournee,
   type SalleEnCours,
   type EtablissementApi,
   type IdentiteEtablissement,
@@ -225,6 +227,7 @@ interface LigneEtablissement {
   imprimante_tickets: ImprimanteReseau | null;
   zones: ZonePlan[] | null;
   plan_version: number | null;
+  moments?: MomentJournee[] | null;
 }
 
 const SELECT_ETABLISSEMENT = `select e.*, c.version as carte_version from etablissements e left join cartes c on c.id = e.carte_id`;
@@ -251,7 +254,33 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     imprimanteTickets: l.imprimante_tickets?.adresse ? l.imprimante_tickets : null,
     zones: l.zones ?? [],
     planVersion: l.plan_version ?? 0,
+    moments: l.moments ?? [],
   };
+}
+
+/** Moments de la journée de l'établissement, contrôlés comme dans l'éditeur. */
+async function majMoments(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
+  const brut = corps.moments;
+  if (!Array.isArray(brut)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Moments invalides.");
+  const moments: MomentJournee[] = brut.map((x) => {
+    const m = (x ?? {}) as Record<string, unknown>;
+    return {
+      id: typeof m.id === "string" && /^[a-z0-9-]{1,40}$/.test(m.id) ? m.id : crypto.randomUUID(),
+      nom: typeof m.nom === "string" ? m.nom.trim() : "",
+      debut: typeof m.debut === "string" ? m.debut : "",
+      fin: typeof m.fin === "string" ? m.fin : "",
+    };
+  });
+  const probleme = problemeMoments(moments);
+  if (probleme) throw new ErreurHttp(400, "MOMENTS_INVALIDES", probleme);
+  if (new Set(moments.map((m) => m.id)).size !== moments.length) throw new ErreurHttp(400, "MOMENTS_INVALIDES", "Deux moments ont le même identifiant.");
+  const [maj] = await env.db.requete<{ id: string }>("update etablissements set moments = $2::jsonb, maj_le = $3 where id = $1 returning id", [
+    etablissementId,
+    JSON.stringify(moments),
+    horloge(env).toISOString(),
+  ]);
+  if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  return etablissement(env.db, etablissementId);
 }
 
 function lirePostes(v: unknown): PostesProduction {
@@ -1202,7 +1231,7 @@ async function statistiques(env: Environnement, etablissementId: string, requete
       motif: typeof l.contenu.details.motif === "string" ? l.contenu.details.motif : null,
       autorisePar: typeof l.contenu.details.autorisePar === "string" ? l.contenu.details.autorisePar : null,
     }));
-  const [e] = await env.db.requete<{ carte_id: string; tables: Table[] }>("select carte_id, tables from etablissements where id = $1", [etablissementId]);
+  const [e] = await env.db.requete<{ carte_id: string; tables: Table[]; moments: MomentJournee[] | null }>("select carte_id, tables, moments from etablissements where id = $1", [etablissementId]);
   const [carte] = e ? await env.db.requete<{ contenu: Catalogue }>("select contenu from cartes where id = $1", [e.carte_id]) : [];
   const equipe = await env.db.requete<{ id: string; nom: string }>("select id, nom from utilisateurs where etablissement_id = $1", [etablissementId]);
   const caisses = await env.db.requete<{ id: string; nom: string; derniere_synchro: string | null; revoquee_le: string | null }>(
@@ -1222,6 +1251,7 @@ async function statistiques(env: Environnement, etablissementId: string, requete
       synchros: Object.fromEntries(caisses.filter((x) => !x.revoquee_le).map((x) => [x.id, x.derniere_synchro])),
       maintenant: horloge(env),
       retraits,
+      moments: e?.moments ?? [],
     }),
     alertes: alertes.alertes,
     ...(au >= dateComptable(horloge(env)) ? { enCours: await salleEnCours(env, etablissementId) } : {}),
@@ -2824,6 +2854,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "PUT") {
         const e = await majPlan(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
         await journaliserAdmin(env, admin.id, "plan_salle", { etablissement: e.id, version: e.planVersion ?? 0, tables: e.tables.length });
+        return json(200, { etablissement: e });
+      }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/moments$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await majMoments(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
+        await journaliserAdmin(env, admin.id, "moments_journee", { etablissement: e.id, moments: (e.moments ?? []).map((x) => `${x.nom} ${x.debut}-${x.fin}`).join(", ") });
         return json(200, { etablissement: e });
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/postes$/.exec(chemin);

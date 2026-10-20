@@ -7,7 +7,7 @@
 import type { Catalogue } from "@matalon/catalogue";
 import { totauxTickets, type Ticket } from "@matalon/noyau-fiscal";
 import { dateComptable } from "@matalon/noyau-fiscal";
-import type { IndicateursPeriode, LigneStat, ReponseStatistiques, RetraitArticle, StatServeur, Table } from "./partage.js";
+import { momentDe, type IndicateursPeriode, type LigneStat, type MomentJournee, type ReponseStatistiques, type RetraitArticle, type StatMoment, type StatServeur, type Table } from "./partage.js";
 
 export const JOURS_MAX_STATISTIQUES = 366;
 export const DATE_VALIDE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
@@ -25,6 +25,12 @@ export function joursEntre(du: string, au: string): number {
 const heureParis = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "numeric", hourCycle: "h23" });
 /** Heure de Paris (0 à 23) d'un horodatage. */
 const heureDe = (iso: string) => Number(heureParis.formatToParts(new Date(iso)).find((p) => p.type === "hour")?.value ?? 0) % 24;
+const minuteParis = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "numeric", minute: "numeric", hourCycle: "h23" });
+/** Minutes depuis minuit, heure de Paris. */
+const minutesDe = (iso: string) => {
+  const p = minuteParis.formatToParts(new Date(iso));
+  return (Number(p.find((x) => x.type === "hour")?.value ?? 0) % 24) * 60 + Number(p.find((x) => x.type === "minute")?.value ?? 0);
+};
 const ventes = (tickets: Ticket[]) => tickets.filter((t) => t.type === "VENTE");
 const ventesEtAnnulations = (tickets: Ticket[]) => tickets.filter((t) => t.type === "VENTE" || t.type === "ANNULATION");
 const estOffert = (l: Ticket["lignes"][number]) => l.remiseTTC !== 0 && Math.abs(l.remiseTTC) === Math.abs(l.quantite * l.prixUnitaireTTC);
@@ -95,6 +101,46 @@ export interface ContexteStatistiques {
   maintenant: Date;
   /** Articles retirés après envoi, de la période et de la précédente. */
   retraits?: RetraitArticle[];
+  /** Moments de la journée de l'établissement. */
+  moments?: MomentJournee[];
+}
+
+/**
+ * CA par moment de la journée. Une vente compte à l'heure de son encaissement ; une
+ * annulation, dans le moment de la vente qu'elle annule (sinon à sa propre heure). Les
+ * ventes hors de tout moment forment une dernière ligne, « Hors moments », si elle n'est pas vide.
+ */
+export function caParMoment(moments: MomentJournee[], tickets: Ticket[], avant: Ticket[], tous: Ticket[]): StatMoment[] {
+  if (!moments.length) return [];
+  const origine = new Map(tous.filter((t) => t.type === "VENTE").map((t) => [`${t.caisseId}#${t.numero}`, t.horodatage]));
+  const cleDe = (t: Ticket) => {
+    const h = t.type === "ANNULATION" && t.ticketOrigine ? (origine.get(`${t.caisseId}#${t.ticketOrigine.numero}`) ?? t.horodatage) : t.horodatage;
+    return momentDe(moments, minutesDe(h))?.id ?? "";
+  };
+  const lignes: StatMoment[] = [...moments, { id: "", nom: "Hors moments", debut: "", fin: "" }].map((m) => ({
+    id: m.id,
+    nom: m.nom,
+    debut: m.debut,
+    fin: m.fin,
+    ttc: 0,
+    tickets: 0,
+    couverts: 0,
+    ticketMoyen: 0,
+    ttcPrecedent: 0,
+  }));
+  const parId = new Map(lignes.map((l) => [l.id, l]));
+  for (const t of ventesEtAnnulations(tickets)) parId.get(cleDe(t))!.ttc += t.totalTTC;
+  for (const t of ventesEtAnnulations(avant)) parId.get(cleDe(t))!.ttcPrecedent += t.totalTTC;
+  const totalConserve = new Map<string, number>();
+  for (const t of ventesConservees(tickets)) {
+    const l = parId.get(cleDe(t))!;
+    l.tickets++;
+    l.couverts += t.couverts ?? 0;
+    totalConserve.set(l.id, (totalConserve.get(l.id) ?? 0) + t.totalTTC);
+  }
+  for (const l of lignes) l.ticketMoyen = l.tickets ? Math.round((totalConserve.get(l.id) ?? 0) / l.tickets) : 0;
+  const hors = parId.get("")!;
+  return hors.ttc || hors.tickets || hors.ttcPrecedent ? lignes : lignes.slice(0, -1);
 }
 
 export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStatistiques, "alertes"> {
@@ -268,6 +314,7 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
     calculeLe: c.maintenant.toISOString(),
     indicateurs: indicateurs(tickets, retraits),
     indicateursPrecedents: indicateurs(avant, retraitsAvant),
+    parMoment: caParMoment(c.moments ?? [], tickets, avant, c.tickets),
     parHeure,
     parJour,
     parJourSemaine,

@@ -480,6 +480,41 @@ describe("commandes en cours partagées", () => {
     expect((await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer)).statut).toBe(200);
   });
 
+  it("les moments de la journée se règlent dans l'administration et regroupent le CA", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    const moments = [
+      { id: "matin", nom: "Matin", debut: "08:00", fin: "12:00" },
+      { id: "soir", nom: "Soir", debut: "18:00", fin: "03:00" },
+    ];
+    const refus = await appel("PUT", "/api/admin/etablissements/moka/moments", { moments: [...moments, { id: "nuit", nom: "Nuit", debut: "01:00", fin: "05:00" }] }, { Cookie: cookie });
+    expect(refus.statut).toBe(400);
+    expect(refus.corps.message).toBe("« Soir » et « Nuit » se chevauchent.");
+    const ok = await appel("PUT", "/api/admin/etablissements/moka/moments", { moments }, { Cookie: cookie });
+    expect(ok.corps.etablissement.moments).toEqual(moments);
+    // 15 octobre (heure de Paris = UTC+2) : 09:00, 15:00 (hors moments), 22:00 ; 16 octobre 01:30 (même journée comptable, Soir).
+    for (const [iso, prix] of [["2026-10-15T07:00:00Z", 400], ["2026-10-15T13:00:00Z", 1100], ["2026-10-15T20:00:00Z", 1100], ["2026-10-15T23:30:00Z", 400]] as const) {
+      instant = Date.parse(iso);
+      await a.registre.enregistrerVente({ lignes: [{ ...CAFE, prixUnitaireTTC: prix }], paiements: [{ mode: "CB", montant: prix }], operateurId: "u-lea", couverts: 1 });
+    }
+    // La vente de 22 h est annulée à 1 h 45 : l'annulation compte dans le Soir.
+    instant = Date.parse("2026-10-15T23:45:00Z");
+    await a.registre.enregistrerAnnulation({ numeroTicket: 3, motif: "Erreur de saisie", operateurId: "u-lea" });
+    expect((await a.synchro()).statut).toBe(200);
+    // Retour en matinée : la session de l'administration reste valable.
+    instant = Date.parse("2026-10-15T09:00:00Z");
+    const s = await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie });
+    expect(s.corps.parMoment.map((x: { nom: string; ttc: number; tickets: number; couverts: number }) => `${x.nom}:${x.ttc}:${x.tickets}:${x.couverts}`)).toEqual([
+      "Matin:400:1:1",
+      "Soir:400:1:1",
+      "Hors moments:1100:1:1",
+    ]);
+    expect(s.corps.parMoment.reduce((t: number, x: { ttc: number }) => t + x.ttc, 0)).toBe(s.corps.indicateurs.caTTC);
+    // Sans moments : rien.
+    await appel("PUT", "/api/admin/etablissements/moka/moments", { moments: [] }, { Cookie: cookie });
+    expect((await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie })).corps.parMoment).toEqual([]);
+  });
+
   it("l'administration lit les tickets d'une période, toutes caisses", async () => {
     const cookie = await adminConnecte();
     const a = await caisseRattachee(cookie);

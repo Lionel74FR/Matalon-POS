@@ -35,6 +35,8 @@ export const MIGRATIONS: string[] = [
   // Clôtures d'établissement (noyau 0.7.0) : un seul appareil clôture à la fois ; anomalie de chaînage signalée.
   `alter table etablissements add column if not exists verrou_cloture jsonb`,
   `alter table etablissements add column if not exists anomalie_cloture text`,
+  // Moments de la journée (matin, midi, soir…) : regroupement du CA dans les statistiques, hors fiscal.
+  `alter table etablissements add column if not exists moments jsonb not null default '[]'::jsonb`,
   `create table if not exists utilisateurs (
     id text primary key,
     etablissement_id text not null references etablissements(id),

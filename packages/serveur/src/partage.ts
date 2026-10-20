@@ -151,6 +151,59 @@ export interface EtablissementApi {
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`). */
   zones?: ZonePlan[];
   planVersion?: number;
+  /** Moments de la journée (matin, midi, soir…) : regroupent le CA dans les statistiques. */
+  moments?: MomentJournee[];
+}
+
+/**
+ * Moment de la journée : une plage horaire de Paris, début inclus, fin exclue, qui peut
+ * passer minuit (« Soir » de 18:00 à 03:00). Hors périmètre fiscal : un regroupement du CA.
+ */
+export interface MomentJournee {
+  id: string;
+  nom: string;
+  /** "08:00" */
+  debut: string;
+  /** "12:00" ; "00:00" pour minuit. */
+  fin: string;
+}
+
+export const MOMENTS_MAX = 8;
+const HEURE_MOMENT = /^([01]\d|2[0-3]):[0-5]\d$/;
+const minutesDe = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+
+/** Minutes couvertes par un moment, en segments [début, fin[ dans une journée de 1 440 minutes. */
+function segmentsMoment(m: MomentJournee): Array<[number, number]> {
+  const d = minutesDe(m.debut);
+  const f = minutesDe(m.fin);
+  const segments: Array<[number, number]> = d < f ? [[d, f]] : [[d, 1440], [0, f]];
+  return segments.filter(([a, b]) => b > a);
+}
+
+/** Moment d'une heure de Paris (minutes depuis minuit), ou null hors de tout moment. */
+export function momentDe(moments: MomentJournee[], minutes: number): MomentJournee | null {
+  return moments.find((m) => segmentsMoment(m).some(([a, b]) => minutes >= a && minutes < b)) ?? null;
+}
+
+/** Contrôle des moments d'un établissement : null si tout va bien, sinon le problème en clair. */
+export function problemeMoments(moments: MomentJournee[]): string | null {
+  if (moments.length > MOMENTS_MAX) return `${MOMENTS_MAX} moments au plus.`;
+  const noms = new Set<string>();
+  for (const m of moments) {
+    const nom = m.nom.trim();
+    if (!nom || nom.length > 30) return "Chaque moment a un nom de 1 à 30 caractères.";
+    if (noms.has(nom.toLowerCase())) return `Deux moments s'appellent « ${nom} ».`;
+    noms.add(nom.toLowerCase());
+    if (!HEURE_MOMENT.test(m.debut) || !HEURE_MOMENT.test(m.fin)) return `« ${nom} » : heures au format 08:00.`;
+    if (m.debut === m.fin) return `« ${nom} » : le début et la fin sont à la même heure.`;
+  }
+  for (let i = 0; i < moments.length; i++) {
+    for (let j = i + 1; j < moments.length; j++) {
+      const chevauche = segmentsMoment(moments[i]!).some(([a, b]) => segmentsMoment(moments[j]!).some(([c, d]) => a < d && c < b));
+      if (chevauche) return `« ${moments[i]!.nom.trim()} » et « ${moments[j]!.nom.trim()} » se chevauchent.`;
+    }
+  }
+  return null;
 }
 
 /** Imprimante Epson du réseau de l'établissement (ePOS-Print). */
@@ -530,6 +583,22 @@ export interface SalleEnCours {
   plusAncienne: string | null;
 }
 
+/** CA d'un moment de la journée sur la période (id vide : ventes hors de tout moment). */
+export interface StatMoment {
+  id: string;
+  nom: string;
+  debut: string;
+  fin: string;
+  /** CA net (ventes moins annulations, une annulation comptant dans le moment de sa vente). */
+  ttc: number;
+  /** Ventes non annulées, leurs couverts et leur ticket moyen. */
+  tickets: number;
+  couverts: number;
+  ticketMoyen: number;
+  /** CA du même moment sur la période précédente. */
+  ttcPrecedent: number;
+}
+
 export interface ReponseStatistiques {
   du: string;
   au: string;
@@ -540,6 +609,8 @@ export interface ReponseStatistiques {
   enCours?: SalleEnCours;
   indicateurs: IndicateursPeriode;
   indicateursPrecedents: IndicateursPeriode;
+  /** CA par moment de la journée, dans l'ordre des moments ; vide si l'établissement n'en a pas défini. */
+  parMoment: StatMoment[];
   /** CA net par heure de la journée (heure de Paris, 0 à 23). */
   parHeure: Array<{ heure: number; ttc: number; tickets: number }>;
   /** CA net par journée comptable, chaque jour de la période (zéro compris). */

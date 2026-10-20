@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 17 octobre 2026 (tickets dans l'administration).
+Dernière mise à jour : 20 octobre 2026 (moments de la journée).
 
 ## Règle de conduite
 
@@ -25,6 +25,7 @@ Dernière mise à jour : 17 octobre 2026 (tickets dans l'administration).
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Moments de la journée (demande de Lionel du 20 octobre) : administration › Statistiques › carte « CA par moment » › « Définir les moments » (proposition Matin 8 h – 12 h, Après-midi 12 h – 18 h, Soir 18 h – 3 h à ajuster ; 8 moments au plus, passage de minuit admis, chevauchement refusé à l'écran et au serveur). La carte donne CA, part, écart avec la période précédente, tickets, ticket moyen, couverts, et « Hors moments » ; même carte sur la caisse, sans modification. Colonne `etablissements.moments`, route `PUT /api/admin/etablissements/:id/moments`, `parMoment` dans les statistiques. Scénario `moments` (26 parcours) |
 | da8a057 | Tickets dans l'administration (demande de Lionel du 17 octobre) : rubrique « Tickets » après Statistiques, consultation seule. Période, résumé par serveur (une ligne filtre la liste), recherche, détail de chaque ticket (heure, appareil, table, couverts, serveur, lignes, paiements corrigés, annulation, journée comptable, empreinte) ; dans les statistiques, le nom d'un serveur (Équipe) ouvre ses tickets. Route `GET /api/admin/etablissements/:id/tickets?du&au` ; `DetailTicket` sans dépendance à la caisse. Scénario `tickets-admin` (25 parcours) |
 | 37c1580 | Demandes de Lionel du 17 octobre : « Vente comptoir » devient « Vente Directe » (barre du haut de l'iPad, guide, scénarios) ; CA par heure dans l'ordre de la journée de service, de 8 h à 3 h du matin, minuit passé après 23 h (journée comptable inchangée, bascule à 5 h) ; libellé « 23 h – 0 h » au lieu de « 23 h – 24 h ». Scénario `statistiques-admin` complété (ordre des heures) |
 | c22bef7 | Statistiques dans l'administration (demande de Lionel du 16 octobre) : rubrique « Statistiques » en tête du menu, même écran et mêmes calculs que la caisse. En direct tant que la période va jusqu'à aujourd'hui (recalcul toutes les 10 s pour la journée, chaque minute au-delà, pastille « En direct · mis à jour à … ») ; tuile « En salle maintenant » (tables ouvertes, couverts, reste à encaisser, acomptes déduits), aussi sur la caisse. Scénario `statistiques-admin` (24 parcours) ; `admin-navigation` passe par la nouvelle rubrique |
@@ -86,6 +87,7 @@ Dernière mise à jour : 17 octobre 2026 (tickets dans l'administration).
 
 ## Décisions techniques à ne pas défaire
 
+- Moments de la journée (20 octobre) : réglage d'établissement (`moments` jsonb, hors fiscal), validé par la même fonction `problemeMoments` à l'écran et au serveur. Regroupement calculé à la lecture des statistiques (`caParMoment`), jamais stocké sur les tickets : changer un horaire réécrit l'historique affiché, voulu. Une annulation compte dans le moment de sa vente quand elle est connue (sinon à sa propre heure) ; la somme des moments et de « Hors moments » égale le CA.
 - Statistiques en direct (16 octobre) : un seul écran, `TableauStatistiques`, qui reçoit ses appels par `AccesStatistiques` (caisse : jeton d'appareil et code responsable pour une alerte ; administration : session). « En direct » = recalcul périodique tant que `au` ≥ aujourd'hui, l'écran visible ; pas de canal poussé (Edge sans connexion durable), les tickets arrivant au serveur ~1,5 s après l'écriture. `enCours` (`SalleEnCours`) n'est calculé que si la période va jusqu'à aujourd'hui, depuis `commandes_ouvertes` : hors fiscal, hors comptoir.
 - Division de la note (16 octobre, choix de Lionel : acomptes et ticket unique, noyau inchangé) : `LigneCommande.reglee` (ligne encaissée à part, gardée pour le service et la production, exclue de `lignesDues`/`totauxCommande`) et `Commande.acomptes` (hors fiscal jusqu'au ticket final, qui les reprend en `paiements`, espèces nettes du rendu). Toute partie payée passe par `PartageCommandes.engager` : écriture conditionnelle de la commande restante, sans fusion ; un acompte refuse le hors-ligne (les autres appareils et la Z doivent le voir), la division par articles l'accepte comme l'encaissement. La fusion ne perd jamais un paiement : une ligne réglée l'emporte, les acomptes se réunissent par identifiant (l'annulation l'emporte) et un acompte reçu survit à la fermeture de l'autre côté. Pas d'acompte au comptoir (propre à l'appareil). Z : refus local et 409 `ACOMPTES_EN_ATTENTE` au verrou de clôture. Couverts sur le seul ticket qui ferme la table.
 - Édition sur l'iPad (16 octobre) : routes `/api/caisse/edition/…` sous le jeton d'appareil, la personne connectée (`utilisateurId`) doit être un responsable actif de l'établissement (403 `RESPONSABLE_REQUIS`), et la carte celle de l'établissement (403 `CARTE_AUTRE`). Mêmes fonctions d'écriture que l'administration (`enregistrerCarteDe`, `enregistrerStockDe`) ; le référentiel renvoyé à la caisse est réduit aux prix et documents de l'établissement. Les composants d'édition prennent leurs appels par `useAccesEdition()` (administration par défaut) ; leurs styles sont dans `admin/edition.css`, sans règle globale, pour être chargés dans la caisse.
@@ -156,4 +158,4 @@ Dernière mise à jour : 17 octobre 2026 (tickets dans l'administration).
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 25 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 26 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

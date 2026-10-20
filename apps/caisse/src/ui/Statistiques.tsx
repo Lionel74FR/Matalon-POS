@@ -1,6 +1,6 @@
 import { dateComptable } from "@matalon/noyau-fiscal";
-import type { AlerteApi, IndicateursPeriode, LigneStat, ReponseStatistiques, SalleEnCours } from "@matalon/serveur/partage";
-import { Bell, Check, RefreshCw, TrendingDown, TrendingUp, Utensils } from "lucide-react";
+import type { AlerteApi, IndicateursPeriode, LigneStat, ReponseStatistiques, SalleEnCours, StatMoment } from "@matalon/serveur/partage";
+import { Bell, Check, Clock, Pencil, RefreshCw, TrendingDown, TrendingUp, Utensils } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { fraicheur } from "../fiscal/journee";
@@ -313,6 +313,8 @@ export interface AccesStatistiques {
   messageErreur?: (e: unknown) => string;
   /** Administration : les tickets d'une personne sur la période affichée. */
   ouvrirServeur?: (serveurId: string, du: string, au: string) => void;
+  /** Administration : ouvre l'éditeur des moments de la journée. */
+  modifierMoments?: () => void;
 }
 
 /** Recalcul automatique tant que la période va jusqu'à aujourd'hui : la journée seule, puis les périodes longues. */
@@ -343,6 +345,67 @@ export function Statistiques() {
     [caisse.client, config.caisseId],
   );
   return <TableauStatistiques acces={acces} />;
+}
+
+/** Horaires d'un moment : « 18:00 – 03:00 » (fin exclue). */
+const heureLisible = (hhmm: string) => `${Number(hhmm.slice(0, 2))} h${hhmm.slice(3) === "00" ? "" : ` ${hhmm.slice(3)}`}`;
+const horaires = (m: StatMoment) => (m.id ? `${heureLisible(m.debut)} – ${heureLisible(m.fin)}` : "en dehors des moments définis");
+
+/** CA par moment de la journée (matin, midi, soir…), comparé au même moment de la période précédente. */
+function Moments(props: { moments: StatMoment[]; caTTC: number; onModifier?: () => void }) {
+  const { moments } = props;
+  return (
+    <section className="stat-carte stat-large stat-moments">
+      <header className="stat-carte-tete">
+        <h2>
+          <AvecIcone icone={Clock}>CA par moment</AvecIcone>
+        </h2>
+        {props.onModifier && (
+          <button className="bouton discret" onClick={props.onModifier}>
+            <AvecIcone icone={Pencil}>{moments.length ? "Modifier les moments" : "Définir les moments"}</AvecIcone>
+          </button>
+        )}
+      </header>
+      {moments.length === 0 ? (
+        <p className="explication">Aucun moment défini. Créez par exemple Matin, Après-midi et Soir avec leurs horaires : le CA de chacun s'affichera ici.</p>
+      ) : (
+        <div className="stat-defile">
+          <table className="tableau stat-tableau">
+            <thead>
+              <tr>
+                <th>Moment</th>
+                <th className="nombre">CA TTC</th>
+                <th className="nombre">Part du CA</th>
+                <th className="nombre">Tickets</th>
+                <th className="nombre">Ticket moyen</th>
+                <th className="nombre">Couverts</th>
+              </tr>
+            </thead>
+            <tbody>
+              {moments.map((m) => (
+                <tr key={m.id || "hors"}>
+                  <td>
+                    {m.nom}
+                    <small className="stat-detail">{horaires(m)}</small>
+                  </td>
+                  <td className="nombre">
+                    {euros(m.ttc)}
+                    <small className="stat-detail">
+                      <Variation actuel={m.ttc} precedent={m.ttcPrecedent} />
+                    </small>
+                  </td>
+                  <td className="nombre">{pourcent(m.ttc, props.caTTC)}</td>
+                  <td className="nombre">{entier(m.tickets)}</td>
+                  <td className="nombre">{m.tickets ? euros(m.ticketMoyen) : "—"}</td>
+                  <td className="nombre">{entier(m.couverts)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
 }
 
 /** Tables ouvertes en ce moment : ce qui sera encaissé, en plus du CA déjà fait. */
@@ -551,6 +614,10 @@ export function TableauStatistiques(props: { acces: AccesStatistiques }) {
           {s.enCours && enDirect && <EnSalle salle={s.enCours} />}
 
           <Indicateurs i={s.indicateurs} p={s.indicateursPrecedents} />
+
+          {(s.parMoment.length > 0 || acces.modifierMoments) && (
+            <Moments moments={s.parMoment} caTTC={s.indicateurs.caTTC} {...(acces.modifierMoments ? { onModifier: acces.modifierMoments } : {})} />
+          )}
 
           <div className="stat-grille-cartes">
             <Colonnes

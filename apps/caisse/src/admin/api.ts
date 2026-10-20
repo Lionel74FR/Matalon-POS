@@ -1,7 +1,7 @@
 import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, Fournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
-import type { CommandeFournisseur, EtatEnvoi, ReponseCommandes, ReponseStatistiques, ReponseTickets } from "@matalon/serveur/partage";
+import type { CommandeFournisseur, EtatEnvoi, MomentJournee, ReponseCommandes, ReponseStatistiques, ReponseTickets } from "@matalon/serveur/partage";
 import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
@@ -113,6 +113,7 @@ export const api = {
   verifier: (caisseId: string) => appel<RapportVerification>("GET", `/caisses/${caisseId}/verification`),
   alertes: (etablissementId: string, toutes = false) => appel<{ alertes: AlerteApi[] }>("GET", `/etablissements/${etablissementId}/alertes${toutes ? "?toutes=1" : ""}`),
   marquerAlerteVue: (id: string) => appel("POST", `/alertes/${id}/vue`, {}),
+  majMoments: (etablissementId: string, moments: MomentJournee[]) => appel("PUT", `/etablissements/${etablissementId}/moments`, { moments }),
   ticketsPeriode: (etablissementId: string, du: string, au: string) =>
     appel<ReponseTickets>("GET", `/etablissements/${etablissementId}/tickets?du=${du}&au=${au}`),
   statistiques: (etablissementId: string, du: string, au: string) =>

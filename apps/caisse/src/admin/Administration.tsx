@@ -13,6 +13,7 @@ import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
 import { TicketsAdmin, type FiltreTickets } from "./TicketsAdmin";
+import { ModaleMoments } from "./Moments";
 import { Reservations } from "./Reservations";
 import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces";
 import { FenetreConfiguration } from "./Configuration";
@@ -644,7 +645,7 @@ function FicheEtablissement(props: {
           <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
         </>
       )}
-      {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} etablissementId={e.id} onAlerte={props.onChange} onServeur={props.onTicketsServeur} />}
+      {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} onServeur={props.onTicketsServeur} />}
       {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
       {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
       {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
@@ -673,27 +674,40 @@ function FicheEtablissement(props: {
 }
 
 /** Statistiques de l'établissement, mêmes calculs et même écran que sur la caisse, recalculés en direct. */
-function StatistiquesAdmin(props: { etablissementId: string; onAlerte: () => Promise<void>; onServeur: (f: FiltreTickets) => void }) {
-  const { etablissementId } = props;
+function StatistiquesAdmin(props: { e: EtablissementAdmin; onChange: () => Promise<void>; onServeur: (f: FiltreTickets) => void }) {
+  const { e } = props;
+  const etablissementId = e.id;
+  // Le rechargement de l'administration change de fonction à chaque rendu : l'écran ne doit pas tout recalculer pour autant.
+  const onChange = useRef(props.onChange);
+  onChange.current = props.onChange;
   const onServeur = useRef(props.onServeur);
   onServeur.current = props.onServeur;
-  // Le rechargement de l'administration change de fonction à chaque rendu : l'écran ne doit pas tout recalculer pour autant.
-  const onAlerte = useRef(props.onAlerte);
-  onAlerte.current = props.onAlerte;
+  const [editionMoments, setEditionMoments] = useState(false);
+  // Moments modifiés : les statistiques se recalculent (même période).
+  const versionMoments = JSON.stringify(e.moments ?? []);
   const acces = useMemo<AccesStatistiques>(
     () => ({
       charger: (du, au) => api.statistiques(etablissementId, du, au),
       marquerVue: async (a) => {
         await api.marquerAlerteVue(a.id);
         // Le compteur d'alertes du menu suit.
-        await onAlerte.current();
+        await onChange.current();
         return true;
       },
       ouvrirServeur: (serveur, du, au) => onServeur.current({ serveur, du, au }),
+      modifierMoments: () => setEditionMoments(true),
     }),
-    [etablissementId],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [etablissementId, versionMoments],
   );
-  return <TableauStatistiques acces={acces} />;
+  return (
+    <>
+      <TableauStatistiques acces={acces} />
+      {editionMoments && (
+        <ModaleMoments etablissementId={e.id} moments={e.moments ?? []} onEnregistre={() => onChange.current()} onFermer={() => setEditionMoments(false)} />
+      )}
+    </>
+  );
 }
 
 const LIBELLES_ALERTE: Record<AlerteApi["type"], string> = {
