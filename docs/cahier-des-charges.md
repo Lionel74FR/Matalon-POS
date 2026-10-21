@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 82, copiée le 21 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 95, copiée le 21 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -18,7 +18,7 @@ Le Moka s'équipe d'une caisse tactile iPad développée en interne, conforme à
 - **Remplacer Yokitup** par un module stock et fiches techniques intégré, amorcé avec les nouvelles fiches du Moka.
 - **Servir de socle groupe** : multi-établissements dès la V1, pour un déploiement ultérieur sur les autres enseignes.
 
-Hors V1, sauf arbitrage contraire : commande à table, écran cuisine, click & collect, borne, programme de fidélité.
+Hors V1, sauf arbitrage contraire : commande à table, écran cuisine, click & collect, borne ; le programme de fidélité forme le lot 7 (validé le 21 octobre 2026).
 
 ## Périmètre fonctionnel de la caisse
 
@@ -215,9 +215,9 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 - Coordonnées gardées un an après la date de la réservation, puis effacées ; le lien d'annulation cesse alors de valoir.
 - Une réservation n'est ni un ticket ni une commande : rien n'entre au registre fiscal. Le CA reste celui des tickets.
 
-## Carte de fidélité (proposition du 21 octobre 2026, à valider)
+## Carte de fidélité (proposée et validée le 21 octobre 2026)
 
-Un programme par établissement, activable dans l'administration, dont la règle se règle (points sur la dépense ou tampons) ; le client est reconnu par son téléphone ou par sa carte dans Apple Wallet ou Google Wallet ; la récompense s'applique comme une remise sur le ticket, sans modifier le noyau fiscal. Proposition demandée par Lionel le 21 octobre 2026 : rien n'est développé avant sa validation, et le lot se planifie après les lots en cours.
+Un programme par établissement, activable dans l'administration, dont la règle se règle (points sur la dépense ou tampons) ; le client est reconnu par son téléphone ou par sa carte dans Apple Wallet ou Google Wallet ; la récompense s'applique comme une remise sur le ticket, sans modifier le noyau fiscal. Proposition demandée par Lionel et validée le 21 octobre 2026 : tout le programme se configure dans l'administration, et la règle comme la récompense du Moka se choisiront à sa mise en route. Première version par le téléphone seul (7a), la carte Wallet viendra plus tard (7b) ; les messages au client partent par e-mail, sans SMS. Le lot se planifie après les lots en cours.
 
 ### Réglages du programme (administration, par établissement)
 
@@ -235,9 +235,9 @@ Une règle modifiée vaut pour la suite ; les points déjà gagnés restent acqu
 
 ### Carte du client
 
-- **Reconnaissance à la caisse** : par le numéro de téléphone (fiche client existante, sans rien à installer), ou par le QR code de sa carte, lu par la caméra de l'iPad ou de l'iPhone.
+- **Reconnaissance à la caisse** : par le numéro de téléphone (fiche client existante, sans rien à installer), puis, avec l'étape 7b, par le QR code de sa carte, lu par la caméra de l'iPad ou de l'iPhone.
 - **Carte dématérialisée** dans Apple Wallet (pass PassKit) et Google Wallet (carte de fidélité) : nom, solde, prochaine récompense, QR code. Elle se met à jour après chaque vente, avec un message sur l'écran verrouillé quand une récompense est atteinte. Une page web de la carte sert ceux qui n'utilisent pas de Wallet. Pas de carte plastique.
-- **Inscription** : à la caisse (téléphone et prénom, puis lien envoyé pour ajouter la carte au Wallet), en libre-service par un QR code (comptoir, table, note client), ou depuis la réservation en ligne (case à cocher). L'accord pour recevoir des offres est une case à part, décochée.
+- **Inscription** : à la caisse (téléphone et prénom, puis, avec l'étape 7b, lien envoyé par e-mail pour ajouter la carte au Wallet), en libre-service par un QR code (comptoir, table, note client), ou depuis la réservation en ligne (case à cocher). L'accord pour recevoir des offres est une case à part, décochée.
 
 ### En caisse
 
@@ -266,7 +266,7 @@ Une règle modifiée vaut pour la suite ; les points déjà gagnés restent acqu
 | Apple Wallet | Compte Apple Developer (déjà actif, à passer au nom de PROIA CONSEIL), un identifiant de pass (Pass Type ID) et son certificat, qui signe les cartes et envoie les mises à jour ([PassKit](https://developer.apple.com/library/ios/documentation/UserExperience/Conceptual/PassKit_PG/Updating.html)) | Compris dans le compte, aucun coût par carte |
 | Google Wallet | Compte émetteur Google Wallet, carte de fidélité par l'API ([Google Wallet API](https://developers.google.com/wallet/reference/rest/v1/loyaltyobject)) | Gratuit |
 | E-mails | Resend, déjà en place | Inchangé |
-| SMS | Prestataire d'envoi, seulement si retenu | Par message |
+| SMS | Non retenu : e-mail seulement (21 octobre 2026) | Aucun |
 
 Un service de cartes Wallet tout fait (abonnement mensuel) est possible, mais n'est pas recommandé : le serveur existe déjà, et les données des clients restent chez nous.
 
@@ -275,16 +275,16 @@ Un service de cartes Wallet tout fait (abonnement mensuel) est possible, mais n'
 | Étape | Contenu | Validation |
 | --- | --- | --- |
 | 7a | Programme et règles dans l'administration, reconnaissance par téléphone, cumul et récompenses en caisse, registre, statistiques | Une semaine au Moka avec la règle choisie, registre égal aux tickets |
-| 7b | Carte Apple Wallet et Google Wallet, lecture du QR code, mises à jour après chaque vente | Carte ajoutée sur iPhone et sur Android, solde à jour moins d'une minute après la vente |
-| 7c | Inscription en libre-service et depuis la réservation, e-mails (et SMS si retenu) | Premières inscriptions sans passage par l'équipe |
+| 7b | Plus tard, au signal de Lionel : carte Apple Wallet et Google Wallet, lecture du QR code, mises à jour après chaque vente | Carte ajoutée sur iPhone et sur Android, solde à jour moins d'une minute après la vente |
+| 7c | Inscription en libre-service et depuis la réservation, e-mails (pas de SMS) | Premières inscriptions sans passage par l'équipe |
 
 ### À trancher par Lionel
 
-- [ ] Règle du Moka : points sur la dépense (un cadeau tous les X euros) ou tampons (le 10e café offert)
+- [ ] Règle du Moka : points sur la dépense (un cadeau tous les X euros) ou tampons (le 10e café offert) ; se choisira dans l'administration à la mise en route (21 octobre 2026)
 - [ ] Programme propre à chaque établissement, ou commun à plusieurs établissements du groupe
-- [ ] Récompense : article offert choisi dans une liste, remise en euros, ou les deux
-- [ ] Carte Wallet dès le départ (7a et 7b ensemble), ou téléphone d'abord
-- [ ] SMS, ou e-mail seulement
+- [ ] Récompense : article offert choisi dans une liste, remise en euros, ou les deux ; se choisira dans l'administration à la mise en route (21 octobre 2026)
+- [x] Téléphone d'abord (7a), carte Wallet plus tard (7b) — décidé le 21 octobre 2026
+- [x] E-mail seulement, pas de SMS — décidé le 21 octobre 2026
 - [ ] Traitement de l'article offert validé par Audrex
 
 ## Intégration Matalon Vision

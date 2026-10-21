@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 21 octobre 2026 (clôtures et exports comptables dans l'administration).
+Dernière mise à jour : 21 octobre 2026 (carte de fidélité validée : téléphone d'abord, e-mail seulement).
 
 ## Règle de conduite
 
@@ -136,7 +136,7 @@ Dernière mise à jour : 21 octobre 2026 (clôtures et exports comptables dans l
 
 ## Actions en attente côté Lionel
 
-- [ ] Carte de fidélité (proposition du 21 octobre, cahier › « Carte de fidélité ») : trancher la règle du Moka (points sur la dépense ou tampons), le périmètre (établissement ou groupe), la récompense (article offert, euros), Wallet dès le départ ou téléphone d'abord, SMS ou e-mail ; faire confirmer par Audrex le traitement de l'article offert. Rien n'est développé avant.
+- [ ] Carte de fidélité (proposition validée le 21 octobre, cahier › « Carte de fidélité ») : configuration dans l'administration ; téléphone d'abord (7a), carte Wallet plus tard (7b) ; e-mail seulement, pas de SMS. Reste à trancher : la règle et la récompense du Moka (à la mise en route, dans l'administration), le périmètre (établissement ou groupe), et faire confirmer par Audrex le traitement de l'article offert. Lot 7 à planifier après les lots en cours.
 - [ ] Commandes fournisseurs : importer `MOKA_import_1_produits.xlsx` puis `MOKA_import_2_fiches_techniques.xlsx` (Stock et recettes › Importer, Vérifier puis Importer), relier les 20 cocktails à leur fiche dans l'éditeur de carte ; compléter la fiche Caves du Mont (e-mail de commande : mettre d'abord sa propre adresse pour le test) et les réglages d'envoi des commandes ; confirmer les points du fichier (volume de la Corona, fournisseur des trois tarifs du 15/10, prix estimés) ; corrigés le 15 octobre : limonade 150 cl, Citadelle 24,96 € HT chez Metro, zone unique Bar.
 
 - [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
