@@ -1264,6 +1264,13 @@ function ComptesClients(props: { etablissementId: string }) {
         Ventes portées en compte et réglées plus tard, sur n'importe quel appareil. La vente compte dans le chiffre du jour ; la TVA
         devient exigible au règlement. {donnees && <strong>Total dû : {euros(du)}.</strong>}
       </p>
+      <p className="explication">
+        Le nom du client figure sur ses tickets en compte, conservés six ans (obligation légale) ; ce qu'en sait le client est sur la{" "}
+        <a href={`/donnees/${props.etablissementId}`} target="_blank" rel="noopener">
+          page d'information sur les données
+        </a>
+        .
+      </p>
       {donnees && donnees.anomalies.length > 0 && (
         <div className="admin-alerte">
           <strong>À vérifier :</strong>

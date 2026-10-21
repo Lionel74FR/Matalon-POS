@@ -60,6 +60,8 @@ writeFileSync(
         { src: "/reserver(/.*)?", headers: { ...sansCache, "Content-Security-Policy": "frame-ancestors *" }, continue: true },
         { src: "/(.*)", headers: securite, continue: true },
         { src: "/api/(.*)", dest: "/api" },
+        // Information des clients sur leurs données (RGPD) : page publique servie par l'API.
+        { src: "/donnees/([a-z0-9-]+)", dest: "/api" },
         { handle: "filesystem" },
         { src: "/admin", dest: "/admin.html" },
         { src: "/n", dest: "/n.html" },

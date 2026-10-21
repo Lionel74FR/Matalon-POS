@@ -3449,3 +3449,59 @@ a.bouton {
 .explication.petite {
   font-size: 0.85rem;
 }
+
+/* ───────── Note par e-mail ───────── */
+
+.note-email {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.note-email input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font-size: 1.05rem;
+}
+
+.note-email input:focus {
+  border-color: var(--terre);
+  outline: none;
+}
+
+.note-email small {
+  flex-basis: 100%;
+  color: var(--sable);
+}
+
+.note-email .erreur {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.note-email-ok {
+  margin-top: 12px;
+  color: var(--mousse);
+  font-weight: 700;
+}
+
+.fidelite-alerte {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin: 8px 0;
+  padding: 12px 14px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--terre);
+}
+
+.fidelite-alerte p {
+  margin: 0;
+}

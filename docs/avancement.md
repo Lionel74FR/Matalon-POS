@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 21 octobre 2026 (carte de fidélité, étape 7a livrée).
+Dernière mise à jour : 21 octobre 2026 (note par e-mail, information RGPD, revue des lots 1 à 6).
 
 ## Règle de conduite
 
@@ -13,9 +13,9 @@ Dernière mise à jour : 21 octobre 2026 (carte de fidélité, étape 7a livrée
 
 | Lot | État | Ce qui reste |
 | --- | --- | --- |
-| 0. Cadrage | En cours, côté Lionel | Fiches techniques du Moka, caisse de transition conforme (plan B), outil comptable destinataire des Z, calendrier de facturation électronique B2B (Audrex) |
-| 1. Noyau fiscal et caisse minimale | Code terminé ; noyau gelé en 1.0.0 le 16 octobre pour la mise en service (même code que la 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients) | Attestation éditeur rédigée (7 octobre), à compléter pour la 1.0.0, valider par Audrex et signer avant la première vente réelle ; tag `noyau-fiscal-v1.0.0` à poser. Ticket envoyé par e-mail (optionnel) : non fait |
-| 2. Back-office et synchronisation | Terminé en simulation : la journée hors ligne donne une copie serveur identique à l'iPad | À refaire sur le vrai iPad pendant un service à blanc |
+| 0. Cadrage | En cours, côté Lionel | Outil comptable destinataire des Z (question du FEC posée à Audrex le 21 octobre), calendrier de facturation électronique B2B (Audrex). Fiches techniques importées ; caisse de transition sans objet (le Moka encaisse sur Matalon POS) |
+| 1. Noyau fiscal et caisse minimale | Code terminé ; noyau gelé en 1.0.0 le 16 octobre pour la mise en service (même code que la 0.7.0 : clôtures d'établissement ; 0.6.0 : correction du paiement ; 0.5.0 : comptes clients). Note par e-mail et information RGPD faites le 21 octobre | Attestation éditeur à boucler pour la 1.0.0 (périmètre, dates), puis validation par Audrex et signature |
+| 2. Back-office et synchronisation | Terminé : journée hors ligne simulée identique au serveur, puis service hors ligne réel sur l'iPad réussi (Lionel, 21 octobre 2026) | Exploitation : restauration de la base sur 7 jours (Neon) et copie quotidienne hors Neon ; protection de la branche principale (à faire par Lionel dans GitHub) |
 | 3. Connecteur Matalon Vision | Pas commencé | Attend le feu vert de Lionel |
 | 4. Stock et fiches techniques | Code livré le 9 octobre 2026, avant la fin des lots 1 à 3 sur décision de Lionel : 4a référentiel et liaison carte, 4b consommation à la vente et pertes, 4c réceptions et inventaires (iPad, iPhone, administration), 4d food cost réel, transferts, agent de factures ; commandes fournisseurs et import des fiches techniques le 15 octobre 2026 (demande de Lionel) | Critère de sortie : écarts calculés sur un inventaire réel au Moka. Reste côté Lionel : premiers produits (pas de reprise Yokitup), fiches du Moka, inventaire d'ouverture, clé pour l'agent de factures |
 | 5. Mise en service | Pas commencé | Services à blanc avec l'équipe |
@@ -26,6 +26,7 @@ Dernière mise à jour : 21 octobre 2026 (carte de fidélité, étape 7a livrée
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Lot 1 : note envoyée par e-mail (option du cahier) : « Par e-mail » à la fin de l'encaissement et « E-mail » (duplicata numéroté) dans les Tickets ; le client reçoit le lien de sa note dématérialisée, avec la clé et l'expéditeur des réservations ; l'adresse n'est conservée nulle part, le journal note le canal « email ». Route `POST /api/caisse/note-email` (lien de note de la même origine exigé). Information RGPD : page publique `/donnees/<établissement>` (responsable, notes, ventes en compte conservées six ans, réservations, fidélité, hébergement, droits), citée à la création d'un compte client, à l'inscription fidélité, dans le module de réservation et dans l'administration. Avancement : fiches importées, caisse de transition sans objet, tags et mentions faits, service hors ligne réel réussi (lot 2 terminé). Scénario `note-email` (30 parcours) ; `reservations` attend la vue « Par jour » |
 | 3386401 | Carte de fidélité, étape 7a (validée par Lionel le 21 octobre : téléphone d'abord, e-mail seulement, configuration dans l'administration) : rubrique « Fidélité » (créer ou rejoindre un programme, règles points ou tampons, récompenses article offert / euros / %, bienvenue, moments doublés, exclusions, plafond, validité ; membres, historique, ajustement, effacement). Caisse : carte sur la commande par téléphone, inscription sur place, récompense réservée en ligne et appliquée en remise « Fidélité », rendue si retirée (ou d'office après 48 h) ; rattachement d'un ticket du jour depuis Tickets. Serveur : tables `fidelite_programmes`, `fidelite_membres`, `fidelite_mouvements` (ajout seul), `fidelite_liens` ; points calculés à la réception du ticket, repris à l'annulation ; e-mails de bienvenue et de récompense atteinte ; carte « Fidélité » des statistiques. Base de l'iPad en version 4 (file des liens). Noyau fiscal inchangé (1.0.0). Scénario `fidelite` (29 parcours) ; `parcours` (rubrique Équipe) et `mise-en-service` ajustés |
 | 51a6886 | Clôtures et exports comptables dans l'administration (demande de Lionel du 21 octobre) : rubrique « Clôtures » après Tickets, consultation seule. Mois ou année : total des Z (TTC, HT, TVA, ventes, moyens de paiement), rappel d'un mois passé sans clôture mensuelle, liste des clôtures de tous les appareils (appareil, tickets, écart de comptage ou « sans comptage ») ; détail avec appareils couverts, totaux, grand total perpétuel, comptage, empreinte et archive JSON. Export comptable CSV de la période (format du noyau, celui validé par Audrex) et comptages de caisse CSV (nouveau). Routes `GET /api/admin/etablissements/:id/clotures`, `clotures.csv`, `comptages.csv` (`?du&au`, 366 jours au plus), exports journalisés. Noyau fiscal inchangé (1.0.0). Scénario `clotures-admin` (28 parcours) ; `admin-navigation` passe par la rubrique |
 | 2d3f2e9 | Réservation sur plusieurs tables (demande de Lionel du 20 octobre) : composant commun `ChoixTables` à la place du menu à une table, dans la saisie (administration et caisse : « Attribuée d'office » ou les tables choisies) et dans les listes (administration et caisse). Tables par zone, total des places face aux personnes (« 12 places pour 15 personnes : ajoutez une table »), tables déjà prises sur le créneau signalées. Serveur inchangé (il acceptait déjà jusqu'à 8 tables) ; l'installation ouvre les tables assemblées. Scénario `reservation-groupe` (27 parcours) |
@@ -140,23 +141,23 @@ Dernière mise à jour : 21 octobre 2026 (carte de fidélité, étape 7a livrée
 ## Actions en attente côté Lionel
 
 - [ ] Carte de fidélité : choisir la règle et la récompense du Moka dans l'administration (Fidélité), puis activer le programme ; faire confirmer par Audrex le traitement de l'article offert ; donner le signal de 7b (Wallet) et 7c (libre-service) le moment venu.
-- [ ] Commandes fournisseurs : importer `MOKA_import_1_produits.xlsx` puis `MOKA_import_2_fiches_techniques.xlsx` (Stock et recettes › Importer, Vérifier puis Importer), relier les 20 cocktails à leur fiche dans l'éditeur de carte ; compléter la fiche Caves du Mont (e-mail de commande : mettre d'abord sa propre adresse pour le test) et les réglages d'envoi des commandes ; confirmer les points du fichier (volume de la Corona, fournisseur des trois tarifs du 15/10, prix estimés) ; corrigés le 15 octobre : limonade 150 cl, Citadelle 24,96 € HT chez Metro, zone unique Bar.
+- [ ] Commandes fournisseurs : produits et fiches importés (confirmé le 21 octobre) ; relier les 20 cocktails à leur fiche dans l'éditeur de carte ; compléter la fiche Caves du Mont (e-mail de commande : mettre d'abord sa propre adresse pour le test) et les réglages d'envoi des commandes ; confirmer les points du fichier (volume de la Corona, fournisseur des trois tarifs du 15/10, prix estimés) ; corrigés le 15 octobre : limonade 150 cl, Citadelle 24,96 € HT chez Metro, zone unique Bar.
 
 - [x] Créer le compte administrateur sur `/admin` (fait le 6 octobre 2026).
-- [ ] Remplir les mentions légales des factures dans l'administration.
+- [x] Remplir les mentions légales des factures dans l'administration (fait, 21 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.5.0` sur e81d18c (release GitHub, 6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.4.0` sur 0396872 (6 octobre 2026).
 - [x] Tag `noyau-fiscal-v0.6.0` sur 6eaabbb (7 octobre 2026).
-- [ ] Tag `noyau-fiscal-v0.7.0` sur fefbad6 (clôtures d'établissement), puis `noyau-fiscal-v1.0.0` sur a8aacde.
+- [x] Tag `noyau-fiscal-v1.0.0` posé (vu le 21 octobre 2026). Le tag `noyau-fiscal-v0.7.0` (fefbad6) n'apparaît pas sur GitHub : facultatif, la 1.0.0 est la version citée par l'attestation.
 - [ ] Attestation : décrire les clôtures d'établissement (une Z pour toutes les caisses, faite sur n'importe quel appareil) dans le périmètre fonctionnel.
 - [ ] Attestation éditeur rédigée le 7 octobre 2026 (Claude Docs : https://claude.ai/code/artifact/23f6ff65-9189-4b16-af34-d5554336d55d) : sociétés identifiées (PROIA CONSEIL, SIREN 101 164 614, éditeur ; JLE, SIREN 982 885 279, exploitant) ; reste les dates, puis validation par Audrex (même signataire pour les deux volets, APE de PROIA CONSEIL en 70.22Z et non en édition de logiciels, § 375 ; régime rétabli par la LF 2026), puis signature.
 - [x] Geler le noyau en 1.0.0 (fait le 16 octobre ; reste le tag `noyau-fiscal-v1.0.0` sur a8aacde, version citée par l'attestation).
 - [ ] Mise en service sur matalon-pos.app : faits le 16 octobre, projet Vercel `matalon-pos`, base Neon (Francfort), domaine, `CLE_SECRETS` propre à la production, administrateur, configuration importée (établissement, équipe, carte version 8, stock valorisé 5 060,75 € HT, 2 commandes, 3 pièces, la réservation du 17 octobre) ; reste la restauration Neon sur 7 jours ; ressaisir la clé Resend (Réservations › Services et réglages) ; recréer la clé d'accès ; rattacher chaque appareil depuis matalon-pos.app et accepter le certificat de l'imprimante ; mettre à jour la balise des réservations sur le site du Moka ; ajouter les vrais comptes de l'équipe ; recréer la clé de l'agent de factures si besoin.
 - [ ] Audrex : confirmer l'absence d'option pour les débits (sinon la TVA d'une vente en compte serait due à la vente) et le traitement comptable des créances clients ; l'export CSV des Z a deux colonnes de plus (règlements, TVA exigible).
-- [ ] Information RGPD : le nom des clients en compte est conservé 6 ans dans les enregistrements fiscaux (obligation légale, non effaçable).
-- [ ] Protéger la branche principale, avec le contrôle « Contrôles » obligatoire.
+- [x] Information RGPD : page `/donnees/<établissement>` (nom des clients en compte conservé 6 ans dans les enregistrements fiscaux, obligation légale), citée aux points de collecte (21 octobre 2026). À relire par Lionel, et à lier depuis le site du Moka.
+- [ ] Protéger la branche principale, avec le contrôle « verifier » (workflow « Contrôles ») obligatoire : GitHub refuse ce réglage depuis la session de Claude, à faire dans Settings › Branches (21 octobre 2026).
 - [ ] Console Neon : fenêtre de restauration à 7 jours et sauvegarde quotidienne.
-- [ ] Faire un service hors ligne réel sur l'iPad.
+- [x] Faire un service hors ligne réel sur l'iPad (réussi, 21 octobre 2026).
 - [x] Tester l'imprimante du Moka sur l'iPad : testée et fonctionnelle (Lionel, 13 octobre 2026).
 - [ ] App native iPhone/iPad (coque Capacitor), objectif final Tap to Pay (SDK SumUp, autorisation Apple) : à lancer sur feu vert de Lionel (test de l'imprimante fait le 13 octobre 2026). Préalables : numéro D-U-N-S de PROIA CONSEIL obtenu le 8 octobre 2026 (286382469) ; compte développeur Apple existant (Team ID A3G34UGTY4) mais inscrit en personne physique au nom de Lionel : demande de passage en organisation PROIA CONSEIL envoyée au support Apple Developer le 8 octobre 2026 (indispensable pour demander Tap to Pay, réservé aux comptes organisation ; l'éditeur de l'app sera alors celui de l'attestation).
 - [ ] Vérifier avec Audrex les mentions de facturation électronique.
@@ -165,4 +166,4 @@ Dernière mise à jour : 21 octobre 2026 (carte de fidélité, étape 7a livrée
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 29 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 30 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

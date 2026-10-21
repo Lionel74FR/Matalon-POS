@@ -71,6 +71,10 @@ export function ModaleClient(props: {
             </span>
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" inputMode="email" autoCapitalize="none" autoCorrect="off" maxLength={254} />
           </label>
+          <p className="explication petite">
+            À dire au client : son nom figurera sur le ticket de la vente en compte, que la loi impose de garder six ans. Informations
+            complètes : {location.host}/donnees/{config.etablissementId}.
+          </p>
           <div className="options">
             <button type="button" className="bouton" onClick={() => setCreation(false)}>
               Retour à la liste

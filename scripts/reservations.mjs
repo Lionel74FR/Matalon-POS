@@ -184,6 +184,8 @@ verifier("à venir en caisse", resultats.aVenirCaisse.length === 2 && /^Aujourd'
 await p.screenshot({ path: `${sortie}/rv10b-a-venir-caisse.png` });
 await p.getByRole("button", { name: "Par jour", exact: true }).click();
 await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).waitFor();
+// La vue « Par jour » remplace la liste « À venir » : on attend qu'elle ne montre plus que le jour de Hugo.
+await p.waitForFunction(() => document.querySelectorAll(".resa-caisse-ligne").length === 1, null, { timeout: 5000 }).catch(() => undefined);
 resultats.parJourCaisse = await p.locator(".resa-caisse-ligne").count();
 verifier("par jour en caisse", resultats.parJourCaisse === 1, resultats.parJourCaisse);
 await p.getByRole("button", { name: "Modifier la réservation de Hugo Blanc" }).click();

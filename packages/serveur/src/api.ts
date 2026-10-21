@@ -142,7 +142,9 @@ import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES
 import {
   enregistrerReglages,
   essaiCourriel,
+  echapper,
   expedition,
+  gabarit,
   lireReglages,
   listeReservations,
   modifierReservation,
@@ -156,6 +158,7 @@ import type { EtatEnvoi } from "./partage.js";
 import { maintenantParis } from "@matalon/reservations";
 import { enregistrerSecret, etatSecret, lireSecret, retirerSecret } from "./secrets.js";
 import { exporterConfiguration, importerConfiguration, resumeConfiguration } from "./configuration.js";
+import { pageDonnees } from "./donnees-publiques.js";
 import { programmeCaisse, rapprocherFidelite, routeFideliteAdmin, routeFideliteCaisse, statistiquesFidelite, ventesAnnulees, type ContexteFidelite } from "./fidelite-serveur.js";
 
 export interface Environnement {
@@ -2720,6 +2723,52 @@ function contexteResa(env: Environnement, requete: Request): ContexteResa {
   };
 }
 
+/**
+ * Note envoyée par e-mail au client (ticket dématérialisé) : le lien de la note, la même que
+ * celle du QR code, avec la clé et l'expéditeur des réservations de l'établissement. L'adresse
+ * ne sert qu'à cet envoi : elle n'est ni enregistrée ni journalisée.
+ */
+async function envoyerNoteEmail(env: Environnement, requete: Request): Promise<Response> {
+  const c = await caisseAuthentifiee(env, requete);
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const email = (typeof corps.email === "string" ? corps.email.trim().toLowerCase() : "").slice(0, 254);
+  if (!EMAIL_VALIDE.test(email)) throw new ErreurHttp(400, "EMAIL_INVALIDE", "Adresse e-mail invalide.");
+  const origine = new URL(requete.url).origin;
+  const lien = typeof corps.url === "string" ? corps.url : "";
+  if (!lien.startsWith(`${origine}/n#`) || lien.length > 8000) throw new ErreurHttp(400, "NOTE_INVALIDE", "Lien de note invalide.");
+  const numero = Number(corps.numero);
+  const total = Number(corps.totalTTC);
+  const horodatage = typeof corps.horodatage === "string" && !Number.isNaN(Date.parse(corps.horodatage)) ? corps.horodatage : horloge(env).toISOString();
+  if (!Number.isSafeInteger(numero) || numero < 1 || !Number.isSafeInteger(total)) throw new ErreurHttp(400, "NOTE_INVALIDE", "Note invalide.");
+  const resa = contexteResa(env, requete);
+  const envoi = await preparerEnvoi(resa, c.etablissement_id);
+  if (!envoi || !env.envoyerCourriel) throw new ErreurHttp(503, "ENVOI_NON_CONFIGURE", "L'envoi d'e-mails n'est pas réglé pour cet établissement (administration › Réservations › Services et réglages).");
+  const etab = await etablissement(env.db, c.etablissement_id);
+  const { reglages } = await lireReglages(env.db, c.etablissement_id);
+  const quand = new Date(horodatage).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" });
+  const montant = `${formaterEuros(total)} €`;
+  const sujet = `Votre note ${etab.identite.enseigne} · n° ${numero}`;
+  const lignes = [
+    "Bonjour,",
+    `Voici votre note de ${etab.identite.enseigne} : ticket n° ${numero} du ${quand}, ${montant} TTC.`,
+    "Elle s'ouvre avec le lien ci-dessous ; vous pouvez l'imprimer ou l'enregistrer depuis la page.",
+  ];
+  const mention = "Votre adresse n'a servi qu'à cet envoi : elle n'est pas conservée.";
+  try {
+    await env.envoyerCourriel({
+      ...envoi,
+      ...expedition(etab, reglages),
+      a: email,
+      sujet,
+      html: gabarit(etab, sujet, [...lignes.map(echapper), `<small>${echapper(mention)}</small>`], { texte: "Voir la note", url: lien }),
+      texte: [...lignes, lien, mention].join("\n\n"),
+    });
+  } catch (e) {
+    throw new ErreurHttp(502, "ENVOI_REFUSE", `L'e-mail n'est pas parti : ${e instanceof Error ? e.message : String(e)}`);
+  }
+  return json(200, { envoye: true });
+}
+
 /** Contexte de la fidélité : e-mails envoyés avec la clé et l'expéditeur des réservations de l'établissement. */
 function contexteFidelite(env: Environnement): ContexteFidelite {
   const maintenant = horloge(env);
@@ -2839,6 +2888,15 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
   try {
     await migrer(env.db);
     if (chemin === "/api/sante" && m === "GET") return json(200, { ok: true, heure: horloge(env).toISOString() });
+    // Information des clients sur leurs données (RGPD) : page publique de l'établissement.
+    {
+      const d = /^(?:\/api\/public)?\/donnees\/([a-z0-9-]{1,40})$/.exec(chemin);
+      if (d && m === "GET") {
+        const etab = await etablissement(env.db, d[1]!).catch(() => null);
+        if (!etab) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement inconnu.");
+        return await pageDonnees(env.db, etab);
+      }
+    }
 
     if (chemin.startsWith("/api/public/reservation/")) {
       const r = await routePublique(contexteResa(env, requete), requete, chemin);
@@ -2851,6 +2909,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const r = await routeFideliteCaisse(contexteFidelite(env), c, requete, chemin);
       if (r) return r;
     }
+    if (chemin === "/api/caisse/note-email" && m === "POST") return await envoyerNoteEmail(env, requete);
     if (chemin === "/api/caisse/rattacher" && m === "POST") return await rattacher(env, requete);
     if (chemin === "/api/caisse/etat" && m === "GET") return await etatCaisse(env, requete);
     if (chemin === "/api/caisse/synchro" && m === "POST") return await synchroniser(env, requete);

@@ -1,4 +1,4 @@
-import { Eye, FileText, Printer, QrCode, ReceiptText, RefreshCw, Search, SlidersHorizontal, Undo2, Wallet, X } from "lucide-react";
+import { Eye, FileText, Mail, Printer, QrCode, ReceiptText, RefreshCw, Search, SlidersHorizontal, Undo2, Wallet, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { dateComptable, ErreurFiscale, MODES_PAIEMENT, paiementsEffectifs, ticketCouvertPar, type ModePaiement, type Ticket } from "@matalon/noyau-fiscal";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -7,7 +7,7 @@ import { HEURE_BASCULE } from "../fiscal/caisse";
 import { FILTRES_VIDES, filtrerTickets, NATURES, nombreFiltres, totaliser, type FiltresTickets, type NatureTicket } from "../metier/filtres-tickets";
 import { centimesDepuisSaisie, Modale, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
-import { QrNote, urlNoteTicket } from "./QrNote";
+import { NoteParEmail, QrNote, urlNoteTicket } from "./QrNote";
 import { ModaleFacture } from "./modales/ModaleFacture";
 import { RattachementFidelite } from "./modales/ModaleFidelite";
 import { ModaleCorrection } from "./modales/ModaleCorrection";
@@ -175,6 +175,10 @@ export function Tickets() {
       utilisateur.id,
     );
   };
+
+  /** Duplicata par e-mail : numéroté et journalisé une fois parti. */
+  const [email, setEmail] = useState<{ ticket: Ticket; duplicata: number } | null>(null);
+  const ouvrirEmail = async (t: Ticket) => setEmail({ ticket: t, duplicata: await prochainDuplicata(t) });
 
   const duplicataQr = async (t: Ticket) => {
     const n = await prochainDuplicata(t);
@@ -504,6 +508,11 @@ export function Tickets() {
                   <AvecIcone icone={QrCode}>QR code</AvecIcone>
                 </button>
               )}
+              {!choisi.reglement && choisi.type !== "CORRECTION" && (
+                <button className="bouton" onClick={() => void ouvrirEmail(choisi)}>
+                  <AvecIcone icone={Mail}>E-mail</AvecIcone>
+                </button>
+              )}
               <button className="bouton" onClick={() => void duplicata(choisi)}>
                 <AvecIcone icone={imprimanteConfiguree ? Printer : Eye}>{imprimanteConfiguree ? "Imprimer un duplicata" : "Voir un duplicata"}</AvecIcone>
               </button>
@@ -529,6 +538,19 @@ export function Tickets() {
           {config.fidelite?.actif && choisi.type === "VENTE" && choisi.dateComptable === aujourdhui && !annules.has(cle(choisi)) && (
             <RattachementFidelite key={cle(choisi)} ticket={choisi} />
           )}
+        </Modale>
+      )}
+
+      {email && (
+        <Modale titre={`Note n° ${email.ticket.numero} · duplicata par e-mail`} onFermer={() => setEmail(null)}>
+          <NoteParEmail
+            ouvert
+            ticket={email.ticket}
+            url={urlNoteTicket(email.ticket, config, email.duplicata)}
+            onEnvoyee={() =>
+              caisse.registre.journaliser("REIMPRESSION_TICKET", { ticket: email.ticket.numero, duplicata: email.duplicata, canal: "email" }, utilisateur.id)
+            }
+          />
         </Modale>
       )}
 

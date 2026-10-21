@@ -285,3 +285,56 @@ describe("fidélité : programme, inscription, cumul et récompenses", () => {
     expect((await appel("POST", "/api/admin/etablissements/moka/fidelite", { action: "quitter" }, admin)).corps.programme).toBeNull();
   });
 });
+
+describe("note envoyée par e-mail", () => {
+  it("envoie le lien de la note au client avec l'expéditeur de l'établissement, sans garder l'adresse", async () => {
+    const { bearer } = await preparer();
+    const lien = "https://pos.test/n#abc123";
+    const r = await appel("POST", "/api/caisse/note-email", { email: " Client@Exemple.FR ", url: lien, numero: 12, totalTTC: 2350, horodatage: "2026-10-15T08:00:00Z" }, bearer);
+    expect(r.statut).toBe(200);
+    expect(courriels).toHaveLength(1);
+    const c = courriels[0]!;
+    expect([c.a, c.sujet, c.deNom]).toEqual(["client@exemple.fr", "Votre note Moka · n° 12", "Moka"]);
+    expect(c.texte).toMatch(/ticket n° 12 du 15 octobre 2026 à 10:00, 23,50 € TTC/);
+    expect(c.texte).toMatch(/https:\/\/pos\.test\/n#abc123/);
+    expect(c.html).toContain('href="https://pos.test/n#abc123"');
+    expect(c.texte).toMatch(/n'est pas conservée/);
+    const dump = JSON.stringify(await db.requete("select contenu from enregistrements union all select to_jsonb(j) from journal_admin j"));
+    expect(dump).not.toContain("client@exemple.fr");
+  });
+
+  it("refuse une adresse invalide, un lien d'un autre site, et dit quand l'envoi n'est pas réglé", async () => {
+    const { bearer } = await preparer();
+    const corps = { email: "client@exemple.fr", url: "https://pos.test/n#abc", numero: 1, totalTTC: 400 };
+    expect((await appel("POST", "/api/caisse/note-email", { ...corps, email: "pas-une-adresse" }, bearer)).corps.code).toBe("EMAIL_INVALIDE");
+    expect((await appel("POST", "/api/caisse/note-email", { ...corps, url: "https://ailleurs.test/n#abc" }, bearer)).corps.code).toBe("NOTE_INVALIDE");
+    expect((await appel("POST", "/api/caisse/note-email", corps)).statut).toBe(401);
+    const sansEnvoi = await traiter(
+      new Request("https://pos.test/api/caisse/note-email", { method: "POST", headers: { "Content-Type": "application/json", ...bearer }, body: JSON.stringify(corps) }),
+      { db, maintenant: () => new Date(instant) },
+    );
+    expect([sansEnvoi.status, ((await sansEnvoi.json()) as { code: string }).code]).toEqual([503, "ENVOI_NON_CONFIGURE"]);
+  });
+});
+
+describe("information des clients sur leurs données", () => {
+  it("publie la page de l'établissement : responsable, ventes en compte (six ans), réservations, fidélité si le programme existe", async () => {
+    const { admin } = await preparer();
+    const page = async (chemin: string) => {
+      const r = await traiter(new Request(`https://pos.test${chemin}`), env());
+      return { statut: r.status, type: r.headers.get("Content-Type"), html: await r.text() };
+    };
+    let p = await page("/donnees/moka");
+    expect([p.statut, p.type]).toEqual([200, "text/html; charset=utf-8"]);
+    expect(p.html).toContain("<h1>Vos données personnelles</h1>");
+    expect(p.html).toMatch(/conserver six ans \(livre des procédures fiscales, article L102 B\)/);
+    expect(p.html).toMatch(/effacées un an après la date de la réservation/);
+    expect(p.html).toMatch(/note par e-mail, votre adresse sert uniquement à cet envoi/);
+    expect(p.html).not.toContain("Carte de fidélité");
+    await programmeActif(admin);
+    p = await page("/api/public/donnees/moka");
+    expect(p.html).toContain("Carte de fidélité · Club Moka");
+    expect(p.html).toMatch(/d'office après 3 ans sans visite/);
+    expect((await page("/donnees/inconnu")).statut).toBe(404);
+  });
+});

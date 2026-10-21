@@ -215,7 +215,8 @@ export function ModaleFidelite(props: { commande: Commande; onChange: (c: Comman
               Le client accepte de recevoir des offres
             </label>
             <p className="explication petite">
-              Ses coordonnées servent au seul programme de fidélité ; il peut les faire corriger ou effacer à tout moment.
+              Ses coordonnées servent au seul programme de fidélité ; il peut les faire corriger ou effacer à tout moment. Informations
+              complètes : {location.host}/donnees/{config.etablissementId}.
             </p>
             {erreur && <p className="erreur">{erreur}</p>}
             <div className="fidelite-actions">
@@ -232,7 +233,7 @@ export function ModaleFidelite(props: { commande: Commande; onChange: (c: Comman
             <p className="explication">Le client donne son numéro de téléphone.</p>
             <ChampTelephone valeur={tel} onChange={setTel} onValider={() => void chercher()} enCours={enCours} bouton="Chercher" />
             {etape === "horsLigne" && (
-              <div className="admin-alerte">
+              <div className="fidelite-alerte">
                 <p>Serveur injoignable : la carte ne peut pas être vérifiée. Rattachée par le téléphone, elle recevra ses points à la synchronisation ; les récompenses attendent le réseau.</p>
                 <button
                   className="bouton"

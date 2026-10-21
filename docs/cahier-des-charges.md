@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 100, copiée le 21 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 105, copiée le 21 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -32,7 +32,7 @@ La V1 couvre le cycle complet d'une vente, de la prise de commande à la clôtur
 | Annulations et remboursements | Jamais de suppression : ticket d'annulation négatif lié au ticket d'origine, motif obligatoire, tracé |
 | Correction du paiement | Le détail d'un ticket montre ses moyens de paiement. Un mode erroné se corrige avant la Z de la journée, par un responsable, avec un motif : le ticket reste intact et un ticket de correction signé, de total nul, porte l'écart entre modes ; la Z et une annulation ultérieure tiennent compte des modes corrigés. Exclu pour les ventes en compte. Ajouté le 6 octobre 2026, noyau fiscal 0.6.0. |
 | Recherche des tickets | Écran Tickets : 150 derniers tickets ou une période (aujourd'hui, hier, 7 et 30 jours, dates libres), tous les appareils de l'établissement (hors ligne : ceux de l'appareil). Recherche par n°, montant, table, client, serveur ou motif ; filtres par montant (de… à…), moyen de paiement (après correction), nature (ventes, ventes annulées, annulations, règlements de compte, corrections), comptoir ou table, personne et appareil. Totaux de la sélection : nombre de tickets, ventes et encaissé par moyen de paiement (rapprochement du TPE). Consultation seule. Ajouté le 9 octobre 2026. Dans l'administration, rubrique Tickets (17 octobre 2026) : tickets de tous les appareils sur une période (aujourd'hui, hier, 7 et 30 jours, dates libres), résumé par serveur (ventes gardées, CA, ticket moyen, couverts, remises, ventes annulées) dont une ligne filtre la liste, recherche, et le détail de chaque ticket (heure, appareil, table, couverts, serveur, lignes, paiements après correction, annulation éventuelle, journée comptable, empreinte) ; depuis les statistiques, le nom d'un serveur (Équipe) ouvre ses tickets de la période. Consultation seule : annulation, correction, facture et duplicata restent sur l'appareil qui a encaissé. |
-| Ticket et note | Mentions légales (raison sociale, SIRET, adresse, n° TVA, date et heure, numéro séquentiel, lignes, TVA par taux, totaux HT et TTC, version du logiciel), impression à la demande, envoi par e-mail en option. Note due à partir d'un seuil (25 € par défaut) : imprimée d'office, ou, si l'établissement le règle ainsi, rappel à l'encaissement de la remettre (papier ou QR code si le client préfère la version dématérialisée). Duplicata « note sans détail » depuis les Tickets : un total par taux de TVA au lieu des articles, tracé au journal (14 octobre 2026) |
+| Ticket et note | Mentions légales (raison sociale, SIRET, adresse, n° TVA, date et heure, numéro séquentiel, lignes, TVA par taux, totaux HT et TTC, version du logiciel), impression à la demande, envoi par e-mail (21 octobre 2026 : à la fin de l'encaissement, ou en duplicata depuis les Tickets, le client reçoit le lien de sa note dématérialisée ; l'adresse ne sert qu'à cet envoi, le journal ne garde que le canal). Note due à partir d'un seuil (25 € par défaut) : imprimée d'office, ou, si l'établissement le règle ainsi, rappel à l'encaissement de la remettre (papier ou QR code si le client préfère la version dématérialisée). Duplicata « note sans détail » depuis les Tickets : un total par taux de TVA au lieu des articles, tracé au journal (14 octobre 2026) |
 | Facture | Facture client sur demande, générée depuis le ticket, numérotation propre |
 | Clôtures | Lecture X à tout moment, clôture Z journalière, clôtures mensuelle et annuelle, fond de caisse, comptage espèces et écart ; dépenses payées en espèces sur le fond (objet et montant) déclarées au comptage, déduites des espèces attendues, tracées au journal et imprimées sur le Z (15 octobre 2026). Les tickets et les clôtures de tous les appareils de l'établissement se consultent depuis chacun ; annulation, correction et facture restent sur l'appareil qui a encaissé (7 octobre 2026). La lecture X, la Z et les clôtures mensuelle et annuelle portent sur tout l'établissement, quel que soit le nombre de caisses, et se font depuis n'importe quel appareil, en ligne : un seul appareil clôture à la fois ; un ticket pas encore reçu d'un appareil hors ligne entre dans la Z suivante ; le fond de caisse déclaré sur un appareil vaut pour tous ; un appareil seul de son établissement peut encore clôturer hors ligne (7 octobre 2026, noyau fiscal 0.7.0). Dans l'administration, rubrique Clôtures (21 octobre 2026) : les clôtures de l'établissement sur un mois ou une année, tous appareils, avec le total des Z de la période (TTC, HT, TVA, ventes, encaissé par moyen de paiement) et un rappel quand un mois passé n'a pas sa clôture mensuelle ; pour chaque Z, l'appareil, le nombre de tickets et l'écart du comptage (ou « sans comptage ») ; son détail donne les appareils couverts, les totaux, le grand total perpétuel, le comptage, l'empreinte et l'archive JSON à télécharger. Exports de la période : export comptable CSV (une ligne par clôture, format validé par Audrex) et comptages de caisse CSV (espèces attendues et comptées, CB et titres-restaurant face au TPE, écarts et motif, dépenses en espèces, fond conservé, remise en banque). Consultation seule : une clôture se fait sur la caisse |
 | Utilisateurs | Connexion par code PIN, changement rapide d'utilisateur, rôles vendeur, responsable, administrateur. Cinq codes PIN faux de suite bloquent la personne 5 minutes (connexion et validation responsable), avec une alerte. Modifier l'équipe depuis une caisse demande le code d'un responsable, vérifié par le serveur (8 octobre 2026) |
@@ -343,7 +343,7 @@ Chaque action est rattachée à un utilisateur nommé, chaque iPad à une clé r
 - **Appareils** : rattachement par code à usage unique ; clé de signature propre à chaque iPad, non exportable (trousseau iOS en V2) ; un iPad perdu ou volé est révoqué depuis l'administration et ne peut plus encaisser.
 - **Secrets** : variables d'environnement Vercel et Secrets Replit, jamais dans le dépôt Git.
 - **Sauvegardes** : base serveur sauvegardée quotidiennement ; archives fiscales conservées 6 ans.
-- **RGPD** : aucune donnée client par défaut ; l'e-mail saisi pour un ticket dématérialisé sert uniquement à cet envoi. Les réservations gardent nom, téléphone, e-mail et commentaire un an après leur date, puis les effacent ; les offres commerciales ne partent qu'avec le consentement coché par le client.
+- **RGPD** : aucune donnée client par défaut ; l'e-mail saisi pour un ticket dématérialisé sert uniquement à cet envoi. Les réservations gardent nom, téléphone, e-mail et commentaire un an après leur date, puis les effacent ; les offres commerciales ne partent qu'avec le consentement coché par le client. Page d'information des clients par établissement, /donnees/<établissement> (21 octobre 2026) : responsable, achats et notes, ventes en compte (nom conservé six ans sur les tickets, obligation légale), réservations, carte de fidélité, hébergement, droits ; citée à la création d'un compte client, à l'inscription à la fidélité et dans le module de réservation (à défaut d'un lien propre à l'établissement).
 
 ## Lots de livraison
 
@@ -363,7 +363,7 @@ Après la V1 : prix fournisseurs via l'agent de factures, déploiement sur une d
 
 ## Points ouverts
 
-Cinq points sont tranchés ; restent la caisse de transition pour l'ouverture, l'outil comptable, la facturation électronique et les fiches techniques.
+Sept points sont tranchés ; restent l'outil comptable et la facturation électronique.
 
 | Point | Décision |
 | --- | --- |
@@ -380,6 +380,6 @@ Cinq points sont tranchés ; restent la caisse de transition pour l'ouverture, l
 - [x] Validation Audrex : localisation des archives, mentions des tickets et notes, format d'export comptable.
 - [ ] Outil comptable destinataire des clôtures Z.
 - [ ] Calendrier de la facturation électronique B2B applicable au Moka, à confirmer avec Audrex.
-- [ ] Fiches techniques du Moka à transmettre.
+- [x] Fiches techniques du Moka à transmettre (importées, confirmé le 21 octobre 2026).
 
-- [ ] Choisir la caisse de transition conforme pour l'ouverture du 15 octobre.
+- [x] Choisir la caisse de transition conforme pour l'ouverture du 15 octobre (sans objet : le Moka encaisse sur Matalon POS, 21 octobre 2026).

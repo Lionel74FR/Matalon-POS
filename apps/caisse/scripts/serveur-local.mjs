@@ -45,7 +45,7 @@ const cleSecrets = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toStr
 
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  if (url.pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/donnees/")) {
     const morceaux = [];
     for await (const m of req) morceaux.push(m);
     const corps = morceaux.length ? Buffer.concat(morceaux) : undefined;

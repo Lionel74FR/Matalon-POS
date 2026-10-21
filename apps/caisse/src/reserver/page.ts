@@ -711,7 +711,7 @@ async function pageReservation(etabId: string) {
             "p",
             {},
             `${config.etablissement.nom} utilise vos coordonnées pour gérer votre réservation : confirmation, rappel éventuel et contact en cas d'imprévu. Elles ne sont transmises à personne et sont effacées un an après la date de la réservation. Les offres ne vous sont envoyées que si vous les avez demandées, et vous pouvez vous désinscrire à tout moment. Pour accéder à vos données ou les faire effacer, écrivez-nous${config.email ? ` à ${config.email}` : ""}.`,
-            config.confidentialite ? el("span", {}, " ", el("a", { href: config.confidentialite, target: "_blank", rel: "noopener" }, "Politique de confidentialité complète")) : null,
+            el("span", {}, " ", el("a", { href: config.confidentialite ?? `${location.origin}/donnees/${config.etablissement.id}`, target: "_blank", rel: "noopener" }, "Politique de confidentialité complète")),
           ),
         ),
       ),

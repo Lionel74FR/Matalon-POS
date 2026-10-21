@@ -110,7 +110,12 @@ export function FideliteAdmin(props: { e: EtablissementAdmin }) {
       <p className="explication">
         Le client est reconnu en caisse par son numéro de téléphone. Il cumule à chaque vente reçue par le serveur, et une récompense
         atteinte s'applique sur le ticket comme une remise « Fidélité » : les points ne sont jamais un moyen de paiement, le noyau
-        fiscal n'est pas touché. Les e-mails (bienvenue, récompense atteinte) partent avec l'expéditeur des réservations.
+        fiscal n'est pas touché. Les e-mails (bienvenue, récompense atteinte) partent avec l'expéditeur des réservations. Les clients
+        sont informés sur la{" "}
+        <a href={`/donnees/${e.id}`} target="_blank" rel="noopener">
+          page d'information sur les données
+        </a>
+        .
       </p>
       {erreur && <p className="erreur">{erreur}</p>}
       {!donnees ? (

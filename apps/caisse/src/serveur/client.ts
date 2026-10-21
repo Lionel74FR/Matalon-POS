@@ -105,6 +105,11 @@ export class ClientApi {
     return this.appel<ReponseCarte>("GET", "/api/caisse/carte");
   }
 
+  /** Note envoyée par e-mail au client (lien de la note dématérialisée) ; l'adresse n'est pas conservée. */
+  envoyerNoteEmail(corps: { email: string; url: string; numero: number; totalTTC: number; horodatage: string }) {
+    return this.appel<{ envoye: true }>("POST", "/api/caisse/note-email", corps);
+  }
+
   // ───────── Fidélité (lot 7a), en ligne ─────────
 
   /** Membre reconnu par son téléphone (null : inconnu), et le programme de l'établissement. */

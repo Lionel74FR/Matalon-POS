@@ -23,7 +23,7 @@ import {
 } from "../../metier/commande";
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
-import { QrNote, urlNoteTicket } from "../QrNote";
+import { NoteParEmail, QrNote, urlNoteTicket } from "../QrNote";
 import { productionActive, useEnvoiProduction } from "../production";
 import { ModaleClient } from "./ModaleClient";
 import { lienDuTicket, utilisationsOrphelines } from "../../metier/fidelite";
@@ -369,6 +369,11 @@ export function ModaleEncaissement(props: {
           )}
           <QrNote url={urlNoteTicket(ticket, config)} />
         </div>
+        <NoteParEmail
+          ticket={ticket}
+          url={urlNoteTicket(ticket, config)}
+          onEnvoyee={() => caisse.registre.journaliser("IMPRESSION_TICKET", { ticket: ticket.numero, canal: "email" }, utilisateur.id).then(() => setNoteImprimee(true))}
+        />
         {partie && <p className="explication">Le reste de la commande demeure sur la table.</p>}
         {noteImprimee && <p className="explication">La note a été imprimée (montant de {euros(config.seuilNoteAutomatique)} ou plus).</p>}
         {noteARemettre && (
