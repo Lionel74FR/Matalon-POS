@@ -7,6 +7,7 @@ Dernière mise à jour : 21 octobre 2026 (note par e-mail, information RGPD, rev
 
 - On ne commence pas un lot tant que le précédent n'est pas terminé. On ne propose pas non plus de passer au lot suivant (consigne de Lionel).
 - À chaque étape, on relit le cahier des charges en entier pour ne rien oublier.
+- Backlog des besoins de la caisse (Claude Docs : https://claude.ai/artifact/9mjEr4HYzoTtt6YU2XG3s3) : quand un besoin qui y figure est livré, passer son statut à « Livré » et renseigner « Réalisé le ». Ne rien ajouter ni modifier d'autre dans ce document (consigne de Lionel, 21 octobre 2026).
 - Ouverture du Moka : jeudi 15 octobre 2026. Décision go / no-go : 13 octobre 2026, après les services à blanc.
 
 ## État des lots
