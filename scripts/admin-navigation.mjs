@@ -14,7 +14,7 @@ const [nomCookie, valeurCookie] = cookie.split("=");
 const b = await chromium.launch();
 const erreurs = [];
 const debordements = {};
-const RUBRIQUES = ["statistiques", "tickets", "appareils", "equipe", "plan", "imprimantes", "reservations", "comptes", "cartes", "stock", "alertes", "identite"];
+const RUBRIQUES = ["statistiques", "tickets", "clotures", "appareils", "equipe", "plan", "imprimantes", "reservations", "comptes", "cartes", "stock", "alertes", "identite"];
 
 for (const [nom, viewport] of [["ipad", { width: 1180, height: 820 }], ["portrait", { width: 820, height: 1180 }], ["iphone", { width: 390, height: 844 }]]) {
   const ctx = await b.newContext({ viewport, deviceScaleFactor: 1, hasTouch: nom !== "ipad" });

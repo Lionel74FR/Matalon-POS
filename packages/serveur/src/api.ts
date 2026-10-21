@@ -24,6 +24,7 @@ import {
   NOM_LOGICIEL,
   VERSION_NOYAU_FISCAL,
   exporterCloturesCSV,
+  formaterEuros,
   sha256Hex,
   HASH_GENESE,
   verifierRegistre,
@@ -2486,6 +2487,94 @@ async function exporterJournal(env: Environnement, admin: { id: string }, caisse
   });
 }
 
+/**
+ * Clôtures de l'établissement sur une période, toutes caisses : les Z dont la journée y tombe,
+ * les mois et exercices qui la recoupent ; avec le comptage de chaque Z (événement COMPTAGE_CAISSE
+ * de l'appareil qui l'a faite, le dernier avant elle, s'il porte sur sa journée).
+ */
+async function cloturesPeriode(env: Environnement, etablissementId: string, du: string, au: string) {
+  const clotures = (
+    await env.db.requete<{ contenu: Cloture }>(
+      `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+       where c.etablissement_id = $1 and e.chaine = 'clotures' and (
+         (e.contenu->>'periode' = 'JOUR' and e.contenu->>'identifiantPeriode' between $2 and $3)
+         or (e.contenu->>'periode' = 'MOIS' and e.contenu->>'identifiantPeriode' between substr($2, 1, 7) and substr($3, 1, 7))
+         or (e.contenu->>'periode' = 'EXERCICE' and e.contenu->>'identifiantPeriode' between substr($2, 1, 4) and substr($3, 1, 4)))
+       order by e.horodatage, e.numero`,
+      [etablissementId, du, au],
+    )
+  ).map((l) => l.contenu);
+  const comptages: Record<string, Evenement["details"]> = {};
+  for (const z of clotures) {
+    if (z.periode !== "JOUR" || z.dernierEvenement == null) continue;
+    const [c] = await env.db.requete<{ contenu: Evenement }>(
+      `select contenu from enregistrements where caisse_id = $1 and chaine = 'evenements' and numero <= $2
+         and contenu->>'code' = 'COMPTAGE_CAISSE' order by numero desc limit 1`,
+      [z.caisseId, z.dernierEvenement],
+    );
+    if (c && c.contenu.details.journee === z.identifiantPeriode) comptages[`${z.caisseId}#${z.numero}`] = c.contenu.details;
+  }
+  const caisses = await env.db.requete<{ id: string; nom: string }>("select id, nom from caisses where etablissement_id = $1", [etablissementId]);
+  return { clotures, comptages, appareils: Object.fromEntries(caisses.map((c) => [c.id, c.nom])) };
+}
+
+function lirePeriodeClotures(url: URL): { du: string; au: string } {
+  const du = url.searchParams.get("du") ?? "";
+  const au = url.searchParams.get("au") ?? "";
+  if (!DATE_VALIDE.test(du) || !DATE_VALIDE.test(au) || au < du || joursEntre(du, au) > JOURS_MAX_STATISTIQUES) {
+    throw new ErreurHttp(400, "PERIODE_INVALIDE", `Période invalide (du ≤ au, ${JOURS_MAX_STATISTIQUES} jours au plus).`);
+  }
+  return { du, au };
+}
+
+const fichierCsv = (contenu: string, nom: string) =>
+  new Response("\ufeff" + contenu, {
+    headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${nom}"`, "Cache-Control": "no-store" },
+  });
+
+/** Comptages de caisse de la période : espèces, cartes, titres-restaurant, écarts, dépenses, remise en banque. */
+function comptagesCSV(clotures: Cloture[], comptages: Record<string, Evenement["details"]>, appareils: Record<string, string>): string {
+  const colonnes: Array<[string, string]> = [
+    ["fondInitial", "Fond initial"],
+    ["especesEncaissees", "Especes encaissees"],
+    ["depensesEspeces", "Depenses especes"],
+    ["especesAttendues", "Especes attendues"],
+    ["especesComptees", "Especes comptees"],
+    ["ecartEspeces", "Ecart especes"],
+    ["cbCaisse", "CB caisse"],
+    ["cbTpe", "CB TPE"],
+    ["ecartCb", "Ecart CB"],
+    ["trCarteCaisse", "TR carte caisse"],
+    ["trCarteTpe", "TR carte TPE"],
+    ["ecartTrCarte", "Ecart TR carte"],
+    ["trPapierCaisse", "TR papier caisse"],
+    ["trPapierComptes", "TR papier comptes"],
+    ["ecartTrPapier", "Ecart TR papier"],
+    ["fondConserve", "Fond conserve"],
+    ["remiseEnBanque", "Remise en banque"],
+  ];
+  const cellule = (v: string | number) => (/[;"\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+  const depenses = (d: Evenement["details"]) => {
+    try {
+      const l = typeof d.depenses === "string" ? (JSON.parse(d.depenses) as Array<{ libelle: string; montant: number }>) : [];
+      return l.map((x) => `${x.libelle} ${formaterEuros(x.montant)}`).join(" / ");
+    } catch {
+      return "";
+    }
+  };
+  const lignes = clotures
+    .filter((z) => z.periode === "JOUR")
+    .map((z) => {
+      const d = comptages[`${z.caisseId}#${z.numero}`];
+      const valeurs = colonnes.map(([k]) => (d && typeof d[k] === "number" ? formaterEuros(d[k] as number) : ""));
+      return [z.identifiantPeriode, appareils[z.caisseId] ?? z.caisseId, z.numero, d ? "oui" : "non", ...valeurs, d ? depenses(d) : "", d && typeof d.motif === "string" ? d.motif : ""]
+        .map(cellule)
+        .join(";");
+    });
+  const entetes = ["Journee", "Appareil", "Cloture n°", "Comptage", ...colonnes.map(([, l]) => l), "Detail depenses", "Motif des ecarts"];
+  return [entetes.map(cellule).join(";"), ...lignes].join("\r\n") + "\r\n";
+}
+
 /** Clôtures reçues d'une caisse, de la plus récente à la plus ancienne. */
 async function listeCloturesCaisse(env: Environnement, caisseId: string): Promise<Response> {
   await cleDeCaisse(env, caisseId);
@@ -2855,6 +2944,18 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         const e = await majPlan(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
         await journaliserAdmin(env, admin.id, "plan_salle", { etablissement: e.id, version: e.planVersion ?? 0, tables: e.tables.length });
         return json(200, { etablissement: e });
+      }
+      // Clôtures de l'établissement sur une période, et leurs exports comptables.
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/(clotures|clotures\.csv|comptages\.csv)$/.exec(chemin);
+      if (p && m === "GET") {
+        const etab = (await etablissement(env.db, p[1]!)).id;
+        const { du, au } = lirePeriodeClotures(url);
+        const r = await cloturesPeriode(env, etab, du, au);
+        if (p[2] === "clotures") return json(200, r);
+        await journaliserAdmin(env, admin.id, p[2] === "clotures.csv" ? "export_csv_etablissement" : "export_comptages", { etablissement: etab, du, au, clotures: r.clotures.length });
+        return p[2] === "clotures.csv"
+          ? fichierCsv(exporterCloturesCSV(r.clotures), `clotures-${etab}-${du}_${au}.csv`)
+          : fichierCsv(comptagesCSV(r.clotures, r.comptages, r.appareils), `comptages-${etab}-${du}_${au}.csv`);
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/moments$/.exec(chemin);
       if (p && m === "PUT") {

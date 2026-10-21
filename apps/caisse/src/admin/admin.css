@@ -897,6 +897,53 @@ code.cle-api {
   word-break: break-all;
 }
 
+/* ───────── Clôtures (consultation, exports) ───────── */
+
+.clotures-admin .filtres-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.clotures-periode {
+  min-width: 4ch;
+  text-align: center;
+  font-family: var(--police-chiffres);
+}
+
+.clotures-exports {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.clotures-exports .explication {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.clotures-total {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+}
+
+.clotures-total strong {
+  font-family: var(--police-chiffres);
+  font-size: 1.2rem;
+}
+
+.clotures-total small {
+  color: var(--sable);
+}
+
 /* ───────── Moments de la journée ───────── */
 
 .moments-liste {

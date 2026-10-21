@@ -515,6 +515,37 @@ describe("commandes en cours partagées", () => {
     expect((await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie })).corps.parMoment).toEqual([]);
   });
 
+  it("l'administration lit les clôtures de l'établissement d'un mois et les exporte, comptage compris", async () => {
+    const cookie = await adminConnecte();
+    const a = await caisseRattachee(cookie);
+    await a.registre.enregistrerVente({ lignes: [CAFE], paiements: [{ mode: "CB", montant: 400 }], operateurId: "u-lea" });
+    await a.registre.enregistrerVente({ lignes: [SPRITZ], paiements: [{ mode: "ESPECES", montant: 1100 }], operateurId: "u-lea" });
+    await a.registre.journaliser(
+      "COMPTAGE_CAISSE",
+      { journee: "2026-10-15", fondInitial: 15000, especesAttendues: 16100, especesComptees: 16000, ecartEspeces: -100, cbCaisse: 400, cbTpe: 400, ecartCb: 0, fondConserve: 15000, remiseEnBanque: 1000, motif: "pièce perdue" },
+      "u-lea",
+    );
+    expect((await a.synchro()).statut).toBe(200);
+    const v = await appel("POST", "/api/caisse/journee/verrou", undefined, a.bearer);
+    await a.registre.cloturerJournee("u-lea", v.corps.contexte);
+    expect((await a.synchro()).statut).toBe(200);
+    const r = await appel("GET", "/api/admin/etablissements/moka/clotures?du=2026-10-01&au=2026-10-31", undefined, { Cookie: cookie });
+    expect(r.statut).toBe(200);
+    expect(r.corps.clotures.map((c: { periode: string; identifiantPeriode: string; totalTTC: number }) => `${c.periode} ${c.identifiantPeriode} ${c.totalTTC}`)).toEqual(["JOUR 2026-10-15 1500"]);
+    const z = r.corps.clotures[0];
+    expect(r.corps.comptages[`${z.caisseId}#${z.numero}`]).toMatchObject({ ecartEspeces: -100, remiseEnBanque: 1000 });
+    expect(r.corps.appareils[z.caisseId]).toBe("Comptoir");
+    const csv = await appel("GET", "/api/admin/etablissements/moka/clotures.csv?du=2026-10-01&au=2026-10-31", undefined, { Cookie: cookie });
+    expect(csv.corps).toContain("JOUR;2026-10-15");
+    expect(csv.corps).toContain(";15,00;");
+    const comptages = await appel("GET", "/api/admin/etablissements/moka/comptages.csv?du=2026-10-01&au=2026-10-31", undefined, { Cookie: cookie });
+    expect(comptages.corps.split("\r\n")[1]).toBe("2026-10-15;Comptoir;1;oui;150,00;;;161,00;160,00;-1,00;4,00;4,00;0,00;;;;;;;150,00;10,00;;pièce perdue");
+    // Hors période, rien ; période invalide refusée ; sans session, refus.
+    expect((await appel("GET", "/api/admin/etablissements/moka/clotures?du=2026-09-01&au=2026-09-30", undefined, { Cookie: cookie })).corps.clotures).toEqual([]);
+    expect((await appel("GET", "/api/admin/etablissements/moka/clotures?du=2026-10-31&au=2026-10-01", undefined, { Cookie: cookie })).statut).toBe(400);
+    expect((await appel("GET", "/api/admin/etablissements/moka/clotures.csv?du=2026-10-01&au=2026-10-31")).statut).toBe(401);
+  });
+
   it("l'administration lit les tickets d'une période, toutes caisses", async () => {
     const cookie = await adminConnecte();
     const a = await caisseRattachee(cookie);

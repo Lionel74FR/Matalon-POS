@@ -12,6 +12,7 @@ import { api, ErreurAdmin, type AdresseImprimante, type CaisseAdmin, type Etabli
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
+import { CloturesAdmin } from "./CloturesAdmin";
 import { TicketsAdmin, type FiltreTickets } from "./TicketsAdmin";
 import { ModaleMoments } from "./Moments";
 import { Reservations } from "./Reservations";
@@ -308,13 +309,14 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 // ───────── Tableau de bord ─────────
 
 /** Rubriques d'un établissement, dans le menu latéral (ordre d'usage). */
-type Rubrique = "statistiques" | "tickets" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
+type Rubrique = "statistiques" | "tickets" | "clotures" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
 const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: string; icone: LucideIcon; aide: string }> }> = [
   {
     groupe: "Activité",
     liste: [
       { id: "statistiques", libelle: "Statistiques", icone: ChartColumn, aide: "CA en direct, articles, équipe" },
       { id: "tickets", libelle: "Tickets", icone: ReceiptText, aide: "Par serveur, détail de chaque ticket" },
+      { id: "clotures", libelle: "Clôtures", icone: Archive, aide: "Z, exports comptables, archives" },
     ],
   },
   {
@@ -647,6 +649,7 @@ function FicheEtablissement(props: {
       )}
       {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} onServeur={props.onTicketsServeur} />}
       {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
+      {rubrique === "clotures" && <CloturesAdmin e={e} />}
       {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
       {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
       {rubrique === "imprimantes" && (

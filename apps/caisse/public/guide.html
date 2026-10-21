@@ -444,6 +444,16 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s6v">
+    <label><input type="checkbox">Clôtures et exports comptables dans l'administration</label>
+    <ol>
+      <li>Sur l'iPad, faites la Z du jour avec un comptage qui laisse un écart, motif compris.</li>
+      <li>Administration › <span class="bouton">Clôtures</span> : lisez le total du mois et la ligne de la Z, puis touchez-la et <span class="bouton">Télécharger l'archive (JSON)</span>.</li>
+      <li>Téléchargez <span class="bouton">Export comptable (CSV)</span> et <span class="bouton">Comptages de caisse (CSV)</span>, ouvrez-les dans un tableur. Passez au mois précédent, puis en <span class="bouton">Année</span>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> la ligne indique « Z · jour · n° », l'appareil, le nombre de tickets et l'écart (« écart espèces -1,00 € ») ou « sans comptage » ; le détail donne les appareils couverts, les totaux, le grand total perpétuel, le comptage avec le motif et l'empreinte. L'export comptable a une ligne par clôture de la période, les comptages une ligne par Z (fond, espèces attendues et comptées, écarts, motif, remise en banque). Un mois passé sans clôture mensuelle le signale ; rien ne se clôture depuis l'administration.</p>
+  </section>
+
   <section class="scenario" data-id="s6h">
     <label><input type="checkbox">Z de l'établissement depuis l'iPhone</label>
     <ol>

@@ -1,3 +1,4 @@
+import type { Cloture, Evenement } from "@matalon/noyau-fiscal";
 import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, Fournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
@@ -113,6 +114,10 @@ export const api = {
   verifier: (caisseId: string) => appel<RapportVerification>("GET", `/caisses/${caisseId}/verification`),
   alertes: (etablissementId: string, toutes = false) => appel<{ alertes: AlerteApi[] }>("GET", `/etablissements/${etablissementId}/alertes${toutes ? "?toutes=1" : ""}`),
   marquerAlerteVue: (id: string) => appel("POST", `/alertes/${id}/vue`, {}),
+  cloturesPeriode: (etablissementId: string, du: string, au: string) =>
+    appel<{ clotures: Cloture[]; comptages: Record<string, Evenement["details"]>; appareils: Record<string, string> }>("GET", `/etablissements/${etablissementId}/clotures?du=${du}&au=${au}`),
+  urlExportClotures: (etablissementId: string, du: string, au: string) => `/api/admin/etablissements/${etablissementId}/clotures.csv?du=${du}&au=${au}`,
+  urlExportComptages: (etablissementId: string, du: string, au: string) => `/api/admin/etablissements/${etablissementId}/comptages.csv?du=${du}&au=${au}`,
   majMoments: (etablissementId: string, moments: MomentJournee[]) => appel("PUT", `/etablissements/${etablissementId}/moments`, { moments }),
   ticketsPeriode: (etablissementId: string, du: string, au: string) =>
     appel<ReponseTickets>("GET", `/etablissements/${etablissementId}/tickets?du=${du}&au=${au}`),

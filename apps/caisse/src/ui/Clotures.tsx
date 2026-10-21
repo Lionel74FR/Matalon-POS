@@ -32,10 +32,11 @@ function telecharger(nom: string, contenu: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-const LIBELLES = { JOUR: "Z", MOIS: "Mois", EXERCICE: "Exercice" } as const;
+export const LIBELLES_CLOTURE = { JOUR: "Z", MOIS: "Mois", EXERCICE: "Exercice" } as const;
+const LIBELLES = LIBELLES_CLOTURE;
 
 /** Nombre de tickets couverts par une clôture (toutes caisses pour une clôture d'établissement), ou null. */
-function nbTickets(c: Cloture): number | null {
+export function nbTickets(c: Cloture): number | null {
   if (c.etablissement) {
     if (c.periode !== "JOUR") return null;
     return c.etablissement.caisses.reduce((n, x) => n + (x.premierTicket == null ? 0 : x.dernierTicketCouvert - x.premierTicket + 1), 0);
@@ -43,7 +44,7 @@ function nbTickets(c: Cloture): number | null {
   return c.premierTicket == null ? 0 : c.dernierTicket! - c.premierTicket + 1;
 }
 
-function Totaux({ t }: { t: TotauxPeriode }) {
+export function Totaux({ t }: { t: TotauxPeriode }) {
   return (
     <dl className="totaux">
       <div>
@@ -94,7 +95,7 @@ function Totaux({ t }: { t: TotauxPeriode }) {
 
 const montant = (v: unknown) => (typeof v === "number" ? euros(v) : "—");
 
-function ResumeComptage({ e }: { e: Evenement }) {
+export function ResumeComptage({ e }: { e: Pick<Evenement, "details"> }) {
   const d = e.details;
   const ligne = (libelle: string, caisse: unknown, compte: unknown, ecart: unknown) => (
     <tr>
