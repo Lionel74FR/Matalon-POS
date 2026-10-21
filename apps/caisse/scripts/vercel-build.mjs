@@ -62,6 +62,8 @@ writeFileSync(
         { src: "/api/(.*)", dest: "/api" },
         // Information des clients sur leurs données (RGPD) : page publique servie par l'API.
         { src: "/donnees/([a-z0-9-]+)", dest: "/api" },
+        // Logo des établissements (module de réservation, e-mails), servi par l'API.
+        { src: "/logo/([a-z0-9-]+)", dest: "/api" },
         { handle: "filesystem" },
         { src: "/admin", dest: "/admin.html" },
         { src: "/n", dest: "/n.html" },

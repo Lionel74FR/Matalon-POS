@@ -44,6 +44,7 @@ const TABLES = [
   { nom: "reservations", lecture: "select * from reservations where date >= $1 and statut <> 'annulee' order by seq" },
   // Programmes de fidélité (règles) ; leurs membres et leur registre sont de vraies données de clients : ils ne suivent pas.
   { nom: "fidelite_programmes", lecture: "select * from fidelite_programmes order by id" },
+  { nom: "etablissements_logos", lecture: "select * from etablissements_logos order by etablissement_id" },
 ] as const;
 
 /**
@@ -68,6 +69,7 @@ const VIERGES = [
   "reservations_reglages",
   "secrets_etablissement",
   "fidelite_programmes",
+  "etablissements_logos",
   "fidelite_membres",
   "fidelite_mouvements",
   "fidelite_liens",

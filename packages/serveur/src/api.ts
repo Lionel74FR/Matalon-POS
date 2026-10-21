@@ -216,6 +216,7 @@ function texte(v: unknown, champ: string, max = 200): string {
 
 interface LigneEtablissement {
   id: string;
+  logo_version?: string | null;
   enseigne: string;
   raison_sociale: string;
   adresse: string;
@@ -262,7 +263,53 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     zones: l.zones ?? [],
     planVersion: l.plan_version ?? 0,
     moments: l.moments ?? [],
+    logo: l.logo_version ?? null,
   };
+}
+
+/**
+ * Logo de l'établissement : un PNG (préparé par l'administration, 600 × 240 au plus), 300 Ko au
+ * plus. Sa version (empreinte) fait varier l'adresse publique : e-mails et module ne gardent
+ * jamais une image périmée. null : retiré.
+ */
+async function majLogo(env: Environnement, etablissementId: string, corps: Record<string, unknown>, adminId: string): Promise<EtablissementApi> {
+  const e = await etablissement(env.db, etablissementId);
+  const maintenant = horloge(env).toISOString();
+  if (corps.png === null) {
+    await env.db.lot([
+      { texte: "delete from etablissements_logos where etablissement_id = $1", params: [e.id] },
+      { texte: "update etablissements set logo_version = null, maj_le = $2 where id = $1", params: [e.id, maintenant] },
+    ]);
+    return etablissement(env.db, e.id);
+  }
+  const png = typeof corps.png === "string" ? corps.png.replace(/^data:image\/png;base64,/, "") : "";
+  let octets: Uint8Array;
+  try {
+    octets = Uint8Array.from(atob(png), (c) => c.charCodeAt(0));
+  } catch {
+    throw new ErreurHttp(400, "LOGO_INVALIDE", "Image illisible.");
+  }
+  const SIGNATURE_PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (octets.length < 8 || SIGNATURE_PNG.some((o, i) => octets[i] !== o)) throw new ErreurHttp(400, "LOGO_INVALIDE", "Le logo doit être une image PNG.");
+  if (octets.length > 300_000) throw new ErreurHttp(413, "LOGO_TROP_LOURD", "Logo trop lourd (300 Ko au plus).");
+  const version = (await sha256(png)).slice(0, 12);
+  await env.db.lot([
+    {
+      texte: `insert into etablissements_logos (etablissement_id, png, version, maj_le, maj_par) values ($1, $2, $3, $4, $5)
+              on conflict (etablissement_id) do update set png = excluded.png, version = excluded.version, maj_le = excluded.maj_le, maj_par = excluded.maj_par`,
+      params: [e.id, png, version, maintenant, adminId],
+    },
+    { texte: "update etablissements set logo_version = $2, maj_le = $3 where id = $1", params: [e.id, version, maintenant] },
+  ]);
+  return etablissement(env.db, e.id);
+}
+
+/** Logo public d'un établissement (module de réservation, e-mails). */
+async function logoPublic(env: Environnement, etablissementId: string): Promise<Response> {
+  const [l] = await env.db.requete<{ png: string }>("select png from etablissements_logos where etablissement_id = $1", [etablissementId]);
+  if (!l) throw new ErreurHttp(404, "LOGO_ABSENT", "Pas de logo pour cet établissement.");
+  const octets = Uint8Array.from(atob(l.png), (c) => c.charCodeAt(0));
+  return new Response(octets, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=31536000, immutable", "Access-Control-Allow-Origin": "*" } });
 }
 
 /** Moments de la journée de l'établissement, contrôlés comme dans l'éditeur. */
@@ -1065,7 +1112,7 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
   // Fidélité (7a) : gains des ventes reçues, reprises des ventes annulées ; une erreur ici ne bloque jamais la synchronisation.
   if (ticketsNouveaux.length) {
     try {
-      await rapprocherFidelite(contexteFidelite(env), c.id, ventesAnnulees(ticketsNouveaux));
+      await rapprocherFidelite(contexteFidelite(env, requete), c.id, ventesAnnulees(ticketsNouveaux));
     } catch (e) {
       console.error("fidélité", e);
     }
@@ -2760,7 +2807,7 @@ async function envoyerNoteEmail(env: Environnement, requete: Request): Promise<R
       ...expedition(etab, reglages),
       a: email,
       sujet,
-      html: gabarit(etab, sujet, [...lignes.map(echapper), `<small>${echapper(mention)}</small>`], { texte: "Voir la note", url: lien }),
+      html: gabarit(etab, sujet, [...lignes.map(echapper), `<small>${echapper(mention)}</small>`], { texte: "Voir la note", url: lien }, origine),
       texte: [...lignes, lien, mention].join("\n\n"),
     });
   } catch (e) {
@@ -2770,13 +2817,14 @@ async function envoyerNoteEmail(env: Environnement, requete: Request): Promise<R
 }
 
 /** Contexte de la fidélité : e-mails envoyés avec la clé et l'expéditeur des réservations de l'établissement. */
-function contexteFidelite(env: Environnement): ContexteFidelite {
+function contexteFidelite(env: Environnement, requete?: Request): ContexteFidelite {
   const maintenant = horloge(env);
   const resa = contexteResa(env, new Request("https://local.invalid/"));
   return {
     db: env.db,
     maintenant,
     aujourdhui: dateComptable(maintenant),
+    ...(requete ? { origine: new URL(requete.url).origin } : {}),
     etablissement: (id) => etablissement(env.db, id),
     ...(env.envoyerCourriel
       ? {
@@ -2888,6 +2936,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
   try {
     await migrer(env.db);
     if (chemin === "/api/sante" && m === "GET") return json(200, { ok: true, heure: horloge(env).toISOString() });
+    {
+      const l = /^(?:\/api\/public)?\/logo\/([a-z0-9-]{1,40})$/.exec(chemin);
+      if (l && m === "GET") return await logoPublic(env, l[1]!);
+    }
     // Information des clients sur leurs données (RGPD) : page publique de l'établissement.
     {
       const d = /^(?:\/api\/public)?\/donnees\/([a-z0-9-]{1,40})$/.exec(chemin);
@@ -2906,7 +2958,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
 
     if (chemin === "/api/caisse/fidelite" || chemin.startsWith("/api/caisse/fidelite/")) {
       const c = await caisseAuthentifiee(env, requete);
-      const r = await routeFideliteCaisse(contexteFidelite(env), c, requete, chemin);
+      const r = await routeFideliteCaisse(contexteFidelite(env, requete), c, requete, chemin);
       if (r) return r;
     }
     if (chemin === "/api/caisse/note-email" && m === "POST") return await envoyerNoteEmail(env, requete);
@@ -3028,7 +3080,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const ph = /^\/api\/admin\/stock\/prix\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
       if (ph && m === "GET") return await historiquePrix(env, ph[1]!);
       if (/^\/api\/admin\/(etablissements\/[a-z0-9-]+\/fidelite$|fidelite\/)/.test(chemin)) {
-        const r = await routeFideliteAdmin(contexteFidelite(env), requete, admin, chemin);
+        const r = await routeFideliteAdmin(contexteFidelite(env, requete), requete, admin, chemin);
         if (r) {
           if (r.journal) await journaliserAdmin(env, admin.id, r.journal.action, r.journal.details);
           return r.reponse;
@@ -3063,6 +3115,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         return p[2] === "clotures.csv"
           ? fichierCsv(exporterCloturesCSV(r.clotures), `clotures-${etab}-${du}_${au}.csv`)
           : fichierCsv(comptagesCSV(r.clotures, r.comptages, r.appareils), `comptages-${etab}-${du}_${au}.csv`);
+      }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/logo$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await majLogo(env, p[1]!, await lireJson<Record<string, unknown>>(requete), admin.id);
+        await journaliserAdmin(env, admin.id, "logo_etablissement", { etablissement: e.id, version: e.logo ?? null });
+        return json(200, { etablissement: e });
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/moments$/.exec(chemin);
       if (p && m === "PUT") {

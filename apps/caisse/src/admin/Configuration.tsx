@@ -26,6 +26,7 @@ const LIBELLES: Record<string, string> = {
   reservations_reglages: "réglages des réservations",
   reservations: "réservations à venir",
   fidelite_programmes: "programmes de fidélité",
+  etablissements_logos: "logos",
 };
 const resume = (r: Record<string, number>) =>
   Object.entries(r)

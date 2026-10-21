@@ -91,6 +91,11 @@ describe("réservations", () => {
 
     const config = await appel("GET", "/api/public/reservation/moka");
     expect(config.corps).toMatchObject({ accueil: "Bienvenue au Moka", groupeMax: 6, aujourdhui: "2026-10-15", etablissement: { nom: "Moka" } });
+    expect(config.corps.etablissement.logo).toBeUndefined();
+    // Logo déposé : le module et les e-mails le reprennent.
+    const logo = await appel("PUT", "/api/admin/etablissements/moka/logo", { png: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" }, cookie);
+    const urlLogo = `https://pos.test/logo/moka?v=${logo.corps.etablissement.logo}`;
+    expect((await appel("GET", "/api/public/reservation/moka")).corps.etablissement.logo).toBe(urlLogo);
     const creneaux = await appel("GET", "/api/public/reservation/moka/creneaux?date=2026-10-15&couverts=2");
     expect(creneaux.corps.services.map((s: any) => [s.nom, s.creneaux.length])).toEqual([
       ["Déjeuner", 4],
@@ -123,6 +128,7 @@ describe("réservations", () => {
       ["bonjour@moka.test", "Nouvelle réservation"],
     ]);
     expect(courriels[0]!.html).toContain("/reserver/annuler?j=");
+    expect(courriels[0]!.html).toContain(`<img src="${urlLogo}"`);
     // Expéditeur de l'établissement, réponses vers son e-mail.
     expect(courriels[0]).toMatchObject({ de: "reservations@moka.test", deNom: "Moka", repondreA: "bonjour@moka.test", cle: CLE_MOKA });
     expect(courriels[1]!.cle).toBe(CLE_MOKA);

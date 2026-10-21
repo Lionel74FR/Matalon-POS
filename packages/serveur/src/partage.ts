@@ -154,6 +154,8 @@ export interface EtablissementApi {
   planVersion?: number;
   /** Moments de la journée (matin, midi, soir…) : regroupent le CA dans les statistiques. */
   moments?: MomentJournee[];
+  /** Logo déposé dans l'administration : sa version (servi à /logo/<établissement>?v=<version>) ; null : aucun. */
+  logo?: string | null;
 }
 
 /**
@@ -832,7 +834,7 @@ export interface ResumePublic {
   prenom: string;
   nom: string;
   statut: "confirmee" | "arrivee" | "absente" | "annulee";
-  etablissement: { id: string; nom: string; adresse: string; codePostalVille: string; telephone: string };
+  etablissement: { id: string; nom: string; adresse: string; codePostalVille: string; telephone: string; logo?: string };
   /** Le client peut encore annuler en ligne (réservation à venir, confirmée). */
   annulable: boolean;
 }

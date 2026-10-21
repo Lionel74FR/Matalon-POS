@@ -458,6 +458,16 @@ export const MIGRATIONS: string[] = [
     primary key (caisse_id, numero)
   )`,
   `create index if not exists fidelite_liens_attente on fidelite_liens (caisse_id) where not credite`,
+  // Logo de l'établissement (PNG, déposé dans l'administration) : module de réservation et e-mails.
+  // L'image vit à part ; l'établissement n'en porte que la version (empreinte), qui fait varier son adresse.
+  `alter table etablissements add column if not exists logo_version text`,
+  `create table if not exists etablissements_logos (
+    etablissement_id text primary key references etablissements(id),
+    png text not null,
+    version text not null,
+    maj_le text not null,
+    maj_par text
+  )`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

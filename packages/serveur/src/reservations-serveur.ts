@@ -337,7 +337,7 @@ async function parJeton(db: Db, jeton: string): Promise<Reservation> {
 }
 
 
-function resume(etab: EtablissementApi, r: Reservation, maintenant: Date): ResumePublic {
+function resume(etab: EtablissementApi, r: Reservation, maintenant: Date, origine?: string): ResumePublic {
   const ici = maintenantParis(maintenant);
   const aVenir = r.date > ici.jour || (r.date === ici.jour && Number(r.heure.slice(0, 2)) * 60 + Number(r.heure.slice(3)) > ici.minute);
   return {
@@ -354,10 +354,15 @@ function resume(etab: EtablissementApi, r: Reservation, maintenant: Date): Resum
       adresse: etab.identite.adresse,
       codePostalVille: etab.identite.codePostalVille,
       telephone: etab.identite.telephone,
+      ...(origine && urlLogo(etab, origine) ? { logo: urlLogo(etab, origine)! } : {}),
     },
     annulable: r.statut === "confirmee" && aVenir,
   };
 }
+
+/** Adresse publique du logo de l'établissement (sa version fait varier l'adresse : aucun cache périmé) ; null : aucun logo. */
+export const urlLogo = (etab: Pick<EtablissementApi, "id" | "logo">, origine: string): string | null =>
+  etab.logo ? `${origine}/logo/${etab.id}?v=${etab.logo}` : null;
 
 // ───────── E-mails ─────────
 
@@ -366,12 +371,17 @@ export const dateLisible = (jour: string) =>
   new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const personnes = (n: number) => `${n} personne${n > 1 ? "s" : ""}`;
 
-export function gabarit(etab: EtablissementApi, titre: string, lignes: string[], bouton?: { texte: string; url: string }): string {
+export function gabarit(etab: EtablissementApi, titre: string, lignes: string[], bouton?: { texte: string; url: string }, origine?: string): string {
   const i = etab.identite;
+  const logo = origine ? urlLogo(etab, origine) : null;
   return `<!doctype html><html lang="fr"><body style="margin:0;background:#f4f1ec;font-family:Helvetica,Arial,sans-serif;color:#2b2420">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:12px" cellpadding="0" cellspacing="0">
-<tr><td style="background:#2b2b2b;color:#ffffff;border-radius:12px 12px 0 0;padding:20px 28px;font-size:18px;font-weight:bold">${echapper(i.enseigne)}</td></tr>
+${
+  logo
+    ? `<tr><td align="center" style="border-radius:12px 12px 0 0;padding:24px 28px 8px"><img src="${echapper(logo)}" alt="${echapper(i.enseigne)}" height="64" style="display:block;height:64px;width:auto;max-width:240px;border:0"></td></tr>`
+    : `<tr><td style="background:#2b2b2b;color:#ffffff;border-radius:12px 12px 0 0;padding:20px 28px;font-size:18px;font-weight:bold">${echapper(i.enseigne)}</td></tr>`
+}
 <tr><td style="padding:28px">
 <h1 style="font-size:20px;margin:0 0 16px">${echapper(titre)}</h1>
 ${lignes.map((l) => `<p style="margin:0 0 10px;font-size:15px;line-height:1.5">${l}</p>`).join("\n")}
@@ -408,7 +418,7 @@ export async function essaiCourriel(ctx: ContexteResa, etab: EtablissementApi): 
       html: gabarit(etab, "L'envoi des e-mails fonctionne", [
         "Cet e-mail d'essai part avec les réglages des réservations : les clients recevront leurs confirmations de cette adresse.",
         `Expéditeur : ${echapper(reglages.expediteur ?? "adresse par défaut de l'hébergement")}`,
-      ]),
+      ], undefined, ctx.origine),
       texte: `E-mail d'essai : les confirmations de réservation de ${etab.identite.enseigne} partiront de ${reglages.expediteur ?? "l'adresse par défaut"}.`,
     });
   } catch (e) {
@@ -462,7 +472,7 @@ async function envoyerConfirmation(ctx: ContexteResa, etab: EtablissementApi, re
       nomA: `${r.prenom} ${r.nom}`,
       ...expedition(etab, reglages),
       sujet: `Réservation confirmée · ${etab.identite.enseigne} · ${quand}`,
-      html: gabarit(etab, "Votre réservation est confirmée", lignes, { texte: "Annuler ma réservation", url }),
+      html: gabarit(etab, "Votre réservation est confirmée", lignes, { texte: "Annuler ma réservation", url }, ctx.origine),
       texte: `Bonjour ${r.prenom},\nVotre table est réservée le ${quand} pour ${personnes(r.couverts)}.\nPour annuler : ${url}\n${etab.identite.enseigne}, ${etab.identite.adresse}, ${etab.identite.codePostalVille}`,
     },
     "e-mail de confirmation envoyé",
@@ -485,7 +495,7 @@ async function envoyerAnnulation(ctx: ContexteResa, etab: EtablissementApi, regl
         par === "client"
           ? `Nous avons bien noté l'annulation de votre table du <b>${echapper(quand)}</b>. À bientôt !`
           : `Votre table du <b>${echapper(quand)}</b> a été annulée. Pour toute question, répondez à cet e-mail ou appelez-nous.`,
-      ]),
+      ], undefined, ctx.origine),
       texte: `Bonjour ${r.prenom},\nVotre réservation du ${quand} est annulée.\n${etab.identite.enseigne}`,
     },
     "e-mail d'annulation envoyé",
@@ -509,7 +519,7 @@ async function prevenirEtablissement(ctx: ContexteResa, etab: EtablissementApi, 
         `${echapper(`${r.civilite ?? ""} ${r.prenom} ${r.nom}`.trim())} · ${echapper(r.telephone)}${r.email ? ` · ${echapper(r.email)}` : ""}`,
         ...(r.commentaire ? [`« ${echapper(r.commentaire)} »`] : []),
         r.tables.length ? `Table ${echapper(r.tables.map((t) => etab.tables.find((x) => x.id === t)?.nom ?? t).join(" + "))}` : "Table à placer",
-      ]),
+      ], undefined, ctx.origine),
       texte: `${titre} : ${quand}, ${personnes(r.couverts)}, ${r.prenom} ${r.nom}, ${r.telephone}`,
     });
   } catch {
@@ -547,9 +557,9 @@ export async function routePublique(ctx: ContexteResa, requete: Request, chemin:
   if (a) {
     const r = await parJeton(ctx.db, a[1]!);
     const etab = await ctx.etablissement(r.etablissementId);
-    if (m === "GET") return json(200, { reservation: resume(etab, r, ctx.maintenant) });
+    if (m === "GET") return json(200, { reservation: resume(etab, r, ctx.maintenant, ctx.origine) });
     if (m === "POST") {
-      if (!resume(etab, r, ctx.maintenant).annulable) throw new ErreurHttp(409, "NON_ANNULABLE", "Cette réservation ne peut plus être annulée en ligne : appelez-nous.");
+      if (!resume(etab, r, ctx.maintenant, ctx.origine).annulable) throw new ErreurHttp(409, "NON_ANNULABLE", "Cette réservation ne peut plus être annulée en ligne : appelez-nous.");
       r.statut = "annulee";
       r.majLe = ctx.maintenant.toISOString();
       r.historique.push({ le: r.majLe, par: "client", action: "annulée par le client (lien)" });
@@ -557,7 +567,7 @@ export async function routePublique(ctx: ContexteResa, requete: Request, chemin:
       const { reglages } = await lireReglages(ctx.db, etab.id);
       await envoyerAnnulation(ctx, etab, reglages, r, "client");
       await prevenirEtablissement(ctx, etab, reglages, r, "Réservation annulée par le client");
-      return json(200, { reservation: resume(etab, r, ctx.maintenant) });
+      return json(200, { reservation: resume(etab, r, ctx.maintenant, ctx.origine) });
     }
     return null;
   }
@@ -572,7 +582,7 @@ export async function routePublique(ctx: ContexteResa, requete: Request, chemin:
   const couverts = Math.max(1, Math.min(reglages.groupeMax, Number(url.searchParams.get("couverts") ?? 2) || 2));
   if (!p[2] && m === "GET") {
     const config: ConfigPublique = {
-      etablissement: resume(etab, { statut: "confirmee", date: aujourdhui, heure: "00:00" } as Reservation, ctx.maintenant).etablissement,
+      etablissement: resume(etab, { statut: "confirmee", date: aujourdhui, heure: "00:00" } as Reservation, ctx.maintenant, ctx.origine).etablissement,
       accueil: reglages.accueil,
       groupeMax: reglages.groupeMax,
       horizonJours: reglages.horizonJours,
@@ -610,7 +620,7 @@ export async function routePublique(ctx: ContexteResa, requete: Request, chemin:
     delete s.tables;
     if (s.zone && !zonesDe(etab).includes(s.zone)) delete s.zone;
     const { reservation, jeton } = await creerReservation(ctx, etab, s, { source: "en_ligne", par: "client (en ligne)" });
-    return json(201, { reservation: resume(etab, reservation, ctx.maintenant), annulation: jeton });
+    return json(201, { reservation: resume(etab, reservation, ctx.maintenant, ctx.origine), annulation: jeton });
   }
   return null;
 }

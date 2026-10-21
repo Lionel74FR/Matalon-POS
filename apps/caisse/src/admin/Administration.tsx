@@ -14,6 +14,7 @@ import { Stock } from "./Stock";
 import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
 import { CloturesAdmin } from "./CloturesAdmin";
 import { FideliteAdmin } from "./FideliteAdmin";
+import { LogoEtablissement } from "./Logo";
 import { TicketsAdmin, type FiltreTickets } from "./TicketsAdmin";
 import { ModaleMoments } from "./Moments";
 import { Reservations } from "./Reservations";
@@ -344,7 +345,7 @@ const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: s
     groupe: "Établissement",
     liste: [
       { id: "alertes", libelle: "Alertes", icone: Bell, aide: "Prix, articles hors carte, PIN" },
-      { id: "identite", libelle: "Identité et carte", icone: Store, aide: "Mentions légales, carte, note" },
+      { id: "identite", libelle: "Identité et carte", icone: Store, aide: "Mentions légales, carte, note, logo" },
     ],
   },
 ];
@@ -674,6 +675,7 @@ function FicheEtablissement(props: {
             </p>
           )}
           <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
+          <LogoEtablissement e={e} onChange={props.onChange} />
         </>
       )}
     </>

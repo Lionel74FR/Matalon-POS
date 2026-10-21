@@ -40,6 +40,8 @@ export interface ContexteFidelite {
   maintenant: Date;
   /** Journée comptable du jour (bascule à 5 h). */
   aujourdhui: string;
+  /** Adresse publique du serveur (logo des e-mails). */
+  origine?: string;
   etablissement: (id: string) => Promise<EtablissementApi>;
   /** Envoi d'un e-mail au nom de l'établissement ; absent ou sans clé : rien ne part. */
   envoyer?: (etablissementId: string, c: { a: string; nomA?: string; sujet: string; html: string; texte: string }) => Promise<void>;
@@ -301,7 +303,7 @@ async function courriel(ctx: ContexteFidelite, etablissementId: string, m: Ligne
       a: m.email,
       nomA: `${m.prenom} ${m.nom}`.trim(),
       sujet,
-      html: gabarit(etab, sujet, [...lignes.map(echapper), echapper("Vos données servent au seul fonctionnement du programme. Pour les corriger ou les effacer, répondez à cet e-mail ou demandez-le en caisse.")]),
+      html: gabarit(etab, sujet, [...lignes.map(echapper), echapper("Vos données servent au seul fonctionnement du programme. Pour les corriger ou les effacer, répondez à cet e-mail ou demandez-le en caisse.")], undefined, ctx.origine),
       texte: [...lignes, "Vos données servent au seul fonctionnement du programme. Pour les corriger ou les effacer, répondez à cet e-mail ou demandez-le en caisse."].join("\n\n"),
     });
   } catch (e) {

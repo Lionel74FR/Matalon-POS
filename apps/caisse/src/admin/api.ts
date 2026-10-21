@@ -120,6 +120,7 @@ export const api = {
   urlExportClotures: (etablissementId: string, du: string, au: string) => `/api/admin/etablissements/${etablissementId}/clotures.csv?du=${du}&au=${au}`,
   urlExportComptages: (etablissementId: string, du: string, au: string) => `/api/admin/etablissements/${etablissementId}/comptages.csv?du=${du}&au=${au}`,
   majMoments: (etablissementId: string, moments: MomentJournee[]) => appel("PUT", `/etablissements/${etablissementId}/moments`, { moments }),
+  enregistrerLogo: (etablissementId: string, png: string | null) => appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/logo`, { png }),
   fidelite: (etablissementId: string) =>
     appel<{ programme: ProgrammeFidelite | null; autres: Array<{ id: string; nom: string; enseigne: string }> }>("GET", `/etablissements/${etablissementId}/fidelite`),
   actionFidelite: (etablissementId: string, action: "creer" | "rejoindre" | "quitter", programmeId?: string) =>

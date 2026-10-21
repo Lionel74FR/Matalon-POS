@@ -338,3 +338,25 @@ describe("information des clients sur leurs données", () => {
     expect((await page("/donnees/inconnu")).statut).toBe(404);
   });
 });
+
+describe("logo de l'établissement", () => {
+  const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  it("se dépose dans l'administration, se sert en public avec sa version, figure en tête des e-mails, et se retire", async () => {
+    const { admin, bearer } = await preparer();
+    expect((await appel("PUT", "/api/admin/etablissements/moka/logo", { png: "R0lGODlhAQABAAAAACw=" }, admin)).corps.code).toBe("LOGO_INVALIDE");
+    const r = await appel("PUT", "/api/admin/etablissements/moka/logo", { png: `data:image/png;base64,${PNG}` }, admin);
+    expect(r.statut).toBe(200);
+    const version = r.corps.etablissement.logo as string;
+    expect(version).toMatch(/^[0-9a-f]{12}$/);
+    expect((await appel("GET", "/api/caisse/etat", undefined, bearer)).corps.etablissement.logo).toBe(version);
+    const image = await traiter(new Request(`https://pos.test/logo/moka?v=${version}`), env());
+    expect([image.status, image.headers.get("Content-Type")]).toEqual([200, "image/png"]);
+    expect(Buffer.from(await image.arrayBuffer()).toString("base64")).toBe(PNG);
+    await appel("POST", "/api/caisse/note-email", { email: "client@exemple.fr", url: "https://pos.test/n#abc", numero: 1, totalTTC: 400 }, bearer);
+    expect(courriels.at(-1)!.html).toContain(`<img src="https://pos.test/logo/moka?v=${version}" alt="Moka"`);
+    expect((await appel("PUT", "/api/admin/etablissements/moka/logo", { png: null }, admin)).corps.etablissement.logo).toBeNull();
+    expect((await traiter(new Request("https://pos.test/logo/moka"), env())).status).toBe(404);
+    await appel("POST", "/api/caisse/note-email", { email: "client@exemple.fr", url: "https://pos.test/n#abc", numero: 1, totalTTC: 400 }, bearer);
+    expect(courriels.at(-1)!.html).not.toContain("<img");
+  });
+});

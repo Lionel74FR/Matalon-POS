@@ -95,12 +95,14 @@ function fermer() {
   window.parent.postMessage({ type: "matalon-reservation-fermer" }, "*");
 }
 
-function entete(nom: string): HTMLElement {
+/** En-tête : le logo de la balise du site (data-logo) s'il y en a un, sinon celui de l'établissement, sinon son nom. */
+function entete(nom: string, logoEtablissement?: string): HTMLElement {
+  const image = logo ?? logoEtablissement ?? null;
   return el(
     "header",
     { class: "entete" },
     el("span", { class: "entete-cote" }),
-    logo ? el("img", { class: "logo", src: logo, alt: nom }) : el("span", { class: "nom-etab" }, nom),
+    image ? el("img", { class: "logo", src: image, alt: nom }) : el("span", { class: "nom-etab" }, nom),
     el("span", { class: "entete-cote" }, integre ? el("button", { class: "fermer", "aria-label": "Fermer", onclick: fermer }, icone("fermer", 24)) : null),
   );
 }
@@ -110,7 +112,7 @@ function entete(nom: string): HTMLElement {
 async function pageAnnulation(jeton: string) {
   const afficher = (r: ResumePublic, message?: string) => {
     racine.replaceChildren(
-      entete(r.etablissement.nom),
+      entete(r.etablissement.nom, r.etablissement.logo),
       el(
         "section",
         { class: "clair contenu" },
@@ -761,7 +763,7 @@ async function pageReservation(etabId: string) {
   function rendre() {
     const vue = etat.etape === "choix" ? pageChoix() : etat.etape === "contact" ? pageContact() : pageConfirmee();
     document.documentElement.classList.toggle("theme-clair", etat.etape !== "choix");
-    racine.replaceChildren(entete(config.etablissement.nom), vue);
+    racine.replaceChildren(entete(config.etablissement.nom, config.etablissement.logo), vue);
   }
 
   rendre();
