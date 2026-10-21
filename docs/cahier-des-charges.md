@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 75, copiée le 20 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 80, copiée le 21 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -214,6 +214,78 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 - Deux demandes simultanées : chacune est revérifiée après son écriture contre celles écrites avant elle, la seconde est refusée si elle dépasse.
 - Coordonnées gardées un an après la date de la réservation, puis effacées ; le lien d'annulation cesse alors de valoir.
 - Une réservation n'est ni un ticket ni une commande : rien n'entre au registre fiscal. Le CA reste celui des tickets.
+
+## Carte de fidélité (proposition du 21 octobre 2026, à valider)
+
+Un programme par établissement, activable dans l'administration, dont la règle se règle (points sur la dépense ou tampons) ; le client est reconnu par son téléphone ou par sa carte dans Apple Wallet ou Google Wallet ; la récompense s'applique comme une remise sur le ticket, sans modifier le noyau fiscal. Proposition demandée par Lionel le 21 octobre 2026 : rien n'est développé avant sa validation, et le lot se planifie après les lots en cours.
+
+### Réglages du programme (administration, par établissement)
+
+| Réglage | Choix | Exemple pour le Moka |
+| --- | --- | --- |
+| Programme | Actif ou non, nom affiché au client | « Club Moka », actif |
+| Cumul | Points sur la dépense (X points par euro TTC encaissé), ou tampons (par article d'une catégorie, ou par visite au-delà d'un montant) | 1 point par euro |
+| Récompenses | Un ou plusieurs paliers : article offert choisi dans une liste de la carte, remise en euros ou en pourcentage sur le ticket | 50 points : une boisson chaude offerte ; 150 points : 10 € offerts |
+| Bonus | Bienvenue à l'inscription, anniversaire, points doublés sur un moment de la journée (Matin, Après-midi…) | 10 points de bienvenue |
+| Exclusions | Catégories qui ne rapportent rien, plafond par ticket | Aucune |
+| Validité | Points perdus après N mois sans visite ; récompense valable N jours | 12 mois ; 60 jours |
+| Périmètre | Propre à l'établissement, ou commun à plusieurs établissements du groupe | À trancher |
+
+Une règle modifiée vaut pour la suite ; les points déjà gagnés restent acquis.
+
+### Carte du client
+
+- **Reconnaissance à la caisse** : par le numéro de téléphone (fiche client existante, sans rien à installer), ou par le QR code de sa carte, lu par la caméra de l'iPad ou de l'iPhone.
+- **Carte dématérialisée** dans Apple Wallet (pass PassKit) et Google Wallet (carte de fidélité) : nom, solde, prochaine récompense, QR code. Elle se met à jour après chaque vente, avec un message sur l'écran verrouillé quand une récompense est atteinte. Une page web de la carte sert ceux qui n'utilisent pas de Wallet. Pas de carte plastique.
+- **Inscription** : à la caisse (téléphone et prénom, puis lien envoyé pour ajouter la carte au Wallet), en libre-service par un QR code (comptoir, table, note client), ou depuis la réservation en ligne (case à cocher). L'accord pour recevoir des offres est une case à part, décochée.
+
+### En caisse
+
+- Avant d'encaisser, « Fidélité » sur la commande : téléphone ou scan ; la commande affiche le nom et le solde du client.
+- Une récompense atteinte est proposée ; un geste l'applique (article offert ou remise), motif « Fidélité », sans code de responsable puisque la règle l'autorise. Une récompense par ticket (réglable).
+- Client qui avait oublié sa carte : rattachement à un ticket du jour, une fois, depuis l'écran Tickets.
+- Hors ligne, le cumul continue (il est calculé à la synchronisation) ; utiliser une récompense demande le réseau, pour que le solde soit sûr (comme les acomptes).
+- Statistiques : membres actifs, part du CA faite par les membres, récompenses données et leur valeur, fréquence de visite.
+
+### Fiscal et comptable
+
+- **Noyau fiscal inchangé (1.0.0)** : la récompense figure sur le ticket comme une remise de ligne (article offert ou montant), motif « Fidélité ». La base de TVA est réduite à la vente qui consomme la récompense, comme un rabais : le BOFiP traite les ristournes de fidélité comme des réductions de prix, recettes déclarées nettes ([BOI-TVA-BASE-10-20-10](https://bofip.impots.gouv.fr/bofip/705-PGP.html/identifiant=BOI-TVA-BASE-10-20-10-20220629), § 470 à 530). Le cas de l'article offert n'y est pas traité en propre : à faire confirmer par Audrex.
+- **Les points ne sont jamais un moyen de paiement** : ils n'apparaissent ni dans les encaissements ni dans les Z.
+- **Registre de fidélité, hors fiscal**, sur le serveur, en ajout seul : gain, utilisation, ajustement motivé par un responsable, expiration. Le gain se calcule à la réception des tickets, comme les consommations de stock ; une annulation retire les points gagnés. Le lien entre la carte et le ticket voyage à côté du ticket, jamais dans l'enregistrement scellé.
+
+### Données personnelles
+
+- Le fonctionnement du programme repose sur l'adhésion du client (exécution du contrat) ; recevoir des offres demande un consentement distinct, retirable à chaque message ([synthèse RGPD des cartes de fidélité](https://donneespersonnelles.fr/rgpd-carte-fidelite)).
+- Conservation : tant que la carte vit, puis trois ans après la dernière visite (référentiel CNIL de gestion commerciale), ensuite anonymisation.
+- Information courte à l'inscription et page de conditions ; accès, rectification et suppression depuis l'administration.
+
+### Prérequis et coûts
+
+| Élément | Ce qu'il faut | Coût |
+| --- | --- | --- |
+| Apple Wallet | Compte Apple Developer (déjà actif, à passer au nom de PROIA CONSEIL), un identifiant de pass (Pass Type ID) et son certificat, qui signe les cartes et envoie les mises à jour ([PassKit](https://developer.apple.com/library/ios/documentation/UserExperience/Conceptual/PassKit_PG/Updating.html)) | Compris dans le compte, aucun coût par carte |
+| Google Wallet | Compte émetteur Google Wallet, carte de fidélité par l'API ([Google Wallet API](https://developers.google.com/wallet/reference/rest/v1/loyaltyobject)) | Gratuit |
+| E-mails | Resend, déjà en place | Inchangé |
+| SMS | Prestataire d'envoi, seulement si retenu | Par message |
+
+Un service de cartes Wallet tout fait (abonnement mensuel) est possible, mais n'est pas recommandé : le serveur existe déjà, et les données des clients restent chez nous.
+
+### Découpage proposé (lot 7, à planifier après les lots en cours)
+
+| Étape | Contenu | Validation |
+| --- | --- | --- |
+| 7a | Programme et règles dans l'administration, reconnaissance par téléphone, cumul et récompenses en caisse, registre, statistiques | Une semaine au Moka avec la règle choisie, registre égal aux tickets |
+| 7b | Carte Apple Wallet et Google Wallet, lecture du QR code, mises à jour après chaque vente | Carte ajoutée sur iPhone et sur Android, solde à jour moins d'une minute après la vente |
+| 7c | Inscription en libre-service et depuis la réservation, e-mails (et SMS si retenu) | Premières inscriptions sans passage par l'équipe |
+
+### À trancher par Lionel
+
+- [ ] Règle du Moka : points sur la dépense (un cadeau tous les X euros) ou tampons (le 10e café offert)
+- [ ] Programme propre à chaque établissement, ou commun à plusieurs établissements du groupe
+- [ ] Récompense : article offert choisi dans une liste, remise en euros, ou les deux
+- [ ] Carte Wallet dès le départ (7a et 7b ensemble), ou téléphone d'abord
+- [ ] SMS, ou e-mail seulement
+- [ ] Traitement de l'article offert validé par Audrex
 
 ## Intégration Matalon Vision
 
