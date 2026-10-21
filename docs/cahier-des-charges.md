@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 105, copiée le 21 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 106, copiée le 21 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -342,7 +342,7 @@ Chaque action est rattachée à un utilisateur nommé, chaque iPad à une clé r
 - **Droits** : remises, offerts, annulations et clôtures réservés aux rôles autorisés.
 - **Appareils** : rattachement par code à usage unique ; clé de signature propre à chaque iPad, non exportable (trousseau iOS en V2) ; un iPad perdu ou volé est révoqué depuis l'administration et ne peut plus encaisser.
 - **Secrets** : variables d'environnement Vercel et Secrets Replit, jamais dans le dépôt Git.
-- **Sauvegardes** : base serveur sauvegardée quotidiennement ; archives fiscales conservées 6 ans.
+- **Sauvegardes** : retour en arrière de la base serveur à n'importe quel instant des 7 derniers jours, par l'historique de Neon (décision de Lionel du 21 octobre 2026 : pas de copie hors Neon) ; archives fiscales conservées 6 ans.
 - **RGPD** : aucune donnée client par défaut ; l'e-mail saisi pour un ticket dématérialisé sert uniquement à cet envoi. Les réservations gardent nom, téléphone, e-mail et commentaire un an après leur date, puis les effacent ; les offres commerciales ne partent qu'avec le consentement coché par le client. Page d'information des clients par établissement, /donnees/<établissement> (21 octobre 2026) : responsable, achats et notes, ventes en compte (nom conservé six ans sur les tickets, obligation légale), réservations, carte de fidélité, hébergement, droits ; citée à la création d'un compte client, à l'inscription à la fidélité et dans le module de réservation (à défaut d'un lien propre à l'établissement).
 
 ## Lots de livraison
