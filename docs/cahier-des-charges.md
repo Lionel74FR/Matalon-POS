@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 95, copiée le 21 octobre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 98, copiée le 21 octobre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -217,7 +217,7 @@ Le client réserve depuis le site de l'établissement dans un panneau semblable 
 
 ## Carte de fidélité (proposée et validée le 21 octobre 2026)
 
-Un programme par établissement, activable dans l'administration, dont la règle se règle (points sur la dépense ou tampons) ; le client est reconnu par son téléphone ou par sa carte dans Apple Wallet ou Google Wallet ; la récompense s'applique comme une remise sur le ticket, sans modifier le noyau fiscal. Proposition demandée par Lionel et validée le 21 octobre 2026 : tout le programme se configure dans l'administration, et la règle comme la récompense du Moka se choisiront à sa mise en route. Première version par le téléphone seul (7a), la carte Wallet viendra plus tard (7b) ; les messages au client partent par e-mail, sans SMS. Le lot se planifie après les lots en cours.
+Un programme par établissement, activable dans l'administration, dont la règle se règle (points sur la dépense ou tampons) ; le client est reconnu par son téléphone ou par sa carte dans Apple Wallet ou Google Wallet ; la récompense s'applique comme une remise sur le ticket, sans modifier le noyau fiscal. Proposition demandée par Lionel et validée le 21 octobre 2026 : tout le programme se configure dans l'administration, et la règle comme la récompense du Moka se choisiront à sa mise en route. Première version par le téléphone seul (7a), la carte Wallet viendra plus tard (7b) ; les messages au client partent par e-mail, sans SMS. L'étape 7a est lancée le 21 octobre 2026 sur décision de Lionel, avant la fin des lots 1 à 5 (comme le stock et les réservations).
 
 ### Réglages du programme (administration, par établissement)
 
@@ -229,7 +229,7 @@ Un programme par établissement, activable dans l'administration, dont la règle
 | Bonus | Bienvenue à l'inscription, anniversaire, points doublés sur un moment de la journée (Matin, Après-midi…) | 10 points de bienvenue |
 | Exclusions | Catégories qui ne rapportent rien, plafond par ticket | Aucune |
 | Validité | Points perdus après N mois sans visite ; récompense valable N jours | 12 mois ; 60 jours |
-| Périmètre | Propre à l'établissement, ou commun à plusieurs établissements du groupe | À trancher |
+| Périmètre | Un programme par établissement ; d'autres établissements du groupe peuvent le rejoindre (mêmes règles, même solde) (21 octobre 2026) | Programme du Moka, que d'autres établissements pourront rejoindre |
 
 Une règle modifiée vaut pour la suite ; les points déjà gagnés restent acquis.
 
@@ -281,7 +281,7 @@ Un service de cartes Wallet tout fait (abonnement mensuel) est possible, mais n'
 ### À trancher par Lionel
 
 - [ ] Règle du Moka : points sur la dépense (un cadeau tous les X euros) ou tampons (le 10e café offert) ; se choisira dans l'administration à la mise en route (21 octobre 2026)
-- [ ] Programme propre à chaque établissement, ou commun à plusieurs établissements du groupe
+- [x] Un programme par établissement, que d'autres établissements du groupe peuvent rejoindre (mêmes règles, même solde) — décidé le 21 octobre 2026
 - [ ] Récompense : article offert choisi dans une liste, remise en euros, ou les deux ; se choisira dans l'administration à la mise en route (21 octobre 2026)
 - [x] Téléphone d'abord (7a), carte Wallet plus tard (7b) — décidé le 21 octobre 2026
 - [x] E-mail seulement, pas de SMS — décidé le 21 octobre 2026
