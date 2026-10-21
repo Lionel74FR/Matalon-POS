@@ -2,6 +2,7 @@ import type { Reservation } from "@matalon/reservations";
 import type { Ticket } from "@matalon/noyau-fiscal";
 import type { Catalogue } from "@matalon/catalogue";
 import type { Recette } from "@matalon/stock";
+import type { LienFidelite, MembreFidelite, RecompenseFidelite, ReponseMembreCaisse, UtilisationFidelite } from "@matalon/serveur/fidelite";
 import type {
   CommandePartagee,
   CommandeFournisseur,
@@ -102,6 +103,35 @@ export class ClientApi {
 
   carte() {
     return this.appel<ReponseCarte>("GET", "/api/caisse/carte");
+  }
+
+  // ───────── Fidélité (lot 7a), en ligne ─────────
+
+  /** Membre reconnu par son téléphone (null : inconnu), et le programme de l'établissement. */
+  membreFidelite(telephone: string) {
+    return this.appel<ReponseMembreCaisse>("GET", `/api/caisse/fidelite?telephone=${encodeURIComponent(telephone)}`);
+  }
+
+  inscrireFidelite(corps: { telephone: string; prenom: string; nom: string; email: string; offres: boolean; utilisateurId: string }) {
+    return this.appel<{ membre: MembreFidelite; cree: boolean }>("POST", "/api/caisse/fidelite/membres", corps);
+  }
+
+  /** Réserve une récompense (le solde baisse tout de suite) ; rendue si elle est retirée de la commande. */
+  utiliserRecompense(membreId: string, recompenseId: string, utilisateurId: string) {
+    return this.appel<{ utilisation: UtilisationFidelite; recompense: RecompenseFidelite; solde: number }>("POST", "/api/caisse/fidelite/utilisations", { membreId, recompenseId, utilisateurId });
+  }
+
+  rendreRecompense(utilisationId: string) {
+    return this.appel<{ solde: number }>("POST", `/api/caisse/fidelite/utilisations/${utilisationId}/rendre`, {});
+  }
+
+  envoyerLiensFidelite(liens: LienFidelite[]) {
+    return this.appel<{ acceptes: number }>("POST", "/api/caisse/fidelite/liens", { liens });
+  }
+
+  /** Client qui avait oublié sa carte : un ticket du jour rattaché, une seule fois. */
+  rattacherTicketFidelite(caisseId: string, numero: number, telephone: string) {
+    return this.appel<{ membre: MembreFidelite; points: number }>("POST", "/api/caisse/fidelite/rattachement", { caisseId, numero, telephone });
   }
 
   /** Derniers tickets de toutes les caisses de l'établissement, depuis la copie du serveur. */

@@ -13,6 +13,7 @@ import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
 import { CloturesAdmin } from "./CloturesAdmin";
+import { FideliteAdmin } from "./FideliteAdmin";
 import { TicketsAdmin, type FiltreTickets } from "./TicketsAdmin";
 import { ModaleMoments } from "./Moments";
 import { Reservations } from "./Reservations";
@@ -31,6 +32,7 @@ import {
   FileJson,
   Fingerprint,
   FileSpreadsheet,
+  Gift,
   KeyRound,
   LayoutGrid,
   NotebookPen,
@@ -309,7 +311,7 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 // ───────── Tableau de bord ─────────
 
 /** Rubriques d'un établissement, dans le menu latéral (ordre d'usage). */
-type Rubrique = "statistiques" | "tickets" | "clotures" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "stock" | "cartes" | "alertes" | "identite";
+type Rubrique = "statistiques" | "tickets" | "clotures" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "fidelite" | "stock" | "cartes" | "alertes" | "identite";
 const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: string; icone: LucideIcon; aide: string }> }> = [
   {
     groupe: "Activité",
@@ -328,6 +330,7 @@ const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: s
       { id: "imprimantes", libelle: "Imprimantes", icone: Printer, aide: "Tickets, bar et cuisine" },
       { id: "reservations", libelle: "Réservations", icone: CalendarCheck, aide: "À venir, services, module du site" },
       { id: "comptes", libelle: "Comptes clients", icone: NotebookPen, aide: "Ventes en compte, règlements" },
+      { id: "fidelite", libelle: "Fidélité", icone: Gift, aide: "Programme, récompenses, membres" },
     ],
   },
   {
@@ -660,6 +663,7 @@ function FicheEtablissement(props: {
       )}
       {rubrique === "reservations" && <Reservations etablissements={[e]} />}
       {rubrique === "comptes" && <ComptesClients etablissementId={e.id} />}
+      {rubrique === "fidelite" && <FideliteAdmin key={e.id} e={e} />}
       {rubrique === "stock" && <Stock etablissementId={e.id} />}
       {rubrique === "alertes" && <Alertes e={e} onChange={props.onChange} />}
       {rubrique === "identite" && (

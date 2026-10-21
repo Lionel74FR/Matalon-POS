@@ -142,9 +142,11 @@ import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES
 import {
   enregistrerReglages,
   essaiCourriel,
+  expedition,
   lireReglages,
   listeReservations,
   modifierReservation,
+  preparerEnvoi,
   routePublique,
   saisieEquipe,
   type ContexteResa,
@@ -154,6 +156,7 @@ import type { EtatEnvoi } from "./partage.js";
 import { maintenantParis } from "@matalon/reservations";
 import { enregistrerSecret, etatSecret, lireSecret, retirerSecret } from "./secrets.js";
 import { exporterConfiguration, importerConfiguration, resumeConfiguration } from "./configuration.js";
+import { programmeCaisse, rapprocherFidelite, routeFideliteAdmin, routeFideliteCaisse, statistiquesFidelite, ventesAnnulees, type ContexteFidelite } from "./fidelite-serveur.js";
 
 export interface Environnement {
   db: Db;
@@ -916,6 +919,7 @@ async function etatCaisse(env: Environnement, requete: Request): Promise<Respons
     clients: await clients(env.db, c.etablissement_id),
     derniers: await derniers(env.db, c.id),
     heure: horloge(env).toISOString(),
+    fidelite: await programmeCaisse(env.db, c.etablissement_id),
     appareils: Object.fromEntries(
       (await env.db.requete<{ id: string; nom: string }>("select id, nom from caisses where etablissement_id = $1 and revoquee_le is null order by id", [c.etablissement_id])).map((x) => [
         x.id,
@@ -1055,6 +1059,14 @@ async function synchroniser(env: Environnement, requete: Request): Promise<Respo
   aInserer.push(...(await alertesPrix(env, c, ticketsNouveaux, new Date(maintenant))), ...alertesEvenements(c, evenementsNouveaux, new Date(maintenant)));
   aInserer.push({ texte: "update caisses set derniere_synchro = $2 where id = $1", params: [c.id, maintenant] });
   await env.db.lot(aInserer);
+  // Fidélité (7a) : gains des ventes reçues, reprises des ventes annulées ; une erreur ici ne bloque jamais la synchronisation.
+  if (ticketsNouveaux.length) {
+    try {
+      await rapprocherFidelite(contexteFidelite(env), c.id, ventesAnnulees(ticketsNouveaux));
+    } catch (e) {
+      console.error("fidélité", e);
+    }
+  }
   const reponse: ReponseSynchro = { acceptes: aInserer.filter((x) => x.texte.includes("insert into enregistrements")).length, derniers: queues };
   return json(200, reponse);
 }
@@ -1256,6 +1268,7 @@ async function statistiques(env: Environnement, etablissementId: string, requete
     }),
     alertes: alertes.alertes,
     ...(au >= dateComptable(horloge(env)) ? { enCours: await salleEnCours(env, etablissementId) } : {}),
+    ...(await statistiquesFidelite(env.db, etablissementId, du, au, tickets).then((f) => (f ? { fidelite: f } : {}))),
   };
   return json(200, reponse);
 }
@@ -2707,6 +2720,29 @@ function contexteResa(env: Environnement, requete: Request): ContexteResa {
   };
 }
 
+/** Contexte de la fidélité : e-mails envoyés avec la clé et l'expéditeur des réservations de l'établissement. */
+function contexteFidelite(env: Environnement): ContexteFidelite {
+  const maintenant = horloge(env);
+  const resa = contexteResa(env, new Request("https://local.invalid/"));
+  return {
+    db: env.db,
+    maintenant,
+    aujourdhui: dateComptable(maintenant),
+    etablissement: (id) => etablissement(env.db, id),
+    ...(env.envoyerCourriel
+      ? {
+          envoyer: async (etablissementId, c) => {
+            const envoi = await preparerEnvoi(resa, etablissementId);
+            if (!envoi) return;
+            const etab = await etablissement(env.db, etablissementId);
+            const { reglages } = await lireReglages(env.db, etablissementId);
+            await env.envoyerCourriel!({ ...c, ...envoi, ...expedition(etab, reglages) });
+          },
+        }
+      : {}),
+  };
+}
+
 async function reservationsAdmin(env: Environnement, requete: Request, admin: { id: string; identifiant: string }, etabId: string, suite: string | undefined): Promise<Response | null> {
   const m = requete.method;
   const ctx = contexteResa(env, requete);
@@ -2810,6 +2846,11 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     }
     if (chemin === "/api/caisse/reservations" || chemin.startsWith("/api/caisse/reservations/")) return await reservationsCaisse(env, requete, chemin, m);
 
+    if (chemin === "/api/caisse/fidelite" || chemin.startsWith("/api/caisse/fidelite/")) {
+      const c = await caisseAuthentifiee(env, requete);
+      const r = await routeFideliteCaisse(contexteFidelite(env), c, requete, chemin);
+      if (r) return r;
+    }
     if (chemin === "/api/caisse/rattacher" && m === "POST") return await rattacher(env, requete);
     if (chemin === "/api/caisse/etat" && m === "GET") return await etatCaisse(env, requete);
     if (chemin === "/api/caisse/synchro" && m === "POST") return await synchroniser(env, requete);
@@ -2927,6 +2968,13 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (ps && m === "PUT") return await enregistrerStock(env, requete, admin, ps[1] as "produits" | "articles" | "recettes" | "fournisseurs", ps[2]!);
       const ph = /^\/api\/admin\/stock\/prix\/([a-z0-9][a-z0-9-]{0,79})$/.exec(chemin);
       if (ph && m === "GET") return await historiquePrix(env, ph[1]!);
+      if (/^\/api\/admin\/(etablissements\/[a-z0-9-]+\/fidelite$|fidelite\/)/.test(chemin)) {
+        const r = await routeFideliteAdmin(contexteFidelite(env), requete, admin, chemin);
+        if (r) {
+          if (r.journal) await journaliserAdmin(env, admin.id, r.journal.action, r.journal.details);
+          return r.reponse;
+        }
+      }
       if (chemin === "/api/admin/etablissements" && m === "POST") return await creerOuModifierEtablissement(env, requete, admin);
       let p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)$/.exec(chemin);
       if (p && m === "PUT") return await creerOuModifierEtablissement(env, requete, admin, p[1]);

@@ -1,6 +1,7 @@
 import { dateComptable } from "@matalon/noyau-fiscal";
 import type { AlerteApi, IndicateursPeriode, LigneStat, ReponseStatistiques, SalleEnCours, StatMoment } from "@matalon/serveur/partage";
-import { Bell, Check, Clock, Pencil, RefreshCw, TrendingDown, TrendingUp, Utensils } from "lucide-react";
+import { Bell, Check, Clock, Gift, Pencil, RefreshCw, TrendingDown, TrendingUp, Utensils } from "lucide-react";
+import type { StatFidelite } from "@matalon/serveur/fidelite";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { fraicheur } from "../fiscal/journee";
@@ -352,6 +353,38 @@ const heureLisible = (hhmm: string) => `${Number(hhmm.slice(0, 2))} h${hhmm.slic
 const horaires = (m: StatMoment) => (m.id ? `${heureLisible(m.debut)} – ${heureLisible(m.fin)}` : "en dehors des moments définis");
 
 /** CA par moment de la journée (matin, midi, soir…), comparé au même moment de la période précédente. */
+/** Carte de fidélité sur la période : venues des membres, leur part du CA, récompenses données. */
+function Fidelite(props: { f: StatFidelite; caTTC: number }) {
+  const { f } = props;
+  const tuile = (libelle: string, valeur: string, sous?: string) => (
+    <div className="stat-tuile">
+      <span className="stat-libelle">{libelle}</span>
+      <strong className="stat-valeur">{valeur}</strong>
+      {sous && (
+        <span className="stat-pied">
+          <span className="stat-sous">{sous}</span>
+        </span>
+      )}
+    </div>
+  );
+  return (
+    <section className="stat-carte stat-large stat-fidelite">
+      <header className="stat-carte-tete">
+        <h2>
+          <AvecIcone icone={Gift}>Fidélité</AvecIcone>
+        </h2>
+      </header>
+      <div className="stat-tuiles">
+        {tuile("Membres venus", entier(f.membresVenus), `${entier(f.membres)} membre${f.membres > 1 ? "s" : ""} · ${entier(f.inscriptions)} inscription${f.inscriptions > 1 ? "s" : ""} sur la période`)}
+        {tuile("CA des membres", euros(f.ttc), `${pourcent(f.ttc, props.caTTC)} du CA · ${entier(f.tickets)} tickets`)}
+        {tuile("Visites par membre", f.membresVenus ? (f.tickets / f.membresVenus).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "—")}
+        {tuile("Récompenses données", entier(f.recompenses), `valeur ${euros(f.valeurRecompenses)}`)}
+        {tuile("Points gagnés", entier(f.points))}
+      </div>
+    </section>
+  );
+}
+
 function Moments(props: { moments: StatMoment[]; caTTC: number; onModifier?: () => void }) {
   const { moments } = props;
   return (
@@ -618,6 +651,8 @@ export function TableauStatistiques(props: { acces: AccesStatistiques }) {
           {(s.parMoment.length > 0 || acces.modifierMoments) && (
             <Moments moments={s.parMoment} caTTC={s.indicateurs.caTTC} {...(acces.modifierMoments ? { onModifier: acces.modifierMoments } : {})} />
           )}
+
+          {s.fidelite && <Fidelite f={s.fidelite} caTTC={s.indicateurs.caTTC} />}
 
           <div className="stat-grille-cartes">
             <Colonnes

@@ -69,7 +69,7 @@ export function fusionnerCommande(base: Commande | null, locale: Commande | null
     lignes,
     additionsImprimees: Math.max(locale.additionsImprimees, distante.additionsImprimees),
   };
-  for (const k of ["note", "jointes", "reclames", "parts"] as const) {
+  for (const k of ["note", "jointes", "reclames", "parts", "fidelite"] as const) {
     const v = champ(k);
     if (v === undefined) delete resultat[k];
     else (resultat as unknown as Record<string, unknown>)[k] = v;

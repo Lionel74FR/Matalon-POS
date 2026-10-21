@@ -1,4 +1,5 @@
-import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Link2, Printer, Send, Split, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Gift, Link2, Printer, Send, Split, StickyNote, Users } from "lucide-react";
+import { unite } from "@matalon/serveur/fidelite";
 import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
@@ -33,6 +34,7 @@ import { ModaleArticle } from "./modales/ModaleArticle";
 import { ModaleCouverts } from "./modales/ModaleCouverts";
 import { ModaleDivision } from "./modales/ModaleDivision";
 import { ModaleEncaissement } from "./modales/ModaleEncaissement";
+import { ModaleFidelite } from "./modales/ModaleFidelite";
 import { ModaleLigne } from "./modales/ModaleLigne";
 import { ModaleAssembler, ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
 import { productionActive, useEnvoiProduction, useReclame } from "./production";
@@ -109,6 +111,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const [transfertOuvert, setTransfertOuvert] = useState(false);
   const [noteOuverte, setNoteOuverte] = useState(false);
   const [assemblageOuvert, setAssemblageOuvert] = useState(false);
+  const [fideliteOuverte, setFideliteOuverte] = useState(false);
+  const fidelite = config.fidelite?.actif ? config.fidelite : null;
   /** Sur téléphone, la commande s'ouvre par-dessus la carte. */
   const [ticketOuvert, setTicketOuvert] = useState(false);
   const totaux = totauxCommande(c);
@@ -187,6 +191,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             )}
           </div>
           <div className="ticket-outils">
+            {fidelite && <BoutonIcone icone={Gift} variante="discret" libelle="Carte de fidélité" onClick={() => setFideliteOuverte(true)} />}
             <BoutonIcone icone={StickyNote} variante="discret" libelle="Note sur la commande" onClick={() => setNoteOuverte(true)} />
             {!estComptoir && (
               <BoutonIcone icone={Link2} variante="discret" libelle="Assembler des tables" onClick={() => setAssemblageOuvert(true)} />
@@ -200,6 +205,13 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         {c.note && (
           <button className="ticket-note" onClick={() => setNoteOuverte(true)}>
             {c.note}
+          </button>
+        )}
+        {fidelite && c.fidelite && (
+          <button className="ticket-fidelite" onClick={() => setFideliteOuverte(true)}>
+            <AvecIcone icone={Gift} taille={18}>
+              {`${c.fidelite.prenom || "Carte"} · ${c.fidelite.solde != null ? unite(fidelite.regles, c.fidelite.solde) : "hors ligne"}${c.fidelite.utilisations.length ? ` · ${c.fidelite.utilisations.map((u) => u.libelle).join(", ")}` : ""}`}
+            </AvecIcone>
           </button>
         )}
         {!estComptoir && (
@@ -406,6 +418,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           onFermer={() => setAssemblageOuvert(false)}
         />
       )}
+      {fideliteOuverte && fidelite && <ModaleFidelite commande={c} onChange={props.onChange} onFermer={() => setFideliteOuverte(false)} />}
       {noteOuverte && (
         <ModaleNoteCommande
           note={c.note ?? ""}

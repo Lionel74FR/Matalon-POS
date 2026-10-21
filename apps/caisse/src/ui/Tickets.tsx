@@ -9,6 +9,7 @@ import { centimesDepuisSaisie, Modale, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { QrNote, urlNoteTicket } from "./QrNote";
 import { ModaleFacture } from "./modales/ModaleFacture";
+import { RattachementFidelite } from "./modales/ModaleFidelite";
 import { ModaleCorrection } from "./modales/ModaleCorrection";
 import { DetailTicket } from "./DetailTicket";
 import { emettreAvoir, listerFactures } from "../metier/facture";
@@ -525,6 +526,9 @@ export function Tickets() {
           {choisi.motif && <p className="explication">Motif : {choisi.motif}</p>}
           {locale(choisi) && factures.has(choisi.numero) && <p className="explication">Facturé : n° {factures.get(choisi.numero)}</p>}
           <DetailTicket ticket={choisi} tickets={tous} appareilCourant={config.caisseId} />
+          {config.fidelite?.actif && choisi.type === "VENTE" && choisi.dateComptable === aujourdhui && !annules.has(cle(choisi)) && (
+            <RattachementFidelite key={cle(choisi)} ticket={choisi} />
+          )}
         </Modale>
       )}
 

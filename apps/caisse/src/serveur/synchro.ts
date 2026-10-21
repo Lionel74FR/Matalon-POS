@@ -163,11 +163,41 @@ export class Synchroniseur {
         await this.memoriser({ derniers });
       }
 
+      await this.envoyerFidelite();
+
       const fin = new Date(this.maintenant()).toISOString();
       await this.memoriser({ derniereSynchro: fin, divergence: null, derniers });
       this.publier({ statut: "synchronise", enAttente: 0, derniereSynchro: fin, message: null, enCours: false });
     } catch (e) {
       await this.echec(e);
+    }
+  }
+
+  /**
+   * Fidélité : tickets rattachés à une carte, envoyés après leurs tickets. Hors fiscal : un
+   * échec laisse la file pour le tour suivant sans marquer la synchronisation en erreur.
+   */
+  private async envoyerFidelite(): Promise<void> {
+    const tous = await this.o.db.getAll("fidelite");
+    const maintenant = this.maintenant();
+    const aEnvoyer = tous.filter((l) => !l.envoyeLe);
+    for (let i = 0; i < aEnvoyer.length; i += 200) {
+      const lot = aEnvoyer.slice(i, i + 200);
+      try {
+        await this.o.client.envoyerLiensFidelite(lot.map(({ envoyeLe: _, ...l }) => l));
+      } catch (e) {
+        // Refus définitif (400, 404…) : la file ne doit pas bloquer ; une coupure ou une erreur du serveur se rejoue.
+        if (!(e instanceof ErreurApi) || e.statut === 0 || e.statut >= 500 || e.statut === 401) return;
+      }
+      const tx = this.o.db.transaction("fidelite", "readwrite");
+      for (const l of lot) await tx.store.put({ ...l, envoyeLe: new Date(maintenant).toISOString() });
+      await tx.done;
+    }
+    const perimes = tous.filter((l) => l.envoyeLe && maintenant - Date.parse(l.envoyeLe) > 3 * 86_400_000);
+    if (perimes.length) {
+      const tx = this.o.db.transaction("fidelite", "readwrite");
+      for (const l of perimes) await tx.store.delete(l.numero);
+      await tx.done;
     }
   }
 

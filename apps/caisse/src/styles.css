@@ -893,7 +893,7 @@ code {
   background: var(--papier);
   color: var(--encre);
   display: grid;
-  grid-template-rows: auto auto auto 1fr auto;
+  grid-template-rows: auto auto auto auto 1fr auto;
   min-height: 0;
   border-radius: 4px 4px 0 0;
   position: relative;
@@ -2659,17 +2659,17 @@ a.bouton {
 }
 
 .ticket-lignes {
-  grid-row: 4;
+  grid-row: 5;
 }
 
 .ticket-pied {
-  grid-row: 5;
+  grid-row: 6;
 }
 
 /* ───────── Suites (« courses ») ───────── */
 
 .selecteur-suite {
-  grid-row: 3;
+  grid-row: 4;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
@@ -3320,4 +3320,132 @@ a.bouton {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+}
+
+/* ───────── Carte de fidélité (lot 7a) ───────── */
+
+.ticket-fidelite {
+  grid-row: 3;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: var(--rayon-petit);
+  background: #e4ead9;
+  color: var(--encre);
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.fidelite-recherche {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+
+.fidelite-recherche input {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font-family: var(--police-chiffres);
+  font-size: 1.4rem;
+  letter-spacing: 0.04em;
+}
+
+.fidelite-recherche input:focus {
+  border-color: var(--terre);
+  outline: none;
+}
+
+.fidelite-inscription .champ {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.fidelite-membre {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: var(--rayon);
+  background: var(--espresso-2);
+  margin-bottom: 10px;
+}
+
+.fidelite-membre strong {
+  font-size: 1.3rem;
+}
+
+.fidelite-membre span {
+  font-family: var(--police-chiffres);
+  font-size: 1.2rem;
+  color: var(--terre);
+}
+
+.fidelite-membre small {
+  color: var(--sable);
+}
+
+.fidelite-recompenses-caisse,
+.fidelite-utilisees {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fidelite-recompenses-caisse li,
+.fidelite-utilisees li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+}
+
+.fidelite-recompenses-caisse li span {
+  display: grid;
+}
+
+.fidelite-recompenses-caisse li small {
+  color: var(--sable);
+}
+
+.fidelite-recompenses-caisse li:not(.atteinte) {
+  opacity: 0.75;
+}
+
+.fidelite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fidelite-actions .discret {
+  margin-right: auto;
+}
+
+.fidelite-articles-choix {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.fidelite-rattachement {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--espresso-3);
+}
+
+.explication.petite {
+  font-size: 0.85rem;
 }

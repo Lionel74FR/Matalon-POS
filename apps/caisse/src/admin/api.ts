@@ -3,6 +3,7 @@ import type { Catalogue } from "@matalon/catalogue";
 import type { ArticleFournisseur, Fournisseur, PrixAchat, Produit, Recette } from "@matalon/stock";
 import type { ReglagesReservation, Reservation } from "@matalon/reservations";
 import type { CommandeFournisseur, EtatEnvoi, MomentJournee, ReponseCommandes, ReponseStatistiques, ReponseTickets } from "@matalon/serveur/partage";
+import type { MembreFidelite, MouvementFidelite, ProgrammeFidelite, ReglesFidelite } from "@matalon/serveur/fidelite";
 import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
 import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
@@ -119,6 +120,19 @@ export const api = {
   urlExportClotures: (etablissementId: string, du: string, au: string) => `/api/admin/etablissements/${etablissementId}/clotures.csv?du=${du}&au=${au}`,
   urlExportComptages: (etablissementId: string, du: string, au: string) => `/api/admin/etablissements/${etablissementId}/comptages.csv?du=${du}&au=${au}`,
   majMoments: (etablissementId: string, moments: MomentJournee[]) => appel("PUT", `/etablissements/${etablissementId}/moments`, { moments }),
+  fidelite: (etablissementId: string) =>
+    appel<{ programme: ProgrammeFidelite | null; autres: Array<{ id: string; nom: string; enseigne: string }> }>("GET", `/etablissements/${etablissementId}/fidelite`),
+  actionFidelite: (etablissementId: string, action: "creer" | "rejoindre" | "quitter", programmeId?: string) =>
+    appel<{ programme: ProgrammeFidelite | null }>("POST", `/etablissements/${etablissementId}/fidelite`, { action, ...(programmeId ? { programmeId } : {}) }),
+  enregistrerProgramme: (id: string, corps: { nom: string; actif: boolean; regles: ReglesFidelite; version: number }) =>
+    appel<{ programme: ProgrammeFidelite }>("PUT", `/fidelite/${id}`, corps),
+  membresFidelite: (programmeId: string, q = "") => appel<{ membres: MembreFidelite[] }>("GET", `/fidelite/${programmeId}/membres${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  membreFidelite: (programmeId: string, id: string) => appel<{ membre: MembreFidelite; mouvements: MouvementFidelite[] }>("GET", `/fidelite/${programmeId}/membres/${id}`),
+  modifierMembre: (programmeId: string, id: string, corps: Pick<MembreFidelite, "telephone" | "prenom" | "nom" | "email" | "offres">) =>
+    appel<{ membre: MembreFidelite }>("PUT", `/fidelite/${programmeId}/membres/${id}`, corps),
+  ajusterMembre: (programmeId: string, id: string, points: number, motif: string) =>
+    appel<{ membre: MembreFidelite }>("POST", `/fidelite/${programmeId}/membres/${id}/ajustement`, { points, motif }),
+  effacerMembre: (programmeId: string, id: string) => appel("POST", `/fidelite/${programmeId}/membres/${id}/effacement`, {}),
   ticketsPeriode: (etablissementId: string, du: string, au: string) =>
     appel<ReponseTickets>("GET", `/etablissements/${etablissementId}/tickets?du=${du}&au=${au}`),
   statistiques: (etablissementId: string, du: string, au: string) =>

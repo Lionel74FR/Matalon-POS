@@ -366,7 +366,7 @@ export const dateLisible = (jour: string) =>
   new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 const personnes = (n: number) => `${n} personne${n > 1 ? "s" : ""}`;
 
-function gabarit(etab: EtablissementApi, titre: string, lignes: string[], bouton?: { texte: string; url: string }): string {
+export function gabarit(etab: EtablissementApi, titre: string, lignes: string[], bouton?: { texte: string; url: string }): string {
   const i = etab.identite;
   return `<!doctype html><html lang="fr"><body style="margin:0;background:#f4f1ec;font-family:Helvetica,Arial,sans-serif;color:#2b2420">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
@@ -382,7 +382,7 @@ ${bouton ? `<p style="margin:24px 0 0"><a href="${echapper(bouton.url)}" style="
 }
 
 /** Expéditeur des e-mails aux clients : l'établissement (nom, adresse réglée), réponses vers son e-mail. */
-function expedition(etab: EtablissementApi, reglages: ReglagesReservation): Pick<Courriel, "de" | "deNom" | "repondreA"> {
+export function expedition(etab: EtablissementApi, reglages: ReglagesReservation): Pick<Courriel, "de" | "deNom" | "repondreA"> {
   return {
     ...(reglages.expediteur ? { de: reglages.expediteur } : {}),
     deNom: etab.identite.enseigne,

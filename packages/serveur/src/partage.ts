@@ -4,6 +4,7 @@
  */
 import type { Catalogue } from "@matalon/catalogue";
 import type { PrixAchat, RapportImport, Referentiel, TypeMouvement } from "@matalon/stock";
+import type { ProgrammeCaisse, StatFidelite } from "./fidelite.js";
 import {
   canonique,
   montantEnCompte,
@@ -266,6 +267,8 @@ export interface ReponseEtat {
   heure: string;
   /** Appareils en service de l'établissement (identifiant → nom). Seul, un appareil peut clôturer hors ligne. Depuis 0.7.0. */
   appareils?: Record<string, string>;
+  /** Programme de fidélité de l'établissement (lot 7a) ; null : aucun. */
+  fidelite?: ProgrammeCaisse | null;
 }
 
 export interface EntreeSynchro {
@@ -629,6 +632,8 @@ export interface ReponseStatistiques {
   annulationsParMotif: LigneStat[];
   /** Articles retirés après envoi, par motif (quantité, montant). */
   retraitsParMotif?: LigneStat[];
+  /** Carte de fidélité (lot 7a) : présente quand l'établissement a un programme. */
+  fidelite?: StatFidelite;
   /** Dernière synchronisation de chaque appareil : ses ventes non reçues manquent ici. */
   synchros: Record<string, string | null>;
   nomsAppareils: Record<string, string>;

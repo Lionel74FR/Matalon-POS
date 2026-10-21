@@ -27,7 +27,7 @@ await a.screenshot({ path: `${sortie}/00a-admin-2fa.png` });
 await champA("Code à 6 chiffres").fill(totp(secret));
 await a.getByRole("button", { name: "Activer et se connecter" }).click();
 await a.locator(".admin-etab select").waitFor();
-const rubrique = (nom) => a.locator(".admin-lien", { hasText: nom }).click();
+const rubrique = (nom) => a.locator(".admin-lien", { has: a.locator("strong", { hasText: nom }) }).click();
 // Équipe : un responsable d'abord.
 await rubrique("Équipe");
 await a.getByPlaceholder("Prénom").fill("Lionel");

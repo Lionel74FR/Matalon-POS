@@ -1,5 +1,6 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
 import { CARTES, type Catalogue } from "@matalon/catalogue";
+import type { ProgrammeCaisse } from "@matalon/serveur/fidelite";
 import type { ClientApi, IdentiteEtablissement, ImprimanteReseau, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export type { Role, Table };
@@ -53,12 +54,14 @@ export interface Configuration {
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`) et sa version. */
   zones?: ZonePlan[];
   planVersion?: number;
+  /** Programme de fidélité de l'établissement (lot 7a) ; null ou absent : la caisse ne propose pas la fidélité. */
+  fidelite?: ProgrammeCaisse | null;
 }
 
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
 export function fusionnerReferentiel(
   config: Configuration,
-  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients" | "appareils">,
+  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients" | "appareils" | "fidelite">,
 ): Configuration | null {
   const serveur = etat.clients;
   const clients = serveur
@@ -79,6 +82,7 @@ export function fusionnerReferentiel(
     ...(etat.etablissement.imprimanteTickets?.adresse && !config.imprimante.adresse ? { imprimanteConnue: etat.etablissement.imprimanteTickets } : {}),
     ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
     ...(etat.appareils ? { appareils: etat.appareils } : {}),
+    ...(etat.fidelite !== undefined ? { fidelite: etat.fidelite } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
 }

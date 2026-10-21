@@ -26,6 +26,7 @@ import { euros, useCaisse } from "../contexte";
 import { QrNote, urlNoteTicket } from "../QrNote";
 import { productionActive, useEnvoiProduction } from "../production";
 import { ModaleClient } from "./ModaleClient";
+import { lienDuTicket, utilisationsOrphelines } from "../../metier/fidelite";
 import type { ClientApi } from "@matalon/serveur/partage";
 
 const MODES: ModePaiement[] = ["CB", "ESPECES", "TITRE_RESTAURANT_CARTE", "TITRE_RESTAURANT_PAPIER", "EN_COMPTE"];
@@ -189,6 +190,12 @@ export function ModaleEncaissement(props: {
         throw e;
       }
       setTicket(t);
+      // Fidélité : le lien du ticket part à côté de lui, à la synchronisation ; les récompenses réservées
+      // mais plus appliquées sur aucune ligne sont rendues (hors ligne : le serveur les rend sous 48 h).
+      if (c.fidelite) {
+        await caisse.db.put("fidelite", lienDuTicket(c.fidelite, config.caisseId, t.numero, lignesTicket));
+        if (!partie) for (const u of utilisationsOrphelines(c)) void caisse.client.rendreRecompense(u.id).catch(() => undefined);
+      }
       // Ce qui n'a pas été envoyé en production part maintenant.
       const carte = carteDe(config);
       if (partie) {

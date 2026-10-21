@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./vercel": "./src/vercel.ts",
-    "./partage": "./src/partage.ts"
+    "./partage": "./src/partage.ts",
+    "./fidelite": "./src/fidelite.ts"
   },
   "scripts": {
     "test": "vitest run",

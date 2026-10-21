@@ -384,6 +384,80 @@ export const MIGRATIONS: string[] = [
     maj_le text not null,
     maj_par text
   )`,
+  // Carte de fidélité (lot 7a), hors fiscal. Un programme appartient à un établissement ; d'autres
+  // établissements peuvent le rejoindre (mêmes règles, même solde). Règles modifiées par version.
+  `create table if not exists fidelite_programmes (
+    id text primary key,
+    nom text not null,
+    actif boolean not null default true,
+    regles jsonb not null,
+    version integer not null default 1,
+    proprietaire text not null references etablissements(id),
+    cree_le text not null,
+    maj_le text not null,
+    maj_par text
+  )`,
+  `alter table etablissements add column if not exists programme_fidelite text`,
+  // Membres, reconnus par leur téléphone (forme +33…) ; coordonnées effacées à la demande ou après trois ans sans visite.
+  `create table if not exists fidelite_membres (
+    id text primary key,
+    programme_id text not null references fidelite_programmes(id),
+    telephone text not null,
+    prenom text not null,
+    nom text not null default '',
+    email text not null default '',
+    offres boolean not null default false,
+    inscrit_le text not null,
+    inscrit_etablissement text not null,
+    derniere_visite text,
+    supprime_le text,
+    maj_le text not null,
+    unique (programme_id, telephone)
+  )`,
+  // Registre de fidélité, en ajout seul : le solde d'un membre est la somme de ses mouvements.
+  // La clé rend chaque mouvement unique (gain d'un ticket, réservation d'une récompense, sa reprise…).
+  `create table if not exists fidelite_mouvements (
+    id bigserial primary key,
+    cle text not null unique,
+    programme_id text not null references fidelite_programmes(id),
+    membre_id text not null references fidelite_membres(id),
+    nature text not null check (nature in ('BIENVENUE', 'GAIN', 'UTILISATION', 'RENDU', 'ANNULATION', 'AJUSTEMENT', 'EXPIRATION')),
+    points integer not null,
+    etablissement_id text not null,
+    caisse_id text,
+    numero integer,
+    recompense jsonb,
+    motif text not null default '',
+    auteur text not null default '',
+    horodatage text not null
+  )`,
+  `create index if not exists fidelite_mouvements_membre on fidelite_mouvements (membre_id)`,
+  `create or replace function interdire_modification_fidelite() returns trigger as $$
+    begin
+      raise exception 'Le registre de fidélité est en ajout seul';
+    end;
+  $$ language plpgsql`,
+  `do $$ begin
+    if not exists (select 1 from pg_trigger where tgname = 'fidelite_mouvements_ajout_seul') then
+      create trigger fidelite_mouvements_ajout_seul before update or delete on fidelite_mouvements
+      for each row execute function interdire_modification_fidelite();
+    end if;
+  end $$`,
+  // Ticket rattaché à un membre : à côté du ticket, jamais dans l'enregistrement scellé. Une fois par ticket.
+  `create table if not exists fidelite_liens (
+    caisse_id text not null,
+    numero integer not null,
+    etablissement_id text not null,
+    programme_id text not null,
+    membre_id text,
+    telephone text,
+    utilisations jsonb not null default '[]'::jsonb,
+    credite boolean not null default false,
+    annule boolean not null default false,
+    cree_le text not null,
+    primary key (caisse_id, numero)
+  )`,
+  `create index if not exists fidelite_liens_attente on fidelite_liens (caisse_id) where not credite`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

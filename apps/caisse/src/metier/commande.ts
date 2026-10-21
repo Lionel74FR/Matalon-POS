@@ -1,4 +1,5 @@
 import { calculerLigne, ventiler, type ModePaiement, type Paiement, type SaisieLigne, type VentilationTVA } from "@matalon/noyau-fiscal";
+import type { UtilisationFidelite } from "@matalon/serveur/fidelite";
 
 /**
  * Commande ouverte (table ou comptoir). Données de travail, hors périmètre
@@ -41,6 +42,8 @@ export interface LigneCommande {
    * dans le reste à payer et ne se modifie plus.
    */
   reglee?: { le: string; par: string; caisseId: string };
+  /** Récompense de fidélité appliquée sur cette ligne (identifiant de la réservation). */
+  fidelite?: string;
 }
 
 /** Moyens acceptés en acompte : la mise en compte se fait à l'encaissement final, avec le client. */
@@ -102,6 +105,19 @@ export interface Commande {
   acomptes?: Acompte[];
   /** Note partagée en parts égales : retenu pour la part suivante. */
   parts?: number;
+  /** Carte de fidélité rattachée (lot 7a) : hors fiscal, son lien part à côté du ticket. */
+  fidelite?: FideliteCommande;
+}
+
+export interface FideliteCommande {
+  /** Membre reconnu en ligne ; null : rattaché hors ligne par son téléphone, reconnu par le serveur. */
+  membreId: string | null;
+  telephone: string;
+  prenom: string;
+  /** Solde lu au dernier contact avec le serveur (récompenses réservées déduites) ; null : inconnu (hors ligne). */
+  solde: number | null;
+  /** Récompenses réservées pour cette commande. */
+  utilisations: UtilisationFidelite[];
 }
 
 /** Tables qu'occupe une commande : la sienne, puis celles qui lui sont assemblées. */
@@ -339,6 +355,7 @@ export function fusionnerCommandes(cible: Commande, source: Commande): Commande 
     ...(jointesFusion(cible, source).length ? { jointes: jointesFusion(cible, source) } : {}),
     ...(reclamesFusion(cible, source).length ? { reclames: reclamesFusion(cible, source) } : {}),
     ...(cible.acomptes?.length || source.acomptes?.length ? { acomptes: [...(cible.acomptes ?? []), ...(source.acomptes ?? [])] } : {}),
+    ...(cible.fidelite ?? source.fidelite ? { fidelite: (cible.fidelite ?? source.fidelite)! } : {}),
   };
 }
 

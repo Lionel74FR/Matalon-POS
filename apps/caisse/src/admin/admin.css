@@ -977,3 +977,139 @@ code.cle-api {
     grid-column: 1 / -1;
   }
 }
+
+/* ───────── Carte de fidélité ───────── */
+
+.fidelite-entete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.fidelite-entete .bouton {
+  margin-left: auto;
+}
+
+.fidelite-editeur .champ {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+}
+
+.fidelite-cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0 16px;
+  margin-bottom: 8px;
+}
+
+.fidelite-cases .case {
+  padding: 6px 0;
+}
+
+.fidelite-recompenses {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.fidelite-recompense {
+  padding: 10px 14px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+}
+
+.fidelite-recompense-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.fidelite-recompense-ligne .champ {
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.fidelite-articles summary {
+  cursor: pointer;
+  padding: 8px 0;
+  color: var(--sable);
+}
+
+.fidelite-membres h3 {
+  margin: 24px 0 8px;
+}
+
+.fidelite-membres > form input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+}
+
+.fidelite-solde strong {
+  font-family: var(--police-chiffres);
+  font-size: 1.3rem;
+}
+
+.fidelite-fiche {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.fidelite-fiche .bouton {
+  justify-self: start;
+}
+
+.fidelite-ajustement input {
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  min-width: 0;
+}
+
+.fidelite-ajustement input[type="number"] {
+  width: 9rem;
+}
+
+.fidelite-ajustement input:not([type]) {
+  flex: 1;
+}
+
+@media (max-width: 700px) {
+  .fidelite-editeur .champ {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .fidelite-recompense-ligne {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .fidelite-recompense-ligne .champ:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .fidelite-entete .bouton {
+    margin-left: 0;
+  }
+
+  .fidelite-membres > form {
+    flex-wrap: wrap;
+  }
+
+  .fidelite-membres > form input {
+    flex-basis: 100%;
+  }
+}

@@ -87,6 +87,7 @@ URL=… node scripts/tickets-admin.mjs captures      # tickets dans l'administra
 URL=… node scripts/moments.mjs captures            # moments de la journée : proposition dans l'administration, chevauchement refusé, vente rangée dans son moment (administration et caisse), éditeur sur iPhone
 URL=… node scripts/reservation-groupe.mjs captures # réservation de 15 personnes sur 4 tables (administration), table changée dans la liste, groupe de 10 saisi à la caisse sur 3 tables, installation des tables assemblées
 URL=… node scripts/clotures-admin.mjs captures     # clôtures dans l'administration : Z avec écart sur l'iPad, liste du mois et total, détail (comptage, empreinte), archive JSON, export comptable et comptages CSV, mois précédent, année, iPhone
+URL=… node scripts/fidelite.mjs captures         # carte de fidélité : programme réglé dans l'administration, inscription par téléphone sur l'iPad, cumul à la réception, récompense appliquée, ticket du jour rattaché, fiche et ajustement, statistiques, e-mails, iPhone
 pnpm --filter @matalon/caisse build:vercel   # sortie Vercel (Build Output API) : statique + fonction Edge cdg1
 ```
 

@@ -42,6 +42,8 @@ const TABLES = [
   { nom: "reservations_reglages", lecture: "select * from reservations_reglages" },
   // Réservations à venir seulement (les passées sont des essais ou de l'historique).
   { nom: "reservations", lecture: "select * from reservations where date >= $1 and statut <> 'annulee' order by seq" },
+  // Programmes de fidélité (règles) ; leurs membres et leur registre sont de vraies données de clients : ils ne suivent pas.
+  { nom: "fidelite_programmes", lecture: "select * from fidelite_programmes order by id" },
 ] as const;
 
 /**
@@ -65,6 +67,10 @@ const VIERGES = [
   "reservations",
   "reservations_reglages",
   "secrets_etablissement",
+  "fidelite_programmes",
+  "fidelite_membres",
+  "fidelite_mouvements",
+  "fidelite_liens",
 ];
 
 export async function exporterConfiguration(db: Db, versionNoyau: string, maintenant: string, aujourdhui: string): Promise<Configuration> {
