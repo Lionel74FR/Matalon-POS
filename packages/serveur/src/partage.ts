@@ -608,7 +608,12 @@ export interface ReponseStatistiques {
   du: string;
   au: string;
   jours: number;
-  precedente: { du: string; au: string };
+  /**
+   * Période de comparaison : le même jour de la semaine précédente pour une journée, la période
+   * de même durée juste avant sinon. `jusqua` (heure de Paris, « 16:50 ») : tant que la période
+   * est en cours, la comparaison s'arrête à la même heure de la journée de service.
+   */
+  precedente: { du: string; au: string; jusqua?: string };
   calculeLe: string;
   /** Présent quand la période va jusqu'à aujourd'hui. */
   enCours?: SalleEnCours;

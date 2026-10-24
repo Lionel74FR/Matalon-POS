@@ -138,7 +138,7 @@ import {
   modifierCommande,
   solderCommande,
 } from "./commandes-serveur.js";
-import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre } from "./statistiques.js";
+import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre, periodePrecedente } from "./statistiques.js";
 import {
   enregistrerReglages,
   essaiCourriel,
@@ -1256,7 +1256,7 @@ function alertesEvenements(c: LigneCaisse, evenements: Evenement[], maintenant: 
 
 /**
  * Statistiques de l'établissement entre deux journées comptables incluses
- * (au plus 366 jours), comparées à la période précédente de même durée.
+ * (au plus 366 jours), comparées à la période précédente (voir periodePrecedente).
  */
 async function statistiques(env: Environnement, etablissementId: string, requete: Request): Promise<Response> {
   const params = new URL(requete.url).searchParams;
@@ -1265,7 +1265,7 @@ async function statistiques(env: Environnement, etablissementId: string, requete
   if (!DATE_VALIDE.test(du) || !DATE_VALIDE.test(au) || au < du || joursEntre(du, au) > JOURS_MAX_STATISTIQUES) {
     throw new ErreurHttp(400, "PERIODE_INVALIDE", `Période invalide (du ≤ au, ${JOURS_MAX_STATISTIQUES} jours au plus).`);
   }
-  const debut = ajouterJours(du, -joursEntre(du, au));
+  const debut = periodePrecedente(du, au).du;
   const tickets = (
     await env.db.requete<{ contenu: Ticket }>(
       `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id

@@ -31,6 +31,20 @@ const minutesDe = (iso: string) => {
   const p = minuteParis.formatToParts(new Date(iso));
   return (Number(p.find((x) => x.type === "hour")?.value ?? 0) % 24) * 60 + Number(p.find((x) => x.type === "minute")?.value ?? 0);
 };
+/** Minutes écoulées depuis le début de la journée de service (bascule à 5 h, heure de Paris). */
+const minutesService = (iso: string) => (minutesDe(iso) - 5 * 60 + 1440) % 1440;
+
+/**
+ * Période de comparaison (remarque de Lionel du 24 octobre 2026) : une journée se compare au même
+ * jour de la semaine précédente (un samedi à un samedi) ; une période plus longue, à celle de même
+ * durée juste avant. `decalage` : écart en jours entre un jour de la période et son équivalent.
+ */
+export function periodePrecedente(du: string, au: string): { du: string; au: string; decalage: number } {
+  const jours = joursEntre(du, au);
+  const decalage = jours === 1 ? 7 : jours;
+  return { du: ajouterJours(du, -decalage), au: ajouterJours(au, -decalage), decalage };
+}
+
 const ventes = (tickets: Ticket[]) => tickets.filter((t) => t.type === "VENTE");
 const ventesEtAnnulations = (tickets: Ticket[]) => tickets.filter((t) => t.type === "VENTE" || t.type === "ANNULATION");
 const estOffert = (l: Ticket["lignes"][number]) => l.remiseTTC !== 0 && Math.abs(l.remiseTTC) === Math.abs(l.quantite * l.prixUnitaireTTC);
@@ -145,11 +159,19 @@ export function caParMoment(moments: MomentJournee[], tickets: Ticket[], avant: 
 
 export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStatistiques, "alertes"> {
   const jours = joursEntre(c.du, c.au);
-  const precedente = { du: ajouterJours(c.du, -jours), au: ajouterJours(c.du, -1) };
+  const { decalage, ...bornes } = periodePrecedente(c.du, c.au);
+  // Période en cours : la comparaison s'arrête au même moment de la journée de service, le jour
+  // équivalent à aujourd'hui (un samedi à 16 h 50 face au samedi précédent jusqu'à 16 h 50).
+  const aujourdhui = dateComptable(c.maintenant);
+  const enCours = c.du <= aujourdhui && aujourdhui <= c.au;
+  const jourLimite = ajouterJours(aujourdhui, -decalage);
+  const minutesLimite = minutesService(c.maintenant.toISOString());
+  const avantLimite = (jour: string, horodatage: string) => !enCours || jour < jourLimite || (jour === jourLimite && minutesService(horodatage) <= minutesLimite);
+  const precedente = enCours ? { ...bornes, jusqua: minuteParis.format(c.maintenant) } : bornes;
   const tickets = c.tickets.filter((t) => t.dateComptable >= c.du && t.dateComptable <= c.au);
-  const avant = c.tickets.filter((t) => t.dateComptable >= precedente.du && t.dateComptable <= precedente.au);
+  const avant = c.tickets.filter((t) => t.dateComptable >= precedente.du && t.dateComptable <= precedente.au && avantLimite(t.dateComptable, t.horodatage));
   const retraits = (c.retraits ?? []).filter((r) => jourDe(r) >= c.du && jourDe(r) <= c.au);
-  const retraitsAvant = (c.retraits ?? []).filter((r) => jourDe(r) >= precedente.du && jourDe(r) <= precedente.au);
+  const retraitsAvant = (c.retraits ?? []).filter((r) => jourDe(r) >= precedente.du && jourDe(r) <= precedente.au && avantLimite(jourDe(r), r.horodatage));
   const va = ventesEtAnnulations(tickets);
 
   // Heures et jours.

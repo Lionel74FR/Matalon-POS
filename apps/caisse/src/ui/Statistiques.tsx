@@ -66,6 +66,12 @@ const dateCourte = (jour: string) => new Date(`${jour}T12:00:00Z`).toLocaleDateS
 const dateLongue = (jour: string) =>
   new Date(`${jour}T12:00:00Z`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 const libellePeriode = (du: string, au: string) => (du === au ? dateLongue(du) : `du ${dateCourte(du)} au ${dateCourte(au)}`);
+/** « au samedi 17 octobre jusqu'à 16 h 50 » : la comparaison d'une période en cours s'arrête à la même heure. */
+const libelleComparaison = (p: ReponseStatistiques["precedente"]) => {
+  const heure = p.jusqua?.replace(/^0?(\d+):(\d+)$/, "$1 h $2");
+  if (p.du === p.au) return `au ${dateLongue(p.du)}${heure ? ` jusqu'à ${heure}` : ""}`;
+  return `à la période ${libellePeriode(p.du, p.au)}${heure ? `, jusqu'à ${heure} le dernier jour` : ""}`;
+};
 const JOURS_SEMAINE = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const entier = (n: number) => n.toLocaleString("fr-FR");
 const pl = (n: number, mot: string) => `${entier(n)} ${mot}${Math.abs(n) > 1 ? "s" : ""}`;
@@ -587,7 +593,7 @@ export function TableauStatistiques(props: { acces: AccesStatistiques }) {
     <div className="page statistiques">
       <header className="page-tete">
         <h1>Statistiques</h1>
-        <p>{s ? `Tous les appareils · ${libellePeriode(s.du, s.au)}, comparé ${libellePeriode(s.precedente.du, s.precedente.au)}` : "Tous les appareils de l'établissement"}</p>
+        <p>{s ? `Tous les appareils · ${libellePeriode(s.du, s.au)}, comparé ${libelleComparaison(s.precedente)}` : "Tous les appareils de l'établissement"}</p>
         {s && enDirect && (
           <p className="stat-direct" role="status">
             <span className="stat-direct-point" aria-hidden="true" /> En direct · mis à jour à {heureCourte(s.calculeLe)}

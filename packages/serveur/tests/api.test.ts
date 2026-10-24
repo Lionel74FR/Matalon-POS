@@ -761,9 +761,14 @@ describe("statistiques", () => {
     const b = await caisseRattachee(cookie, "ipad-1111aaaa");
     const lea = a.rattachement.utilisateurs[0]!.id;
     const cap = { ...CAFE, articleId: "cappuccino" };
-    // Veille (14 octobre, période précédente) : une vente de 4,00 €.
-    instant = Date.parse("2026-10-14T09:00:00Z");
+    // Jeudi précédent (8 octobre, période de comparaison) : 4,00 € à 11 h, 9,00 € à 18 h (heure de Paris).
+    instant = Date.parse("2026-10-08T09:00:00Z");
     await a.registre.enregistrerVente({ lignes: [cap], paiements: [{ mode: "CB", montant: 400 }], operateurId: lea });
+    instant = Date.parse("2026-10-08T16:00:00Z");
+    await a.registre.enregistrerVente({ lignes: [{ ...cap, prixUnitaireTTC: 900 }], paiements: [{ mode: "CB", montant: 900 }], operateurId: lea });
+    // La veille (14 octobre) n'entre plus dans la comparaison d'une journée.
+    instant = Date.parse("2026-10-14T09:00:00Z");
+    await a.registre.enregistrerVente({ lignes: [{ ...cap, prixUnitaireTTC: 700 }], paiements: [{ mode: "CB", montant: 700 }], operateurId: lea });
     // 15 octobre : table 2 (2 couverts, 10 h à Paris), un offert ; comptoir sur l'iPhone à 12 h ; une annulation.
     instant = Date.parse("2026-10-15T08:10:00Z");
     await a.registre.enregistrerVente({
@@ -790,7 +795,8 @@ describe("statistiques", () => {
     const r = await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-15", undefined, a.bearer);
     expect(r.statut).toBe(200);
     const st = r.corps;
-    expect(st.precedente).toEqual({ du: "2026-10-14", au: "2026-10-14" });
+    // Journée en cours (12 h 05 à Paris) : comparée au jeudi précédent jusqu'à la même heure.
+    expect(st.precedente).toEqual({ du: "2026-10-08", au: "2026-10-08", jusqua: "12:05" });
     expect(st.indicateurs).toMatchObject({ caTTC: 1200, nbVentes: 3, ventesConservees: 2, nbAnnulations: 1, montantAnnule: 1200, ticketMoyen: 600, couverts: 2, parCouvert: 400, offerts: 1100, remises: 0, articles: 4 });
     expect(st.indicateursPrecedents).toMatchObject({ caTTC: 400, nbVentes: 1 });
     expect(st.parHeure[10]).toEqual({ heure: 10, ttc: 800, tickets: 1 });
@@ -822,6 +828,19 @@ describe("statistiques", () => {
     expect((await appel("GET", "/api/caisse/statistiques?du=2025-01-01&au=2026-10-15", undefined, a.bearer)).statut).toBe(400);
     expect((await appel("GET", "/api/admin/etablissements/moka/statistiques?du=2026-10-15&au=2026-10-15", undefined, { Cookie: cookie })).corps.indicateurs.caTTC).toBe(1200);
     expect((await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-15")).statut).toBe(401);
+
+    // Une fois la journée passée : le jeudi précédent entier.
+    instant = Date.parse("2026-10-16T08:00:00Z");
+    const passee = (await appel("GET", "/api/caisse/statistiques?du=2026-10-15&au=2026-10-15", undefined, a.bearer)).corps;
+    expect(passee.precedente).toEqual({ du: "2026-10-08", au: "2026-10-08" });
+    expect(passee.indicateursPrecedents).toMatchObject({ caTTC: 1300, nbVentes: 2 });
+    // Plusieurs jours en cours (9 au 16 octobre à 10 h) : les 8 jours d'avant, le dernier coupé à 10 h.
+    const semaine = (await appel("GET", "/api/caisse/statistiques?du=2026-10-09&au=2026-10-16", undefined, a.bearer)).corps;
+    expect(semaine.precedente).toEqual({ du: "2026-10-01", au: "2026-10-08", jusqua: "10:00" });
+    expect(semaine.indicateursPrecedents).toMatchObject({ caTTC: 0, nbVentes: 0 });
+    instant = Date.parse("2026-10-16T09:30:00Z");
+    const semaine2 = (await appel("GET", "/api/caisse/statistiques?du=2026-10-09&au=2026-10-16", undefined, a.bearer)).corps;
+    expect(semaine2.indicateursPrecedents).toMatchObject({ caTTC: 400, nbVentes: 1 });
   });
 });
 
