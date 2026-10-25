@@ -24,7 +24,8 @@ import { cleAccesDisponible, utiliserCleAcces } from "./cleAcces";
 import { Accueil } from "./Accueil";
 import { EntetePage, TitreAvecAide } from "./Page";
 import { confirmer, informer, Panneau } from "./Panneau";
-import { BoutonAlertes, defRubrique, familleDe, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
+import { Recherche } from "./Recherche";
+import { BoutonAlertes, BoutonRecherche, defRubrique, familleDe, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
 import {
   Archive,
   Ban,
@@ -334,13 +335,31 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   /** Tickets d'une personne, ouverts depuis les statistiques ; le menu les rouvre sans filtre. */
   const [filtreTickets, setFiltreTickets] = useState<FiltreTickets | null>(null);
   const [theme, choisirTheme] = useTheme();
+  /** Élément à ouvrir à l'arrivée (choisi dans la recherche) : produit, personne, client, article. */
+  const [cible, setCible] = useState<string | null>(null);
+  const [recherche, setRecherche] = useState(false);
+  // ⌘K ou Ctrl+K depuis n'importe quel écran ; « / » hors d'un champ de saisie.
+  useEffect(() => {
+    const touche = (ev: KeyboardEvent) => {
+      const saisie = ev.target instanceof HTMLElement && (ev.target.closest("input, textarea, select, [contenteditable]") !== null);
+      if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "k") {
+        ev.preventDefault();
+        setRecherche((o) => !o);
+      } else if (ev.key === "/" && !saisie && !ev.metaKey && !ev.ctrlKey && !ev.altKey) {
+        ev.preventDefault();
+        setRecherche(true);
+      }
+    };
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  }, []);
   const [menuReduit, basculerMenu] = useMenuReduit();
   /** Un changement de rubrique s'inscrit dans l'historique : le bouton Retour du navigateur y ramène. */
   const historique = useRef(false);
   /** Adresse de la vue affichée : un Retour refusé (carte non enregistrée) y revient. */
   const adresseCourante = useRef(location.hash);
   /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
-  const aller = (vue: { etab?: string; rubrique?: Rubrique; sous?: string | null; carte?: string | null }, abandonConfirme = false) => {
+  const aller = (vue: { etab?: string; rubrique?: Rubrique; sous?: string | null; carte?: string | null; cible?: string | null }, abandonConfirme = false) => {
     if (carteModifiee && !abandonConfirme) {
       void confirmer({
         titre: "Abandonner les modifications de la carte ?",
@@ -360,6 +379,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     if (vue.rubrique !== undefined) setRubrique(vue.rubrique);
     if (vue.sous !== undefined || vue.rubrique !== undefined) setSous(vue.sous ?? null);
     setCarteOuverte(vue.carte ?? null);
+    setCible(vue.cible ?? null);
     setFiltreTickets(null);
     window.scrollTo({ top: 0 });
     return true;
@@ -435,7 +455,8 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
       </a>
       <header className="coque-barre">
         <Marque />
-        {donnees && <MenuEtablissement etablissements={donnees.etablissements} choisi={choisi} onChoisir={(id) => aller({ etab: id, ...(id === "nouveau" ? {} : {}) })} />}
+        {donnees && <MenuEtablissement etablissements={donnees.etablissements} choisi={choisi} onChoisir={(id) => aller({ etab: id })} />}
+        {etablissement && <BoutonRecherche onOuvrir={() => setRecherche(true)} />}
         <div className="coque-barre-droite">
           {etablissement && <BoutonAlertes nombre={etablissement.alertesNonVues} onOuvrir={() => aller({ rubrique: "alertes" })} />}
           <MenuCompte
@@ -470,6 +491,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
               <EditeurCarte
                 key={carteOuverte}
                 id={carteOuverte}
+                {...(cible ? { article: cible } : {})}
                 onRetour={() => aller({ rubrique: "cartes" })}
                 onEnregistre={() => void recharger()}
                 onModifiee={setCarteModifiee}
@@ -494,6 +516,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
               onAller={(r, o) => aller({ rubrique: r, carte: o?.carte ?? null, sous: o?.sous ?? null })}
               sous={sous}
               onSous={(s) => aller({ sous: s, ...(carteOuverte ? { carte: carteOuverte } : {}) })}
+              cible={cible}
               filtreTickets={filtreTickets}
               onTicketsServeur={(f) => {
                 aller({ rubrique: "tickets" });
@@ -504,6 +527,18 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
         </main>
       </div>
       {etablissement && <OngletsMobile etab={etablissement} rubrique={rubrique} signal={signal} onAller={(r) => aller({ rubrique: r })} />}
+      {recherche && etablissement && (
+        <Recherche
+          e={etablissement}
+          onFermer={() => setRecherche(false)}
+          onAller={(d) => {
+            if (d.ticket) {
+              const t = d.ticket;
+              if (aller({ rubrique: "tickets" })) setFiltreTickets({ serveur: null, du: t.jour, au: t.jour, ticket: { caisseId: t.caisseId, numero: t.numero } });
+            } else aller({ rubrique: d.rubrique, sous: d.sous ?? null, carte: d.carte ?? null, cible: d.cible ?? null });
+          }}
+        />
+      )}
       {fenetreConfiguration && <FenetreConfiguration onFermer={() => setFenetreConfiguration(false)} onImporte={() => void recharger()} />}
       {fenetreCles && <FenetreClesAcces cles={clesAcces.cles} onChange={clesAcces.setCles} onFermer={() => setFenetreCles(false)} />}
     </div>
@@ -590,6 +625,8 @@ function FicheEtablissement(props: {
   onAller: (r: Rubrique, options?: { carte?: string; sous?: string }) => void;
   sous: string | null;
   onSous: (s: string | null) => void;
+  /** Élément à ouvrir à l'arrivée (recherche). */
+  cible: string | null;
 }) {
   const { e, rubrique } = props;
   const responsable = e.utilisateurs.some((u) => u.role === "responsable" && u.actif);
@@ -601,7 +638,7 @@ function FicheEtablissement(props: {
       {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} onServeur={props.onTicketsServeur} />}
       {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
       {rubrique === "clotures" && <CloturesAdmin e={e} />}
-      {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} surtitre={surtitre} />}
+      {rubrique === "equipe" && <Equipe key={props.cible ?? ""} e={e} onChange={props.onChange} surtitre={surtitre} ouvrir={props.cible} />}
       {rubrique === "plan" && (
         <>
           <EntetePage
@@ -620,9 +657,9 @@ function FicheEtablissement(props: {
         </>
       )}
       {rubrique === "reservations" && <Reservations etablissements={[e]} onglet={props.sous} onOnglet={props.onSous} />}
-      {rubrique === "comptes" && <ComptesClients etablissementId={e.id} surtitre={surtitre} />}
+      {rubrique === "comptes" && <ComptesClients key={props.cible ?? ""} etablissementId={e.id} surtitre={surtitre} ouvrir={props.cible} />}
       {rubrique === "fidelite" && <FideliteAdmin key={e.id} e={e} />}
-      {rubrique === "stock" && <Stock etablissementId={e.id} onglet={props.sous} onOnglet={props.onSous} />}
+      {rubrique === "stock" && <Stock key={props.cible ?? ""} etablissementId={e.id} onglet={props.sous} onOnglet={props.onSous} ouvrir={props.cible} />}
       {rubrique === "alertes" && <Alertes e={e} onChange={props.onChange} surtitre={surtitre} />}
       {rubrique === "identite" && (
         <>
@@ -1027,9 +1064,10 @@ interface FichePersonne {
   pin: string;
 }
 
-function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void>; surtitre?: string }) {
-  const [fiche, setFiche] = useState<FichePersonne | null>(null);
-  const [depart, setDepart] = useState<FichePersonne | null>(null);
+function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void>; surtitre?: string; ouvrir?: string | null }) {
+  const initiale = ((u) => (u ? { id: u.id, nom: u.nom, role: u.role, actif: u.actif, pin: "" } : null))(props.e.utilisateurs.find((u) => u.id === props.ouvrir));
+  const [fiche, setFiche] = useState<FichePersonne | null>(initiale);
+  const [depart, setDepart] = useState<FichePersonne | null>(initiale);
   const { enCours, erreur, setErreur, envoyer } = useEnvoi();
   const ouvrir = (f: FichePersonne) => {
     setErreur("");
@@ -1286,7 +1324,7 @@ function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => P
   );
 }
 
-function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
+function ComptesClients(props: { etablissementId: string; surtitre?: string; ouvrir?: string | null }) {
   const [donnees, setDonnees] = useState<ReponseComptes | null>(null);
   const [edition, setEdition] = useState<ClientApi | null>(null);
   const [departEdition, setDepartEdition] = useState<ClientApi | null>(null);
@@ -1297,6 +1335,15 @@ function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
   const { enCours, erreur, setErreur, envoyer } = useEnvoi();
   const charger = useCallback(() => envoyer(async () => setDonnees(await api.comptes(props.etablissementId))), [envoyer, props.etablissementId]);
   useEffect(() => void charger(), [charger]);
+  // Client choisi dans la recherche : sa fiche s'ouvre une fois la liste lue.
+  const aOuvrir = useRef(props.ouvrir ?? null);
+  useEffect(() => {
+    const c = aOuvrir.current && donnees?.comptes.find((x) => x.client.id === aOuvrir.current);
+    if (c) {
+      aOuvrir.current = null;
+      ouvrir({ ...c.client });
+    }
+  }, [donnees]); // eslint-disable-line react-hooks/exhaustive-deps
   const enregistrer = () => {
     if (!edition) return;
     if (!edition.nom.trim()) return setErreur("Le nom du client est obligatoire.");

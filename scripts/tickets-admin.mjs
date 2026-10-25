@@ -90,6 +90,15 @@ await rubriqueAdmin(a, "Tickets");
 await a.locator(".tickets-serveur.actif").waitFor({ state: "detached" });
 await a.locator(".ticket-admin").nth(2).waitFor({ timeout: 10000 });
 r.apresMenu = await a.locator(".ticket-admin").count();
+// Recherche ⌘K : un ticket du jour par son montant, son détail s'ouvre.
+await rubriqueAdmin(a, "Aujourd'hui");
+await a.keyboard.press("ControlOrMeta+k");
+await a.getByRole("dialog", { name: "Recherche" }).getByRole("combobox").fill("6,00");
+await a.getByRole("dialog", { name: "Recherche" }).getByRole("option", { name: /^Ticket n°/ }).first().waitFor({ timeout: 15000 });
+await a.keyboard.press("Enter");
+await a.waitForFunction(() => location.hash === "#/moka/tickets");
+r.ticketRecherche = await texte(a.getByRole("dialog").locator("h2").first());
+await a.keyboard.press("Escape");
 
 // ── iPhone ──
 const m = await administration("iphone", { width: 390, height: 844 });
@@ -114,6 +123,7 @@ const ok =
   /empreinte [0-9a-f]{16}/.test(r.fiche) &&
   r.lionel === 2 &&
   r.apresMenu === 3 &&
+  /^Ticket n° \d+$/.test(r.ticketRecherche ?? "") &&
   r.debordementIphone <= 0 &&
   !erreurs.length;
 if (!ok) process.exit(1);

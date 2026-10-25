@@ -160,7 +160,15 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
  * ordre), articles (prix, TVA, disponibilité), variantes, suppléments,
  * formules. Les contrôles sont ceux du serveur, appliqués avant l'envoi.
  */
-export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregistre: () => void; onModifiee?: (modifiee: boolean) => void; libelleRetour?: string }) {
+export function EditeurCarte(props: {
+  id: string;
+  onRetour: () => void;
+  onEnregistre: () => void;
+  onModifiee?: (modifiee: boolean) => void;
+  libelleRetour?: string;
+  /** Article à ouvrir dès la carte lue (recherche de l'administration). */
+  article?: string;
+}) {
   const acces = useAccesEdition();
   const [origine, setOrigine] = useState<{ carte: Catalogue; version: number } | null>(null);
   const [carte, setCarte] = useState<Catalogue | null>(null);
@@ -193,7 +201,12 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
     const r = await acces.carte(props.id);
     setOrigine(r);
     setCarte(structuredClone(r.carte));
-    setCatId((c) => c ?? r.carte.categories[0]?.id ?? null);
+    const demande = props.article ? r.carte.categories.find((c) => c.articles.some((a) => a.id === props.article)) : undefined;
+    const article = demande?.articles.find((a) => a.id === props.article);
+    if (demande && article && !origine) {
+      setCatId(demande.id);
+      setArticleOuvert({ catId: demande.id, article: structuredClone(article), nouveau: false });
+    } else setCatId((c) => c ?? r.carte.categories[0]?.id ?? null);
     setErreurs([]);
     setEtat("");
   };

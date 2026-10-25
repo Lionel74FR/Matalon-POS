@@ -1,7 +1,7 @@
 import { dateComptable, paiementsEffectifs, type Ticket } from "@matalon/noyau-fiscal";
 import type { ReponseTickets } from "@matalon/serveur/partage";
 import { RefreshCw, Search, Users, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { FILTRES_VIDES, filtrerTickets, natureDe, parServeur, totaliser, ventesAnnulees } from "../metier/filtres-tickets";
@@ -40,6 +40,8 @@ export interface FiltreTickets {
   serveur: string | null;
   du: string;
   au: string;
+  /** Ticket à ouvrir à l'arrivée (recherche). */
+  ticket?: { caisseId: string; numero: number };
 }
 
 /**
@@ -72,6 +74,16 @@ export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTick
     }
   }, [e.id, periode]);
   useEffect(() => void charger(), [charger]);
+  // Ticket choisi dans la recherche : son détail s'ouvre une fois la liste lue.
+  const aOuvrir = useRef(props.filtre?.ticket ?? null);
+  useEffect(() => {
+    const cible = aOuvrir.current;
+    const t = cible && donnees?.tickets.find((x) => x.caisseId === cible.caisseId && x.numero === cible.numero);
+    if (t) {
+      aOuvrir.current = null;
+      setChoisi(t);
+    }
+  }, [donnees]);
 
   const nomServeur = (id: string | null) => (id ? (e.utilisateurs.find((u) => u.id === id)?.nom ?? id) : "—");
   const nomTable = (id: string | null) => (!id || id === "comptoir" ? "Comptoir" : `Table ${e.tables.find((t) => t.id === id)?.nom ?? id}`);

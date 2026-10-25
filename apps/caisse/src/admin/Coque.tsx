@@ -22,6 +22,7 @@ import {
   Plus,
   Printer,
   ReceiptText,
+  Search,
   Store,
   Sun,
   TabletSmartphone,
@@ -490,6 +491,18 @@ export function OngletsMobile(props: { etab: EtablissementAdmin; rubrique: Rubri
         </div>
       )}
     </>
+  );
+}
+
+/** Recherche de la barre du haut : un faux champ sur ordinateur, une loupe sur iPhone ; ⌘K l'ouvre aussi. */
+export function BoutonRecherche(props: { onOuvrir: () => void }) {
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  return (
+    <button type="button" className="coque-recherche" onClick={props.onOuvrir} aria-label="Rechercher un article, une fiche, un ticket, une personne" aria-keyshortcuts={mac ? "Meta+K" : "Control+K"}>
+      <Search className="icone" size={18} aria-hidden="true" />
+      <span className="coque-recherche-texte">Rechercher un produit, un ticket, une personne…</span>
+      <kbd>{mac ? "⌘K" : "Ctrl K"}</kbd>
+    </button>
   );
 }
 

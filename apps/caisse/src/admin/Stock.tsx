@@ -77,7 +77,7 @@ const parUnite = (u: UniteStock) => (u === "piece" ? "pièce" : u);
  * recettes sont communs au groupe ; les prix et les coûts affichés sont
  * ceux de l'établissement choisi.
  */
-export function Stock(props: { etablissementId?: string; onglet?: string | null; onOnglet?: (o: string | null) => void } = {}) {
+export function Stock(props: { etablissementId?: string; onglet?: string | null; onOnglet?: (o: string | null) => void; ouvrir?: string | null } = {}) {
   const [stock, setStock] = useState<ReponseStock | null>(null);
   const [erreur, setErreur] = useState("");
   const [ongletLocal, setOngletLocal] = useState<Onglet>("produits");
@@ -140,8 +140,8 @@ export function Stock(props: { etablissementId?: string; onglet?: string | null;
           onChoisir={setOnglet}
         />
       </EntetePage>
-      {onglet === "produits" && <Produits stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
-      {onglet === "recettes" && <Recettes stock={stock} couts={couts} nomEtab={nomEtab} onStock={setStock} />}
+      {onglet === "produits" && <Produits stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} ouvrir={props.ouvrir} />}
+      {onglet === "recettes" && <Recettes stock={stock} couts={couts} nomEtab={nomEtab} onStock={setStock} ouvrir={props.ouvrir} />}
       {onglet === "fournisseurs" && <OngletFournisseurs stock={stock} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "commandes" && <OngletCommandes key={etab} stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "import" && <Import etab={etab} nomEtab={nomEtab} onStock={setStock} onTermine={() => setOnglet("produits")} />}
@@ -165,12 +165,12 @@ export interface ProprietesOnglet {
 
 // ───────── Produits ─────────
 
-function Produits(props: ProprietesOnglet & { etab: string }) {
+function Produits(props: ProprietesOnglet & { etab: string; ouvrir?: string | null }) {
   const ref = props.stock.referentiel;
   const [recherche, setRecherche] = useState("");
   const [famille, setFamille] = useState("");
   const [archives, setArchives] = useState(false);
-  const [ouvert, setOuvert] = useState<Produit | null>(null);
+  const [ouvert, setOuvert] = useState<Produit | null>(() => ref.produits.find((p) => p.id === props.ouvrir) ?? null);
   const familles = [...new Set(ref.produits.map((p) => p.famille).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, "fr"));
   const n = normaliserNom(recherche);
   const liste = ref.produits
@@ -548,11 +548,11 @@ function PrixModifiable(props: { prix: number | null; le?: string | undefined; o
 
 // ───────── Recettes ─────────
 
-export function Recettes(props: ProprietesOnglet) {
+export function Recettes(props: ProprietesOnglet & { ouvrir?: string | null }) {
   const ref = props.stock.referentiel;
   const [recherche, setRecherche] = useState("");
   const [archives, setArchives] = useState(false);
-  const [ouverte, setOuverte] = useState<Recette | null>(null);
+  const [ouverte, setOuverte] = useState<Recette | null>(() => ref.recettes.find((r) => r.id === props.ouvrir) ?? null);
   const n = normaliserNom(recherche);
   const liste = ref.recettes.filter((r) => (archives || r.actif) && (!n || normaliserNom(r.nom).includes(n))).sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
   return (
