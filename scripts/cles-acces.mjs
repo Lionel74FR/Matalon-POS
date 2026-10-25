@@ -4,7 +4,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/cles-acces.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur, totp } from "./preparer-caisse.mjs";
+import { menuCompte, preparerServeur, totp } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -49,20 +49,20 @@ await a.getByRole("button", { name: "Fermer" }).click();
 resultats.invitationApres = await a.locator(".admin-suggestion").count();
 
 // ── Déconnexion, puis connexion par la clé seule ──
-await a.getByRole("button", { name: /Se déconnecter/ }).click();
+await menuCompte(a, "Se déconnecter");
 await a.getByRole("button", { name: "Se connecter avec une clé d'accès" }).waitFor();
 await a.screenshot({ path: `${sortie}/p03-connexion.png` });
 await a.getByRole("button", { name: "Se connecter avec une clé d'accès" }).click();
-await a.locator(".admin-etab select").waitFor();
+await a.locator(".coque-etab").waitFor();
 resultats.connecteParCle = true;
-await a.getByRole("button", { name: "Clés d'accès" }).click();
+await menuCompte(a, "Clés d'accès");
 resultats.derniereConnexion = (await a.locator(".cles-liste small").first().textContent()).includes("dernière connexion : jamais") ? "jamais" : "renseignée";
 
 // ── Retrait : la clé reste dans l'appareil mais n'ouvre plus rien ──
 await a.getByRole("button", { name: /Retirer la clé/ }).click();
 await a.locator(".cles-liste").waitFor({ state: "detached" });
 await a.getByRole("button", { name: "Fermer" }).click();
-await a.getByRole("button", { name: /Se déconnecter/ }).click();
+await menuCompte(a, "Se déconnecter");
 await a.getByRole("button", { name: "Se connecter avec une clé d'accès" }).click();
 resultats.apresRetrait = (await a.locator(".admin-acces .erreur").filter({ hasText: /\S/ }).textContent({ timeout: 10000 })).trim();
 await ctx.close();

@@ -6,7 +6,7 @@
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/clotures-admin.mjs [dossier-captures]
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -62,7 +62,7 @@ async function administration(nom, viewport) {
 }
 const a = await administration("admin", { width: 1280, height: 900 });
 await a.goto(`${URL}/admin#/moka/appareils`);
-await a.getByRole("button", { name: /^Clôtures Z, exports/ }).click();
+await rubriqueAdmin(a, "Clôtures");
 await a.waitForFunction(() => location.hash === "#/moka/clotures");
 const liste = a.getByRole("list", { name: "Clôtures" });
 const ligne = liste.locator(".ticket-admin").first();

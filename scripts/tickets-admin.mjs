@@ -4,7 +4,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/tickets-admin.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -79,14 +79,14 @@ await a.screenshot({ path: `${sortie}/ta01-ticket-lea.png` });
 await a.keyboard.press("Escape");
 
 // ── Statistiques › Équipe › Lionel : ses tickets ──
-await a.locator(".admin-liste .admin-lien", { hasText: "Statistiques" }).click();
+await rubriqueAdmin(a, "Statistiques");
 await a.getByRole("button", { name: "Voir les tickets de Lionel" }).click();
 await a.waitForFunction(() => location.hash === "#/moka/tickets");
 await a.locator(".tickets-serveur.actif", { hasText: "Lionel" }).waitFor();
 r.lionel = await a.locator(".ticket-admin").count();
 await a.screenshot({ path: `${sortie}/ta02-tickets-lionel.png` });
 // Le menu rouvre la rubrique sans filtre.
-await a.getByRole("button", { name: /^Tickets Par serveur/ }).click();
+await rubriqueAdmin(a, "Tickets");
 await a.locator(".tickets-serveur.actif").waitFor({ state: "detached" });
 await a.locator(".ticket-admin").nth(2).waitFor({ timeout: 10000 });
 r.apresMenu = await a.locator(".ticket-admin").count();

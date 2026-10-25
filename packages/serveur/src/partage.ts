@@ -623,6 +623,8 @@ export interface ReponseStatistiques {
   parMoment: StatMoment[];
   /** CA net par heure de la journée (heure de Paris, 0 à 23). */
   parHeure: Array<{ heure: number; ttc: number; tickets: number }>;
+  /** Même chose sur la période de comparaison (accueil de l'administration : CA par heure face à la semaine précédente). */
+  parHeurePrecedente: Array<{ heure: number; ttc: number; tickets: number }>;
   /** CA net par journée comptable, chaque jour de la période (zéro compris). */
   parJour: Array<{ jour: string; ttc: number; tickets: number; couverts: number }>;
   /** Par jour de la semaine (0 = lundi) : CA total et moyenne par jour de la période. */

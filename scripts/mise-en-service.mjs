@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { preparerServeur, totp } from "./preparer-caisse.mjs";
+import { menuCompte, preparerServeur, totp } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const PROD = "http://localhost:4181";
@@ -63,7 +63,7 @@ try {
   const t = await ctxTest.newPage();
   t.on("pageerror", (e) => erreurs.push(`test : ${e.message}`));
   await t.goto(`${URL}/admin#/moka/appareils`);
-  await t.getByRole("button", { name: "Configuration de l'installation" }).click();
+  await menuCompte(t, "Configuration de l'installation");
   const [telechargement] = await Promise.all([t.waitForEvent("download"), t.getByRole("button", { name: "Exporter la configuration" }).click()]);
   const fichier = `${sortie}/configuration.json`;
   await telechargement.saveAs(fichier);
@@ -76,7 +76,7 @@ try {
   const p = await ctxProd.newPage();
   p.on("pageerror", (e) => erreurs.push(`production : ${e.message}`));
   await p.goto(`${PROD}/admin`);
-  await p.getByRole("button", { name: "Configuration de l'installation" }).click();
+  await menuCompte(p, "Configuration de l'installation");
   await p.getByLabel("Fichier de configuration").setInputFiles(fichier);
   await p.getByRole("button", { name: "Importer", exact: true }).click();
   await p.locator(".modale .succes").waitFor();

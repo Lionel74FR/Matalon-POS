@@ -60,3 +60,25 @@ export async function preparerServeur(url, nomCaisse = "iPad") {
   const { code } = await appel("POST", "/etablissements/moka/codes", { nomCaisse });
   return { code, cookie, appel, secret };
 }
+
+/**
+ * Ouvre une rubrique de l'administration par son libellé du menu (refonte du 25 octobre 2026) :
+ * menu latéral sur ordinateur et iPad, onglets du bas ou feuille « Plus » sur iPhone.
+ */
+export async function rubriqueAdmin(page, libelle) {
+  await page.locator(".coque-etab").waitFor({ timeout: 20000 });
+  const menu = page.getByRole("navigation", { name: /^Rubriques de / });
+  if (await menu.isVisible().catch(() => false)) return menu.getByRole("link", { name: libelle, exact: true }).click();
+  const barre = page.getByRole("navigation", { name: "Navigation principale" });
+  const court = { Statistiques: "Stats", "Stock et recettes": "Stock" }[libelle] ?? libelle;
+  const onglet = barre.getByRole("link", { name: court, exact: true });
+  if (await onglet.count()) return onglet.click();
+  await barre.getByRole("button", { name: "Plus" }).click();
+  await page.getByRole("dialog", { name: "Toutes les rubriques" }).getByRole("link", { name: libelle, exact: true }).click();
+}
+
+/** Action du menu du compte (pastille en haut à droite) : « Clés d'accès », « Se déconnecter »… */
+export async function menuCompte(page, action) {
+  await page.getByRole("button", { name: /^Compte / }).click();
+  await page.getByRole("menuitem", { name: action }).click();
+}

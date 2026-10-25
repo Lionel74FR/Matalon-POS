@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const require = createRequire(new globalThis.URL("../apps/caisse/package.json", import.meta.url));
 const { zipSync, strToU8 } = require("fflate");
@@ -66,7 +66,7 @@ a.on("pageerror", (e) => erreurs.push(e.message));
 a.on("dialog", (d) => void d.accept());
 const clic = (nom) => a.getByRole("button", { name: nom, exact: true }).first().click();
 await a.goto(`${URL}/admin`);
-await a.getByRole("button", { name: /Stock et recettes/ }).click();
+await rubriqueAdmin(a, "Stock et recettes");
 await a.getByText("Aucun produit pour l'instant").waitFor();
 
 // ── Import CSV : aperçu, vérification sans écriture, puis import ──
@@ -149,7 +149,7 @@ await a.locator(".stock-table tr", { hasText: "Latte caramel" }).waitFor();
 await a.screenshot({ path: `${sortie}/k04-recettes.png`, fullPage: true });
 
 // ── Carte : le latte pointe vers sa fiche, food cost affiché ──
-await a.getByRole("button", { name: /Cartes et prix/ }).click();
+await rubriqueAdmin(a, "Cartes et prix");
 await clic("Modifier");
 await a.locator(".editeur-fiches").waitFor();
 const avantFiches = (await a.locator(".editeur-fiches").textContent()).replace(/\s+/g, " ");

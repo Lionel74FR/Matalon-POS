@@ -5,7 +5,7 @@
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/reservations.mjs [dossier-captures]
 // Le service d'essai couvre toute la journée : le créneau réservé est le prochain quart d'heure (avant 23 h 30).
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -25,7 +25,7 @@ const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
 a.on("dialog", (d) => void d.accept());
 await a.goto(`${URL}/admin`);
-await a.locator(".admin-lien", { hasText: "Réservations" }).click();
+await rubriqueAdmin(a, "Réservations");
 await a.getByRole("tab", { name: /Services et réglages/ }).click();
 await a.getByText("Réservation en ligne ouverte").click();
 await a.getByRole("button", { name: "Ajouter un service" }).click();

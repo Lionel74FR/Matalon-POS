@@ -151,8 +151,8 @@
   <p>Si la caisse affiche « Qui prend le service ? », elle est déjà en service : passez à l'étape 4.</p>
   <p>Sinon, la caisse affiche « Rattacher cet iPad à un établissement » (ou « cet iPhone »). Saisissez le code de rattachement reçu de Lionel (par exemple K7PM-3QXA), puis <b>Rattacher l'iPad</b> (ou <b>l'iPhone</b>). L'appareil doit être connecté à Internet pour cette étape. Chaque appareil a son propre code.</p>
   <p>La caisse reçoit alors l'établissement (Moka), l'équipe et la carte. Un code ne sert qu'une fois et expire au bout de 48 heures : s'il est refusé, demandez-en un nouveau.</p>
-  <p>Côté administration (ordinateur), l'établissement se choisit dans la liste en haut de l'écran ; le menu de gauche ouvre ses rubriques (Appareils, Équipe, Plan de salle, Imprimantes, Réservations, Comptes clients, Cartes et prix, Stock et recettes, Alertes, Identité et carte). Les codes de rattachement se génèrent dans <b>Appareils</b>. Sur iPhone, le menu devient la liste « Rubrique ».</p>
-  <p><b>Clé d'accès</b> : pour ne plus saisir le code de vérification, touchez l'icône clé en haut à droite de l'administration, saisissez le code une dernière fois puis <b>Créer la clé d'accès</b> (Face ID ou Touch ID). Ensuite, sur l'écran de connexion : <b>Se connecter avec une clé d'accès</b>. Avec le trousseau iCloud, la clé créée sur le Mac sert aussi sur l'iPhone et l'iPad. Le mot de passe et le code restent possibles.</p>
+  <p>Côté administration (ordinateur), l'établissement se choisit en haut de l'écran, dans le menu à côté du logo. L'administration s'ouvre sur <b>Aujourd'hui</b> ; le menu de gauche range les rubriques en quatre familles : Piloter, Exploiter, Carte et Réglages. Les codes de rattachement se génèrent dans Réglages › <b>Appareils</b>. Sur iPhone, une barre d'onglets en bas remplace le menu ; <b>Plus</b> ouvre toutes les rubriques.</p>
+  <p><b>Clé d'accès</b> : pour ne plus saisir le code de vérification, touchez la pastille ronde en haut à droite de l'administration, puis <b>Clés d'accès</b> ; saisissez le code une dernière fois puis <b>Créer la clé d'accès</b> (Face ID ou Touch ID). Ensuite, sur l'écran de connexion : <b>Se connecter avec une clé d'accès</b>. Avec le trousseau iCloud, la clé créée sur le Mac sert aussi sur l'iPhone et l'iPad. Le mot de passe et le code restent possibles.</p>
 
   <h2>3 bis. Ouverture de la journée</h2>
   <p>À la première connexion de la journée, la caisse demande le <b>fond de caisse</b> : comptez les espèces du tiroir et saisissez le montant. Pour le test, 150 € conviennent. « Plus tard » reporte la question jusqu'à la prochaine clôture.</p>
@@ -444,10 +444,21 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s6z">
+    <label><input type="checkbox">Nouvelle administration : accueil, menu et thème</label>
+    <ol>
+      <li>Sur l'ordinateur, ouvrez l'administration : elle arrive sur <b>Aujourd'hui</b>. Encaissez une vente sur l'iPad, puis regardez l'accueil sans recharger.</li>
+      <li>Dans « À faire », touchez un bouton (Déposer, Relier, Configurer…), puis le bouton Retour du navigateur.</li>
+      <li>Touchez la pastille ronde en haut à droite : choisissez <b>Sombre</b>, rechargez la page, puis revenez à <b>Clair</b>. En bas du menu de gauche, <b>Réduire le menu</b>.</li>
+      <li>Sur l'iPhone, ouvrez l'administration : barre d'onglets en bas, puis <b>Plus</b>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> l'accueil montre le CA, les tickets, le ticket moyen et les couverts du jour, comparés au même jour de la semaine dernière à la même heure, et la vente s'y ajoute en une dizaine de secondes. Le CA par heure place aujourd'hui face à ce jour-là. Les alertes à lire se marquent vues sur place. Chaque bouton « À faire » ouvre la bonne rubrique, et Retour ramène à l'accueil. Le thème choisi reste après rechargement. Le menu réduit garde les icônes, avec le nom de chaque rubrique en bulle. Sur iPhone, Plus ouvre toutes les rubriques, rangées par famille, sans débordement.</p>
+  </section>
+
   <section class="scenario" data-id="s6y">
     <label><input type="checkbox">Logo de l'établissement</label>
     <ol>
-      <li>Administration › <span class="bouton">Identité et carte</span> › Logo › <span class="bouton">Choisir le logo</span> : une image PNG (fond transparent de préférence).</li>
+      <li>Administration › Réglages › <span class="bouton">Établissement</span> › Logo › <span class="bouton">Choisir le logo</span> : une image PNG (fond transparent de préférence).</li>
       <li>Ouvrez le module de réservation du Moka, puis faites une réservation avec votre e-mail.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> l'aperçu montre le logo sur fond sombre (module) et sur fond blanc (e-mails) ; le module l'affiche en tête, l'e-mail de confirmation aussi. Retiré, le nom de l'établissement reprend sa place.</p>
@@ -502,7 +513,7 @@
     <ol>
       <li>Touchez l'icône Quitter, choisissez votre nom et tapez 5 fois un code faux.</li>
       <li>Menu ☰ › Réglages › Équipe : ajoutez un serveur de test avec un code PIN.</li>
-      <li>Dans l'administration (ordinateur), choisissez l'établissement en haut, puis la rubrique <b>Alertes</b> du menu de gauche (un badge rouge compte les alertes non vues).</li>
+      <li>Dans l'administration (ordinateur), choisissez l'établissement en haut, puis la cloche en haut à droite ou Piloter › <b>Alertes</b> (un nombre compte les alertes à lire).</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> au 4e code faux, « 1 essai avant blocage » ; au 5e, le pavé se grise jusqu'à l'heure affichée (5 minutes), même le bon code ne passe plus. L'ajout à l'équipe demande le code d'un responsable, même si vous êtes responsable. L'administration affiche l'alerte « Code PIN bloqué » ; « Vu » la retire de la liste.</p>
   </section>

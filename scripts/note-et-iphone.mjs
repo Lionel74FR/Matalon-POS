@@ -2,7 +2,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/note-et-iphone.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 import { createRequire } from "node:module";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -95,12 +95,12 @@ const url = await p.evaluate(async () => {
 await ctx.addCookies([{ name: cookie.split("=")[0], value: cookie.split("=").slice(1).join("="), url: URL }]);
 const admin = await ctx.newPage();
 admin.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
-await admin.goto(`${URL}/admin`);
+await admin.goto(`${URL}/admin#/moka/appareils`);
 await admin.locator(".admin-caisse", { hasText: "iPhone ·" }).waitFor();
 await admin.screenshot({ path: `${sortie}/m10-admin.png` });
 largeurs.adminAppareils = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-// Sur iPhone, le menu latéral devient la liste « Rubrique » ; la fiche Identité est assez longue pour défiler.
-await admin.locator(".admin-rubrique-mobile select").selectOption("identite");
+// Sur iPhone, le menu latéral devient la barre d'onglets et sa feuille « Plus » ; la fiche Identité est assez longue pour défiler.
+await rubriqueAdmin(admin, "Établissement");
 await admin.getByText("Raison sociale").first().waitFor();
 largeurs.admin = await admin.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const tactile = await ctx.newCDPSession(admin);

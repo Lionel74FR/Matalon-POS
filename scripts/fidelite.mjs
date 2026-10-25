@@ -6,7 +6,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/fidelite.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -163,7 +163,7 @@ await fiche.locator(".fidelite-solde", { hasText: "17 points" }).waitFor({ timeo
 r.ajuste = await texte(fiche.locator(".fidelite-solde"));
 await a.screenshot({ path: `${sortie}/fi05-fiche.png` });
 await fiche.getByRole("button", { name: "Fermer" }).click();
-await a.getByRole("button", { name: /^Statistiques CA en direct/ }).click();
+await rubriqueAdmin(a, "Statistiques");
 const carteStats = a.locator(".stat-fidelite");
 await carteStats.waitFor({ timeout: 15000 }).catch(async (e) => {
   await a.screenshot({ path: `${sortie}/fi-debug.png`, fullPage: true });

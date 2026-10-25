@@ -21,29 +21,24 @@ import { Reservations } from "./Reservations";
 import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces";
 import { FenetreConfiguration } from "./Configuration";
 import { cleAccesDisponible, utiliserCleAcces } from "./cleAcces";
+import { Accueil } from "./Accueil";
+import { BoutonAlertes, defRubrique, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
 import {
   Archive,
   Ban,
   Bell,
   Check,
   History,
-  BookOpen,
-  CalendarCheck,
-  ChartColumn,
   FileJson,
   Fingerprint,
   FileSpreadsheet,
-  Gift,
   KeyRound,
   LayoutGrid,
   NotebookPen,
-  Package,
   Pencil,
   LogIn,
-  LogOut,
   Plus,
   Printer,
-  ReceiptText,
   RotateCw,
   Save,
   ShieldCheck,
@@ -311,50 +306,10 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 
 // ───────── Tableau de bord ─────────
 
-/** Rubriques d'un établissement, dans le menu latéral (ordre d'usage). */
-type Rubrique = "statistiques" | "tickets" | "clotures" | "appareils" | "equipe" | "plan" | "imprimantes" | "reservations" | "comptes" | "fidelite" | "stock" | "cartes" | "alertes" | "identite";
-const RUBRIQUES: Array<{ groupe: string; liste: Array<{ id: Rubrique; libelle: string; icone: LucideIcon; aide: string }> }> = [
-  {
-    groupe: "Activité",
-    liste: [
-      { id: "statistiques", libelle: "Statistiques", icone: ChartColumn, aide: "CA en direct, articles, équipe" },
-      { id: "tickets", libelle: "Tickets", icone: ReceiptText, aide: "Par serveur, détail de chaque ticket" },
-      { id: "clotures", libelle: "Clôtures", icone: Archive, aide: "Z, exports comptables, archives" },
-    ],
-  },
-  {
-    groupe: "Service",
-    liste: [
-      { id: "appareils", libelle: "Appareils", icone: TabletSmartphone, aide: "iPad et iPhone rattachés, clôtures" },
-      { id: "equipe", libelle: "Équipe", icone: Users, aide: "Personnes, rôles, codes PIN" },
-      { id: "plan", libelle: "Plan de salle", icone: LayoutGrid, aide: "Zones, tables, chaises" },
-      { id: "imprimantes", libelle: "Imprimantes", icone: Printer, aide: "Tickets, bar et cuisine" },
-      { id: "reservations", libelle: "Réservations", icone: CalendarCheck, aide: "À venir, services, module du site" },
-      { id: "comptes", libelle: "Comptes clients", icone: NotebookPen, aide: "Ventes en compte, règlements" },
-      { id: "fidelite", libelle: "Fidélité", icone: Gift, aide: "Programme, récompenses, membres" },
-    ],
-  },
-  {
-    groupe: "Carte et stock",
-    liste: [
-      { id: "cartes", libelle: "Cartes et prix", icone: BookOpen, aide: "Communes au groupe" },
-      { id: "stock", libelle: "Stock et recettes", icone: Package, aide: "Produits, fiches, food cost" },
-    ],
-  },
-  {
-    groupe: "Établissement",
-    liste: [
-      { id: "alertes", libelle: "Alertes", icone: Bell, aide: "Prix, articles hors carte, PIN" },
-      { id: "identite", libelle: "Identité et carte", icone: Store, aide: "Mentions légales, carte, note, logo" },
-    ],
-  },
-];
-const TOUTES_RUBRIQUES = RUBRIQUES.flatMap((g) => g.liste);
-
 /** Vue lue et écrite dans l'adresse (#/moka/equipe) : un rechargement ou un lien ramène au même écran. */
 function vueDepuisAdresse(): { etab: string | null; rubrique: Rubrique } {
   const [etab, rubrique] = location.hash.replace(/^#\/?/, "").split("/");
-  return { etab: etab || dernierEtablissement(), rubrique: TOUTES_RUBRIQUES.some((r) => r.id === rubrique) ? (rubrique as Rubrique) : "appareils" };
+  return { etab: etab || dernierEtablissement(), rubrique: TOUTES_RUBRIQUES.some((r) => r.id === rubrique) ? (rubrique as Rubrique) : "accueil" };
 }
 
 /** Dernier établissement ouvert sur ce poste : simple confort, absent en navigation privée. */
@@ -378,14 +333,21 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const [carteModifiee, setCarteModifiee] = useState(false);
   /** Tickets d'une personne, ouverts depuis les statistiques ; le menu les rouvre sans filtre. */
   const [filtreTickets, setFiltreTickets] = useState<FiltreTickets | null>(null);
+  const [theme, choisirTheme] = useTheme();
+  const [menuReduit, basculerMenu] = useMenuReduit();
+  /** Un changement de rubrique s'inscrit dans l'historique : le bouton Retour du navigateur y ramène. */
+  const historique = useRef(false);
   /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
   const aller = (vue: { etab?: string; rubrique?: Rubrique; carte?: string | null }) => {
-    if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return;
+    if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return false;
     setCarteModifiee(false);
+    historique.current = true;
     if (vue.etab !== undefined) setChoisi(vue.etab);
     if (vue.rubrique !== undefined) setRubrique(vue.rubrique);
     setCarteOuverte(vue.carte ?? null);
     setFiltreTickets(null);
+    window.scrollTo({ top: 0 });
+    return true;
   };
   const [erreur, setErreur] = useState("");
   const clesAcces = useClesAcces();
@@ -408,103 +370,73 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   }, [recharger]);
   useEffect(() => {
     if (!choisi) return;
-    history.replaceState(null, "", `#/${choisi}${choisi === "nouveau" ? "" : `/${rubrique}`}`);
+    const adresse = `#/${choisi}${choisi === "nouveau" ? "" : `/${rubrique}`}`;
+    if (historique.current && location.hash !== adresse) history.pushState(null, "", adresse);
+    else history.replaceState(null, "", adresse);
+    historique.current = false;
     try {
       if (choisi !== "nouveau") localStorage.setItem(CLE_DERNIER, choisi);
     } catch {
       /* stockage indisponible : on retombera sur le premier établissement */
     }
   }, [choisi, rubrique]);
+  // Retour et Suivant du navigateur, ou adresse modifiée à la main.
+  const allerRef = useRef(aller);
+  allerRef.current = aller;
+  useEffect(() => {
+    const suivre = () => {
+      const v = vueDepuisAdresse();
+      if (!v.etab) return;
+      if (!allerRef.current({ etab: v.etab, rubrique: v.rubrique })) return;
+      historique.current = false;
+    };
+    window.addEventListener("popstate", suivre);
+    return () => window.removeEventListener("popstate", suivre);
+  }, []);
 
   const etablissement = donnees?.etablissements.find((e) => e.id === choisi);
-  const badge = (id: Rubrique): ReactNode => {
-    if (!etablissement) return null;
-    if (id === "alertes" && etablissement.alertesNonVues > 0) return <span className="admin-badge">{etablissement.alertesNonVues}</span>;
-    if (id === "appareils" && etablissement.caisses.some((c) => c.divergence && !c.revoqueeLe)) return <TriangleAlert className="icone erreur" size={16} aria-label="divergence" />;
-    if (id === "identite" && identiteIncomplete(etablissement)) return <TriangleAlert className="icone erreur" size={16} aria-label="incomplète" />;
+  const signal = (id: Rubrique): Signal => {
+    const e = etablissement;
+    if (!e) return null;
+    if (id === "alertes" && e.alertesNonVues > 0) return { nombre: e.alertesNonVues, libelle: pluriel(e.alertesNonVues, "alerte") + " à lire" };
+    if (id === "appareils" && e.caisses.some((c) => c.divergence && !c.revoqueeLe)) return { point: "danger", libelle: "Divergence sur un appareil" };
+    if (id === "identite" && identiteIncomplete(e)) return { point: "attention", libelle: "Identité légale incomplète" };
+    if (id === "identite" && !e.logo) return { point: "attention", libelle: "Logo à déposer" };
     return null;
   };
-  const libelleRubrique = TOUTES_RUBRIQUES.find((r) => r.id === rubrique)?.libelle ?? "";
+  const libelleRubrique = defRubrique(rubrique).libelle;
+  useEffect(() => {
+    document.title = etablissement ? `${libelleRubrique} · ${etablissement.identite.enseigne} · Matalon POS` : "Matalon POS · Administration";
+  }, [etablissement, libelleRubrique]);
 
   return (
     <div className="admin">
-      <header className="admin-barre">
-        <div className="barre-marque">
-          <img src="/icone.svg" alt="" width={34} height={34} />
-          <span>Matalon POS</span>
-          <small>Administration</small>
-        </div>
-        {donnees && (
-          <label className="admin-etab">
-            <Store className="icone" size={20} aria-hidden="true" />
-            <span className="lecteur-ecran">Établissement</span>
-            <select value={choisi ?? ""} onChange={(e) => aller({ etab: e.target.value })}>
-              {donnees.etablissements.map((e) => {
-                const actives = e.caisses.filter((c) => !c.revoqueeLe).length;
-                return (
-                  <option key={e.id} value={e.id}>
-                    {`${e.identite.enseigne} · ${pluriel(actives, "caisse")}${e.alertesNonVues ? ` · ${pluriel(e.alertesNonVues, "alerte")}` : ""}`}
-                  </option>
-                );
-              })}
-              <option value="nouveau">+ Nouvel établissement</option>
-            </select>
-          </label>
-        )}
-        <div className="admin-barre-droite">
-          <span className="admin-identifiant">{props.identifiant}</span>
-          <BoutonIcone icone={FileJson} libelle="Configuration de l'installation" variante="discret" onClick={() => setFenetreConfiguration(true)} />
-          <BoutonIcone icone={KeyRound} libelle="Clés d'accès" variante="discret" onClick={() => setFenetreCles(true)} />
-          <BoutonIcone
-            icone={LogOut}
-            libelle={`Se déconnecter (${props.identifiant})`}
-            variante="discret"
-            onClick={() => void api.deconnexion().finally(props.onDeconnecte)}
+      <a className="coque-evitement" href="#contenu" onClick={(ev) => {
+        ev.preventDefault();
+        document.getElementById("contenu")?.focus();
+      }}>
+        Aller au contenu
+      </a>
+      <header className="coque-barre">
+        <Marque />
+        {donnees && <MenuEtablissement etablissements={donnees.etablissements} choisi={choisi} onChoisir={(id) => aller({ etab: id, ...(id === "nouveau" ? {} : {}) })} />}
+        <div className="coque-barre-droite">
+          {etablissement && <BoutonAlertes nombre={etablissement.alertesNonVues} onOuvrir={() => aller({ rubrique: "alertes" })} />}
+          <MenuCompte
+            identifiant={props.identifiant}
+            theme={theme}
+            onTheme={choisirTheme}
+            onCles={() => setFenetreCles(true)}
+            onConfiguration={() => setFenetreConfiguration(true)}
+            onDeconnexion={() => void api.deconnexion().finally(props.onDeconnecte)}
           />
         </div>
       </header>
-      <div className={`admin-corps${etablissement ? "" : " sans-menu"}`}>
+      <div className={`coque-corps${etablissement ? "" : " sans-menu"}${menuReduit ? " reduit" : ""}`}>
         {etablissement && (
-          <>
-            <nav className="admin-liste" aria-label={`Rubriques de ${etablissement.identite.enseigne}`}>
-              {RUBRIQUES.map((g) => (
-                <div key={g.groupe} className="admin-groupe">
-                  <h2>{g.groupe}</h2>
-                  {g.liste.map((r) => (
-                    <button
-                      key={r.id}
-                      className={`admin-lien${rubrique === r.id ? " actif" : ""}`}
-                      aria-current={rubrique === r.id ? "page" : undefined}
-                      onClick={() => aller({ rubrique: r.id })}
-                    >
-                      <strong>
-                        <AvecIcone icone={r.icone}>{r.libelle}</AvecIcone>
-                        {badge(r.id)}
-                      </strong>
-                      <small>{r.aide}</small>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </nav>
-            <label className="champ admin-rubrique-mobile">
-              <span>Rubrique</span>
-              <select value={rubrique} onChange={(e) => aller({ rubrique: e.target.value as Rubrique })}>
-                {RUBRIQUES.map((g) => (
-                  <optgroup key={g.groupe} label={g.groupe}>
-                    {g.liste.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.libelle}
-                        {r.id === "alertes" && etablissement.alertesNonVues ? ` (${etablissement.alertesNonVues})` : ""}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
-          </>
+          <MenuLateral etab={etablissement} rubrique={rubrique} reduit={menuReduit} onReduire={basculerMenu} signal={signal} onAller={(r) => aller({ rubrique: r })} />
         )}
-        <main className="admin-contenu" aria-label={etablissement ? `${etablissement.identite.enseigne} · ${libelleRubrique}` : "Administration"}>
+        <main id="contenu" tabIndex={-1} className="admin-contenu" aria-label={etablissement ? `${etablissement.identite.enseigne} · ${libelleRubrique}` : "Administration"}>
           {erreur && <p className="erreur">{erreur}</p>}
           <SuggestionCleAcces cles={clesAcces.cles} onOuvrir={() => setFenetreCles(true)} />
           {!donnees ? (
@@ -543,6 +475,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
               rubrique={rubrique}
               cartes={donnees.cartes}
               onChange={recharger}
+              onAller={(r, o) => aller({ rubrique: r, carte: o?.carte ?? null })}
               filtreTickets={filtreTickets}
               onTicketsServeur={(f) => {
                 aller({ rubrique: "tickets" });
@@ -552,6 +485,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           )}
         </main>
       </div>
+      {etablissement && <OngletsMobile etab={etablissement} rubrique={rubrique} signal={signal} onAller={(r) => aller({ rubrique: r })} />}
       {fenetreConfiguration && <FenetreConfiguration onFermer={() => setFenetreConfiguration(false)} onImporte={() => void recharger()} />}
       {fenetreCles && <FenetreClesAcces cles={clesAcces.cles} onChange={clesAcces.setCles} onFermer={() => setFenetreCles(false)} />}
     </div>
@@ -635,16 +569,13 @@ function FicheEtablissement(props: {
   /** Tickets ouverts depuis les statistiques : une personne, une période. */
   filtreTickets: FiltreTickets | null;
   onTicketsServeur: (f: FiltreTickets) => void;
+  onAller: (r: Rubrique, options?: { carte?: string }) => void;
 }) {
   const { e, rubrique } = props;
   const responsable = e.utilisateurs.some((u) => u.role === "responsable" && u.actif);
   return (
     <>
-      {identiteIncomplete(e) && rubrique !== "identite" && (
-        <p className="admin-alerte">
-          <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète (rubrique Identité et carte) : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
-        </p>
-      )}
+      {rubrique === "accueil" && <Accueil e={e} onAller={props.onAller} onChange={props.onChange} />}
       {rubrique === "appareils" && (
         <>
           <Rattacher e={e} responsable={responsable} onChange={props.onChange} />

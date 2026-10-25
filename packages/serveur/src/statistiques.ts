@@ -175,12 +175,16 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
   const va = ventesEtAnnulations(tickets);
 
   // Heures et jours.
-  const parHeure = Array.from({ length: 24 }, (_, heure) => ({ heure, ttc: 0, tickets: 0 }));
-  for (const t of va) {
-    const h = parHeure[heureDe(t.horodatage)]!;
-    h.ttc += t.totalTTC;
-    if (t.type === "VENTE") h.tickets++;
-  }
+  const heures = (liste: Ticket[]) => {
+    const r = Array.from({ length: 24 }, (_, heure) => ({ heure, ttc: 0, tickets: 0 }));
+    for (const t of ventesEtAnnulations(liste)) {
+      const h = r[heureDe(t.horodatage)]!;
+      h.ttc += t.totalTTC;
+      if (t.type === "VENTE") h.tickets++;
+    }
+    return r;
+  };
+  const parHeure = heures(tickets);
   const parJour = Array.from({ length: jours }, (_, i) => ({ jour: ajouterJours(c.du, i), ttc: 0, tickets: 0, couverts: 0 }));
   const indexJour = new Map(parJour.map((j, i) => [j.jour, i]));
   for (const t of va) {
@@ -338,6 +342,7 @@ export function calculerStatistiques(c: ContexteStatistiques): Omit<ReponseStati
     indicateursPrecedents: indicateurs(avant, retraitsAvant),
     parMoment: caParMoment(c.moments ?? [], tickets, avant, c.tickets),
     parHeure,
+    parHeurePrecedente: heures(avant),
     parJour,
     parJourSemaine,
     paiements,

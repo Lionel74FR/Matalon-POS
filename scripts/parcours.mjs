@@ -4,7 +4,7 @@
 // Usage (dans apps/caisse) : pnpm build && node scripts/serveur-local.mjs 4180, puis à la racine :
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { totp } from "./preparer-caisse.mjs";
+import { rubriqueAdmin, totp } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -26,8 +26,8 @@ const secret = await a.locator(".admin-totp code").textContent();
 await a.screenshot({ path: `${sortie}/00a-admin-2fa.png` });
 await champA("Code à 6 chiffres").fill(totp(secret));
 await a.getByRole("button", { name: "Activer et se connecter" }).click();
-await a.locator(".admin-etab select").waitFor();
-const rubrique = (nom) => a.locator(".admin-lien", { has: a.locator("strong", { hasText: nom }) }).click();
+await a.locator(".coque-etab").waitFor();
+const rubrique = (nom) => rubriqueAdmin(a, nom);
 // Équipe : un responsable d'abord.
 await rubrique("Équipe");
 await a.getByPlaceholder("Prénom").fill("Lionel");
@@ -36,7 +36,7 @@ await a.getByPlaceholder("Code PIN").fill("1234");
 await a.getByRole("button", { name: "Ajouter", exact: true }).click();
 await a.locator(".admin-tableau td", { hasText: "Lionel" }).waitFor();
 // Identité légale.
-await rubrique("Identité et carte");
+await rubrique("Établissement");
 await champA("Raison sociale").fill("SAS Moka Annecy");
 await champA("SIRET").fill("123 456 789 00012");
 await champA("TVA intracommunautaire").fill("FR12123456789");
