@@ -30,7 +30,7 @@ await bureau.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/ap
 const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
 await a.goto(`${URL}/admin#/moka/plan`);
-const section = a.locator(".admin-section", { has: a.getByRole("heading", { name: "Plan de salle" }) });
+const section = a.locator(".admin-section", { has: a.getByRole("button", { name: "Table ronde" }) });
 await section.scrollIntoViewIfNeeded();
 await section.getByRole("button", { name: "Table ronde" }).click();
 await section.getByRole("button", { name: "Une chaise de plus" }).click();

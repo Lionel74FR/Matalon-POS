@@ -114,7 +114,7 @@ a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
 a.on("dialog", (d) => void d.accept());
 const aclic = (nom) => a.getByRole("button", { name: nom, exact: true }).first().click();
 await a.goto(`${URL}/admin#/moka/stock`);
-await a.getByRole("tab", { name: "Stock et pièces" }).click();
+await a.getByRole("tab", { name: "État du stock" }).click();
 await a.locator(".tableau-stock").waitFor();
 await a.locator(".tableau-stock tr", { hasText: "Lait entier" }).click();
 await a.locator(".mouvements-liste li").first().waitFor();
@@ -147,7 +147,7 @@ await a.screenshot({ path: `${sortie}/o04c-inventaire-detail.png` });
 await a.getByRole("button", { name: "Fermer" }).click();
 
 // Transfert de 1 kg de sucre au Chardon.
-await a.getByRole("tab", { name: "Transfert" }).click();
+await a.getByRole("tab", { name: "Transferts" }).click();
 await a.getByLabel("Transfert 1 : produit").selectOption({ label: "Sucre" });
 await a.getByLabel("Transfert 1 : quantité").fill("1");
 await aclic("Transférer");

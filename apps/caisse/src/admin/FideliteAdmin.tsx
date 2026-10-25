@@ -12,11 +12,12 @@ import {
   type ReglesFidelite,
   type TypeRecompense,
 } from "@matalon/serveur/fidelite";
-import { Gift, LogOut, Plus, RotateCw, Save, Search, Trash2, UserX } from "lucide-react";
+import { LogOut, Plus, RotateCw, Save, Search, Trash2, UserX } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Modale } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, type EtablissementAdmin } from "./api";
+import { EntetePage } from "./Page";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }) : "—");
@@ -101,22 +102,23 @@ export function FideliteAdmin(props: { e: EtablissementAdmin }) {
     });
 
   return (
+    <>
+    <EntetePage
+      surtitre="Exploiter"
+      titre="Fidélité"
+      aide={
+        <>
+          Le client est reconnu en caisse par son numéro de téléphone. Il cumule à chaque vente reçue par le serveur, et une récompense atteinte
+          s'applique sur le ticket comme une remise « Fidélité » : les points ne sont jamais un moyen de paiement, le noyau fiscal n'est pas
+          touché. Les e-mails (bienvenue, récompense atteinte) partent avec l'expéditeur des réservations. Les clients sont informés sur la{" "}
+          <a href={`/donnees/${e.id}`} target="_blank" rel="noopener">
+            page d'information sur les données
+          </a>
+          .
+        </>
+      }
+    />
     <section className="admin-section fidelite-admin">
-      <h2 className="titre-icone">
-        <AvecIcone icone={Gift} taille={22}>
-          Carte de fidélité
-        </AvecIcone>
-      </h2>
-      <p className="explication">
-        Le client est reconnu en caisse par son numéro de téléphone. Il cumule à chaque vente reçue par le serveur, et une récompense
-        atteinte s'applique sur le ticket comme une remise « Fidélité » : les points ne sont jamais un moyen de paiement, le noyau
-        fiscal n'est pas touché. Les e-mails (bienvenue, récompense atteinte) partent avec l'expéditeur des réservations. Les clients
-        sont informés sur la{" "}
-        <a href={`/donnees/${e.id}`} target="_blank" rel="noopener">
-          page d'information sur les données
-        </a>
-        .
-      </p>
       {erreur && <p className="erreur">{erreur}</p>}
       {!donnees ? (
         <p className="explication">Chargement…</p>
@@ -167,6 +169,7 @@ export function FideliteAdmin(props: { e: EtablissementAdmin }) {
         </>
       )}
     </section>
+    </>
   );
 }
 

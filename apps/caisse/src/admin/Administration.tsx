@@ -22,23 +22,20 @@ import { FenetreClesAcces, SuggestionCleAcces, useClesAcces } from "./ClesAcces"
 import { FenetreConfiguration } from "./Configuration";
 import { cleAccesDisponible, utiliserCleAcces } from "./cleAcces";
 import { Accueil } from "./Accueil";
-import { BoutonAlertes, defRubrique, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
+import { EntetePage, TitreAvecAide } from "./Page";
+import { BoutonAlertes, defRubrique, familleDe, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
 import {
   Archive,
   Ban,
-  Bell,
   Check,
   History,
   FileJson,
   Fingerprint,
   FileSpreadsheet,
   KeyRound,
-  LayoutGrid,
-  NotebookPen,
   Pencil,
   LogIn,
   Plus,
-  Printer,
   RotateCw,
   Save,
   ShieldCheck,
@@ -49,7 +46,6 @@ import {
   TriangleAlert,
   UserCheck,
   UserPlus,
-  Users,
   UserX,
   type LucideIcon,
 } from "lucide-react";
@@ -307,9 +303,10 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 // ───────── Tableau de bord ─────────
 
 /** Vue lue et écrite dans l'adresse (#/moka/equipe) : un rechargement ou un lien ramène au même écran. */
-function vueDepuisAdresse(): { etab: string | null; rubrique: Rubrique } {
-  const [etab, rubrique] = location.hash.replace(/^#\/?/, "").split("/");
-  return { etab: etab || dernierEtablissement(), rubrique: TOUTES_RUBRIQUES.some((r) => r.id === rubrique) ? (rubrique as Rubrique) : "accueil" };
+function vueDepuisAdresse(): { etab: string | null; rubrique: Rubrique; sous: string | null } {
+  const [etab, rubrique, sous] = location.hash.replace(/^#\/?/, "").split("/");
+  const connue = TOUTES_RUBRIQUES.some((r) => r.id === rubrique);
+  return { etab: etab || dernierEtablissement(), rubrique: connue ? (rubrique as Rubrique) : "accueil", sous: connue && sous ? sous : null };
 }
 
 /** Dernier établissement ouvert sur ce poste : simple confort, absent en navigation privée. */
@@ -329,6 +326,8 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   /** Établissement choisi dans l'en-tête (ou « nouveau »), puis rubrique du menu latéral. */
   const [choisi, setChoisi] = useState<string | null>(initiale.etab);
   const [rubrique, setRubrique] = useState<Rubrique>(initiale.rubrique);
+  /** Sous-page de la rubrique (onglet de Stock ou de Réservations), dans l'adresse : #/moka/stock/inventaire. */
+  const [sous, setSous] = useState<string | null>(initiale.sous);
   const [carteOuverte, setCarteOuverte] = useState<string | null>(null);
   const [carteModifiee, setCarteModifiee] = useState(false);
   /** Tickets d'une personne, ouverts depuis les statistiques ; le menu les rouvre sans filtre. */
@@ -338,12 +337,13 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   /** Un changement de rubrique s'inscrit dans l'historique : le bouton Retour du navigateur y ramène. */
   const historique = useRef(false);
   /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
-  const aller = (vue: { etab?: string; rubrique?: Rubrique; carte?: string | null }) => {
+  const aller = (vue: { etab?: string; rubrique?: Rubrique; sous?: string | null; carte?: string | null }) => {
     if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return false;
     setCarteModifiee(false);
     historique.current = true;
     if (vue.etab !== undefined) setChoisi(vue.etab);
     if (vue.rubrique !== undefined) setRubrique(vue.rubrique);
+    if (vue.sous !== undefined || vue.rubrique !== undefined) setSous(vue.sous ?? null);
     setCarteOuverte(vue.carte ?? null);
     setFiltreTickets(null);
     window.scrollTo({ top: 0 });
@@ -370,7 +370,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   }, [recharger]);
   useEffect(() => {
     if (!choisi) return;
-    const adresse = `#/${choisi}${choisi === "nouveau" ? "" : `/${rubrique}`}`;
+    const adresse = `#/${choisi}${choisi === "nouveau" ? "" : `/${rubrique}${sous ? `/${sous}` : ""}`}`;
     if (historique.current && location.hash !== adresse) history.pushState(null, "", adresse);
     else history.replaceState(null, "", adresse);
     historique.current = false;
@@ -379,7 +379,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     } catch {
       /* stockage indisponible : on retombera sur le premier établissement */
     }
-  }, [choisi, rubrique]);
+  }, [choisi, rubrique, sous]);
   // Retour et Suivant du navigateur, ou adresse modifiée à la main.
   const allerRef = useRef(aller);
   allerRef.current = aller;
@@ -387,7 +387,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     const suivre = () => {
       const v = vueDepuisAdresse();
       if (!v.etab) return;
-      if (!allerRef.current({ etab: v.etab, rubrique: v.rubrique })) return;
+      if (!allerRef.current({ etab: v.etab, rubrique: v.rubrique, sous: v.sous })) return;
       historique.current = false;
     };
     window.addEventListener("popstate", suivre);
@@ -475,7 +475,9 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
               rubrique={rubrique}
               cartes={donnees.cartes}
               onChange={recharger}
-              onAller={(r, o) => aller({ rubrique: r, carte: o?.carte ?? null })}
+              onAller={(r, o) => aller({ rubrique: r, carte: o?.carte ?? null, sous: o?.sous ?? null })}
+              sous={sous}
+              onSous={(s) => aller({ sous: s, ...(carteOuverte ? { carte: carteOuverte } : {}) })}
               filtreTickets={filtreTickets}
               onTicketsServeur={(f) => {
                 aller({ rubrique: "tickets" });
@@ -569,15 +571,23 @@ function FicheEtablissement(props: {
   /** Tickets ouverts depuis les statistiques : une personne, une période. */
   filtreTickets: FiltreTickets | null;
   onTicketsServeur: (f: FiltreTickets) => void;
-  onAller: (r: Rubrique, options?: { carte?: string }) => void;
+  onAller: (r: Rubrique, options?: { carte?: string; sous?: string }) => void;
+  sous: string | null;
+  onSous: (s: string | null) => void;
 }) {
   const { e, rubrique } = props;
   const responsable = e.utilisateurs.some((u) => u.role === "responsable" && u.actif);
+  const surtitre = familleDe(rubrique);
   return (
     <>
       {rubrique === "accueil" && <Accueil e={e} onAller={props.onAller} onChange={props.onChange} />}
       {rubrique === "appareils" && (
         <>
+          <EntetePage
+            surtitre={surtitre}
+            titre="Appareils"
+            aide="Les clôtures (Z, mois, exercice) valent pour tout l'établissement, quel que soit l'appareil qui les a faites. Le contrôle d'établissement vérifie qu'elles couvrent chaque caisse sans trou ni double compte."
+          />
           <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
           <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
         </>
@@ -585,21 +595,41 @@ function FicheEtablissement(props: {
       {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} onServeur={props.onTicketsServeur} />}
       {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
       {rubrique === "clotures" && <CloturesAdmin e={e} />}
-      {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} />}
-      {rubrique === "plan" && <PlanDeSalle e={e} onChange={props.onChange} />}
+      {rubrique === "equipe" && (
+        <>
+          <EntetePage
+            surtitre={surtitre}
+            titre="Équipe"
+            aide="Chaque personne se connecte en caisse avec son code PIN. Les responsables valident annulations et clôtures. Les changements arrivent sur les iPad et iPhone à la synchronisation suivante (une minute au plus en ligne)."
+          />
+          <Equipe e={e} onChange={props.onChange} />
+        </>
+      )}
+      {rubrique === "plan" && (
+        <>
+          <EntetePage
+            surtitre={surtitre}
+            titre="Plan de salle"
+            aide="Ajoutez les tables (carré, rectangle, rond), réglez leurs chaises et glissez-les à leur place ; bar, porte et murs servent de repères. Grille de 25 cm. Un responsable peut aussi modifier le plan depuis l'iPad."
+          />
+          <PlanDeSalle e={e} onChange={props.onChange} />
+        </>
+      )}
       {rubrique === "imprimantes" && (
         <>
+          <EntetePage surtitre={surtitre} titre="Imprimantes" />
           <ImprimanteTickets e={e} onChange={props.onChange} />
           <ImprimantesProduction e={e} onChange={props.onChange} />
         </>
       )}
-      {rubrique === "reservations" && <Reservations etablissements={[e]} />}
-      {rubrique === "comptes" && <ComptesClients etablissementId={e.id} />}
+      {rubrique === "reservations" && <Reservations etablissements={[e]} onglet={props.sous} onOnglet={props.onSous} />}
+      {rubrique === "comptes" && <ComptesClients etablissementId={e.id} surtitre={surtitre} />}
       {rubrique === "fidelite" && <FideliteAdmin key={e.id} e={e} />}
-      {rubrique === "stock" && <Stock etablissementId={e.id} />}
-      {rubrique === "alertes" && <Alertes e={e} onChange={props.onChange} />}
+      {rubrique === "stock" && <Stock etablissementId={e.id} onglet={props.sous} onOnglet={props.onSous} />}
+      {rubrique === "alertes" && <Alertes e={e} onChange={props.onChange} surtitre={surtitre} />}
       {rubrique === "identite" && (
         <>
+          <EntetePage surtitre={surtitre} titre="Établissement" />
           {identiteIncomplete(e) && (
             <p className="admin-alerte">
               <TriangleAlert className="icone" size={20} aria-hidden="true" /> Identité légale incomplète : raison sociale, adresse, SIRET et n° de TVA figurent sur chaque note client ; forme juridique, capital et RCS sont exigés pour émettre des factures.
@@ -660,7 +690,7 @@ const LIBELLES_ALERTE: Record<AlerteApi["type"], string> = {
  * Alertes de l'établissement : ventes à un autre prix que la carte, articles
  * hors carte, codes PIN bloqués. Elles ne bloquent rien ; on les marque vues.
  */
-function Alertes(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
+function Alertes(props: { e: EtablissementAdmin; onChange: () => Promise<void>; surtitre?: string }) {
   const [toutes, setToutes] = useState(false);
   const [alertes, setAlertes] = useState<AlerteApi[] | string | null>(null);
   const charger = useCallback(async () => {
@@ -682,8 +712,18 @@ function Alertes(props: { e: EtablissementAdmin; onChange: () => Promise<void> }
   };
   const nom = (id: string | null) => props.e.caisses.find((c) => c.id === id)?.nom ?? id ?? "Serveur";
   return (
+    <>
+    <EntetePage
+      surtitre={props.surtitre}
+      titre="Alertes"
+      aide="Ventes à un autre prix que la carte, articles hors carte et codes PIN bloqués, sur tous les appareils. Une alerte ne bloque rien ; on la marque vue."
+      actions={
+        <button className="bouton" aria-pressed={toutes} onClick={() => setToutes((t) => !t)}>
+          <AvecIcone icone={History}>{toutes ? "Seulement les alertes à lire" : "Voir aussi les alertes vues"}</AvecIcone>
+        </button>
+      }
+    />
     <section className="admin-section">
-      <Titre icone={Bell}>Alertes{props.e.alertesNonVues ? ` (${props.e.alertesNonVues})` : ""}</Titre>
       {typeof alertes === "string" ? (
         <p className="erreur">{alertes}</p>
       ) : !alertes ? (
@@ -716,12 +756,8 @@ function Alertes(props: { e: EtablissementAdmin; onChange: () => Promise<void> }
           </tbody>
         </table>
       )}
-      <div className="admin-actions">
-        <button className="bouton discret" aria-pressed={toutes} onClick={() => setToutes((t) => !t)}>
-          <AvecIcone icone={History}>{toutes ? "Seulement les alertes à lire" : "Voir aussi les alertes vues"}</AvecIcone>
-        </button>
-      </div>
     </section>
+    </>
   );
 }
 
@@ -858,10 +894,6 @@ function Caisses(props: { e: EtablissementAdmin; caisses: CaisseAdmin[]; onChang
   return (
     <section className="admin-section">
       <Titre icone={TabletSmartphone}>Appareils rattachés</Titre>
-      <p className="explication">
-        Les clôtures (Z, mois, exercice) valent pour tout l'établissement, quel que soit l'appareil qui les a faites. Le contrôle
-        d'établissement vérifie qu'elles couvrent chaque caisse sans trou ni double compte.
-      </p>
       {props.e.anomalieCloture && <p className="erreur">Clôtures : {props.e.anomalieCloture}</p>}
       {rapportEtablissement && <ResumeRapport rapport={rapportEtablissement} objet="Établissement" />}
       {props.caisses.length > 0 && (
@@ -986,11 +1018,6 @@ function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> })
 
   return (
     <section className="admin-section">
-      <Titre icone={Users}>Équipe</Titre>
-      <p className="explication">
-        Chaque personne se connecte en caisse avec son code PIN. Les responsables valident annulations et clôtures. Les
-        changements arrivent sur les iPad et iPhone à la synchronisation suivante (une minute au plus en ligne).
-      </p>
       {props.e.utilisateurs.length > 0 && (
         <table className="tableau admin-tableau">
           <tbody>
@@ -1051,11 +1078,7 @@ function PlanDeSalle(props: { e: EtablissementAdmin; onChange: () => Promise<voi
   const [ok, setOk] = useState(false);
   return (
     <section className="admin-section">
-      <Titre icone={LayoutGrid}>Plan de salle</Titre>
-      <p className="explication">
-        Ajoutez les tables (carré, rectangle, rond), réglez leurs chaises et glissez-les à leur place ; bar, porte et murs servent de
-        repères. Grille de 25 cm. Un responsable peut aussi modifier le plan depuis l'iPad. {ok && <span className="admin-ok">Plan enregistré.</span>}
-      </p>
+      {ok && <p className="admin-ok" role="status">Plan enregistré.</p>}
       <EditeurPlan
         plan={plan}
         onEnregistrer={async (p) => {
@@ -1104,12 +1127,11 @@ function ImprimanteTickets(props: { e: EtablissementAdmin; onChange: () => Promi
   const anciennes = historique.filter((h) => h.adresse !== actuelle?.adresse);
   return (
     <form className="admin-section" onSubmit={enregistrer}>
-      <Titre icone={Printer}>Imprimante des tickets</Titre>
-      <p className="explication">
+      <TitreAvecAide titre="Imprimante des tickets" nom="Imprimante des tickets">
         Notes, factures, Z et reçus. Commune à tous les iPad et iPhone de l'établissement, sauf ceux à qui on a donné leur propre
         imprimante dans leurs Réglages. Sur chaque appareil, l'assistant de connexion fait accepter une fois le certificat de
         l'imprimante (étape « Autoriser »).
-      </p>
+      </TitreAvecAide>
       <Champ libelle="Adresse IP" aide="Page d'état de l'imprimante (bouton Feed au démarrage)">
         <input value={adresse} onChange={(ev) => setAdresse(ev.target.value)} placeholder="192.168.1.50" inputMode="decimal" />
       </Champ>
@@ -1158,18 +1180,17 @@ function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => P
   };
   return (
     <section className="admin-section">
-      <Titre icone={Printer}>Imprimantes de production</Titre>
-      <p className="explication">
+      <TitreAvecAide titre="Imprimantes de production" nom="Imprimantes de production">
         Les catégories de la carte désignent leur poste (bar, cuisine) ; indiquez ici l'adresse IP de l'imprimante de chaque poste sur
         le réseau de l'établissement. Le bon d'essai s'imprime depuis les Réglages d'une caisse, sur place.
-      </p>
+      </TitreAvecAide>
       {erreur && <p className="erreur">{erreur}</p>}
       {postesCarte && <EditeurPostes postesCarte={postesCarte} valeur={props.e.postesProduction ?? {}} onEnregistrer={enregistrer} />}
     </section>
   );
 }
 
-function ComptesClients(props: { etablissementId: string }) {
+function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
   const [donnees, setDonnees] = useState<ReponseComptes | null>(null);
   const [edition, setEdition] = useState<ClientApi | null>(null);
   const { enCours, erreur, envoyer } = useEnvoi();
@@ -1191,19 +1212,39 @@ function ComptesClients(props: { etablissementId: string }) {
   };
   const du = donnees?.comptes.reduce((s, c) => s + c.soldeTTC, 0) ?? 0;
   return (
+    <>
+    <EntetePage
+      surtitre={props.surtitre}
+      titre="Comptes clients"
+      aide={
+        <>
+          Ventes portées en compte et réglées plus tard, sur n'importe quel appareil. La vente compte dans le chiffre du jour ; la TVA devient
+          exigible au règlement. Le nom du client figure sur ses tickets en compte, conservés six ans (obligation légale) ; ce qu'en sait le client
+          est sur la{" "}
+          <a href={`/donnees/${props.etablissementId}`} target="_blank" rel="noopener">
+            page d'information sur les données
+          </a>
+          .
+        </>
+      }
+      actions={
+        <>
+          <button className="bouton" disabled={enCours} onClick={() => void charger()}>
+            <AvecIcone icone={RotateCw}>Actualiser</AvecIcone>
+          </button>
+          <button className="bouton principal" onClick={() => setEdition({ id: nouvelIdClient(), nom: "", telephone: "", email: "", actif: true })}>
+            <AvecIcone icone={UserPlus}>Nouveau client</AvecIcone>
+          </button>
+        </>
+      }
+    />
     <section className="admin-section">
-      <Titre icone={NotebookPen}>Comptes clients</Titre>
-      <p className="explication">
-        Ventes portées en compte et réglées plus tard, sur n'importe quel appareil. La vente compte dans le chiffre du jour ; la TVA
-        devient exigible au règlement. {donnees && <strong>Total dû : {euros(du)}.</strong>}
-      </p>
-      <p className="explication">
-        Le nom du client figure sur ses tickets en compte, conservés six ans (obligation légale) ; ce qu'en sait le client est sur la{" "}
-        <a href={`/donnees/${props.etablissementId}`} target="_blank" rel="noopener">
-          page d'information sur les données
-        </a>
-        .
-      </p>
+      {donnees && (
+        <p className="a-resume">
+          Total dû : <strong className="chiffres">{euros(du)}</strong>
+          {donnees.comptes.length > 0 && ` · ${pluriel(donnees.comptes.filter((c) => c.soldeTTC > 0).length, "client")} à régler`}
+        </p>
+      )}
       {donnees && donnees.anomalies.length > 0 && (
         <div className="admin-alerte">
           <strong>À vérifier :</strong>
@@ -1251,18 +1292,10 @@ function ComptesClients(props: { etablissementId: string }) {
             Annuler
           </button>
         </form>
-      ) : (
-        <div className="admin-ligne">
-          <button className="bouton" onClick={() => setEdition({ id: nouvelIdClient(), nom: "", telephone: "", email: "", actif: true })}>
-            <AvecIcone icone={UserPlus}>Nouveau client</AvecIcone>
-          </button>
-          <button className="bouton" disabled={enCours} onClick={() => void charger()}>
-            <AvecIcone icone={RotateCw}>Actualiser</AvecIcone>
-          </button>
-        </div>
-      )}
+      ) : null}
       {erreur && <p className="erreur">{erreur}</p>}
     </section>
+    </>
   );
 }
 
@@ -1292,7 +1325,7 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
 
   return (
     <form className="admin-section" onSubmit={enregistrer}>
-      <Titre icone={Store}>Identité et carte</Titre>
+      <Titre icone={Store}>Identité légale, carte et note</Titre>
       <div className="formulaire-colonnes">
         <div>
           {CHAMPS_IDENTITE.map(([cle, libelle, aide]) => (

@@ -1,23 +1,31 @@
 import { maintenantParis, REGLAGES_DEFAUT, validerReglages, type ReglagesReservation, type Reservation, type ServiceReservation, type StatutReservation } from "@matalon/reservations";
 import type { EtatEnvoi, Table } from "@matalon/serveur/partage";
-import { CalendarCheck, ChevronLeft, ChevronRight, Code, Copy, ExternalLink, KeyRound, Pencil, Plus, Save, Search, Send, Settings, Trash2, X } from "lucide-react";
-import { Modale } from "../ui/communs";
+import { ChevronLeft, ChevronRight, Copy, ExternalLink, KeyRound, Pencil, Plus, Save, Search, Send, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
 import { dateLongue, decaler, FicheReservation, JOURS_A_VENIR, LIBELLES_SOURCE, LIBELLES_STATUT } from "../ui/FicheReservation";
 import { ChoixTables } from "../ui/ChoixTables";
+import { EntetePage, Onglets, type DefOnglet } from "./Page";
 
 type Onglet = "liste" | "reglages" | "site";
+const ONGLETS: Array<DefOnglet<Onglet>> = [
+  { id: "liste", libelle: "Réservations" },
+  { id: "reglages", libelle: "Services et réglages" },
+  { id: "site", libelle: "Sur votre site" },
+];
 const JOURS = ["L", "M", "M", "J", "V", "S", "D"];
 const NOMS_JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const entierOuNul = (v: string) => (v.trim() === "" ? null : Math.max(0, Math.round(Number(v))));
 
 /** Réservations : liste du jour et saisie, réglages des services, code à poser sur le site. */
-export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
+export function Reservations(props: { etablissements: EtablissementAdmin[]; onglet?: string | null; onOnglet?: (o: string | null) => void }) {
   const [etabId, setEtabId] = useState(props.etablissements[0]?.id ?? "");
-  const [onglet, setOnglet] = useState<Onglet>("liste");
+  const [ongletLocal, setOngletLocal] = useState<Onglet>("liste");
+  // Sous-page dans l'adresse de l'administration (#/moka/reservations/reglages) ; « liste » par défaut.
+  const onglet: Onglet = props.onOnglet ? (ONGLETS.some((o) => o.id === props.onglet) ? (props.onglet as Onglet) : "liste") : ongletLocal;
+  const setOnglet = (o: Onglet) => (props.onOnglet ? props.onOnglet(o === "liste" ? null : o) : setOngletLocal(o));
   const etab = props.etablissements.find((e) => e.id === etabId);
   const [reglages, setReglages] = useState<{ reglages: ReglagesReservation; version: number; envoi?: EtatEnvoi } | null>(null);
   const [erreur, setErreur] = useState("");
@@ -34,12 +42,12 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
   if (!etab) return <p>Aucun établissement.</p>;
   return (
     <div className="resa">
-      <section className="admin-section">
-        <div className="stock-tete">
-          <h1 className="titre-icone">
-            <AvecIcone icone={CalendarCheck} taille={26}>Réservations</AvecIcone>
-          </h1>
-          {props.etablissements.length > 1 && (
+      <EntetePage
+        surtitre="Exploiter"
+        titre="Réservations"
+        aide="Le module du site propose les créneaux libres selon les services, les capacités et la durée d'une réservation. Chaque réservation reçoit d'office la plus petite table libre qui convient ; elle apparaît sur le plan de salle de la caisse."
+        actions={
+          props.etablissements.length > 1 && (
             <label className="champ stock-etab">
               <span>Établissement</span>
               <select value={etabId} onChange={(e) => setEtabId(e.target.value)}>
@@ -50,27 +58,19 @@ export function Reservations(props: { etablissements: EtablissementAdmin[] }) {
                 ))}
               </select>
             </label>
-          )}
-        </div>
-        <p className="explication">
-          Le module du site propose les créneaux libres selon les services, les capacités et la durée d'une réservation. Chaque
-          réservation reçoit d'office la plus petite table libre qui convient ; elle apparaît sur le plan de salle de la caisse.
-          {reglages && !reglages.reglages.actif ? " La réservation en ligne est fermée : ouvrez-la dans les réglages." : ""}
+          )
+        }
+      >
+        <Onglets libelle="Sous-pages des réservations" groupes={[ONGLETS]} actif={onglet} adresse={(o) => `#/${etab.id}/reservations${o === "liste" ? "" : `/${o}`}`} onChoisir={setOnglet} />
+      </EntetePage>
+      {reglages && !reglages.reglages.actif && (
+        <p className="a-bandeau attention">
+          La réservation en ligne est fermée.{" "}
+          <button type="button" className="lien-action" onClick={() => setOnglet("reglages")}>
+            L'ouvrir dans les réglages
+          </button>
         </p>
-        <div className="options" role="tablist">
-          {(
-            [
-              ["liste", "Réservations", CalendarCheck],
-              ["reglages", "Services et réglages", Settings],
-              ["site", "Sur votre site", Code],
-            ] as const
-          ).map(([id, libelle, ic]) => (
-            <button key={id} role="tab" aria-selected={onglet === id} className={`option${onglet === id ? " active" : ""}`} onClick={() => setOnglet(id)}>
-              <AvecIcone icone={ic}>{libelle}</AvecIcone>
-            </button>
-          ))}
-        </div>
-      </section>
+      )}
       {erreur && <p className="erreur">{erreur}</p>}
       {!reglages ? (
         <p>Chargement…</p>

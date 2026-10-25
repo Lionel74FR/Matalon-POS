@@ -1,6 +1,6 @@
 import { dateComptable, paiementsEffectifs, type Ticket } from "@matalon/noyau-fiscal";
 import type { ReponseTickets } from "@matalon/serveur/partage";
-import { ReceiptText, RefreshCw, Search, Users, X } from "lucide-react";
+import { RefreshCw, Search, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { LIBELLES_PAIEMENT } from "../metier/libelles";
@@ -10,6 +10,7 @@ import { euros } from "../ui/contexte";
 import { DetailTicket } from "../ui/DetailTicket";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, type EtablissementAdmin } from "./api";
+import { EntetePage } from "./Page";
 
 const decaler = (jour: string, n: number) => {
   const d = new Date(`${jour}T12:00:00Z`);
@@ -121,17 +122,14 @@ export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTick
       : (t.type === "VENTE" ? paiementsEffectifs(t, tous) : t.paiements).map((p) => LIBELLES_PAIEMENT[p.mode]).join(", ") || "sans paiement";
 
   return (
+    <>
+    <EntetePage
+      surtitre="Piloter"
+      titre="Tickets"
+      aide="Tous les appareils, en consultation. Un ticket ne se modifie pas : l'annulation, la correction du paiement, la facture et le duplicata se font sur l'appareil qui a encaissé."
+      actions={<BoutonIcone icone={RefreshCw} libelle="Actualiser les tickets" disabled={chargement} onClick={() => void charger()} />}
+    />
     <section className="admin-section tickets-admin">
-      <div className="tickets-admin-tete">
-        <h2>
-          <AvecIcone icone={ReceiptText}>Tickets</AvecIcone>
-        </h2>
-        <BoutonIcone icone={RefreshCw} variante="discret" libelle="Actualiser les tickets" disabled={chargement} onClick={() => void charger()} />
-      </div>
-      <p className="explication">
-        Tous les appareils, en consultation. Un ticket ne se modifie pas : l'annulation, la correction du paiement, la facture et le duplicata
-        se font sur l'appareil qui a encaissé.
-      </p>
 
       <div className="filtres-ligne" role="group" aria-label="Période">
         {PRESETS.map(([p, libelle]) => (
@@ -261,5 +259,6 @@ export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTick
         </Modale>
       )}
     </section>
+    </>
   );
 }

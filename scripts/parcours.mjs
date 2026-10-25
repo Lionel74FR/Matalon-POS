@@ -31,7 +31,7 @@ const rubrique = (nom) => rubriqueAdmin(a, nom);
 // Équipe : un responsable d'abord.
 await rubrique("Équipe");
 await a.getByPlaceholder("Prénom").fill("Lionel");
-await a.locator(".admin-section", { hasText: "Équipe" }).locator("select").last().selectOption("responsable");
+await a.locator(".admin-section", { has: a.getByPlaceholder("Prénom") }).locator("select").last().selectOption("responsable");
 await a.getByPlaceholder("Code PIN").fill("1234");
 await a.getByRole("button", { name: "Ajouter", exact: true }).click();
 await a.locator(".admin-tableau td", { hasText: "Lionel" }).waitFor();

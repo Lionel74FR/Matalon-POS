@@ -14,7 +14,7 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, BookOpen, Check, ChefHat, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ReponseStock, ReponseVentesCarte, ResumeCarte } from "@matalon/serveur/partage";
 import { Couts, foodCost } from "@matalon/stock";
@@ -24,6 +24,7 @@ import { centimesDepuisSaisie, saisieDepuisCentimes } from "../ui/communs";
 import { api } from "./api";
 import { useAccesEdition } from "./acces-edition";
 import "./edition.css";
+import { EntetePage } from "./Page";
 
 const TAUX = [
   { valeur: 1000, libelle: "10 % (sur place)" },
@@ -84,14 +85,13 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
   };
   return (
     <>
+      <EntetePage
+        surtitre="Carte"
+        titre="Cartes et prix"
+        portee="Communes au groupe"
+        aide="Une carte peut servir à plusieurs établissements ; chacun choisit la sienne dans sa fiche (Réglages › Établissement). Une modification enregistrée arrive sur les iPad à la synchronisation suivante, en moins d'une minute quand ils sont en ligne."
+      />
       <section className="admin-section">
-        <h1 className="titre-icone">
-          <AvecIcone icone={BookOpen} taille={26}>Cartes</AvecIcone>
-        </h1>
-        <p className="explication">
-          Une carte peut servir à plusieurs établissements ; chacun choisit la sienne dans sa fiche. Une modification enregistrée
-          arrive sur les iPad à la synchronisation suivante, en moins d'une minute quand ils sont en ligne.
-        </p>
         <table className="tableau admin-tableau">
           <thead>
             <tr>

@@ -234,6 +234,33 @@ textarea {
   border-radius: 9px;
 }
 
+/* Champ de recherche à loupe : le cadre est sur l'étiquette, pas sur le champ. */
+.recherche-client {
+  background: var(--a-surface);
+  border: 1px solid var(--a-ligne-forte);
+  border-radius: 10px;
+}
+
+.recherche-client:focus-within {
+  border-color: var(--a-accent);
+}
+
+.recherche-client input {
+  border: 0 !important;
+  background: transparent !important;
+  outline: none !important;
+}
+
+.filtres-ligne input,
+.filtre-date input {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--a-ligne-forte);
+  border-radius: 9px;
+  background: var(--a-surface);
+  color: var(--a-texte);
+}
+
 select:focus,
 .champ input:focus,
 .admin-ligne input:focus,
@@ -857,6 +884,151 @@ textarea:focus {
   background: transparent;
   font-weight: 400;
   color: var(--a-doux);
+}
+
+.a-page {
+  min-width: 0;
+  margin-bottom: 20px;
+}
+
+.a-page .a-page-tete {
+  margin-bottom: 0;
+}
+
+.a-page-titres {
+  min-width: 0;
+}
+
+.a-page-titre-ligne {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.a-portee {
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: var(--a-puce);
+  color: var(--a-doux);
+  font-size: 0.8rem;
+}
+
+.a-aide-bouton {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--a-doux);
+}
+
+.a-aide-bouton:hover,
+.a-aide-bouton[aria-expanded="true"] {
+  background: var(--a-puce);
+  color: var(--a-accent-texte);
+}
+
+.a-aide-texte {
+  max-width: 78ch;
+  margin: 10px 0 4px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--a-surface);
+  border: 1px solid var(--a-ligne);
+  color: var(--a-doux);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.a-onglets {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  margin-top: 16px;
+  overflow-x: auto;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--a-ligne-forte);
+  scrollbar-width: thin;
+}
+
+.a-onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  color: var(--a-doux);
+  text-decoration: none;
+}
+
+.a-onglet:hover {
+  color: var(--a-texte);
+}
+
+.a-onglet[aria-selected="true"] {
+  border-bottom-color: var(--a-accent);
+  color: var(--a-texte);
+  font-weight: 700;
+}
+
+.a-onglet-compteur {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--a-puce);
+  font-family: var(--police-chiffres);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.a-onglets-filet {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 8px 12px;
+  background: var(--a-ligne-forte);
+}
+
+.a-section-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 10px;
+}
+
+.a-section-titre {
+  margin: 0 !important;
+}
+
+.a-section-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.a-bandeau {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+}
+
+.a-bandeau.attention {
+  background: var(--a-attention-fond);
+  color: var(--a-attention);
+}
+
+.a-resume {
+  margin: 0 0 12px;
+  color: var(--a-doux);
+}
+
+.a-resume strong {
+  color: var(--a-texte);
 }
 
 /* ───────── Accueil « Aujourd'hui » ───────── */

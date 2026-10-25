@@ -6,6 +6,7 @@ import { LIBELLES_PAIEMENT } from "../metier/libelles";
 import { datePeriode, LIBELLES_CLOTURE, nbTickets, ResumeComptage, Totaux } from "../ui/Clotures";
 import { Modale, Vide } from "../ui/communs";
 import { euros } from "../ui/contexte";
+import { EntetePage, TitreAvecAide } from "./Page";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, type EtablissementAdmin } from "./api";
 
@@ -81,17 +82,24 @@ export function CloturesAdmin(props: { e: EtablissementAdmin }) {
   const libellePeriode = annee ? `l'année ${mois.slice(0, 4)}` : moisLong(mois);
 
   return (
+    <>
+    <EntetePage
+      surtitre="Piloter"
+      titre="Clôtures"
+      aide="Les Z de tout l'établissement, quel que soit l'appareil qui les a faites. Une clôture se fait sur la caisse (menu › Clôtures) ; ici, on la consulte, on télécharge son archive et on exporte la période pour la comptabilité."
+      actions={
+        <>
+          <BoutonIcone icone={RefreshCw} libelle="Actualiser les clôtures" onClick={() => void charger()} />
+          <a className="bouton" href={api.urlExportComptages(e.id, periode.du, periode.au)}>
+            <AvecIcone icone={Download}>Comptages de caisse (CSV)</AvecIcone>
+          </a>
+          <a className="bouton principal" href={api.urlExportClotures(e.id, periode.du, periode.au)}>
+            <AvecIcone icone={FileSpreadsheet}>Export comptable (CSV)</AvecIcone>
+          </a>
+        </>
+      }
+    />
     <section className="admin-section clotures-admin">
-      <div className="tickets-admin-tete">
-        <h2>
-          <AvecIcone icone={Archive}>Clôtures et exports comptables</AvecIcone>
-        </h2>
-        <BoutonIcone icone={RefreshCw} variante="discret" libelle="Actualiser les clôtures" onClick={() => void charger()} />
-      </div>
-      <p className="explication">
-        Les Z de tout l'établissement, quel que soit l'appareil qui les a faites. Une clôture se fait sur la caisse (menu › Clôtures) ;
-        ici, on la consulte, on télécharge son archive et on exporte la période pour la comptabilité.
-      </p>
 
       <div className="filtres-ligne" role="group" aria-label="Période">
         <BoutonIcone icone={ChevronLeft} variante="discret" libelle={annee ? "Année précédente" : "Mois précédent"} onClick={() => setMois((m) => decalerMois(m, annee ? -12 : -1))} />
@@ -115,20 +123,12 @@ export function CloturesAdmin(props: { e: EtablissementAdmin }) {
         </button>
       </div>
 
-      <div className="clotures-exports">
-        <a className="bouton principal" href={api.urlExportClotures(e.id, periode.du, periode.au)}>
-          <AvecIcone icone={FileSpreadsheet}>Export comptable (CSV)</AvecIcone>
-        </a>
-        <a className="bouton" href={api.urlExportComptages(e.id, periode.du, periode.au)}>
-          <AvecIcone icone={Download}>Comptages de caisse (CSV)</AvecIcone>
-        </a>
-        <p className="explication">
-          Export comptable : une ligne par clôture de {libellePeriode} (Z, mois, exercice), HT, TVA et TTC par taux, encaissements par moyen de
-          paiement, remises, règlements de comptes clients, grand total perpétuel et empreinte ; séparateur « ; », montants à la virgule.
-          Comptages : espèces attendues et comptées, cartes et titres-restaurant face au TPE, écarts et leur motif, dépenses en espèces, fond
-          conservé et remise en banque.
-        </p>
-      </div>
+      <TitreAvecAide titre={`Exports ${/^[aeiouyàâéèêîôû]/i.test(libellePeriode) ? "d'" : "de "}${libellePeriode}`} niveau={3} nom="Exports comptables">
+        Export comptable : une ligne par clôture de {libellePeriode} (Z, mois, exercice), HT, TVA et TTC par taux, encaissements par moyen de
+        paiement, remises, règlements de comptes clients, grand total perpétuel et empreinte ; séparateur « ; », montants à la virgule.
+        Comptages : espèces attendues et comptées, cartes et titres-restaurant face au TPE, écarts et leur motif, dépenses en espèces, fond
+        conservé et remise en banque.
+      </TitreAvecAide>
 
       {erreur && <p className="erreur">{erreur}</p>}
       {!donnees && !erreur ? (
@@ -214,5 +214,6 @@ export function CloturesAdmin(props: { e: EtablissementAdmin }) {
         </Modale>
       )}
     </section>
+    </>
   );
 }

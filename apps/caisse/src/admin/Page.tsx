@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { Fragment, useId, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 /**
  * Modèle de page unique de l'administration (refonte du 25 octobre 2026) : même en-tête partout
@@ -58,8 +58,17 @@ export interface DefOnglet<T extends string> {
  * analyse). Chaque onglet est un lien vers sa sous-page (#/moka/stock/inventaire).
  */
 export function Onglets<T extends string>(props: { libelle: string; groupes: Array<Array<DefOnglet<T>>>; actif: T; adresse: (id: T) => string; onChoisir: (id: T) => void }) {
+  const barre = useRef<HTMLDivElement>(null);
+  // Sur iPhone, l'onglet choisi reste visible dans la barre qui défile.
+  useEffect(() => {
+    const b = barre.current;
+    const choisi = b?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (b && choisi && (choisi.offsetLeft < b.scrollLeft || choisi.offsetLeft + choisi.offsetWidth > b.scrollLeft + b.clientWidth)) {
+      b.scrollLeft = choisi.offsetLeft - 16;
+    }
+  }, [props.actif]);
   return (
-    <div className="a-onglets" role="tablist" aria-label={props.libelle}>
+    <div ref={barre} className="a-onglets" role="tablist" aria-label={props.libelle}>
       {props.groupes.map((g, i) => (
         <Fragment key={i}>
           {i > 0 && <span className="a-onglets-filet" aria-hidden="true" />}

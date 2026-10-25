@@ -44,6 +44,7 @@ import { MouvementsAdmin, OngletCommandes, OngletEtat, OngletFactures, OngletFoo
 import { lireFichierTableau } from "./tableur";
 import "./edition.css";
 import { useAccesEdition } from "./acces-edition";
+import { EntetePage, Onglets } from "./Page";
 
 /** « 1 produit créé », « 5 produits créés », « 2 prix à enregistrer ». */
 function nombre(n: number, nom: string, participe: string): string {
@@ -53,11 +54,17 @@ function nombre(n: number, nom: string, participe: string): string {
 }
 
 type Onglet = "produits" | "recettes" | "fournisseurs" | "import" | "etat" | "commandes" | "reception" | "inventaire" | "perte" | "transfert" | "foodcost" | "factures";
-const ONGLETS: Array<[string, Array<[Onglet, string]>]> = [
-  ["Référentiel", [["produits", "Produits"], ["recettes", "Recettes"], ["fournisseurs", "Fournisseurs"], ["import", "Importer"]]],
-  ["Opérations", [["etat", "Stock et pièces"], ["commandes", "Commandes"], ["reception", "Réception"], ["inventaire", "Inventaire"], ["perte", "Perte"], ["transfert", "Transfert"]]],
-  ["Analyse", [["foodcost", "Food cost"], ["factures", "Factures"]]],
+/** Onglets du stock (refonte du 25 octobre 2026) : opérations, référentiel, analyse ; « Importer » est un bouton de l'en-tête. */
+const ONGLETS: Array<Array<[Onglet, string]>> = [
+  [["etat", "État du stock"], ["commandes", "Commandes"], ["reception", "Réception"], ["inventaire", "Inventaire"], ["perte", "Pertes"], ["transfert", "Transferts"]],
+  [["produits", "Produits"], ["recettes", "Recettes"], ["fournisseurs", "Fournisseurs"]],
+  [["foodcost", "Food cost"], ["factures", "Factures"]],
 ];
+const TITRES: Record<Onglet, string> = {
+  ...(Object.fromEntries(ONGLETS.flat()) as Record<Onglet, string>),
+  import: "Importer des produits",
+};
+const ONGLETS_VALIDES = new Set<string>([...ONGLETS.flat().map(([id]) => id), "import"]);
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const UNITES: UniteStock[] = ["kg", "L", "piece"];
@@ -69,10 +76,13 @@ const parUnite = (u: UniteStock) => (u === "piece" ? "pièce" : u);
  * recettes sont communs au groupe ; les prix et les coûts affichés sont
  * ceux de l'établissement choisi.
  */
-export function Stock(props: { etablissementId?: string } = {}) {
+export function Stock(props: { etablissementId?: string; onglet?: string | null; onOnglet?: (o: string | null) => void } = {}) {
   const [stock, setStock] = useState<ReponseStock | null>(null);
   const [erreur, setErreur] = useState("");
-  const [onglet, setOnglet] = useState<Onglet>("produits");
+  const [ongletLocal, setOngletLocal] = useState<Onglet>("produits");
+  // Sous-page dans l'adresse de l'administration (#/moka/stock/inventaire) ; « Produits » par défaut.
+  const onglet: Onglet = props.onOnglet ? (props.onglet && ONGLETS_VALIDES.has(props.onglet) ? (props.onglet as Onglet) : "produits") : ongletLocal;
+  const setOnglet = (o: Onglet) => (props.onOnglet ? props.onOnglet(o === "produits" ? null : o) : setOngletLocal(o));
   const [etabChoisi, setEtab] = useState("");
   // Choisi dans l'en-tête de l'administration ; sans lui, la liste déroulante du stock.
   const etab = props.etablissementId ?? etabChoisi;
@@ -89,61 +99,46 @@ export function Stock(props: { etablissementId?: string } = {}) {
   if (!stock || !couts) return <p>{erreur || "Chargement du stock…"}</p>;
   const nomEtab = stock.etablissements.find((e) => e.id === etab)?.enseigne ?? etab;
   const ref = stock.referentiel;
+  const referentiel = onglet === "produits" || onglet === "recettes" || onglet === "fournisseurs" || onglet === "import";
+  const compteur = (id: Onglet) => (id === "produits" ? ref.produits.filter((p) => p.actif).length : id === "recettes" ? ref.recettes.filter((r) => r.actif).length : undefined);
 
   return (
     <div className="stock">
-      <section className="admin-section">
-        <div className="stock-tete">
-          <h1 className="titre-icone">
-            <AvecIcone icone={Package} taille={26}>Stock et fiches techniques</AvecIcone>
-          </h1>
-          {!props.etablissementId && (
-            <label className="champ stock-etab">
-              <span>Prix et coûts de</span>
-              <select value={etab} onChange={(e) => setEtab(e.target.value)}>
-                {stock.etablissements.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.enseigne}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-        <p className="explication">
-          Produits et recettes sont communs à tous les établissements. Les prix d'achat sont ceux de chaque établissement : sans achat
-          à {nomEtab}, le coût reprend le dernier prix payé ailleurs, signalé « emprunté ». Les fiches techniques se relient à la carte
-          dans l'éditeur de carte.
-        </p>
-        <label className="champ stock-onglets-mobile">
-          <span>Rubrique</span>
-          <select value={onglet} onChange={(e) => setOnglet(e.target.value as Onglet)}>
-            {ONGLETS.map(([groupe, liste]) => (
-              <optgroup key={groupe} label={groupe}>
-                {liste.map(([id, libelle]) => (
-                  <option key={id} value={id}>
-                    {libelle}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
-        <div className="stock-onglets" role="tablist">
-          {ONGLETS.map(([groupe, liste]) => (
-            <div key={groupe} className="stock-groupe-onglets">
-              <span>{groupe}</span>
-              <div className="options">
-                {liste.map(([id, libelle]) => (
-                  <button key={id} role="tab" aria-selected={onglet === id} className={`option${onglet === id ? " active" : ""}`} onClick={() => setOnglet(id)}>
-                    {id === "produits" ? `${libelle} (${ref.produits.filter((p) => p.actif).length})` : id === "recettes" ? `${libelle} (${ref.recettes.filter((r) => r.actif).length})` : libelle}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <EntetePage
+        surtitre="Stock et recettes"
+        titre={TITRES[onglet]}
+        portee={referentiel ? `Communs au groupe · prix de ${nomEtab}` : onglet === "transfert" ? `Depuis ${nomEtab}` : `Stock de ${nomEtab}`}
+        aide={`Produits et recettes sont communs à tous les établissements. Les prix d'achat sont ceux de chaque établissement : sans achat à ${nomEtab}, le coût reprend le dernier prix payé ailleurs, signalé « emprunté ». Les fiches techniques se relient à la carte dans l'éditeur de carte.`}
+        actions={
+          <>
+            {!props.etablissementId && (
+              <label className="champ stock-etab">
+                <span>Prix et coûts de</span>
+                <select value={etab} onChange={(e) => setEtab(e.target.value)}>
+                  {stock.etablissements.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.enseigne}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {onglet !== "import" && (
+              <button type="button" className="bouton" onClick={() => setOnglet("import")}>
+                <AvecIcone icone={Upload}>Importer</AvecIcone>
+              </button>
+            )}
+          </>
+        }
+      >
+        <Onglets
+          libelle="Sous-pages du stock"
+          groupes={ONGLETS.map((g) => g.map(([id, libelle]) => ({ id, libelle, ...(compteur(id) != null ? { compteur: compteur(id) } : {}) })))}
+          actif={onglet}
+          adresse={(o) => `#/${etab}/stock${o === "produits" ? "" : `/${o}`}`}
+          onChoisir={setOnglet}
+        />
+      </EntetePage>
       {onglet === "produits" && <Produits stock={stock} couts={couts} etab={etab} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "recettes" && <Recettes stock={stock} couts={couts} nomEtab={nomEtab} onStock={setStock} />}
       {onglet === "fournisseurs" && <OngletFournisseurs stock={stock} etab={etab} nomEtab={nomEtab} onStock={setStock} />}

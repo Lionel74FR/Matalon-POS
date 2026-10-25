@@ -39,7 +39,7 @@ const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
 await a.goto(`${URL}/admin#/moka/stock`);
 // Fiches techniques collées depuis le tableur : vérifiées, puis importées.
-await a.getByRole("tab", { name: "Importer" }).click();
+await a.getByRole("button", { name: "Importer", exact: true }).click();
 await a.getByLabel("Ou collez les cellules copiées depuis Excel").fill("Cocktail\tIngrédient\tQuantité\tUnité\nDolce Vita\tBombay Sapphire\t3\tcl\nDolce Vita\tProsecco\t8\tcl");
 await a.getByRole("button", { name: "Vérifier" }).click();
 await a.getByText("1 recette à créer : Dolce Vita").waitFor();

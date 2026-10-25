@@ -85,6 +85,33 @@ for (const [nom, viewport] of [["ordinateur", { width: 1440, height: 900 }], ["i
   await ctx.close();
 }
 
+// Sous-pages dans l'adresse : un onglet du stock s'ouvre par son lien, garde l'onglet au rechargement, Retour revient au précédent.
+{
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+  await ctx.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/api/admin` }]);
+  const a = await ctx.newPage();
+  a.on("pageerror", (e) => erreurs.push(`sous-pages : ${e.message}`));
+  await a.goto(`${URL}/admin#/moka/stock/inventaire`);
+  await a.getByRole("tab", { name: "Inventaire", selected: true }).waitFor({ timeout: 15000 });
+  r.titreInventaire = await a.locator(".a-page-titre").textContent();
+  await a.getByRole("tab", { name: "Food cost" }).click();
+  await a.waitForFunction(() => location.hash === "#/moka/stock/foodcost");
+  await a.reload();
+  await a.getByRole("tab", { name: "Food cost", selected: true }).waitFor();
+  await a.goBack();
+  await a.waitForFunction(() => location.hash === "#/moka/stock/inventaire");
+  r.retourOnglet = await a.getByRole("tab", { selected: true }).textContent();
+  await a.getByRole("tab", { name: "Produits" }).click();
+  await a.waitForFunction(() => location.hash === "#/moka/stock");
+  await a.goto(`${URL}/admin#/moka/reservations/reglages`);
+  r.resaReglages = await a.getByRole("tab", { selected: true }).textContent();
+  await a.screenshot({ path: `${sortie}/n-ordinateur-sous-page.png` });
+  // Aide repliée derrière l'icône (i).
+  await a.getByRole("button", { name: "Aide : Réservations" }).click();
+  r.aide = (await a.locator(".a-aide-texte").textContent()).slice(0, 30);
+  await ctx.close();
+}
+
 // Thème sombre choisi au menu du compte, gardé au rechargement ; menu réduit en icônes.
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
 await ctx.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/api/admin` }]);
@@ -115,6 +142,10 @@ const ok =
   r.sombre[0] === "sombre" &&
   r.sombre[1] === "rgb(43, 30, 24)" &&
   r.reduit < 90 &&
+  r.titreInventaire === "Inventaire" &&
+  r.retourOnglet === "Inventaire" &&
+  r.resaReglages === "Services et réglages" &&
+  r.aide.startsWith("Le module du site") &&
   Object.keys(r)
     .filter((k) => k.endsWith("-retour"))
     .every((k) => r[k] === "Appareils" || k.startsWith("iphone")) &&

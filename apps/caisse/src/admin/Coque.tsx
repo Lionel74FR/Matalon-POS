@@ -104,6 +104,8 @@ export const FAMILLES: Array<{ nom: string; liste: DefRubrique[] }> = [
 
 export const TOUTES_RUBRIQUES: DefRubrique[] = [ACCUEIL, ...FAMILLES.flatMap((f) => f.liste)];
 export const defRubrique = (id: Rubrique) => TOUTES_RUBRIQUES.find((r) => r.id === id)!;
+/** Famille d'une rubrique (surtitre de sa page) : « Réglages » pour Équipe. */
+export const familleDe = (id: Rubrique) => FAMILLES.find((f) => f.liste.some((r) => r.id === id))?.nom;
 
 /** Onglets du bas sur iPhone ; « Plus » ouvre toutes les rubriques. */
 const ONGLETS_MOBILE: Rubrique[] = ["accueil", "statistiques", "reservations", "stock"];
