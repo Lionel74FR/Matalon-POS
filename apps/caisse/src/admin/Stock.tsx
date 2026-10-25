@@ -45,6 +45,7 @@ import { lireFichierTableau } from "./tableur";
 import "./edition.css";
 import { useAccesEdition } from "./acces-edition";
 import { EntetePage, Onglets } from "./Page";
+import { confirmer } from "./Panneau";
 
 /** « 1 produit créé », « 5 produits créés », « 2 prix à enregistrer ». */
 function nombre(n: number, nom: string, participe: string): string {
@@ -292,7 +293,7 @@ function ModaleProduit(props: ProprietesOnglet & { etab: string; produit: Produi
   };
 
   return (
-    <Modale
+    <Modale lateral
       large
       titre={nouveau ? "Nouveau produit" : p.nom}
       onFermer={props.onFermer}
@@ -306,10 +307,12 @@ function ModaleProduit(props: ProprietesOnglet & { etab: string; produit: Produi
           {!nouveau && (
             <button
               className="bouton"
-              onClick={() => {
-                if (p.actif && usages.length && !window.confirm(`« ${p.nom} » sert dans ${usages.map((r) => r.nom).join(", ")}. L'archiver quand même ? Ces recettes gardent leur ligne.`)) return;
-                setP({ ...p, actif: !p.actif });
-              }}
+              onClick={() =>
+                void (async () => {
+                  if (p.actif && usages.length && !(await confirmer({ titre: `Archiver « ${p.nom} » ?`, message: `Il sert dans ${usages.map((r) => r.nom).join(", ")}. Ces recettes gardent leur ligne.`, confirmer: "Archiver quand même" }))) return;
+                  setP({ ...p, actif: !p.actif });
+                })()
+              }
             >
               <AvecIcone icone={Archive}>{p.actif ? "Archiver" : "Réactiver"}</AvecIcone>
             </button>
@@ -693,7 +696,7 @@ function ModaleRecette(props: ProprietesOnglet & { recette: Recette; onEnregistr
   const usages = r.id ? utilisations(ref, "recette", r.id) : [];
 
   return (
-    <Modale
+    <Modale lateral
       large
       titre={nouvelle ? "Nouvelle recette" : r.nom}
       onFermer={props.onFermer}
@@ -702,10 +705,12 @@ function ModaleRecette(props: ProprietesOnglet & { recette: Recette; onEnregistr
           {!nouvelle && (
             <button
               className="bouton"
-              onClick={() => {
-                if (r.actif && usages.length && !window.confirm(`« ${r.nom} » sert dans ${usages.map((x) => x.nom).join(", ")}. L'archiver quand même ?`)) return;
-                setR({ ...r, actif: !r.actif });
-              }}
+              onClick={() =>
+                void (async () => {
+                  if (r.actif && usages.length && !(await confirmer({ titre: `Archiver « ${r.nom} » ?`, message: `Elle sert dans ${usages.map((x) => x.nom).join(", ")}.`, confirmer: "Archiver quand même" }))) return;
+                  setR({ ...r, actif: !r.actif });
+                })()
+              }
             >
               <AvecIcone icone={Archive}>{r.actif ? "Archiver" : "Réactiver"}</AvecIcone>
             </button>

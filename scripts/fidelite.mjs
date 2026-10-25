@@ -6,7 +6,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/fidelite.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
+import { accepterConfirmations, preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -31,7 +31,7 @@ async function administration(nom, viewport) {
   await c.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/api/admin` }]);
   const a = await c.newPage();
   a.on("pageerror", (e) => erreurs.push(`${nom} : ${e.message}`));
-  a.on("dialog", (d) => void d.accept());
+  await accepterConfirmations(a);
   return a;
 }
 

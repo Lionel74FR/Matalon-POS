@@ -238,7 +238,7 @@ export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTick
       )}
 
       {choisi && (
-        <Modale titre={`${TYPES[choisi.type]} n° ${choisi.numero}`} onFermer={() => setChoisi(null)}>
+        <Modale lateral titre={`${TYPES[choisi.type]} n° ${choisi.numero}`} onFermer={() => setChoisi(null)}>
           <p className="explication ticket-admin-entete">
             {new Date(choisi.horodatage).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "full", timeStyle: "short" })}
             <br />

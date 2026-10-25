@@ -25,6 +25,7 @@ import { api } from "./api";
 import { useAccesEdition } from "./acces-edition";
 import "./edition.css";
 import { EntetePage } from "./Page";
+import { confirmer, informer } from "./Panneau";
 
 const TAUX = [
   { valeur: 1000, libelle: "10 % (sur place)" },
@@ -297,10 +298,15 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
       }),
     }));
 
-  const supprimer = (catIds: string[], artIds: string[], libelle: string) => {
+  const supprimer = async (catIds: string[], artIds: string[], libelle: string) => {
     const citees = formulesCitant(catIds, artIds);
-    const avertissement = citees.length ? `\n\nCité dans les formules : ${citees.join(", ")}. Ces choix seront retirés des formules.` : "";
-    if (!window.confirm(`Supprimer ${libelle} ?${avertissement}`)) return false;
+    const oui = await confirmer({
+      titre: `Supprimer ${libelle} ?`,
+      message: citees.length ? `Cité dans les formules : ${citees.join(", ")}. Ces choix seront retirés des formules.` : "La suppression ne vaut qu'une fois la carte enregistrée.",
+      confirmer: "Supprimer",
+      danger: true,
+    });
+    if (!oui) return false;
     majCategories((cats) =>
       purger(
         cats.filter((c) => !catIds.includes(c.id)).map((c) => ({ ...c, articles: c.articles.filter((a) => !artIds.includes(a.id)) })),
@@ -313,17 +319,22 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
 
   const supprimerCategorie = (c: Categorie) => {
     const libelle = c.articles.length ? `« ${c.nom} » et ses ${c.articles.length} articles` : `« ${c.nom} »`;
-    if (supprimer([c.id], c.articles.map((a) => a.id), libelle)) setCatId(carte.categories.find((x) => x.id !== c.id)?.id ?? null);
+    void supprimer([c.id], c.articles.map((a) => a.id), libelle).then((ok) => ok && setCatId(carte.categories.find((x) => x.id !== c.id)?.id ?? null));
   };
 
   /** Fusionne la catégorie affichée dans une autre (même taux de TVA) ; elle disparaît, ses articles passent dans l'autre. */
-  const fusionnerDans = (source: Categorie, cibleId: string) => {
+  const fusionnerDans = async (source: Categorie, cibleId: string) => {
     const cible = carte.categories.find((c) => c.id === cibleId);
     if (!cible) return;
     const raison = fusionImpossible(source, cible);
-    if (raison) return window.alert(`Fusion impossible : ${raison}.`);
+    if (raison) return informer("Fusion impossible", `${raison[0]!.toUpperCase()}${raison.slice(1)}.`);
     const n = source.articles.length;
-    if (!window.confirm(`Fusionner « ${source.nom} » dans « ${cible.nom} » ? ${n ? `Ses ${n} article${n > 1 ? "s" : ""} passent dans « ${cible.nom} », ` : ""}les formules qui la proposaient proposeront « ${cible.nom} », et « ${source.nom} » disparaît.`)) return;
+    const oui = await confirmer({
+      titre: `Fusionner « ${source.nom} » dans « ${cible.nom} » ?`,
+      message: `${n ? `Ses ${n} article${n > 1 ? "s" : ""} passent dans « ${cible.nom} », ` : ""}les formules qui la proposaient proposeront « ${cible.nom} », et « ${source.nom} » disparaît.`,
+      confirmer: "Fusionner",
+    });
+    if (!oui) return;
     setCarte(fusionnerCategories(carte, source.id, cible.id));
     setEtat("");
     setCatId(cible.id);
@@ -374,7 +385,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
           {etat === "enregistre" && <span className="admin-ok">Enregistrée : les iPad et iPhone la reçoivent à la prochaine synchronisation.</span>}
           {modifiee && etat !== "envoi" && <span className="editeur-modifiee">Modifications non enregistrées</span>}
           {modifiee && (
-            <button className="bouton" onClick={() => window.confirm("Annuler toutes les modifications ?") && setCarte(structuredClone(origine.carte))}>
+            <button className="bouton" onClick={() => void confirmer({ titre: "Annuler toutes les modifications ?", message: "La carte revient à sa dernière version enregistrée.", confirmer: "Tout annuler", annuler: "Garder mes modifications", danger: true }).then((oui) => oui && setCarte(structuredClone(origine.carte)))}>
               <AvecIcone icone={Undo2}>Annuler</AvecIcone>
             </button>
           )}
@@ -395,7 +406,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
             className="bouton danger"
             onClick={() =>
               void (async () => {
-                if (!window.confirm("Remplacer la carte enregistrée par votre version ? Les modifications de l'autre personne seront perdues.")) return;
+                if (!(await confirmer({ titre: "Remplacer la carte enregistrée par votre version ?", message: "Les modifications de l'autre personne seront perdues.", confirmer: "Remplacer par ma version", danger: true }))) return;
                 const derniere = await acces.carte(props.id);
                 await enregistrer(derniere.version);
               })()
@@ -591,7 +602,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
                   <select
                     value=""
                     onChange={(e) => {
-                      if (e.target.value) fusionnerDans(categorie, e.target.value);
+                      if (e.target.value) void fusionnerDans(categorie, e.target.value);
                     }}
                   >
                     <option value="">Choisir une catégorie</option>
@@ -700,7 +711,7 @@ export function EditeurCarte(props: { id: string; onRetour: () => void; onEnregi
           nomEtab={nomEtab}
           onValider={enregistrerArticle}
           onSupprimer={() => {
-            if (supprimer([], [articleOuvert.article.id], `« ${articleOuvert.article.nom} » de la carte`)) setArticleOuvert(null);
+            void supprimer([], [articleOuvert.article.id], `« ${articleOuvert.article.nom} » de la carte`).then((ok) => ok && setArticleOuvert(null));
           }}
           onFermer={() => setArticleOuvert(null)}
         />

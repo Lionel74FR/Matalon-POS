@@ -178,7 +178,7 @@ export function CloturesAdmin(props: { e: EtablissementAdmin }) {
       )}
 
       {choisie && (
-        <Modale
+        <Modale lateral
           titre={`${LIBELLES_CLOTURE[choisie.periode]} ${datePeriode(choisie.identifiantPeriode)} · n° ${choisie.numero}`}
           onFermer={() => setChoisie(null)}
           pied={

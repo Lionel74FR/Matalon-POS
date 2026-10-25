@@ -3,7 +3,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/carte.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
+import { accepterConfirmations, preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -17,7 +17,7 @@ const bureau = await b.newContext({ viewport: { width: 1280, height: 900 } });
 await bureau.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/api/admin` }]);
 const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
-a.on("dialog", (d) => void d.accept());
+await accepterConfirmations(a);
 await a.goto(`${URL}/admin`);
 await rubriqueAdmin(a, "Cartes et prix");
 await a.getByRole("button", { name: "Modifier" }).first().click();

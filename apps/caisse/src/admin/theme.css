@@ -1031,6 +1031,253 @@ textarea:focus {
   color: var(--a-texte);
 }
 
+/* ───────── Panneau latéral et confirmations ───────── */
+
+.a-panneau-voile,
+.voile.lateral {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0;
+  background: rgba(43, 30, 24, 0.28);
+}
+
+.a-panneau,
+.modale.lateral {
+  width: min(460px, 100%);
+  height: 100%;
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  border-radius: 0;
+  background: var(--a-surface);
+  border-left: 1px solid var(--a-ligne);
+  box-shadow: -12px 0 32px rgba(43, 30, 24, 0.16);
+  animation: a-glisse 160ms ease-out;
+}
+
+.modale.lateral.large {
+  width: min(720px, 100%);
+}
+
+@keyframes a-glisse {
+  from {
+    transform: translateX(24px);
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a-panneau,
+  .modale.lateral {
+    animation: none;
+  }
+}
+
+.a-panneau-tete {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--a-ligne);
+}
+
+.a-panneau-tete h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.a-panneau-tete .a-page-surtitre {
+  font-size: 0.82rem;
+}
+
+.a-panneau-fermer {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px var(--a-ligne-forte);
+}
+
+.a-panneau-fermer:hover {
+  background: var(--a-puce);
+}
+
+.a-panneau-corps {
+  overflow-y: auto;
+  padding: 18px 24px 24px;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.a-panneau .champ,
+.modale.lateral .champ {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 0;
+}
+
+.a-panneau .champ > span {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.a-panneau .champ small {
+  font-weight: 400;
+}
+
+.a-panneau-pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--a-ligne);
+  background: var(--a-surface-2);
+}
+
+.a-panneau-pied.abandon {
+  background: var(--a-attention-fond);
+}
+
+.a-panneau-etat {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.a-panneau-etat.modifie,
+.a-panneau-pied.abandon .a-panneau-etat {
+  color: var(--a-attention);
+}
+
+.a-panneau-etat.erreur {
+  margin: 0 auto 0 0;
+  min-height: 0;
+  font-weight: 400;
+}
+
+.a-panneau-etat.succes {
+  color: var(--a-ok);
+}
+
+.modale.lateral .modale-tete {
+  padding: 20px 20px 12px 24px;
+  border-bottom: 1px solid var(--a-ligne);
+}
+
+.modale.lateral .modale-corps {
+  padding: 16px 24px 20px;
+}
+
+.a-confirmation-voile {
+  z-index: 40;
+}
+
+.a-confirmation {
+  width: min(440px, 100%);
+}
+
+.a-confirmation .modale-tete {
+  padding: 20px 22px 6px;
+}
+
+.a-confirmation .modale-corps {
+  color: var(--a-doux);
+}
+
+.a-choix {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.a-choix legend {
+  margin-bottom: 4px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.a-panneau .case,
+.a-choix .case {
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--a-ligne);
+}
+
+.a-panneau .case:has(input:checked) {
+  border-color: var(--a-accent);
+  background: color-mix(in srgb, var(--a-accent) 6%, var(--a-surface));
+}
+
+.a-panneau .case input {
+  margin-top: 2px;
+  flex: none;
+}
+
+.a-panneau .case span {
+  display: grid;
+  gap: 2px;
+}
+
+.a-panneau .case small {
+  color: var(--a-doux);
+  font-size: 0.82rem;
+}
+
+.a-etapes {
+  margin: 0;
+  padding-left: 1.3em;
+  color: var(--a-doux);
+  font-size: 0.9rem;
+  display: grid;
+  gap: 4px;
+}
+
+.a-codes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.a-codes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  color: var(--a-doux);
+}
+
+.a-code {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--a-texte);
+  user-select: all;
+}
+
+.a-liste th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* ───────── Accueil « Aujourd'hui » ───────── */
 
 .accueil {

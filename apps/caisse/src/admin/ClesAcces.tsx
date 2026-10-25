@@ -3,6 +3,7 @@ import { Fingerprint, KeyRound, Trash2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, type CleAccesAdmin } from "./api";
 import { cleAccesDisponible, creerCleAcces, nomAppareil } from "./cleAcces";
+import { confirmer } from "./Panneau";
 
 const dateHeure = (iso: string | null) => (iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "jamais");
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -91,8 +92,8 @@ export function FenetreClesAcces(props: { cles: CleAccesAdmin[] | null; onChange
     })();
   };
 
-  const retirer = (c: CleAccesAdmin) => {
-    if (!window.confirm(`Retirer la clé « ${c.nom} » ? Elle ne permettra plus de se connecter.`)) return;
+  const retirer = async (c: CleAccesAdmin) => {
+    if (!(await confirmer({ titre: `Retirer la clé « ${c.nom} » ?`, message: "Elle ne permettra plus de se connecter. La clé reste dans l'appareil, mais n'ouvre plus rien.", confirmer: "Retirer la clé", danger: true }))) return;
     setErreur("");
     setSucces("");
     api
@@ -127,7 +128,7 @@ export function FenetreClesAcces(props: { cles: CleAccesAdmin[] | null; onChange
                       {c.domaine !== location.hostname && ` · pour ${c.domaine}`}
                     </small>
                   </div>
-                  <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer la clé ${c.nom}`} onClick={() => retirer(c)} />
+                  <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer la clé ${c.nom}`} onClick={() => void retirer(c)} />
                 </li>
               ))}
             </ul>

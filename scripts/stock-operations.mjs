@@ -5,7 +5,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/stock-operations.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { accepterConfirmations, preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -111,7 +111,7 @@ const bureau = await b.newContext({ viewport: { width: 1280, height: 900 } });
 await bureau.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/api/admin` }]);
 const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
-a.on("dialog", (d) => void d.accept());
+await accepterConfirmations(a);
 const aclic = (nom) => a.getByRole("button", { name: nom, exact: true }).first().click();
 await a.goto(`${URL}/admin#/moka/stock`);
 await a.getByRole("tab", { name: "État du stock" }).click();

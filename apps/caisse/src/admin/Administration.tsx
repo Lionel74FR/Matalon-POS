@@ -23,6 +23,7 @@ import { FenetreConfiguration } from "./Configuration";
 import { cleAccesDisponible, utiliserCleAcces } from "./cleAcces";
 import { Accueil } from "./Accueil";
 import { EntetePage, TitreAvecAide } from "./Page";
+import { confirmer, informer, Panneau } from "./Panneau";
 import { BoutonAlertes, defRubrique, familleDe, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
 import {
   Archive,
@@ -336,9 +337,23 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const [menuReduit, basculerMenu] = useMenuReduit();
   /** Un changement de rubrique s'inscrit dans l'historique : le bouton Retour du navigateur y ramène. */
   const historique = useRef(false);
+  /** Adresse de la vue affichée : un Retour refusé (carte non enregistrée) y revient. */
+  const adresseCourante = useRef(location.hash);
   /** Changer de vue avec une carte modifiée non enregistrée demande confirmation. */
-  const aller = (vue: { etab?: string; rubrique?: Rubrique; sous?: string | null; carte?: string | null }) => {
-    if (carteModifiee && !window.confirm("La carte a des modifications non enregistrées. Les abandonner ?")) return false;
+  const aller = (vue: { etab?: string; rubrique?: Rubrique; sous?: string | null; carte?: string | null }, abandonConfirme = false) => {
+    if (carteModifiee && !abandonConfirme) {
+      void confirmer({
+        titre: "Abandonner les modifications de la carte ?",
+        message: "La carte a des modifications non enregistrées : elles seront perdues.",
+        confirmer: "Abandonner",
+        annuler: "Rester sur la carte",
+        danger: true,
+      }).then((oui) => {
+        if (oui) aller(vue, true);
+        else if (location.hash !== adresseCourante.current) history.pushState(null, "", adresseCourante.current);
+      });
+      return false;
+    }
     setCarteModifiee(false);
     historique.current = true;
     if (vue.etab !== undefined) setChoisi(vue.etab);
@@ -371,6 +386,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   useEffect(() => {
     if (!choisi) return;
     const adresse = `#/${choisi}${choisi === "nouveau" ? "" : `/${rubrique}${sous ? `/${sous}` : ""}`}`;
+    adresseCourante.current = adresse;
     if (historique.current && location.hash !== adresse) history.pushState(null, "", adresse);
     else history.replaceState(null, "", adresse);
     historique.current = false;
@@ -581,30 +597,11 @@ function FicheEtablissement(props: {
   return (
     <>
       {rubrique === "accueil" && <Accueil e={e} onAller={props.onAller} onChange={props.onChange} />}
-      {rubrique === "appareils" && (
-        <>
-          <EntetePage
-            surtitre={surtitre}
-            titre="Appareils"
-            aide="Les clôtures (Z, mois, exercice) valent pour tout l'établissement, quel que soit l'appareil qui les a faites. Le contrôle d'établissement vérifie qu'elles couvrent chaque caisse sans trou ni double compte."
-          />
-          <Rattacher e={e} responsable={responsable} onChange={props.onChange} />
-          <Caisses e={e} caisses={e.caisses} onChange={props.onChange} />
-        </>
-      )}
+      {rubrique === "appareils" && <Appareils e={e} responsable={responsable} onChange={props.onChange} surtitre={surtitre} />}
       {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} onServeur={props.onTicketsServeur} />}
       {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
       {rubrique === "clotures" && <CloturesAdmin e={e} />}
-      {rubrique === "equipe" && (
-        <>
-          <EntetePage
-            surtitre={surtitre}
-            titre="Équipe"
-            aide="Chaque personne se connecte en caisse avec son code PIN. Les responsables valident annulations et clôtures. Les changements arrivent sur les iPad et iPhone à la synchronisation suivante (une minute au plus en ligne)."
-          />
-          <Equipe e={e} onChange={props.onChange} />
-        </>
-      )}
+      {rubrique === "equipe" && <Equipe e={e} onChange={props.onChange} surtitre={surtitre} />}
       {rubrique === "plan" && (
         <>
           <EntetePage
@@ -761,77 +758,104 @@ function Alertes(props: { e: EtablissementAdmin; onChange: () => Promise<void>; 
   );
 }
 
-function Rattacher(props: { e: EtablissementAdmin; responsable: boolean; onChange: () => Promise<void> }) {
+/** Appareils : rattacher un iPad ou un iPhone (panneau), codes encore valables, appareils rattachés. */
+function Appareils(props: { e: EtablissementAdmin; responsable: boolean; onChange: () => Promise<void>; surtitre?: string }) {
+  const [rattacher, setRattacher] = useState(false);
+  const codes = props.e.codes;
+  return (
+    <>
+      <EntetePage
+        surtitre={props.surtitre}
+        titre="Appareils"
+        aide="Les clôtures (Z, mois, exercice) valent pour tout l'établissement, quel que soit l'appareil qui les a faites. Le contrôle d'établissement vérifie qu'elles couvrent chaque caisse sans trou ni double compte."
+        actions={
+          <button
+            className="bouton principal"
+            disabled={!props.responsable}
+            title={props.responsable ? undefined : "Ajoutez d'abord un responsable à l'équipe"}
+            onClick={() => setRattacher(true)}
+          >
+            <AvecIcone icone={Plus}>Rattacher un appareil</AvecIcone>
+          </button>
+        }
+      />
+      {!props.responsable && (
+        <p className="a-bandeau attention">Ajoutez d'abord un responsable à l'équipe : sans lui, personne ne pourrait ouvrir la caisse.</p>
+      )}
+      {codes.length > 0 && (
+        <section className="admin-section">
+          <TitreAvecAide titre="Codes de rattachement en attente" nom="Codes de rattachement">
+            Un code sert une seule fois et expire au bout de 48 heures. Sur l'appareil, ouvrez {location.host} dans Safari, ajoutez-le à l'écran
+            d'accueil (Partager › Sur l'écran d'accueil), ouvrez-le depuis cette icône, puis saisissez le code.
+          </TitreAvecAide>
+          <ul className="a-codes">
+            {codes.map((c) => (
+              <li key={c.code}>
+                <span className="chiffres a-code">{afficherCode(c.code)}</span>
+                <span>
+                  {c.nomCaisse} · valable jusqu'au {dateHeure(c.expireLe)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <Caisses e={props.e} caisses={props.e.caisses} onChange={props.onChange} />
+      {rattacher && <PanneauRattacher e={props.e} onChange={props.onChange} onFermer={() => setRattacher(false)} />}
+    </>
+  );
+}
+
+function PanneauRattacher(props: { e: EtablissementAdmin; onChange: () => Promise<void>; onFermer: () => void }) {
   const [type, setType] = useState<"iPad" | "iPhone">("iPad");
   const [nom, setNom] = useState("");
   const [nouveau, setNouveau] = useState<{ code: string; expireLe: string; nomCaisse: string } | null>(null);
   const { enCours, erreur, envoyer } = useEnvoi();
-  const generer = (ev: FormEvent) => {
-    ev.preventDefault();
+  const generer = () =>
     void envoyer(async () => {
       setNouveau(await api.genererCode(props.e.id, nom.trim() || type));
       setNom("");
       await props.onChange();
     });
-  };
   return (
-    <section className="admin-section">
-      <Titre icone={Plus}>Rattacher un iPad ou un iPhone</Titre>
-      {!props.responsable ? (
-        <p className="explication">Ajoutez d'abord un responsable à l'équipe : sans lui, personne ne pourrait ouvrir la caisse.</p>
-      ) : (
-        <>
-          <div className="options" role="radiogroup" aria-label="Appareil à rattacher">
-            {(["iPad", "iPhone"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="radio"
-                aria-checked={type === t}
-                className={`option${type === t ? " active" : ""}`}
-                onClick={() => setType(t)}
-              >
-                <AvecIcone icone={ICONE_APPAREIL[t]} classe={CLASSE_APPAREIL[t]}>{t}</AvecIcone>
-              </button>
-            ))}
-          </div>
-          <p className="explication">
-            Sur l'{type}, ouvrez {location.host} dans Safari, ajoutez-le à l'écran d'accueil (Partager › Sur l'écran d'accueil),
-            ouvrez-le depuis cette icône, puis saisissez le code. Un code sert une seule fois et expire au bout de 48 heures.
-          </p>
-          <form className="admin-ligne" onSubmit={generer}>
-            <input
-              value={nom}
-              onChange={(ev) => setNom(ev.target.value)}
-              placeholder={type === "iPad" ? "Nom de l'iPad (Comptoir, Terrasse…)" : "Nom de l'iPhone (Salle, Lionel…)"}
-              aria-label={`Nom de l'${type}`}
-              maxLength={40}
-            />
-            <button className="bouton principal" disabled={enCours}>
-              <AvecIcone icone={KeyRound}>Générer un code</AvecIcone>
-            </button>
-          </form>
-          {erreur && <p className="erreur">{erreur}</p>}
-          {nouveau && (
-            <div className="admin-code" role="status">
-              <span>{afficherCode(nouveau.code)}</span>
-              <small>
-                {nouveau.nomCaisse} · valable jusqu'au {dateHeure(nouveau.expireLe)}
-              </small>
-            </div>
-          )}
-          {props.e.codes.filter((c) => c.code !== nouveau?.code).length > 0 && (
-            <p className="explication">
-              Codes encore valables :{" "}
-              {props.e.codes
-                .filter((c) => c.code !== nouveau?.code)
-                .map((c) => `${afficherCode(c.code)} (${c.nomCaisse}, jusqu'au ${dateHeure(c.expireLe)})`)
-                .join(" · ")}
-            </p>
-          )}
-        </>
-      )}
-    </section>
+    <Panneau
+      surtitre="Appareils"
+      titre="Rattacher un iPad ou un iPhone"
+      onFermer={props.onFermer}
+      onEnregistrer={generer}
+      libelleEnregistrer={nouveau ? "Générer un autre code" : "Générer un code"}
+      enCours={enCours}
+      erreur={erreur}
+      modifie={!nouveau && nom.trim() !== ""}
+    >
+      <div className="options" role="radiogroup" aria-label="Appareil à rattacher">
+        {(["iPad", "iPhone"] as const).map((t) => (
+          <button key={t} type="button" role="radio" aria-checked={type === t} className={`option${type === t ? " active" : ""}`} onClick={() => setType(t)}>
+            <AvecIcone icone={ICONE_APPAREIL[t]} classe={CLASSE_APPAREIL[t]}>
+              {t}
+            </AvecIcone>
+          </button>
+        ))}
+      </div>
+      <Champ libelle={`Nom de l'${type}`} aide={type === "iPad" ? "Comptoir, Terrasse…" : "Salle, Lionel…"}>
+        <input value={nom} onChange={(ev) => setNom(ev.target.value)} placeholder={type === "iPad" ? "Nom de l'iPad (Comptoir, Terrasse…)" : "Nom de l'iPhone (Salle, Lionel…)"} maxLength={40} autoComplete="off" />
+      </Champ>
+      {nouveau ? (
+        <div className="admin-code" role="status">
+          <span>{afficherCode(nouveau.code)}</span>
+          <small>
+            {nouveau.nomCaisse} · valable jusqu'au {dateHeure(nouveau.expireLe)}
+          </small>
+        </div>
+      ) : null}
+      <ol className="a-etapes">
+        <li>
+          Sur l'{type}, ouvrez <strong>{location.host}</strong> dans Safari.
+        </li>
+        <li>Partager › Sur l'écran d'accueil, puis ouvrez la caisse depuis cette icône.</li>
+        <li>Saisissez le code. Il sert une seule fois et expire au bout de 48 heures.</li>
+      </ol>
+    </Panneau>
   );
 }
 
@@ -883,12 +907,18 @@ function Caisses(props: { e: EtablissementAdmin; caisses: CaisseAdmin[]; onChang
     }
   };
   const revoquer = async (c: CaisseAdmin) => {
-    if (!window.confirm(`Révoquer « ${c.nom} » ? Cet appareil ne pourra plus encaisser ni se synchroniser. C'est définitif.`)) return;
+    const oui = await confirmer({
+      titre: `Révoquer « ${c.nom} » ?`,
+      message: "Cet appareil ne pourra plus encaisser ni se synchroniser. C'est définitif : pour le réutiliser, il faudra le rattacher de nouveau.",
+      confirmer: "Révoquer l'appareil",
+      danger: true,
+    });
+    if (!oui) return;
     try {
       await api.revoquer(c.id);
       await props.onChange();
     } catch (e) {
-      window.alert(message(e));
+      await informer("Révocation impossible", message(e));
     }
   };
   return (
@@ -987,86 +1017,142 @@ function Caisses(props: { e: EtablissementAdmin; caisses: CaisseAdmin[]; onChang
   );
 }
 
-function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
-  const [nom, setNom] = useState("");
-  const [role, setRole] = useState<Role>(props.e.utilisateurs.length ? "serveur" : "responsable");
-  const [pin, setPin] = useState("");
-  const { enCours, erreur, setErreur, envoyer } = useEnvoi();
+/** Personne ouverte dans le panneau : une nouvelle (sans id) ou une existante. */
+interface FichePersonne {
+  id?: string;
+  nom: string;
+  role: Role;
+  actif: boolean;
+  /** Nouveau code PIN ; vide pour une personne existante : inchangé. */
+  pin: string;
+}
 
-  const ajouter = (ev: FormEvent) => {
-    ev.preventDefault();
-    if (!PIN_VALIDE.test(pin)) return setErreur("Le code PIN compte 4 chiffres.");
+function Equipe(props: { e: EtablissementAdmin; onChange: () => Promise<void>; surtitre?: string }) {
+  const [fiche, setFiche] = useState<FichePersonne | null>(null);
+  const [depart, setDepart] = useState<FichePersonne | null>(null);
+  const { enCours, erreur, setErreur, envoyer } = useEnvoi();
+  const ouvrir = (f: FichePersonne) => {
+    setErreur("");
+    setFiche(f);
+    setDepart(f);
+  };
+  const nouvelle = () => ouvrir({ nom: "", role: props.e.utilisateurs.some((u) => u.role === "responsable") ? "serveur" : "responsable", actif: true, pin: "" });
+  const modifie = !!fiche && JSON.stringify(fiche) !== JSON.stringify(depart);
+  const enregistrer = () => {
+    if (!fiche) return;
+    if (!fiche.nom.trim()) return setErreur("Le prénom est obligatoire.");
+    if ((!fiche.id || fiche.pin) && !PIN_VALIDE.test(fiche.pin)) return setErreur("Le code PIN compte 4 chiffres.");
     void envoyer(async () => {
-      await api.enregistrerUtilisateur(props.e.id, { nom: nom.trim(), role, pin, actif: true });
-      setNom("");
-      setPin("");
-      setRole("serveur");
+      await api.enregistrerUtilisateur(props.e.id, {
+        ...(fiche.id ? { id: fiche.id } : {}),
+        nom: fiche.nom.trim(),
+        role: fiche.role,
+        actif: fiche.actif,
+        ...(fiche.pin ? { pin: fiche.pin } : {}),
+      });
+      setFiche(null);
       await props.onChange();
     });
   };
-  const modifier = (u: UtilisateurApi, maj: Partial<{ role: Role; actif: boolean; pin: string }>) =>
-    envoyer(async () => {
-      await api.enregistrerUtilisateur(props.e.id, { id: u.id, nom: u.nom, role: maj.role ?? u.role, actif: maj.actif ?? u.actif, pin: maj.pin });
-      await props.onChange();
-    });
-  const changerPin = (u: UtilisateurApi) => {
-    const p = window.prompt(`Nouveau code PIN à 4 chiffres pour ${u.nom}`);
-    if (p == null) return;
-    if (!PIN_VALIDE.test(p)) return setErreur("Le code PIN compte 4 chiffres.");
-    void modifier(u, { pin: p });
-  };
+  const actifs = props.e.utilisateurs.filter((u) => u.actif);
 
   return (
-    <section className="admin-section">
-      {props.e.utilisateurs.length > 0 && (
-        <table className="tableau admin-tableau">
-          <tbody>
-            {props.e.utilisateurs.map((u) => (
-              <tr key={u.id} className={u.actif ? "" : "annule"}>
-                <td>{u.nom}</td>
-                <td>
-                  <select value={u.role} disabled={enCours} onChange={(ev) => void modifier(u, { role: ev.target.value as Role })}>
-                    <option value="serveur">Serveur</option>
-                    <option value="responsable">Responsable</option>
-                  </select>
-                </td>
-                <td className="admin-boutons">
-                  <BoutonIcone icone={KeyRound} libelle={`Changer le code PIN de ${u.nom}`} variante="discret" disabled={enCours} onClick={() => changerPin(u)} />
-                  <BoutonIcone
-                    icone={u.actif ? UserX : UserCheck}
-                    libelle={`${u.actif ? "Désactiver" : "Réactiver"} ${u.nom}`}
-                    variante="discret"
-                    disabled={enCours}
-                    onClick={() => void modifier(u, { actif: !u.actif })}
-                  />
-                </td>
-              </tr>
+    <>
+      <EntetePage
+        surtitre={props.surtitre}
+        titre="Équipe"
+        aide="Chaque personne se connecte en caisse avec son code PIN. Les responsables valident annulations et clôtures. Les changements arrivent sur les iPad et iPhone à la synchronisation suivante (une minute au plus en ligne)."
+        actions={
+          <button className="bouton principal" onClick={nouvelle}>
+            <AvecIcone icone={UserPlus}>Ajouter une personne</AvecIcone>
+          </button>
+        }
+      />
+      <section className="admin-section">
+        {props.e.utilisateurs.length === 0 ? (
+          <p className="explication">Personne pour l'instant : commencez par un responsable.</p>
+        ) : (
+          <>
+            <p className="a-resume">
+              {pluriel(actifs.length, "personne")} en service · {pluriel(actifs.filter((u) => u.role === "responsable").length, "responsable")}
+            </p>
+            <table className="tableau admin-tableau a-liste">
+              <thead>
+                <tr>
+                  <th>Personne</th>
+                  <th>Rôle</th>
+                  <th>État</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {props.e.utilisateurs.map((u) => (
+                  <tr key={u.id} className={u.actif ? "" : "annule"}>
+                    <td>
+                      <strong>{u.nom}</strong>
+                    </td>
+                    <td>{u.role === "responsable" ? "Responsable" : "Serveur"}</td>
+                    <td>{u.actif ? "En service" : "Désactivé"}</td>
+                    <td className="admin-boutons">
+                      <button className="bouton" onClick={() => ouvrir({ id: u.id, nom: u.nom, role: u.role, actif: u.actif, pin: "" })} aria-label={`Modifier ${u.nom}`}>
+                        <AvecIcone icone={Pencil}>Modifier</AvecIcone>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </section>
+      {fiche && (
+        <Panneau
+          surtitre="Équipe"
+          titre={fiche.id ? fiche.nom || "Personne" : "Nouvelle personne"}
+          onFermer={() => setFiche(null)}
+          onEnregistrer={enregistrer}
+          libelleEnregistrer={fiche.id ? "Enregistrer" : "Ajouter"}
+          enCours={enCours}
+          modifie={modifie}
+          erreur={erreur}
+        >
+          <Champ libelle="Prénom">
+            <input value={fiche.nom} onChange={(ev) => setFiche({ ...fiche, nom: ev.target.value })} required maxLength={60} autoComplete="off" />
+          </Champ>
+          <fieldset className="a-choix">
+            <legend>Rôle</legend>
+            {(["serveur", "responsable"] as const).map((r) => (
+              <label key={r} className="case">
+                <input type="radio" name="role" checked={fiche.role === r} onChange={() => setFiche({ ...fiche, role: r })} />
+                <span>
+                  <strong>{r === "responsable" ? "Responsable" : "Serveur"}</strong>
+                  <small>{r === "responsable" ? "Valide annulations, remises et clôtures ; ouvre les statistiques" : "Prend les commandes et encaisse"}</small>
+                </span>
+              </label>
             ))}
-          </tbody>
-        </table>
+          </fieldset>
+          <Champ libelle={fiche.id ? "Nouveau code PIN" : "Code PIN"} aide={fiche.id ? "4 chiffres ; laissez vide pour le garder" : "4 chiffres, pour se connecter en caisse"}>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={4}
+              value={fiche.pin}
+              onChange={(ev) => setFiche({ ...fiche, pin: ev.target.value.replace(/\D/g, "") })}
+            />
+          </Champ>
+          {fiche.id && (
+            <label className="case">
+              <input type="checkbox" checked={fiche.actif} onChange={(ev) => setFiche({ ...fiche, actif: ev.target.checked })} />
+              <span>
+                <strong>En service</strong>
+                <small>Décochée, la personne ne peut plus se connecter ; ses tickets restent à son nom.</small>
+              </span>
+            </label>
+          )}
+        </Panneau>
       )}
-      <form className="admin-ligne" onSubmit={ajouter}>
-        <input placeholder="Prénom" value={nom} onChange={(ev) => setNom(ev.target.value)} required maxLength={60} />
-        <select value={role} onChange={(ev) => setRole(ev.target.value as Role)}>
-          <option value="serveur">Serveur</option>
-          <option value="responsable">Responsable</option>
-        </select>
-        <input
-          placeholder="Code PIN"
-          type="password"
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={4}
-          value={pin}
-          onChange={(ev) => setPin(ev.target.value.replace(/\D/g, ""))}
-        />
-        <button className="bouton" disabled={enCours}>
-          <AvecIcone icone={UserPlus}>Ajouter</AvecIcone>
-        </button>
-      </form>
-      {props.e.utilisateurs.length === 0 && <p className="explication">Commencez par un responsable.</p>}
-      {erreur && <p className="erreur">{erreur}</p>}
-    </section>
+    </>
   );
 }
 
@@ -1116,8 +1202,18 @@ function ImprimanteTickets(props: { e: EtablissementAdmin; onChange: () => Promi
     setFait("");
     const a = adresse.trim();
     if (a && !/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) return setErreur("Adresse IP attendue, par exemple 192.168.1.50.");
-    if (!a && actuelle && !window.confirm(`Retirer l'imprimante ${actuelle.adresse} ? Les appareils sans imprimante à eux n'imprimeront plus.`)) return;
     void envoyer(async () => {
+      if (
+        !a &&
+        actuelle &&
+        !(await confirmer({
+          titre: `Retirer l'imprimante ${actuelle.adresse} ?`,
+          message: "Les appareils qui n'ont pas d'imprimante à eux n'imprimeront plus les notes, factures et Z.",
+          confirmer: "Retirer l'imprimante",
+          danger: true,
+        }))
+      )
+        return;
       const r = await api.enregistrerImprimanteTickets(props.e.id, a ? { adresse: a, sansAccents } : null);
       setHistorique(r.historique);
       await props.onChange();
@@ -1193,12 +1289,17 @@ function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => P
 function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
   const [donnees, setDonnees] = useState<ReponseComptes | null>(null);
   const [edition, setEdition] = useState<ClientApi | null>(null);
-  const { enCours, erreur, envoyer } = useEnvoi();
+  const [departEdition, setDepartEdition] = useState<ClientApi | null>(null);
+  const ouvrir = (c: ClientApi) => {
+    setEdition(c);
+    setDepartEdition(c);
+  };
+  const { enCours, erreur, setErreur, envoyer } = useEnvoi();
   const charger = useCallback(() => envoyer(async () => setDonnees(await api.comptes(props.etablissementId))), [envoyer, props.etablissementId]);
   useEffect(() => void charger(), [charger]);
-  const enregistrer = (ev: FormEvent) => {
-    ev.preventDefault();
+  const enregistrer = () => {
     if (!edition) return;
+    if (!edition.nom.trim()) return setErreur("Le nom du client est obligatoire.");
     void envoyer(async () => {
       await api.enregistrerClient(props.etablissementId, {
         ...edition,
@@ -1232,7 +1333,7 @@ function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
           <button className="bouton" disabled={enCours} onClick={() => void charger()}>
             <AvecIcone icone={RotateCw}>Actualiser</AvecIcone>
           </button>
-          <button className="bouton principal" onClick={() => setEdition({ id: nouvelIdClient(), nom: "", telephone: "", email: "", actif: true })}>
+          <button className="bouton principal" onClick={() => ouvrir({ id: nouvelIdClient(), nom: "", telephone: "", email: "", actif: true })}>
             <AvecIcone icone={UserPlus}>Nouveau client</AvecIcone>
           </button>
         </>
@@ -1268,7 +1369,7 @@ function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
                 <td>{c.ventes.length ? pluriel(c.ventes.length, "note due") : "—"}</td>
                 <td className="nombre">{euros(c.soldeTTC)}</td>
                 <td className="admin-boutons">
-                  <BoutonIcone icone={Pencil} variante="discret" libelle={`Modifier la fiche de ${c.client.nom}`} onClick={() => setEdition({ ...c.client })} />
+                  <BoutonIcone icone={Pencil} variante="discret" libelle={`Modifier la fiche de ${c.client.nom}`} onClick={() => ouvrir({ ...c.client })} />
                 </td>
               </tr>
             ))}
@@ -1276,25 +1377,36 @@ function ComptesClients(props: { etablissementId: string; surtitre?: string }) {
         </table>
       )}
       {donnees && donnees.comptes.length === 0 && <p className="explication">Aucun client pour l'instant : ils se créent en caisse (Encaisser › En compte) ou ici.</p>}
-      {edition ? (
-        <form className="admin-ligne" onSubmit={enregistrer}>
-          <input value={edition.nom} onChange={(ev) => setEdition({ ...edition, nom: ev.target.value })} placeholder="Nom du client" required maxLength={80} />
-          <input value={edition.telephone} onChange={(ev) => setEdition({ ...edition, telephone: ev.target.value })} placeholder="Téléphone" maxLength={30} />
-          <input value={edition.email ?? ""} onChange={(ev) => setEdition({ ...edition, email: ev.target.value })} placeholder="E-mail" type="email" maxLength={254} />
-          <label className="case">
-            <input type="checkbox" checked={edition.actif} onChange={(ev) => setEdition({ ...edition, actif: ev.target.checked })} />
-            Actif
-          </label>
-          <button className="bouton principal" disabled={enCours}>
-            <AvecIcone icone={Save}>Enregistrer</AvecIcone>
-          </button>
-          <button type="button" className="bouton" onClick={() => setEdition(null)}>
-            Annuler
-          </button>
-        </form>
-      ) : null}
-      {erreur && <p className="erreur">{erreur}</p>}
+      {erreur && !edition && <p className="erreur">{erreur}</p>}
     </section>
+    {edition && (
+      <Panneau
+        surtitre="Comptes clients"
+        titre={donnees?.comptes.some((c) => c.client.id === edition.id) ? departEdition?.nom || "Client" : "Nouveau client"}
+        onFermer={() => setEdition(null)}
+        onEnregistrer={enregistrer}
+        enCours={enCours}
+        modifie={JSON.stringify(edition) !== JSON.stringify(departEdition)}
+        erreur={erreur}
+      >
+        <Champ libelle="Nom du client" aide="Figure sur ses tickets en compte">
+          <input value={edition.nom} onChange={(ev) => setEdition({ ...edition, nom: ev.target.value })} required maxLength={80} autoComplete="off" />
+        </Champ>
+        <Champ libelle="Téléphone" aide="Facultatif">
+          <input value={edition.telephone} onChange={(ev) => setEdition({ ...edition, telephone: ev.target.value })} maxLength={30} inputMode="tel" autoComplete="off" />
+        </Champ>
+        <Champ libelle="E-mail" aide="Facultatif">
+          <input value={edition.email ?? ""} onChange={(ev) => setEdition({ ...edition, email: ev.target.value })} type="email" maxLength={254} autoComplete="off" />
+        </Champ>
+        <label className="case">
+          <input type="checkbox" checked={edition.actif} onChange={(ev) => setEdition({ ...edition, actif: ev.target.checked })} />
+          <span>
+            <strong>Actif</strong>
+            <small>Décoché, le client n'est plus proposé en caisse ; son solde reste dû.</small>
+          </span>
+        </label>
+      </Panneau>
+    )}
     </>
   );
 }

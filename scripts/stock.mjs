@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
+import { accepterConfirmations, preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
 
 const require = createRequire(new globalThis.URL("../apps/caisse/package.json", import.meta.url));
 const { zipSync, strToU8 } = require("fflate");
@@ -63,7 +63,7 @@ const bureau = await b.newContext({ viewport: { width: 1280, height: 900 } });
 await bureau.addCookies([{ name: nomCookie, value: valeurCookie, url: `${URL}/api/admin` }]);
 const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(e.message));
-a.on("dialog", (d) => void d.accept());
+await accepterConfirmations(a);
 const clic = (nom) => a.getByRole("button", { name: nom, exact: true }).first().click();
 await a.goto(`${URL}/admin`);
 await rubriqueAdmin(a, "Stock et recettes");

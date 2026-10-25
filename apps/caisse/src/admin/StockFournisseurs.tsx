@@ -133,7 +133,7 @@ function ModaleFournisseur(props: { fournisseur: Fournisseur; stock: ReponseStoc
   };
 
   return (
-    <Modale
+    <Modale lateral
       large
       titre={f0.id ? f0.nom : f0.nom ? `Fiche de ${f0.nom}` : "Nouveau fournisseur"}
       onFermer={props.onFermer}

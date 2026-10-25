@@ -82,3 +82,20 @@ export async function menuCompte(page, action) {
   await page.getByRole("button", { name: /^Compte / }).click();
   await page.getByRole("menuitem", { name: action }).click();
 }
+
+/**
+ * Accepte les confirmations : celles du navigateur (window.confirm) et celles de l'administration,
+ * dans la page depuis la refonte (fenêtre « Révoquer l'appareil », « Supprimer »…), comme le ferait
+ * la personne qui clique sur le bouton qui confirme. À appeler avant d'ouvrir la page.
+ */
+export async function accepterConfirmations(page) {
+  page.on("dialog", (d) => void d.accept());
+  await page.addInitScript(() => {
+    new MutationObserver(() => {
+      const d = document.querySelector(".a-confirmation:not([data-acceptee])");
+      if (!d) return;
+      d.setAttribute("data-acceptee", "");
+      setTimeout(() => d.querySelector(".modale-pied button:last-child")?.click(), 30);
+    }).observe(document, { childList: true, subtree: true });
+  });
+}

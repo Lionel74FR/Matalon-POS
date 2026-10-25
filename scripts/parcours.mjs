@@ -30,10 +30,13 @@ await a.locator(".coque-etab").waitFor();
 const rubrique = (nom) => rubriqueAdmin(a, nom);
 // Équipe : un responsable d'abord.
 await rubrique("Équipe");
-await a.getByPlaceholder("Prénom").fill("Lionel");
-await a.locator(".admin-section", { has: a.getByPlaceholder("Prénom") }).locator("select").last().selectOption("responsable");
-await a.getByPlaceholder("Code PIN").fill("1234");
-await a.getByRole("button", { name: "Ajouter", exact: true }).click();
+// Panneau d'ajout (refonte du 25 octobre) : la première personne est proposée responsable.
+await a.getByRole("button", { name: "Ajouter une personne" }).click();
+const panneauPersonne = a.getByRole("dialog", { name: "Nouvelle personne" });
+await panneauPersonne.getByLabel("Prénom").fill("Lionel");
+await panneauPersonne.getByRole("radio", { name: /^Responsable/ }).check();
+await panneauPersonne.getByLabel("Code PIN").fill("1234");
+await panneauPersonne.getByRole("button", { name: "Ajouter", exact: true }).click();
 await a.locator(".admin-tableau td", { hasText: "Lionel" }).waitFor();
 // Identité légale.
 await rubrique("Établissement");
@@ -45,7 +48,8 @@ await a.getByRole("button", { name: "Enregistrer", exact: true }).click();
 await a.getByText("Enregistré.").waitFor();
 // Code de rattachement.
 await rubrique("Appareils");
-await a.getByPlaceholder("Nom de l'iPad").fill("Comptoir");
+await a.getByRole("button", { name: "Rattacher un appareil" }).click();
+await a.getByLabel("Nom de l'iPad").fill("Comptoir");
 await a.getByRole("button", { name: "Générer un code" }).click();
 const code = (await a.locator(".admin-code span").textContent()).trim();
 await a.screenshot({ path: `${sortie}/00b-admin-code.png`, fullPage: true });

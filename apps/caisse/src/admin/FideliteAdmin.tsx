@@ -18,6 +18,7 @@ import { Modale } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, type EtablissementAdmin } from "./api";
 import { EntetePage } from "./Page";
+import { confirmer } from "./Panneau";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Paris" }) : "—");
@@ -157,9 +158,14 @@ export function FideliteAdmin(props: { e: EtablissementAdmin }) {
             <button
               className="bouton discret"
               disabled={enCours}
-              onClick={() => {
-                if (confirm(`Retirer ${e.identite.enseigne} du programme « ${programme.nom} » ? La caisse ne proposera plus la fidélité ; les membres et leurs points restent.`)) void action("quitter");
-              }}
+              onClick={() =>
+                void confirmer({
+                  titre: `Retirer ${e.identite.enseigne} du programme « ${programme.nom} » ?`,
+                  message: "La caisse ne proposera plus la fidélité ; les membres et leurs points restent.",
+                  confirmer: "Quitter le programme",
+                  danger: true,
+                }).then((oui) => oui && void action("quitter"))
+              }
             >
               <AvecIcone icone={LogOut}>Quitter le programme</AvecIcone>
             </button>
@@ -440,7 +446,7 @@ function FicheMembre(props: { programme: ProgrammeFidelite; id: string; onFermer
   const m = d?.membre;
 
   return (
-    <Modale titre={m ? `${m.prenom} ${m.nom}`.trim() : "Membre"} large onFermer={props.onFermer}>
+    <Modale lateral titre={m ? `${m.prenom} ${m.nom}`.trim() : "Membre"} large onFermer={props.onFermer}>
       {!m || !saisie ? (
         <p className="explication">{erreur || "Chargement…"}</p>
       ) : (
@@ -523,13 +529,21 @@ function FicheMembre(props: { programme: ProgrammeFidelite; id: string; onFermer
             <button
               className="bouton danger"
               disabled={enCours}
-              onClick={() => {
-                if (confirm(`Effacer ${m.prenom} ? Son nom, son téléphone et son e-mail sont supprimés ; ses points sont perdus. Irréversible.`))
-                  void envoyer(async () => {
-                    await api.effacerMembre(programme.id, m.id);
-                    props.onFermer();
-                  });
-              }}
+              onClick={() =>
+                void confirmer({
+                  titre: `Effacer ${m.prenom} ?`,
+                  message: "Son nom, son téléphone et son e-mail sont supprimés ; ses points sont perdus. C'est irréversible.",
+                  confirmer: "Effacer le membre",
+                  danger: true,
+                }).then(
+                  (oui) =>
+                    oui &&
+                    void envoyer(async () => {
+                      await api.effacerMembre(programme.id, m.id);
+                      props.onFermer();
+                    }),
+                )
+              }
             >
               <AvecIcone icone={UserX}>Effacer le membre (RGPD)</AvecIcone>
             </button>

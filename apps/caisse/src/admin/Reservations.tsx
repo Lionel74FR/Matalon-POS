@@ -7,6 +7,7 @@ import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
 import { dateLongue, decaler, FicheReservation, JOURS_A_VENIR, LIBELLES_SOURCE, LIBELLES_STATUT } from "../ui/FicheReservation";
 import { ChoixTables } from "../ui/ChoixTables";
 import { EntetePage, Onglets, type DefOnglet } from "./Page";
+import { confirmer } from "./Panneau";
 
 type Onglet = "liste" | "reglages" | "site";
 const ONGLETS: Array<DefOnglet<Onglet>> = [
@@ -115,7 +116,8 @@ function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation 
     try {
       await api.modifierReservation(etab.id, r.id, corps);
     } catch (e) {
-      if (e instanceof ErreurAdmin && e.statut === 409 && window.confirm(e.message)) await api.modifierReservation(etab.id, r.id, { ...corps, forcer: true });
+      if (e instanceof ErreurAdmin && e.statut === 409 && (await confirmer({ titre: "Enregistrer quand même ?", message: e.message, confirmer: "Enregistrer quand même" })))
+        await api.modifierReservation(etab.id, r.id, { ...corps, forcer: true });
       else setErreur(message(e));
     }
     await charger();
@@ -299,7 +301,7 @@ export function Saisie(props: { etab: { id: string; tables: Table[] }; jour: str
       await creer(corps);
       props.onFaite();
     } catch (err) {
-      if (err instanceof Error && "statut" in err && (err as ErreurAdmin).statut === 409 && window.confirm(`${err.message} Enregistrer quand même ?`)) {
+      if (err instanceof Error && "statut" in err && (err as ErreurAdmin).statut === 409 && (await confirmer({ titre: "Enregistrer quand même ?", message: err.message, confirmer: "Enregistrer quand même" }))) {
         try {
           await creer({ ...corps, forcer: true });
           props.onFaite();
@@ -631,7 +633,7 @@ function CleResend(props: { etabId: string; envoi: EtatEnvoi | undefined; onChan
     }
   };
   const retirer = async () => {
-    if (!window.confirm("Retirer la clé Resend de l'établissement ? Les e-mails ne partiront plus (sauf clé commune du groupe).")) return;
+    if (!(await confirmer({ titre: "Retirer la clé Resend de l'établissement ?", message: "Les e-mails ne partiront plus, sauf avec la clé commune du groupe.", confirmer: "Retirer la clé", danger: true }))) return;
     try {
       await api.retirerCleResend(props.etabId);
       props.onChange({ ...envoi, cleEtablissement: null });

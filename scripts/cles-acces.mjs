@@ -4,7 +4,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/cles-acces.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { menuCompte, preparerServeur, totp } from "./preparer-caisse.mjs";
+import { accepterConfirmations, menuCompte, preparerServeur, totp } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -18,7 +18,7 @@ async function contexte(viewport) {
   const ctx = await b.newContext({ viewport, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => erreurs.push(e.message));
-  page.on("dialog", (d) => void d.accept());
+  await accepterConfirmations(page);
   const cdp = await ctx.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
   const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {

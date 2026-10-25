@@ -33,7 +33,8 @@ export function Panneau(props: {
   useEffect(() => {
     precedent.current = document.activeElement;
     // Le premier champ reçoit le focus ; à la fermeture, il revient au bouton qui a ouvert le panneau.
-    const champ = panneau.current?.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea, button");
+    const corps = panneau.current?.querySelector(".a-panneau-corps");
+    const champ = corps?.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea") ?? corps?.querySelector<HTMLElement>("button");
     champ?.focus();
     const echap = (e: KeyboardEvent) => e.key === "Escape" && fermerRef.current();
     window.addEventListener("keydown", echap);

@@ -10,6 +10,7 @@ import { Modale } from "../ui/communs";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api } from "./api";
 import { euros, eurosMicro, pourcent } from "./stock-commun";
+import { confirmer } from "./Panneau";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const jour = (d = new Date()) => new Intl.DateTimeFormat("fr-CA", { timeZone: "Europe/Paris" }).format(d);
@@ -58,10 +59,11 @@ export function OngletEtat(props: Proprietes) {
         <ListePieces
           documents={pieces}
           referentiel={props.stock.referentiel}
-          onAnnuler={(d) => {
-            if (!window.confirm("Annuler cette réception ? Ses quantités ressortent du stock.")) return;
-            void api.annulerReception(props.etab, d.id).then(charger, (x) => setErreur(message(x)));
-          }}
+          onAnnuler={(d) =>
+            void confirmer({ titre: "Annuler cette réception ?", message: "Ses quantités ressortent du stock ; la réception reste dans l'historique, marquée annulée.", confirmer: "Annuler la réception", annuler: "Garder", danger: true }).then(
+              (oui) => oui && void api.annulerReception(props.etab, d.id).then(charger, (x) => setErreur(message(x))),
+            )
+          }
         />
         {erreur && <p className="erreur">{erreur}</p>}
       </section>
@@ -502,7 +504,7 @@ export function OngletFactures(props: Proprietes) {
                 </td>
                 <td className="stock-actions">
                   {!c.revoqueeLe && (
-                    <button className="bouton danger" onClick={() => window.confirm(`Révoquer « ${c.nom} » ? L'agent ne pourra plus envoyer de factures avec cette clé.`) && void api.revoquerCleApi(c.id).then(charger)}>
+                    <button className="bouton danger" onClick={() => void confirmer({ titre: `Révoquer « ${c.nom} » ?`, message: "L'agent ne pourra plus envoyer de factures avec cette clé.", confirmer: "Révoquer la clé", danger: true }).then((oui) => oui && void api.revoquerCleApi(c.id).then(charger))}>
                       Révoquer
                     </button>
                   )}

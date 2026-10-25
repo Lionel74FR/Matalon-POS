@@ -444,6 +444,17 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7a">
+    <label><input type="checkbox">Administration : panneau latéral et confirmations</label>
+    <ol>
+      <li>Réglages › Équipe › <span class="bouton">Ajouter une personne</span> : un prénom, le rôle, un code PIN, puis <span class="bouton">Ajouter</span>.</li>
+      <li>Sur cette personne, <span class="bouton">Modifier</span> : changez le rôle, puis Échap ; ensuite saisissez un nouveau code PIN et enregistrez.</li>
+      <li>Réglages › Appareils › <span class="bouton">Rattacher un appareil</span> : choisissez iPhone, un nom, <span class="bouton">Générer un code</span>.</li>
+      <li>Sur un appareil de test, <span class="bouton">Révoquer</span>, puis <span class="bouton">Annuler</span> dans la fenêtre.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> chaque fiche s'ouvre sur le bord droit, la liste reste visible derrière (tout l'écran sur iPhone). Dès qu'un champ change, le bas du panneau affiche « Modifié, non enregistré » ; Échap demande « Abandonner les modifications ? » (Continuer garde la saisie). Le nouveau code PIN marche en caisse à la synchronisation suivante. Le code de rattachement s'affiche dans le panneau et reste listé dans « Codes de rattachement en attente ». La révocation demande une confirmation dans la page ; Annuler laisse l'appareil en service. Aucune fenêtre grise du navigateur ne s'ouvre.</p>
+  </section>
+
   <section class="scenario" data-id="s6z">
     <label><input type="checkbox">Nouvelle administration : accueil, menu et thème</label>
     <ol>

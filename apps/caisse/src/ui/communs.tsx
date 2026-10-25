@@ -8,6 +8,8 @@ export function Modale(props: {
   children: ReactNode;
   pied?: ReactNode;
   large?: boolean;
+  /** Panneau sur le bord droit plutôt qu'au centre (administration : fiche d'un produit, d'un ticket…). */
+  lateral?: boolean;
 }) {
   useEffect(() => {
     const echap = (e: KeyboardEvent) => e.key === "Escape" && props.onFermer();
@@ -15,8 +17,8 @@ export function Modale(props: {
     return () => window.removeEventListener("keydown", echap);
   }, [props]);
   return (
-    <div className="voile" onPointerDown={(e) => e.target === e.currentTarget && props.onFermer()}>
-      <div className={`modale${props.large ? " large" : ""}`} role="dialog" aria-modal="true" aria-label={props.titre}>
+    <div className={`voile${props.lateral ? " lateral" : ""}`} onPointerDown={(e) => e.target === e.currentTarget && props.onFermer()}>
+      <div className={`modale${props.large ? " large" : ""}${props.lateral ? " lateral" : ""}`} role="dialog" aria-modal="true" aria-label={props.titre}>
         <header className="modale-tete">
           <h2>{props.titre}</h2>
           <BoutonIcone icone={X} variante="discret" libelle="Fermer" onClick={props.onFermer} />
