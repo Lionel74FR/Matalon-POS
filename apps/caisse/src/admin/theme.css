@@ -438,6 +438,12 @@ textarea:focus {
   font-weight: 700;
 }
 
+.coque-menu-titre small {
+  display: block;
+  font-weight: 400;
+  color: var(--a-doux);
+}
+
 .coque-menu-item {
   width: 100%;
   display: flex;
@@ -1853,4 +1859,110 @@ textarea:focus {
   .accueil-resa-table {
     display: none;
   }
+}
+
+/* Accès à l'administration (26 octobre 2026) : comptables invitées par le propriétaire. */
+.modale.acces-admin {
+  width: min(680px, 100%);
+}
+.acces-liste {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.acces-fiche {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--a-ligne);
+  border-radius: 10px;
+  background: var(--a-surface-2);
+}
+.acces-fiche.revoque {
+  opacity: 0.75;
+}
+.acces-fiche-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.acces-fiche-tete > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.acces-fiche small {
+  color: var(--a-doux);
+}
+.acces-fiche .acces-etat {
+  color: var(--a-texte);
+}
+.acces-fiche .options,
+.acces-lien .options,
+.acces-invitation .options,
+.acces-edition .options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.acces-etabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.acces-etabs legend {
+  width: 100%;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.acces-edition,
+.acces-invitation {
+  display: grid;
+  gap: 10px;
+}
+.acces-invitation h3 {
+  margin: 4px 0;
+}
+.acces-invitation .champ {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+.acces-lien {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 2px solid var(--a-accent);
+  background: var(--a-surface);
+}
+.acces-lien p {
+  margin: 0;
+}
+.acces-lien input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+.acces-journal summary {
+  cursor: pointer;
+  color: var(--a-doux);
+}
+.acces-journal ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--a-doux);
+  font-size: 0.9rem;
+}
+.acces-admin .erreur:empty {
+  display: none;
 }

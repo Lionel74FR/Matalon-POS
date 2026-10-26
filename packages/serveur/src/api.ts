@@ -90,6 +90,8 @@ import {
   type ReponseSynchro,
   type Table,
   type UtilisateurApi,
+  type AccesAdminApi,
+  type InvitationAdminApi,
 } from "./partage.js";
 import { migrer } from "./schema.js";
 import { ALGORITHMES, depuisBase64Url, ErreurWebAuthn, verifierAssertion, verifierEnregistrement, type ReponseAssertion, type ReponseEnregistrement } from "./webauthn.js";
@@ -2060,16 +2062,31 @@ function controlerOrigine(requete: Request) {
   }
 }
 
-async function adminConnecte(env: Environnement, requete: Request): Promise<{ id: string; identifiant: string } | null> {
+/** Compte de l'administration : le propriétaire, ou un accès comptable limité à ses établissements. */
+export type RoleAdmin = "proprietaire" | "comptable";
+interface AdminSession {
+  id: string;
+  identifiant: string;
+  role: RoleAdmin;
+  nom: string;
+  /** Établissements ouverts à un accès comptable ; null pour le propriétaire (tous). */
+  etablissements: string[] | null;
+}
+
+/** Un compte valable : propriétaire à double authentification activée, ou comptable non révoqué. */
+const COMPTE_VALABLE = `a.revoque_le is null and (a.totp_actif or a.role = 'comptable')`;
+
+async function adminConnecte(env: Environnement, requete: Request): Promise<AdminSession | null> {
   const jeton = cookie(requete, COOKIE);
   if (!jeton) return null;
-  const [s] = await env.db.requete<{ id: string; identifiant: string; expire_le: string }>(
-    `select a.id, a.identifiant, s.expire_le from sessions_admin s join admins a on a.id = s.admin_id
-     where s.jeton_hash = $1 and a.totp_actif`,
+  const [s] = await env.db.requete<{ id: string; identifiant: string; role: string; nom: string; etablissements: string[] | null; expire_le: string }>(
+    `select a.id, a.identifiant, a.role, a.nom, a.etablissements, s.expire_le from sessions_admin s join admins a on a.id = s.admin_id
+     where s.jeton_hash = $1 and ${COMPTE_VALABLE}`,
     [await sha256(jeton)],
   );
   if (!s || s.expire_le < horloge(env).toISOString()) return null;
-  return { id: s.id, identifiant: s.identifiant };
+  const comptable = s.role === "comptable";
+  return { id: s.id, identifiant: s.identifiant, role: comptable ? "comptable" : "proprietaire", nom: s.nom, etablissements: comptable ? (s.etablissements ?? []) : null };
 }
 
 async function exigerAdmin(env: Environnement, requete: Request) {
@@ -2080,15 +2097,15 @@ async function exigerAdmin(env: Environnement, requete: Request) {
 }
 
 async function statutAdmin(env: Environnement, requete: Request): Promise<Response> {
-  const [n] = await env.db.requete<{ n: number }>("select count(*)::int as n from admins where totp_actif");
+  const [n] = await env.db.requete<{ n: number }>("select count(*)::int as n from admins where totp_actif and role = 'proprietaire'");
   const a = await adminConnecte(env, requete);
-  return json(200, { initialise: !!n?.n, connecte: !!a, identifiant: a?.identifiant ?? null });
+  return json(200, { initialise: !!n?.n, connecte: !!a, identifiant: a?.identifiant ?? null, role: a?.role ?? null, nom: a?.nom ?? null });
 }
 
 /** Création du premier administrateur, possible tant qu'aucun n'a activé sa double authentification. */
 async function initialiserAdmin(env: Environnement, requete: Request): Promise<Response> {
   controlerOrigine(requete);
-  const [n] = await env.db.requete<{ n: number }>("select count(*)::int as n from admins where totp_actif");
+  const [n] = await env.db.requete<{ n: number }>("select count(*)::int as n from admins where totp_actif and role = 'proprietaire'");
   if (n?.n) throw new ErreurHttp(403, "DEJA_INITIALISE", "L'administration est déjà configurée.");
   const corps = await lireJson<Record<string, unknown>>(requete);
   const identifiant = texte(corps.identifiant, "identifiant", 80).toLowerCase();
@@ -2097,7 +2114,7 @@ async function initialiserAdmin(env: Environnement, requete: Request): Promise<R
   if (motDePasse.length < 12) throw new ErreurHttp(400, "MOT_DE_PASSE_FAIBLE", "Le mot de passe doit compter au moins 12 caractères.");
   const secret = nouveauSecretTotp();
   await env.db.lot([
-    { texte: "delete from admins where not totp_actif" },
+    { texte: "delete from admins where not totp_actif and role = 'proprietaire'" },
     {
       texte: "insert into admins (id, identifiant, mot_de_passe, totp_secret, cree_le) values ($1, $2, $3, $4, $5)",
       params: [`a-${[...aleatoire(4)].map((b) => b.toString(16).padStart(2, "0")).join("")}`, identifiant, await hacherMotDePasse(motDePasse), secret, horloge(env).toISOString()],
@@ -2119,7 +2136,7 @@ interface LigneAdmin {
 async function verifierIdentifiants(env: Environnement, corps: Record<string, unknown>, activation: boolean): Promise<LigneAdmin> {
   const maintenant = horloge(env);
   const identifiant = String(corps.identifiant ?? "").trim().toLowerCase();
-  const [a] = await env.db.requete<LigneAdmin>("select * from admins where identifiant = $1 and totp_actif = $2", [identifiant, !activation]);
+  const [a] = await env.db.requete<LigneAdmin>("select * from admins where identifiant = $1 and totp_actif = $2 and role = 'proprietaire' and revoque_le is null", [identifiant, !activation]);
   const refus = new ErreurHttp(401, "IDENTIFIANTS_INVALIDES", "Identifiant, mot de passe ou code incorrect.");
   if (!a) throw refus;
   if (a.bloque_jusqua && a.bloque_jusqua > maintenant.toISOString()) {
@@ -2318,7 +2335,7 @@ async function connexionCle(env: Environnement, requete: Request): Promise<Respo
   const defi = await consommerDefi(env, r.response.clientDataJSON, "connexion", null);
   const { rpId, origine } = partieConfiante(requete);
   const [c] = await env.db.requete<LigneCleAcces>(
-    `select k.* from cles_acces_admin k join admins a on a.id = k.admin_id where k.id = $1 and k.rp_id = $2 and a.totp_actif`,
+    `select k.* from cles_acces_admin k join admins a on a.id = k.admin_id where k.id = $1 and k.rp_id = $2 and ${COMPTE_VALABLE}`,
     [r.id, rpId],
   );
   const refus = new ErreurHttp(401, "CLE_INCONNUE", "Clé d'accès non reconnue : connectez-vous avec le mot de passe et le code.");
@@ -2339,6 +2356,301 @@ async function deconnexionAdmin(env: Environnement, requete: Request): Promise<R
   const jeton = cookie(requete, COOKIE);
   if (jeton) await env.db.requete("delete from sessions_admin where jeton_hash = $1", [await sha256(jeton)]);
   return json(200, { ok: true }, { "Set-Cookie": `${COOKIE}=; Path=/api/admin; HttpOnly; Secure; SameSite=Strict; Max-Age=0` });
+}
+
+// ───────── Accès à l'administration (propriétaire et comptables) ─────────
+
+const DUREE_INVITATION_MS = 7 * 24 * 3600_000;
+const ACCES_MAX = 20;
+
+interface LigneAcces {
+  id: string;
+  identifiant: string;
+  role: string;
+  nom: string;
+  etablissements: string[] | null;
+  cree_le: string;
+  revoque_le: string | null;
+}
+
+/** Comptes de l'administration, avec leur dernière connexion, leurs clés et leurs dernières actions. */
+async function listeAcces(env: Environnement): Promise<Response> {
+  const maintenant = horloge(env).toISOString();
+  const comptes = await env.db.requete<LigneAcces>(
+    `select id, identifiant, role, nom, etablissements, cree_le, revoque_le from admins
+     where totp_actif or role = 'comptable' order by role desc, cree_le`,
+  );
+  const acces: AccesAdminApi[] = [];
+  for (const a of comptes) {
+    const [cles] = await env.db.requete<{ n: number }>("select count(*)::int as n from cles_acces_admin where admin_id = $1", [a.id]);
+    const [connexion] = await env.db.requete<{ horodatage: string }>(
+      "select horodatage from journal_admin where admin_id = $1 and action = 'connexion' order by id desc limit 1",
+      [a.id],
+    );
+    const [invitation] = await env.db.requete<{ expire_le: string }>(
+      "select expire_le from invitations_admin where admin_id = $1 and utilisee_le is null and expire_le > $2 order by expire_le desc limit 1",
+      [a.id, maintenant],
+    );
+    const journal = a.role === "comptable"
+      ? await env.db.requete<{ horodatage: string; action: string; details: Record<string, unknown> }>(
+          "select horodatage, action, details from journal_admin where admin_id = $1 order by id desc limit 15",
+          [a.id],
+        )
+      : [];
+    acces.push({
+      id: a.id,
+      role: a.role === "comptable" ? "comptable" : "proprietaire",
+      nom: a.nom,
+      identifiant: a.identifiant,
+      etablissements: a.role === "comptable" ? (a.etablissements ?? []) : null,
+      creeLe: a.cree_le,
+      revoqueLe: a.revoque_le,
+      cles: Number(cles?.n ?? 0),
+      derniereConnexion: connexion?.horodatage ?? null,
+      invitation: invitation ? { expireLe: invitation.expire_le } : null,
+      journal,
+    });
+  }
+  return json(200, { acces });
+}
+
+/** Établissements choisis pour un accès comptable : au moins un, tous existants. */
+async function etablissementsAcces(env: Environnement, v: unknown): Promise<string[]> {
+  const ids = Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string"))] : [];
+  if (!ids.length) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Choisissez au moins un établissement.");
+  const connus = await env.db.requete<{ id: string }>("select id from etablissements where id = any($1::text[])", [ids]);
+  if (connus.length !== ids.length) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Établissement inconnu.");
+  return ids.sort();
+}
+
+/** Nouveau lien d'invitation : il remplace celui qui n'a pas servi. Seule son empreinte est gardée. */
+async function nouvelleInvitation(env: Environnement, adminId: string, parId: string): Promise<{ jeton: string; expireLe: string }> {
+  const maintenant = horloge(env);
+  const jeton = nouveauJeton();
+  const expireLe = new Date(maintenant.getTime() + DUREE_INVITATION_MS).toISOString();
+  await env.db.lot([
+    { texte: "update invitations_admin set expire_le = $2 where admin_id = $1 and utilisee_le is null and expire_le > $2", params: [adminId, maintenant.toISOString()] },
+    {
+      texte: "insert into invitations_admin (jeton_hash, admin_id, cree_le, cree_par, expire_le) values ($1, $2, $3, $4, $5)",
+      params: [await sha256(jeton), adminId, maintenant.toISOString(), parId, expireLe],
+    },
+  ]);
+  return { jeton, expireLe };
+}
+
+/** Le propriétaire invite une comptable : nom, e-mail, établissements ; le lien s'affiche une fois. */
+async function inviterComptable(env: Environnement, requete: Request, admin: AdminSession): Promise<Response> {
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const nom = texte(corps.nom, "nom", 80);
+  const email = texte(corps.email, "email", 254).toLowerCase();
+  if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le nom est obligatoire.");
+  if (!EMAIL_VALIDE.test(email)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Adresse e-mail invalide.");
+  const etablissements = await etablissementsAcces(env, corps.etablissements);
+  const [existe] = await env.db.requete<{ id: string }>("select id from admins where identifiant = $1", [email]);
+  if (existe) throw new ErreurHttp(409, "DEJA_EXISTANT", "Un accès existe déjà pour cette adresse : envoyez-lui un nouveau lien depuis sa fiche.");
+  const [n] = await env.db.requete<{ n: number }>("select count(*)::int as n from admins where role = 'comptable'");
+  if ((n?.n ?? 0) >= ACCES_MAX) throw new ErreurHttp(409, "TROP_D_ACCES", `${ACCES_MAX} accès comptables au plus.`);
+  const id = `a-${[...aleatoire(4)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  // Ni mot de passe ni code : un accès comptable ne s'ouvre que par une clé d'accès.
+  await env.db.requete(
+    `insert into admins (id, identifiant, mot_de_passe, totp_secret, totp_actif, role, nom, etablissements, cree_le, cree_par)
+     values ($1, $2, '', '', false, 'comptable', $3, $4::jsonb, $5, $6)`,
+    [id, email, nom, JSON.stringify(etablissements), horloge(env).toISOString(), admin.id],
+  );
+  const invitation = await nouvelleInvitation(env, id, admin.id);
+  await journaliserAdmin(env, admin.id, "acces_cree", { acces: id, nom, email, etablissements });
+  return json(201, { id, ...invitation });
+}
+
+async function accesComptable(env: Environnement, id: string): Promise<LigneAcces> {
+  const [a] = await env.db.requete<LigneAcces>(
+    "select id, identifiant, role, nom, etablissements, cree_le, revoque_le from admins where id = $1 and role = 'comptable'",
+    [id],
+  );
+  if (!a) throw new ErreurHttp(404, "INTROUVABLE", "Accès introuvable.");
+  return a;
+}
+
+/** Établissements d'un accès, modifiés par le propriétaire. */
+async function modifierAcces(env: Environnement, requete: Request, admin: AdminSession, id: string): Promise<Response> {
+  const a = await accesComptable(env, id);
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const nom = corps.nom === undefined ? a.nom : texte(corps.nom, "nom", 80);
+  if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le nom est obligatoire.");
+  const etablissements = corps.etablissements === undefined ? (a.etablissements ?? []) : await etablissementsAcces(env, corps.etablissements);
+  await env.db.requete("update admins set nom = $2, etablissements = $3::jsonb where id = $1", [id, nom, JSON.stringify(etablissements)]);
+  await journaliserAdmin(env, admin.id, "acces_modifie", { acces: id, nom, etablissements });
+  return listeAcces(env);
+}
+
+/** Nouveau lien pour un accès : autre ordinateur, clé perdue, ou accès révoqué qu'on rétablit. */
+async function relancerAcces(env: Environnement, admin: AdminSession, id: string): Promise<Response> {
+  const a = await accesComptable(env, id);
+  if (a.revoque_le) await env.db.requete("update admins set revoque_le = null where id = $1", [id]);
+  const invitation = await nouvelleInvitation(env, id, admin.id);
+  await journaliserAdmin(env, admin.id, a.revoque_le ? "acces_retabli" : "acces_nouveau_lien", { acces: id, nom: a.nom });
+  return json(200, { id, ...invitation });
+}
+
+/** Révocation : sessions fermées, clés et invitation retirées ; le compte reste pour le journal. */
+async function revoquerAcces(env: Environnement, admin: AdminSession, id: string): Promise<Response> {
+  const a = await accesComptable(env, id);
+  const maintenant = horloge(env).toISOString();
+  await env.db.lot([
+    { texte: "update admins set revoque_le = coalesce(revoque_le, $2) where id = $1", params: [id, maintenant] },
+    { texte: "delete from sessions_admin where admin_id = $1", params: [id] },
+    { texte: "delete from cles_acces_admin where admin_id = $1", params: [id] },
+    { texte: "update invitations_admin set expire_le = $2 where admin_id = $1 and utilisee_le is null and expire_le > $2", params: [id, maintenant] },
+  ]);
+  await journaliserAdmin(env, admin.id, "acces_revoque", { acces: id, nom: a.nom });
+  return listeAcces(env);
+}
+
+/** Invitation valable (non utilisée, non expirée, accès non révoqué), retrouvée par son jeton. */
+async function invitationValable(env: Environnement, jeton: unknown): Promise<{ hash: string; acces: LigneAcces; expireLe: string }> {
+  const refus = new ErreurHttp(404, "INVITATION_INVALIDE", "Lien d'invitation inconnu, déjà utilisé ou expiré. Demandez un nouveau lien.");
+  if (typeof jeton !== "string" || !/^[A-Za-z0-9_-]{20,100}$/.test(jeton)) throw refus;
+  const hash = await sha256(jeton);
+  const [i] = await env.db.requete<{ admin_id: string; expire_le: string }>(
+    "select admin_id, expire_le from invitations_admin where jeton_hash = $1 and utilisee_le is null and expire_le > $2",
+    [hash, horloge(env).toISOString()],
+  );
+  if (!i) throw refus;
+  const [a] = await env.db.requete<LigneAcces>(
+    "select id, identifiant, role, nom, etablissements, cree_le, revoque_le from admins where id = $1 and role = 'comptable' and revoque_le is null",
+    [i.admin_id],
+  );
+  if (!a) throw refus;
+  return { hash, acces: a, expireLe: i.expire_le };
+}
+
+/** Page d'invitation : à qui elle s'adresse et ce qu'elle ouvre, avant de créer la clé. */
+async function lireInvitation(env: Environnement, requete: Request): Promise<Response> {
+  controlerOrigine(requete);
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const { acces, expireLe } = await invitationValable(env, corps.jeton);
+  const etabs = await env.db.requete<{ id: string; enseigne: string }>(
+    "select id, enseigne from etablissements where id = any($1::text[]) order by enseigne",
+    [acces.etablissements ?? []],
+  );
+  const reponse: InvitationAdminApi = { nom: acces.nom, identifiant: acces.identifiant, etablissements: etabs, expireLe };
+  if (corps.options !== true) return json(200, { invitation: reponse });
+  // Options de création de la clé, comme pour le propriétaire mais sans code : l'invitation en tient lieu.
+  const { rpId } = partieConfiante(requete);
+  const existantes = await env.db.requete<{ id: string }>("select id from cles_acces_admin where admin_id = $1 and rp_id = $2", [acces.id, rpId]);
+  if (existantes.length >= CLES_MAX) throw new ErreurHttp(409, "TROP_DE_CLES", `${CLES_MAX} clés d'accès au plus : demandez qu'on en retire une.`);
+  const defi = await nouveauDefi(env, "enregistrement", acces.id);
+  return json(200, {
+    invitation: reponse,
+    options: {
+      challenge: defi,
+      rp: { name: "Matalon POS", id: rpId },
+      user: { id: base64Url(new TextEncoder().encode(acces.id)), name: acces.identifiant, displayName: `${acces.nom} (Matalon POS)` },
+      pubKeyCredParams: ALGORITHMES.map((alg) => ({ type: "public-key", alg })),
+      timeout: DUREE_DEFI_MS,
+      attestation: "none",
+      authenticatorSelection: { residentKey: "required", requireResidentKey: true, userVerification: "required" },
+      excludeCredentials: existantes.map((c) => ({ type: "public-key", id: c.id })),
+    },
+  });
+}
+
+/** Clé créée depuis l'invitation : l'invitation est consommée et la session s'ouvre. */
+async function accepterInvitation(env: Environnement, requete: Request): Promise<Response> {
+  controlerOrigine(requete);
+  const corps = await lireJson<{ jeton?: unknown; nom?: unknown; reponse?: ReponseEnregistrement }>(requete);
+  const { hash, acces } = await invitationValable(env, corps.jeton);
+  const nom = texte(corps.nom, "nom", 60) || "Clé d'accès";
+  const r = corps.reponse;
+  if (!r || typeof r !== "object" || typeof r.id !== "string" || !r.response) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Réponse de la clé manquante.");
+  const defi = await consommerDefi(env, r.response.clientDataJSON, "enregistrement", acces.id);
+  const { rpId, origine } = partieConfiante(requete);
+  let cle;
+  try {
+    cle = await verifierEnregistrement(r, { defi, origine, rpId });
+  } catch (e) {
+    if (e instanceof ErreurWebAuthn) throw new ErreurHttp(400, "CLE_REFUSEE", `Clé refusée : ${e.message}`);
+    throw e;
+  }
+  const [deja] = await env.db.requete<{ id: string }>("select id from cles_acces_admin where id = $1", [cle.id]);
+  if (deja) throw new ErreurHttp(409, "CLE_EXISTANTE", "Cette clé d'accès est déjà enregistrée.");
+  const maintenant = horloge(env).toISOString();
+  // L'invitation ne sert qu'une fois, même si deux onglets la présentent en même temps.
+  const consommee = await env.db.requete<{ admin_id: string }>(
+    "update invitations_admin set utilisee_le = $2 where jeton_hash = $1 and utilisee_le is null returning admin_id",
+    [hash, maintenant],
+  );
+  if (!consommee.length) throw new ErreurHttp(404, "INVITATION_INVALIDE", "Lien d'invitation déjà utilisé. Demandez un nouveau lien.");
+  await env.db.requete(
+    "insert into cles_acces_admin (id, admin_id, nom, alg, jwk, compteur, rp_id, cree_le) values ($1, $2, $3, $4, $5::jsonb, $6, $7, $8)",
+    [cle.id, acces.id, nom, cle.alg, JSON.stringify(cle.jwk), cle.compteur, rpId, maintenant],
+  );
+  await journaliserAdmin(env, acces.id, "cle_acces_ajoutee", { nom, domaine: rpId, invitation: true });
+  return ouvrirSession(env, acces.id, { methode: "invitation", nom });
+}
+
+/** Un accès comptable ne voit que ses établissements. */
+function exigerEtablissement(admin: AdminSession, etablissementId: string) {
+  if (admin.etablissements && !admin.etablissements.includes(etablissementId)) {
+    throw new ErreurHttp(403, "INTERDIT", "Cet établissement n'est pas ouvert à votre accès.");
+  }
+}
+
+/** Établissements d'un accès comptable : identité seulement, sans équipe, appareils ni alertes. */
+async function etablissementsComptable(env: Environnement, admin: AdminSession): Promise<Response> {
+  const etabs = await env.db.requete<LigneEtablissement>(`${SELECT_ETABLISSEMENT} where e.id = any($1::text[]) order by e.enseigne`, [admin.etablissements ?? []]);
+  return json(200, {
+    etablissements: etabs.map((e) => {
+      const { identite, id, moments } = versEtablissement(e);
+      return { id, identite, moments, carteId: "", carteVersion: 0, tables: [], seuilNote: 0, noteAutomatique: true, postesProduction: {}, imprimanteTickets: null, zones: [], planVersion: 0, logo: null, anomalieCloture: null, alertesNonVues: 0, utilisateurs: [], codes: [], caisses: [] };
+    }),
+    cartes: [],
+  });
+}
+
+/**
+ * Routes d'un accès comptable : statistiques, clôtures, exports et archives de ses établissements,
+ * et ses clés (lecture). Toute autre route est refusée par le serveur, pas seulement masquée.
+ */
+async function routeComptable(env: Environnement, requete: Request, admin: AdminSession, chemin: string, m: string): Promise<Response> {
+  const url = new URL(requete.url);
+  const refus = new ErreurHttp(403, "ACCES_COMPTABLE", "Votre accès est réservé aux statistiques et aux clôtures.");
+  if (m !== "GET") throw refus;
+  if (chemin === "/api/admin/cles-acces") return listeClesAcces(env, admin.id);
+  if (chemin === "/api/admin/etablissements") return etablissementsComptable(env, admin);
+  let p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/statistiques$/.exec(chemin);
+  if (p) {
+    exigerEtablissement(admin, p[1]!);
+    const r = await statistiques(env, (await etablissement(env.db, p[1]!)).id, requete);
+    // Les alertes (prix, codes PIN) relèvent de l'exploitation : elles ne figurent pas dans cet accès.
+    const s = (await r.json()) as ReponseStatistiques;
+    return json(200, { ...s, alertes: [] });
+  }
+  p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/(clotures|clotures\.csv|comptages\.csv)$/.exec(chemin);
+  if (p) {
+    exigerEtablissement(admin, p[1]!);
+    return cloturesEtablissementAdmin(env, admin, p[1]!, p[2] as "clotures" | "clotures.csv" | "comptages.csv", url);
+  }
+  p = /^\/api\/admin\/caisses\/(ipad-[0-9a-f]{8})\/clotures\/(\d{1,9})\/archive\.json$/.exec(chemin);
+  if (p) {
+    const [c] = await env.db.requete<{ etablissement_id: string }>("select etablissement_id from caisses where id = $1", [p[1]!]);
+    if (!c) throw new ErreurHttp(404, "INTROUVABLE", "Appareil inconnu.");
+    exigerEtablissement(admin, c.etablissement_id);
+    return archiveCloture(env, admin, p[1]!, Number(p[2]));
+  }
+  throw refus;
+}
+
+/** Clôtures de l'établissement sur une période, et leurs exports comptables (journalisés). */
+async function cloturesEtablissementAdmin(env: Environnement, admin: { id: string }, etablissementId: string, quoi: "clotures" | "clotures.csv" | "comptages.csv", url: URL): Promise<Response> {
+  const etab = (await etablissement(env.db, etablissementId)).id;
+  const { du, au } = lirePeriodeClotures(url);
+  const r = await cloturesPeriode(env, etab, du, au);
+  if (quoi === "clotures") return json(200, r);
+  await journaliserAdmin(env, admin.id, quoi === "clotures.csv" ? "export_csv_etablissement" : "export_comptages", { etablissement: etab, du, au, clotures: r.clotures.length });
+  return quoi === "clotures.csv"
+    ? fichierCsv(exporterCloturesCSV(r.clotures), `clotures-${etab}-${du}_${au}.csv`)
+    : fichierCsv(comptagesCSV(r.clotures, r.comptages, r.appareils), `comptages-${etab}-${du}_${au}.csv`);
 }
 
 async function listeEtablissements(env: Environnement): Promise<Response> {
@@ -3041,8 +3353,18 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
     if (chemin === "/api/admin/cle-acces/options" && m === "POST") return await optionsConnexionCle(env, requete);
     if (chemin === "/api/admin/cle-acces/connexion" && m === "POST") return await connexionCle(env, requete);
 
+    if (chemin === "/api/admin/invitation" && m === "POST") return await lireInvitation(env, requete);
+    if (chemin === "/api/admin/invitation/accepter" && m === "POST") return await accepterInvitation(env, requete);
+
     if (chemin.startsWith("/api/admin/")) {
       const admin = await exigerAdmin(env, requete);
+      if (admin.role === "comptable") return await routeComptable(env, requete, admin, chemin, m);
+      if (chemin === "/api/admin/acces" && m === "GET") return await listeAcces(env);
+      if (chemin === "/api/admin/acces" && m === "POST") return await inviterComptable(env, requete, admin);
+      const pa = /^\/api\/admin\/acces\/(a-[0-9a-f]{8})(\/revoquer|\/lien)?$/.exec(chemin);
+      if (pa && m === "PUT" && !pa[2]) return await modifierAcces(env, requete, admin, pa[1]!);
+      if (pa && m === "POST" && pa[2] === "/revoquer") return await revoquerAcces(env, admin, pa[1]!);
+      if (pa && m === "POST" && pa[2] === "/lien") return await relancerAcces(env, admin, pa[1]!);
       if (chemin === "/api/admin/cles-acces" && m === "GET") return await listeClesAcces(env, admin.id);
       if (chemin === "/api/admin/cles-acces" && m === "POST") return await enregistrerCle(env, requete, admin);
       if (chemin === "/api/admin/cles-acces/options" && m === "POST") return await optionsEnregistrementCle(env, requete, admin);
@@ -3106,16 +3428,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       }
       // Clôtures de l'établissement sur une période, et leurs exports comptables.
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/(clotures|clotures\.csv|comptages\.csv)$/.exec(chemin);
-      if (p && m === "GET") {
-        const etab = (await etablissement(env.db, p[1]!)).id;
-        const { du, au } = lirePeriodeClotures(url);
-        const r = await cloturesPeriode(env, etab, du, au);
-        if (p[2] === "clotures") return json(200, r);
-        await journaliserAdmin(env, admin.id, p[2] === "clotures.csv" ? "export_csv_etablissement" : "export_comptages", { etablissement: etab, du, au, clotures: r.clotures.length });
-        return p[2] === "clotures.csv"
-          ? fichierCsv(exporterCloturesCSV(r.clotures), `clotures-${etab}-${du}_${au}.csv`)
-          : fichierCsv(comptagesCSV(r.clotures, r.comptages, r.appareils), `comptages-${etab}-${du}_${au}.csv`);
-      }
+      if (p && m === "GET") return await cloturesEtablissementAdmin(env, admin, p[1]!, p[2] as "clotures" | "clotures.csv" | "comptages.csv", url);
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/logo$/.exec(chemin);
       if (p && m === "PUT") {
         const e = await majLogo(env, p[1]!, await lireJson<Record<string, unknown>>(requete), admin.id);

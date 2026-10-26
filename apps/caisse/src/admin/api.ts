@@ -5,7 +5,7 @@ import type { ReglagesReservation, Reservation } from "@matalon/reservations";
 import type { CommandeFournisseur, EtatEnvoi, MomentJournee, ReponseCommandes, ReponseStatistiques, ReponseTickets } from "@matalon/serveur/partage";
 import type { MembreFidelite, MouvementFidelite, ProgrammeFidelite, ReglesFidelite } from "@matalon/serveur/fidelite";
 import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
-import type { AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type { AccesAdminApi, InvitationAdminApi, AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -61,6 +61,18 @@ export interface CleAccesAdmin {
   utiliseeLe: string | null;
 }
 
+export interface StatutAdmin {
+  initialise: boolean;
+  connecte: boolean;
+  identifiant: string | null;
+  /** Rôle du compte connecté : propriétaire (tout) ou comptable (statistiques et clôtures). */
+  role: "proprietaire" | "comptable" | null;
+  nom: string | null;
+}
+
+/** Lien d'invitation à transmettre : l'adresse de l'administration, le jeton après le #. */
+export const lienInvitation = (jeton: string) => `${location.origin}/admin#/invitation/${jeton}`;
+
 export class ErreurAdmin extends Error {
   constructor(
     readonly statut: number,
@@ -90,7 +102,7 @@ async function appel<T>(methode: string, chemin: string, corps?: unknown): Promi
 }
 
 export const api = {
-  statut: () => appel<{ initialise: boolean; connecte: boolean; identifiant: string | null }>("GET", "/statut"),
+  statut: () => appel<StatutAdmin>("GET", "/statut"),
   initialiser: (identifiant: string, motDePasse: string) =>
     appel<{ secret: string; otpauth: string }>("POST", "/initialiser", { identifiant, motDePasse }),
   confirmer: (identifiant: string, motDePasse: string, code: string) => appel("POST", "/confirmer", { identifiant, motDePasse, code }),
@@ -103,6 +115,16 @@ export const api = {
   enregistrerCleAcces: (nom: string, reponse: unknown) => appel<{ cles: CleAccesAdmin[] }>("POST", "/cles-acces", { nom, reponse }),
   retirerCleAcces: (id: string) => appel<{ cles: CleAccesAdmin[] }>("DELETE", `/cles-acces/${id}`),
   etablissements: () => appel<{ etablissements: EtablissementAdmin[]; cartes: Array<{ id: string; nom: string }> }>("GET", "/etablissements"),
+  // Accès à l'administration : comptables invitées par le propriétaire.
+  acces: () => appel<{ acces: AccesAdminApi[] }>("GET", "/acces"),
+  inviterComptable: (nom: string, email: string, etablissements: string[]) =>
+    appel<{ id: string; jeton: string; expireLe: string }>("POST", "/acces", { nom, email, etablissements }),
+  modifierAcces: (id: string, modif: { nom?: string; etablissements?: string[] }) => appel<{ acces: AccesAdminApi[] }>("PUT", `/acces/${id}`, modif),
+  lienAcces: (id: string) => appel<{ id: string; jeton: string; expireLe: string }>("POST", `/acces/${id}/lien`, {}),
+  revoquerAcces: (id: string) => appel<{ acces: AccesAdminApi[] }>("POST", `/acces/${id}/revoquer`, {}),
+  lireInvitation: (jeton: string) => appel<{ invitation: InvitationAdminApi }>("POST", "/invitation", { jeton }),
+  optionsInvitation: (jeton: string) => appel<{ invitation: InvitationAdminApi; options: OptionsCreation }>("POST", "/invitation", { jeton, options: true }),
+  accepterInvitation: (jeton: string, nom: string, reponse: unknown) => appel("POST", "/invitation/accepter", { jeton, nom, reponse }),
   creerEtablissement: (corps: { id: string; identite: Partial<IdentiteEtablissement>; carteId: string; tables: Table[]; seuilNote: number }) =>
     appel("POST", "/etablissements", corps),
   modifierEtablissement: (id: string, corps: { identite: IdentiteEtablissement; carteId: string; seuilNote: number; noteAutomatique?: boolean }) =>

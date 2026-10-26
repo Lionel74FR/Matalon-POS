@@ -8,7 +8,7 @@ import { EditeurPostes } from "../ui/EditeurPostes";
 import { EditeurPlan } from "../ui/EditeurPlan";
 import { nouvelIdClient } from "../donnees/clients";
 import type { AlerteApi } from "@matalon/serveur/partage";
-import { api, ErreurAdmin, type AdresseImprimante, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
+import { api, ErreurAdmin, type StatutAdmin, type AdresseImprimante, type CaisseAdmin, type EtablissementAdmin, type RapportVerification, type ResumeCloture } from "./api";
 import { EditeurCarte, ListeCartes } from "./EditeurCarte";
 import { Stock } from "./Stock";
 import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques";
@@ -25,6 +25,7 @@ import { Accueil } from "./Accueil";
 import { EntetePage, TitreAvecAide } from "./Page";
 import { confirmer, informer, Panneau } from "./Panneau";
 import { Recherche } from "./Recherche";
+import { AccepterInvitation, FenetreAcces } from "./Acces";
 import { BoutonAlertes, BoutonRecherche, defRubrique, familleDe, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
 import {
   Archive,
@@ -117,9 +118,13 @@ function Champ(props: { libelle: string; aide?: string; children: ReactNode }) {
 
 // ───────── Accès ─────────
 
+/** Jeton d'invitation dans l'adresse (#/invitation/<jeton>) : jamais envoyé au serveur dans l'URL. */
+const jetonInvitation = () => /^#\/invitation\/([A-Za-z0-9_-]{20,100})$/.exec(location.hash)?.[1] ?? null;
+
 export function Administration() {
-  const [statut, setStatut] = useState<{ initialise: boolean; connecte: boolean; identifiant: string | null } | null>(null);
+  const [statut, setStatut] = useState<StatutAdmin | null>(null);
   const [erreur, setErreur] = useState("");
+  const [invitation, setInvitation] = useState(jetonInvitation);
 
   const charger = useCallback(() => {
     api
@@ -140,10 +145,22 @@ export function Administration() {
       </div>
     );
   }
+  if (invitation) {
+    return (
+      <AccepterInvitation
+        jeton={invitation}
+        onConnecte={() => {
+          history.replaceState(null, "", "#/");
+          setInvitation(null);
+          charger();
+        }}
+      />
+    );
+  }
   if (!statut) return <div className="admin-acces">Chargement…</div>;
   if (!statut.initialise) return <Initialisation onTermine={charger} />;
   if (!statut.connecte) return <ConnexionAdmin onConnecte={charger} />;
-  return <Tableau identifiant={statut.identifiant ?? ""} onDeconnecte={charger} />;
+  return <Tableau identifiant={statut.identifiant ?? ""} comptable={statut.role === "comptable"} nom={statut.nom ?? ""} onDeconnecte={charger} />;
 }
 
 function EnteteAcces(props: { titre: string; children?: ReactNode }) {
@@ -305,11 +322,14 @@ function ConnexionAdmin(props: { onConnecte: () => void }) {
 // ───────── Tableau de bord ─────────
 
 /** Vue lue et écrite dans l'adresse (#/moka/equipe) : un rechargement ou un lien ramène au même écran. */
-function vueDepuisAdresse(): { etab: string | null; rubrique: Rubrique; sous: string | null } {
+function vueDepuisAdresse(ouvertes?: Rubrique[]): { etab: string | null; rubrique: Rubrique; sous: string | null } {
   const [etab, rubrique, sous] = location.hash.replace(/^#\/?/, "").split("/");
-  const connue = TOUTES_RUBRIQUES.some((r) => r.id === rubrique);
-  return { etab: etab || dernierEtablissement(), rubrique: connue ? (rubrique as Rubrique) : "accueil", sous: connue && sous ? sous : null };
+  const connue = TOUTES_RUBRIQUES.some((r) => r.id === rubrique) && (!ouvertes || ouvertes.includes(rubrique as Rubrique));
+  return { etab: etab || dernierEtablissement(), rubrique: connue ? (rubrique as Rubrique) : (ouvertes?.[0] ?? "accueil"), sous: connue && sous ? sous : null };
 }
+
+/** Rubriques d'un accès comptable (le serveur refuse toutes les autres routes). */
+const RUBRIQUES_COMPTABLE: Rubrique[] = ["statistiques", "clotures"];
 
 /** Dernier établissement ouvert sur ce poste : simple confort, absent en navigation privée. */
 const CLE_DERNIER = "matalon-admin-etablissement";
@@ -321,10 +341,12 @@ function dernierEtablissement(): string | null {
   }
 }
 
-function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
+function Tableau(props: { identifiant: string; comptable: boolean; nom: string; onDeconnecte: () => void }) {
   const [donnees, setDonnees] = useState<Awaited<ReturnType<typeof api.etablissements>> | null>(null);
   const [cartes, setCartes] = useState<ResumeCarte[]>([]);
-  const initiale = useMemo(vueDepuisAdresse, []);
+  /** Accès comptable : statistiques et clôtures seulement ; undefined pour le propriétaire (tout). */
+  const ouvertes = props.comptable ? RUBRIQUES_COMPTABLE : undefined;
+  const initiale = useMemo(() => vueDepuisAdresse(ouvertes), [ouvertes]);
   /** Établissement choisi dans l'en-tête (ou « nouveau »), puis rubrique du menu latéral. */
   const [choisi, setChoisi] = useState<string | null>(initiale.etab);
   const [rubrique, setRubrique] = useState<Rubrique>(initiale.rubrique);
@@ -342,6 +364,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   useEffect(() => {
     const touche = (ev: KeyboardEvent) => {
       const saisie = ev.target instanceof HTMLElement && (ev.target.closest("input, textarea, select, [contenteditable]") !== null);
+      if (props.comptable) return;
       if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "k") {
         ev.preventDefault();
         setRecherche((o) => !o);
@@ -352,7 +375,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     };
     window.addEventListener("keydown", touche);
     return () => window.removeEventListener("keydown", touche);
-  }, []);
+  }, [props.comptable]);
   const [menuReduit, basculerMenu] = useMenuReduit();
   /** Un changement de rubrique s'inscrit dans l'historique : le bouton Retour du navigateur y ramène. */
   const historique = useRef(false);
@@ -375,6 +398,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
     }
     setCarteModifiee(false);
     historique.current = true;
+    if (ouvertes && vue.rubrique !== undefined && !ouvertes.includes(vue.rubrique)) vue = { ...vue, rubrique: ouvertes[0]! };
     if (vue.etab !== undefined) setChoisi(vue.etab);
     if (vue.rubrique !== undefined) setRubrique(vue.rubrique);
     if (vue.sous !== undefined || vue.rubrique !== undefined) setSous(vue.sous ?? null);
@@ -388,13 +412,17 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
   const clesAcces = useClesAcces();
   const [fenetreCles, setFenetreCles] = useState(false);
   const [fenetreConfiguration, setFenetreConfiguration] = useState(false);
+  const [fenetreAcces, setFenetreAcces] = useState(false);
 
   const recharger = useCallback(async () => {
     try {
-      const [d, c] = await Promise.all([api.etablissements(), api.cartes()]);
+      // Un accès comptable ne lit pas les cartes (refusé par le serveur) et ne crée pas d'établissement.
+      const [d, c] = await Promise.all([api.etablissements(), props.comptable ? Promise.resolve({ cartes: [] as ResumeCarte[] }) : api.cartes()]);
       setDonnees(d);
       setCartes(c.cartes);
-      setChoisi((x) => (x && (x === "nouveau" || d.etablissements.some((e) => e.id === x)) ? x : (d.etablissements[0]?.id ?? "nouveau")));
+      setChoisi((x) =>
+        x && ((x === "nouveau" && !props.comptable) || d.etablissements.some((e) => e.id === x)) ? x : (d.etablissements[0]?.id ?? (props.comptable ? null : "nouveau")),
+      );
     } catch (e) {
       if (e instanceof ErreurAdmin && e.statut === 401) return props.onDeconnecte();
       setErreur(message(e));
@@ -455,29 +483,43 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
       </a>
       <header className="coque-barre">
         <Marque />
-        {donnees && <MenuEtablissement etablissements={donnees.etablissements} choisi={choisi} onChoisir={(id) => aller({ etab: id })} />}
-        {etablissement && <BoutonRecherche onOuvrir={() => setRecherche(true)} />}
+        {donnees && donnees.etablissements.length > 0 && (
+          <MenuEtablissement etablissements={donnees.etablissements} choisi={choisi} onChoisir={(id) => aller({ etab: id })} restreint={props.comptable} />
+        )}
+        {etablissement && !props.comptable && <BoutonRecherche onOuvrir={() => setRecherche(true)} />}
         <div className="coque-barre-droite">
-          {etablissement && <BoutonAlertes nombre={etablissement.alertesNonVues} onOuvrir={() => aller({ rubrique: "alertes" })} />}
+          {etablissement && !props.comptable && <BoutonAlertes nombre={etablissement.alertesNonVues} onOuvrir={() => aller({ rubrique: "alertes" })} />}
           <MenuCompte
             identifiant={props.identifiant}
+            {...(props.comptable ? { sousTitre: `Comptable${props.nom ? ` · ${props.nom}` : ""}` } : {})}
             theme={theme}
             onTheme={choisirTheme}
-            onCles={() => setFenetreCles(true)}
-            onConfiguration={() => setFenetreConfiguration(true)}
+            {...(props.comptable
+              ? {}
+              : { onCles: () => setFenetreCles(true), onAcces: () => setFenetreAcces(true), onConfiguration: () => setFenetreConfiguration(true) })}
             onDeconnexion={() => void api.deconnexion().finally(props.onDeconnecte)}
           />
         </div>
       </header>
       <div className={`coque-corps${etablissement ? "" : " sans-menu"}${menuReduit ? " reduit" : ""}`}>
         {etablissement && (
-          <MenuLateral etab={etablissement} rubrique={rubrique} reduit={menuReduit} onReduire={basculerMenu} signal={signal} onAller={(r) => aller({ rubrique: r })} />
+          <MenuLateral
+            etab={etablissement}
+            rubrique={rubrique}
+            reduit={menuReduit}
+            onReduire={basculerMenu}
+            signal={signal}
+            onAller={(r) => aller({ rubrique: r })}
+            {...(ouvertes ? { rubriques: ouvertes } : {})}
+          />
         )}
         <main id="contenu" tabIndex={-1} className="admin-contenu" aria-label={etablissement ? `${etablissement.identite.enseigne} · ${libelleRubrique}` : "Administration"}>
           {erreur && <p className="erreur">{erreur}</p>}
-          <SuggestionCleAcces cles={clesAcces.cles} onOuvrir={() => setFenetreCles(true)} />
+          {!props.comptable && <SuggestionCleAcces cles={clesAcces.cles} onOuvrir={() => setFenetreCles(true)} />}
           {!donnees ? (
             <p>Chargement…</p>
+          ) : props.comptable && !etablissement ? (
+            <p className="explication">Aucun établissement n'est ouvert à votre accès : demandez-le à l'administrateur.</p>
           ) : choisi === "nouveau" || !etablissement ? (
             <NouvelEtablissement
               cartes={donnees.cartes}
@@ -509,6 +551,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           ) : (
             <FicheEtablissement
               key={etablissement.id}
+              comptable={props.comptable}
               e={etablissement}
               rubrique={rubrique}
               cartes={donnees.cartes}
@@ -526,8 +569,10 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           )}
         </main>
       </div>
-      {etablissement && <OngletsMobile etab={etablissement} rubrique={rubrique} signal={signal} onAller={(r) => aller({ rubrique: r })} />}
-      {recherche && etablissement && (
+      {etablissement && (
+        <OngletsMobile etab={etablissement} rubrique={rubrique} signal={signal} onAller={(r) => aller({ rubrique: r })} {...(ouvertes ? { rubriques: ouvertes } : {})} />
+      )}
+      {recherche && etablissement && !props.comptable && (
         <Recherche
           e={etablissement}
           onFermer={() => setRecherche(false)}
@@ -539,6 +584,7 @@ function Tableau(props: { identifiant: string; onDeconnecte: () => void }) {
           }}
         />
       )}
+      {fenetreAcces && donnees && <FenetreAcces etablissements={donnees.etablissements} onFermer={() => setFenetreAcces(false)} />}
       {fenetreConfiguration && <FenetreConfiguration onFermer={() => setFenetreConfiguration(false)} onImporte={() => void recharger()} />}
       {fenetreCles && <FenetreClesAcces cles={clesAcces.cles} onChange={clesAcces.setCles} onFermer={() => setFenetreCles(false)} />}
     </div>
@@ -616,6 +662,8 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
 
 function FicheEtablissement(props: {
   e: EtablissementAdmin;
+  /** Accès comptable : statistiques sans lien vers les tickets ni réglage des moments. */
+  comptable: boolean;
   rubrique: Rubrique;
   cartes: Array<{ id: string; nom: string }>;
   onChange: () => Promise<void>;
@@ -635,7 +683,9 @@ function FicheEtablissement(props: {
     <>
       {rubrique === "accueil" && <Accueil e={e} onAller={props.onAller} onChange={props.onChange} />}
       {rubrique === "appareils" && <Appareils e={e} responsable={responsable} onChange={props.onChange} surtitre={surtitre} />}
-      {rubrique === "statistiques" && <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} onServeur={props.onTicketsServeur} />}
+      {rubrique === "statistiques" && (
+        <StatistiquesAdmin key={e.id} e={e} onChange={props.onChange} {...(props.comptable ? {} : { onServeur: props.onTicketsServeur })} />
+      )}
       {rubrique === "tickets" && <TicketsAdmin key={JSON.stringify(props.filtreTickets)} e={e} filtre={props.filtreTickets} />}
       {rubrique === "clotures" && <CloturesAdmin e={e} />}
       {rubrique === "equipe" && <Equipe key={props.cible ?? ""} e={e} onChange={props.onChange} surtitre={surtitre} ouvrir={props.cible} />}
@@ -678,7 +728,7 @@ function FicheEtablissement(props: {
 }
 
 /** Statistiques de l'établissement, mêmes calculs et même écran que sur la caisse, recalculés en direct. */
-function StatistiquesAdmin(props: { e: EtablissementAdmin; onChange: () => Promise<void>; onServeur: (f: FiltreTickets) => void }) {
+function StatistiquesAdmin(props: { e: EtablissementAdmin; onChange: () => Promise<void>; onServeur?: (f: FiltreTickets) => void }) {
   const { e } = props;
   const etablissementId = e.id;
   // Le rechargement de l'administration change de fonction à chaque rendu : l'écran ne doit pas tout recalculer pour autant.
@@ -698,8 +748,10 @@ function StatistiquesAdmin(props: { e: EtablissementAdmin; onChange: () => Promi
         await onChange.current();
         return true;
       },
-      ouvrirServeur: (serveur, du, au) => onServeur.current({ serveur, du, au }),
-      modifierMoments: () => setEditionMoments(true),
+      // Accès comptable : pas de tickets ni de réglage des moments (le serveur les refuse aussi).
+      ...(onServeur.current
+        ? { ouvrirServeur: (serveur: string, du: string, au: string) => onServeur.current?.({ serveur, du, au }), modifierMoments: () => setEditionMoments(true) }
+        : {}),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [etablissementId, versionMoments],

@@ -26,6 +26,7 @@ import {
   Store,
   Sun,
   TabletSmartphone,
+  UserCog,
   Users,
   X,
   type LucideIcon,
@@ -200,13 +201,16 @@ function useMenuOuvert(): [boolean, (o: boolean) => void, RefObject<HTMLDivEleme
 
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 const ville = (e: EtablissementAdmin) => e.identite.codePostalVille?.replace(/^\s*\d{4,5}\s*/, "").trim() ?? "";
-const resumeEtab = (e: EtablissementAdmin) => {
+const resumeEtab = (e: EtablissementAdmin, restreint = false) => {
   const actifs = e.caisses.filter((c) => !c.revoqueeLe).length;
-  return [ville(e), pluriel(actifs, "appareil")].filter(Boolean).join(" · ");
+  return [ville(e), restreint ? "" : pluriel(actifs, "appareil")].filter(Boolean).join(" · ");
 };
 
-/** Sélecteur d'établissement : un vrai menu, chaque établissement avec sa ville et ses appareils. */
-export function MenuEtablissement(props: { etablissements: EtablissementAdmin[]; choisi: string | null; onChoisir: (id: string) => void }) {
+/**
+ * Sélecteur d'établissement : un vrai menu, chaque établissement avec sa ville et ses appareils.
+ * Restreint (accès comptable) : la ville seulement, et pas de « Nouvel établissement ».
+ */
+export function MenuEtablissement(props: { etablissements: EtablissementAdmin[]; choisi: string | null; onChoisir: (id: string) => void; restreint?: boolean }) {
   const [ouvert, setOuvert, zone, bouton] = useMenuOuvert();
   const actuel = props.etablissements.find((e) => e.id === props.choisi);
   return (
@@ -223,7 +227,7 @@ export function MenuEtablissement(props: { etablissements: EtablissementAdmin[];
         <Store className="icone" size={18} aria-hidden="true" />
         <span className="coque-etab-texte">
           <strong>{actuel?.identite.enseigne ?? "Nouvel établissement"}</strong>
-          {actuel && <small>{resumeEtab(actuel)}</small>}
+          {actuel && <small>{resumeEtab(actuel, props.restreint)}</small>}
         </span>
         <ChevronDown className="icone" size={16} aria-hidden="true" />
       </button>
@@ -244,26 +248,30 @@ export function MenuEtablissement(props: { etablissements: EtablissementAdmin[];
               <span className="coque-menu-item-texte">
                 <strong>{e.identite.enseigne}</strong>
                 <small>
-                  {resumeEtab(e)}
+                  {resumeEtab(e, props.restreint)}
                   {e.alertesNonVues ? ` · ${pluriel(e.alertesNonVues, "alerte")}` : ""}
                 </small>
               </span>
               {e.id === props.choisi && <Check className="icone" size={18} aria-hidden="true" />}
             </button>
           ))}
-          <hr />
-          <button
-            type="button"
-            role="menuitem"
-            className="coque-menu-item"
-            onClick={() => {
-              setOuvert(false);
-              props.onChoisir("nouveau");
-            }}
-          >
-            <Plus className="icone" size={18} aria-hidden="true" />
-            <span className="coque-menu-item-texte">Nouvel établissement</span>
-          </button>
+          {!props.restreint && (
+            <>
+              <hr />
+              <button
+                type="button"
+                role="menuitem"
+                className="coque-menu-item"
+                onClick={() => {
+                  setOuvert(false);
+                  props.onChoisir("nouveau");
+                }}
+              >
+                <Plus className="icone" size={18} aria-hidden="true" />
+                <span className="coque-menu-item-texte">Nouvel établissement</span>
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -276,13 +284,19 @@ const THEMES: Array<{ id: Theme; libelle: string; icone: LucideIcon }> = [
   { id: "systeme", libelle: "Comme l'appareil", icone: Monitor },
 ];
 
-/** Menu du compte : thème, clés d'accès, configuration de l'installation, déconnexion. */
+/**
+ * Menu du compte : thème, clés d'accès, accès à l'administration, configuration de l'installation,
+ * déconnexion. Un accès comptable n'a que le thème et la déconnexion.
+ */
 export function MenuCompte(props: {
   identifiant: string;
+  /** Sous l'identifiant : « Comptable · Caroline Petrod ». */
+  sousTitre?: string;
   theme: Theme;
   onTheme: (t: Theme) => void;
-  onCles: () => void;
-  onConfiguration: () => void;
+  onCles?: () => void;
+  onAcces?: () => void;
+  onConfiguration?: () => void;
   onDeconnexion: () => void;
 }) {
   const [ouvert, setOuvert, zone, bouton] = useMenuOuvert();
@@ -312,7 +326,7 @@ export function MenuCompte(props: {
         className="coque-avatar"
         aria-haspopup="menu"
         aria-expanded={ouvert}
-        aria-label={`Compte ${props.identifiant} : thème, clés d'accès, configuration, déconnexion`}
+        aria-label={`Compte ${props.identifiant} : ${props.onCles ? "thème, clés d'accès, configuration, déconnexion" : "thème, déconnexion"}`}
         title={props.identifiant}
         onClick={() => setOuvert(!ouvert)}
       >
@@ -320,7 +334,10 @@ export function MenuCompte(props: {
       </button>
       {ouvert && (
         <div className="coque-menu-flottant" role="menu" aria-label="Compte">
-          <p className="coque-menu-titre">{props.identifiant}</p>
+          <p className="coque-menu-titre">
+            {props.identifiant}
+            {props.sousTitre && <small>{props.sousTitre}</small>}
+          </p>
           <div role="group" aria-label="Thème" className="coque-themes">
             {THEMES.map((t) => {
               const Icone = t.icone;
@@ -340,9 +357,10 @@ export function MenuCompte(props: {
             })}
           </div>
           <hr />
-          {item("Clés d'accès", KeyRound, props.onCles)}
-          {item("Configuration de l'installation", FileJson, props.onConfiguration)}
-          <hr />
+          {props.onCles && item("Clés d'accès", KeyRound, props.onCles)}
+          {props.onAcces && item("Accès à l'administration", UserCog, props.onAcces)}
+          {props.onConfiguration && item("Configuration de l'installation", FileJson, props.onConfiguration)}
+          {(props.onCles || props.onAcces || props.onConfiguration) && <hr />}
           {item("Se déconnecter", LogOut, props.onDeconnexion)}
         </div>
       )}
@@ -387,6 +405,10 @@ function LienRubrique(props: {
   );
 }
 
+/** Familles réduites aux rubriques ouvertes au compte (accès comptable) ; toutes sinon. */
+const famillesOuvertes = (rubriques?: Rubrique[]) =>
+  FAMILLES.map((f) => ({ ...f, liste: f.liste.filter((r) => !rubriques || rubriques.includes(r.id)) })).filter((f) => f.liste.length > 0);
+
 /** Menu latéral : Aujourd'hui, puis les quatre familles ; réductible en icônes. */
 export function MenuLateral(props: {
   etab: EtablissementAdmin;
@@ -395,6 +417,8 @@ export function MenuLateral(props: {
   onReduire: () => void;
   signal: (r: Rubrique) => Signal;
   onAller: (r: Rubrique) => void;
+  /** Rubriques ouvertes au compte ; toutes si absent. */
+  rubriques?: Rubrique[];
 }) {
   const lien = (r: DefRubrique) => (
     <LienRubrique key={r.id} r={r} etab={props.etab.id} actif={props.rubrique === r.id} signal={props.signal(r.id)} reduit={props.reduit} onAller={props.onAller} />
@@ -402,8 +426,8 @@ export function MenuLateral(props: {
   return (
     <div className="coque-menu-colonne">
     <nav className="coque-menu" aria-label={`Rubriques de ${props.etab.identite.enseigne}`}>
-      {lien(ACCUEIL)}
-      {FAMILLES.map((f) => (
+      {(!props.rubriques || props.rubriques.includes("accueil")) && lien(ACCUEIL)}
+      {famillesOuvertes(props.rubriques).map((f) => (
         <div key={f.nom} className="coque-famille" role="group" aria-label={f.nom}>
           <p className="coque-famille-nom" aria-hidden="true">
             {f.nom}
@@ -421,9 +445,11 @@ export function MenuLateral(props: {
 }
 
 /** Barre d'onglets en bas de l'écran sur iPhone ; « Plus » ouvre une feuille avec toutes les rubriques. */
-export function OngletsMobile(props: { etab: EtablissementAdmin; rubrique: Rubrique; signal: (r: Rubrique) => Signal; onAller: (r: Rubrique) => void }) {
+export function OngletsMobile(props: { etab: EtablissementAdmin; rubrique: Rubrique; signal: (r: Rubrique) => Signal; onAller: (r: Rubrique) => void; rubriques?: Rubrique[] }) {
   const [plus, setPlus] = useState(false);
-  const dansOnglets = ONGLETS_MOBILE.includes(props.rubrique);
+  // Accès restreint : ses rubriques forment les onglets, sans feuille « Plus ».
+  const onglets = props.rubriques ?? ONGLETS_MOBILE;
+  const dansOnglets = onglets.includes(props.rubrique);
   useEffect(() => {
     if (!plus) return;
     const touche = (e: KeyboardEvent) => e.key === "Escape" && setPlus(false);
@@ -437,8 +463,8 @@ export function OngletsMobile(props: { etab: EtablissementAdmin; rubrique: Rubri
   const libelleCourt: Partial<Record<Rubrique, string>> = { statistiques: "Stats", stock: "Stock" };
   return (
     <>
-      <nav className="coque-onglets" aria-label="Navigation principale">
-        {ONGLETS_MOBILE.map((id) => {
+      <nav className="coque-onglets" aria-label="Navigation principale" style={props.rubriques ? { gridTemplateColumns: `repeat(${onglets.length}, minmax(0, 1fr))` } : undefined}>
+        {onglets.map((id) => {
           const r = defRubrique(id);
           const Icone = r.icone;
           const s = props.signal(id);
@@ -461,12 +487,14 @@ export function OngletsMobile(props: { etab: EtablissementAdmin; rubrique: Rubri
             </a>
           );
         })}
-        <button type="button" className="coque-onglet" aria-current={!dansOnglets ? "page" : undefined} aria-expanded={plus} onClick={() => setPlus(true)}>
-          <span className="coque-onglet-icone">
-            <Ellipsis className="icone" size={22} aria-hidden="true" />
-          </span>
-          Plus
-        </button>
+        {!props.rubriques && (
+          <button type="button" className="coque-onglet" aria-current={!dansOnglets ? "page" : undefined} aria-expanded={plus} onClick={() => setPlus(true)}>
+            <span className="coque-onglet-icone">
+              <Ellipsis className="icone" size={22} aria-hidden="true" />
+            </span>
+            Plus
+          </button>
+        )}
       </nav>
       {plus && (
         <div className="coque-feuille-voile" onClick={(e) => e.target === e.currentTarget && setPlus(false)}>

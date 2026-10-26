@@ -348,6 +348,37 @@ export const EMAIL_VALIDE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 
 export const CLIENT_ID_VALIDE = /^cli-[0-9a-f]{8}$/;
 
+/**
+ * Accès à l'administration (26 octobre 2026) : le compte du propriétaire et les accès « comptable »,
+ * limités aux statistiques et aux clôtures de leurs établissements, ouverts par une invitation.
+ */
+export interface AccesAdminApi {
+  id: string;
+  role: "proprietaire" | "comptable";
+  nom: string;
+  /** Adresse e-mail d'un accès comptable ; identifiant de connexion du propriétaire. */
+  identifiant: string;
+  /** Établissements ouverts à l'accès ; null : tous (propriétaire). */
+  etablissements: string[] | null;
+  creeLe: string;
+  revoqueLe: string | null;
+  /** Clés d'accès enregistrées. */
+  cles: number;
+  derniereConnexion: string | null;
+  /** Invitation encore valable (pas encore utilisée). */
+  invitation: { expireLe: string } | null;
+  /** Dernières actions de l'accès (connexions, exports), les plus récentes d'abord. */
+  journal: Array<{ horodatage: string; action: string; details: Record<string, unknown> }>;
+}
+
+/** Invitation ouverte par la personne invitée, avant la création de sa clé. */
+export interface InvitationAdminApi {
+  nom: string;
+  identifiant: string;
+  etablissements: Array<{ id: string; enseigne: string }>;
+  expireLe: string;
+}
+
 /** Vente portée en compte, encore due en tout ou partie. */
 export interface VenteOuverte {
   caisseId: string;

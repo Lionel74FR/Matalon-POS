@@ -468,6 +468,22 @@ export const MIGRATIONS: string[] = [
     maj_le text not null,
     maj_par text
   )`,
+  // Accès à l'administration (26 octobre 2026) : le propriétaire (mot de passe, code, clés) et des accès
+  // « comptable », limités aux statistiques et aux clôtures des établissements choisis, ouverts par une
+  // invitation à usage unique et une clé d'accès. Un accès révoqué reste en base (le journal le cite).
+  `alter table admins add column if not exists role text not null default 'proprietaire'`,
+  `alter table admins add column if not exists nom text not null default ''`,
+  `alter table admins add column if not exists etablissements jsonb`,
+  `alter table admins add column if not exists revoque_le text`,
+  `alter table admins add column if not exists cree_par text`,
+  `create table if not exists invitations_admin (
+    jeton_hash text primary key,
+    admin_id text not null references admins(id),
+    cree_le text not null,
+    cree_par text,
+    expire_le text not null,
+    utilisee_le text
+  )`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

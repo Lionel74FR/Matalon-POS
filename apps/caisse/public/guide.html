@@ -444,6 +444,17 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7c">
+    <label><input type="checkbox">Administration : accès comptable</label>
+    <ol>
+      <li>Menu du compte (pastille en haut à droite) › <span class="bouton">Accès à l'administration</span> › <span class="bouton">Inviter une comptable</span> : son nom, son e-mail, le Moka, puis <span class="bouton">Créer le lien d'invitation</span>. <span class="bouton">Copier le lien</span> et envoyez-le-lui.</li>
+      <li>Sur son ordinateur (ou une fenêtre privée du vôtre), elle ouvre le lien et touche <span class="bouton">Créer ma clé d'accès</span> (Touch ID, Face ID ou Windows Hello).</li>
+      <li>Elle ouvre Clôtures, télécharge l'export comptable du mois, puis tape une autre rubrique dans l'adresse (…/moka/equipe).</li>
+      <li>De votre côté, rouvrez <span class="bouton">Accès à l'administration</span>, dépliez « Dernières actions » sur sa fiche, puis <span class="bouton">Révoquer</span>.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> le lien s'affiche une seule fois, valable 7 jours ; la fiche indique « Invitation en attente ». Après la clé, elle arrive sur les Statistiques ; son menu n'a que Statistiques et Clôtures (deux onglets sur iPhone), sans recherche, sans cloche ni réglages ; les noms des serveurs n'ouvrent pas de tickets. L'autre rubrique la ramène aux Statistiques. Votre fiche montre sa dernière connexion et son export. Après la révocation, sa page rechargée revient à l'écran de connexion et sa clé n'ouvre plus rien ; <span class="bouton">Rétablir (nouveau lien)</span> lui rend l'accès.</p>
+  </section>
+
   <section class="scenario" data-id="s7b">
     <label><input type="checkbox">Administration : recherche ⌘K</label>
     <ol>
