@@ -105,25 +105,44 @@ export function ModaleEncaissement(props: {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [acompteFait, setAcompteFait] = useState<{ montant: number; rendu: number; reste: number } | null>(null);
   const [enCours, setEnCours] = useState(false);
-  /** Paiement en espèces qui laisserait un gros rendu, en attente de confirmation. */
-  const [renduAConfirmer, setRenduAConfirmer] = useState<{ montant: number; rendu: number } | null>(null);
+  /**
+   * Paiement qui laisserait un rendu à confirmer : gros rendu en espèces (faute de frappe probable),
+   * ou excédent de carte (pourboire passé au TPE, rendu au serveur en espèces), toujours confirmé.
+   */
+  const [renduAConfirmer, setRenduAConfirmer] = useState<{ mode: "ESPECES" | "CB"; montant: number; rendu: number } | null>(null);
 
   const especes = paiements.filter((p) => p.mode === "ESPECES").reduce((s, p) => s + p.montant, 0);
+  const cb = paiements.filter((p) => p.mode === "CB").reduce((s, p) => s + p.montant, 0);
   const excedent = paye - aPayer;
   const tropPercu = resteTable < 0 || (total === 0 && dejaRegle > 0);
+  /**
+   * Pourboire (noyau 1.1.0) : la carte peut dépasser la note quand ce paiement la solde (ticket
+   * scellé tout de suite), sans part portée en compte ; l'excédent est rendu en espèces.
+   */
+  const pourboirePossible = solde && !paiements.some((p) => p.mode === "EN_COMPTE");
+  const renduSurCarte = excedent > especes;
   // Rien à payer (articles tous offerts, ou acomptes égaux au reste) : le ticket se scelle sans nouveau paiement.
-  const valide = !tropPercu && lignesTicket.length > 0 && paye >= aPayer && excedent <= especes;
+  const valide =
+    !tropPercu && lignesTicket.length > 0 && paye >= aPayer && (excedent <= especes || (pourboirePossible && excedent <= especes + cb));
   /** Montant libre : une partie payée, le reste demeure sur la table. */
   const acompteLibre = surTable && solde && paye > 0 && paye < resteTable && !paiements.some((p) => p.mode === "EN_COMPTE");
 
   const ajouter = (mode: ModePaiement, m = montant) => {
     if (m <= 0) return;
     if (reste === 0) return notifier("Le montant est déjà réglé : retirez un paiement pour en changer.", "erreur");
-    if (mode !== "ESPECES" && paye + m > aPayer) {
-      return notifier(`${LIBELLES_PAIEMENT[mode]} : le montant dépasse le reste à payer. Seules les espèces donnent lieu à un rendu.`, "erreur");
+    if (mode === "CB" && paye + m > aPayer) {
+      if (!pourboirePossible) {
+        return notifier(
+          solde ? "Carte : pas de rendu sur une note portée en partie en compte." : "Carte : le montant dépasse la part. Le rendu sur la carte se fait au paiement qui solde la note.",
+          "erreur",
+        );
+      }
+      if (!renduAConfirmer) return setRenduAConfirmer({ mode, montant: m, rendu: m - reste });
+    } else if (mode !== "ESPECES" && paye + m > aPayer) {
+      return notifier(`${LIBELLES_PAIEMENT[mode]} : le montant dépasse le reste à payer. Seules les espèces et la carte donnent lieu à un rendu.`, "erreur");
     }
     if (mode === "ESPECES" && m - reste > RENDU_A_CONFIRMER && !renduAConfirmer) {
-      return setRenduAConfirmer({ montant: m, rendu: m - reste });
+      return setRenduAConfirmer({ mode, montant: m, rendu: m - reste });
     }
     if (mode === "EN_COMPTE" && !solde) return notifier("Une part ne se porte pas en compte : touchez « Tout » pour mettre le reste au compte d'un client.", "erreur");
     // Chaque somme portée en compte est un crédit accordé : toujours l'accord d'un responsable.
@@ -207,7 +226,8 @@ export function ModaleEncaissement(props: {
       }
       // Sans imprimante, rien ne sort : la note passe par le QR code.
       if (imprimanteConfiguree) {
-        const avecEspeces = paiements.some((p) => p.mode === "ESPECES");
+        // Le tiroir s'ouvre aussi pour un rendu sur la carte : la monnaie en sort.
+        const avecEspeces = paiements.some((p) => p.mode === "ESPECES") || t.renduMonnaie > 0;
         if (t.totalTTC >= config.seuilNoteAutomatique && config.noteAutomatique !== false) {
           await imprimerNote(t, avecEspeces);
           setNoteImprimee(true);
@@ -356,7 +376,7 @@ export function ModaleEncaissement(props: {
           )}
           {ticket.renduMonnaie > 0 ? (
             <div className="rendu">
-              <span>Rendu monnaie</span>
+              <span>{ticket.paiements.some((p) => p.mode === "ESPECES") ? "Rendu monnaie" : "Rendu en espèces (pourboire CB)"}</span>
               <strong>{euros(ticket.renduMonnaie)}</strong>
             </div>
           ) : (
@@ -411,9 +431,16 @@ export function ModaleEncaissement(props: {
         renduAConfirmer ? (
           // Dans le pied, toujours visible même quand le corps défile (iPhone).
           <div className="confirmation-rendu" role="alertdialog" aria-label="Confirmer le rendu">
-            <p>
-              {euros(renduAConfirmer.montant)} en espèces pour {euros(reste)} à payer : rendre <strong>{euros(renduAConfirmer.rendu)}</strong> ?
-            </p>
+            {renduAConfirmer.mode === "CB" ? (
+              <p>
+                {euros(renduAConfirmer.montant)} en carte pour {euros(reste)} à payer : rendre <strong>{euros(renduAConfirmer.rendu)}</strong> en espèces
+                (pourboire) ?
+              </p>
+            ) : (
+              <p>
+                {euros(renduAConfirmer.montant)} en espèces pour {euros(reste)} à payer : rendre <strong>{euros(renduAConfirmer.rendu)}</strong> ?
+              </p>
+            )}
             <div className="options">
               <button
                 className="bouton"
@@ -424,7 +451,7 @@ export function ModaleEncaissement(props: {
               >
                 <AvecIcone icone={Undo2}>Corriger</AvecIcone>
               </button>
-              <button className="bouton principal" onClick={() => ajouter("ESPECES", renduAConfirmer.montant)}>
+              <button className="bouton principal" onClick={() => ajouter(renduAConfirmer.mode, renduAConfirmer.montant)}>
                 <AvecIcone icone={Check}>Oui, rendre {euros(renduAConfirmer.rendu)}</AvecIcone>
               </button>
             </div>
@@ -542,7 +569,7 @@ export function ModaleEncaissement(props: {
             </div>
           ))}
           <div className={`ligne-montant reste${reste === 0 ? " solde" : ""}`}>
-            <span>{excedent > 0 ? "À rendre" : solde ? "Reste à payer" : "Reste de la part"}</span>
+            <span>{excedent > 0 ? (renduSurCarte ? "À rendre en espèces (pourboire)" : "À rendre") : solde ? "Reste à payer" : "Reste de la part"}</span>
             <strong>{euros(excedent > 0 ? excedent : reste)}</strong>
           </div>
         </div>

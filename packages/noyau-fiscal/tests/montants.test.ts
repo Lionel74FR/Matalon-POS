@@ -51,9 +51,19 @@ describe("montants et TVA", () => {
     expect(l.motifRemise).toBe("Offert maison");
   });
 
-  it("n'accepte le rendu monnaie que sur les espèces", () => {
+  it("rend la monnaie sur les espèces, et depuis 1.1.0 sur un excédent de carte, jamais sur un titre-restaurant", () => {
     expect(controlerPaiements(1250, [{ mode: "ESPECES", montant: 2000 }]).renduMonnaie).toBe(750);
-    expect(() => controlerPaiements(1250, [{ mode: "CB", montant: 2000 }])).toThrow(/espèces/);
+    // Pourboire : la carte passe 27 € pour une note de 25 €, 2 € sortent du tiroir.
+    expect(controlerPaiements(2500, [{ mode: "CB", montant: 2700 }]).renduMonnaie).toBe(200);
+    expect(() => controlerPaiements(1250, [{ mode: "TITRE_RESTAURANT_CARTE", montant: 2000 }])).toThrow(/rendu/);
+    expect(() => controlerPaiements(1250, [{ mode: "TITRE_RESTAURANT_PAPIER", montant: 2000 }])).toThrow(/rendu/);
+    expect(() => controlerPaiements(1250, [{ mode: "AUTRE", montant: 2000 }])).toThrow(/rendu/);
+    // Titre-restaurant et carte : l'excédent ne dépasse jamais la part payée par carte.
+    expect(controlerPaiements(2500, [{ mode: "TITRE_RESTAURANT_PAPIER", montant: 1900 }, { mode: "CB", montant: 800 }]).renduMonnaie).toBe(200);
+    expect(() => controlerPaiements(2500, [{ mode: "TITRE_RESTAURANT_PAPIER", montant: 2900 }, { mode: "CB", montant: 100 }])).toThrow(/rendu/);
+    // Une part portée en compte : pas de rendu au-delà des espèces reçues.
+    expect(() => controlerPaiements(2500, [{ mode: "EN_COMPTE", montant: 2000 }, { mode: "CB", montant: 700 }])).toThrow(/rendu/);
+    expect(controlerPaiements(2500, [{ mode: "EN_COMPTE", montant: 2000 }, { mode: "ESPECES", montant: 1000 }]).renduMonnaie).toBe(500);
     expect(() => controlerPaiements(1250, [{ mode: "CB", montant: 1000 }])).toThrow(/reste à payer/);
     expect(
       controlerPaiements(1250, [
@@ -62,6 +72,21 @@ describe("montants et TVA", () => {
       ]).renduMonnaie,
     ).toBe(150);
     expect(paiementsNets([{ mode: "ESPECES", montant: 2000 }], 750)).toEqual([{ mode: "ESPECES", montant: 1250 }]);
+    // Non-régression 1.0.0 : rendu égal aux espèces, espèces et carte.
+    expect(paiementsNets([{ mode: "CB", montant: 1000 }, { mode: "ESPECES", montant: 500 }], 500)).toEqual([{ mode: "CB", montant: 1000 }]);
+    expect(paiementsNets([{ mode: "ESPECES", montant: 500 }, { mode: "CB", montant: 1000 }, { mode: "ESPECES", montant: 500 }], 200)).toEqual([
+      { mode: "CB", montant: 1000 },
+      { mode: "ESPECES", montant: 800 },
+    ]);
+    // 1.1.0 : rendu sur carte, les espèces nettes sont négatives (sorties du tiroir).
+    expect(paiementsNets([{ mode: "CB", montant: 2700 }], 200)).toEqual([
+      { mode: "CB", montant: 2700 },
+      { mode: "ESPECES", montant: -200 },
+    ]);
+    expect(paiementsNets([{ mode: "ESPECES", montant: 100 }, { mode: "CB", montant: 2700 }], 300)).toEqual([
+      { mode: "CB", montant: 2700 },
+      { mode: "ESPECES", montant: -200 },
+    ]);
   });
 
   it("formate les euros à la française", () => {

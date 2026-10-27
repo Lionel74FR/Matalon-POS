@@ -188,8 +188,11 @@ export function cumulerPaiements(listes: Paiement[][]): Paiement[] {
 }
 
 /**
- * Contrôle les paiements d'une vente et calcule le rendu monnaie.
- * Seules les espèces peuvent dépasser le montant dû ; le rendu ne peut excéder les espèces reçues.
+ * Contrôle les paiements d'une vente et calcule le rendu monnaie, toujours rendu en espèces.
+ * Les espèces peuvent dépasser le montant dû. Depuis 1.1.0, la carte bancaire aussi : le client
+ * passe au TPE plus que la note (pourboire) et l'excédent sort du tiroir en espèces. Le rendu
+ * au-delà des espèces reçues est refusé si une partie est portée en compte, et ne dépasse jamais
+ * les espèces et la CB reçues (un titre-restaurant ne donne jamais lieu à un rendu).
  */
 export function controlerPaiements(totalTTC: Centimes, paiements: Paiement[]): { renduMonnaie: Centimes } {
   if (paiements.length === 0 && totalTTC !== 0) {
@@ -197,6 +200,7 @@ export function controlerPaiements(totalTTC: Centimes, paiements: Paiement[]): {
   }
   let somme = 0;
   let especes = 0;
+  let cb = 0;
   for (const p of paiements) {
     if (!MODES_PAIEMENT.includes(p.mode)) {
       throw new ErreurFiscale("MODE_PAIEMENT_INVALIDE", `mode de paiement inconnu : ${p.mode}`);
@@ -205,23 +209,28 @@ export function controlerPaiements(totalTTC: Centimes, paiements: Paiement[]): {
     if (p.montant <= 0) throw new ErreurFiscale("MONTANT_INVALIDE", "paiement nul ou négatif");
     somme += p.montant;
     if (p.mode === "ESPECES") especes += p.montant;
+    if (p.mode === "CB") cb += p.montant;
   }
   const excedent = somme - totalTTC;
   if (excedent < 0) {
     throw new ErreurFiscale("PAIEMENT_INSUFFISANT", `reste à payer : ${-excedent} centimes`);
   }
   if (excedent > especes) {
-    throw new ErreurFiscale("RENDU_IMPOSSIBLE", "seules les espèces peuvent donner lieu à un rendu monnaie");
+    const enCompte = paiements.some((p) => p.mode === "EN_COMPTE");
+    if (enCompte || excedent > especes + cb) {
+      throw new ErreurFiscale("RENDU_IMPOSSIBLE", "seules les espèces et la carte bancaire peuvent donner lieu à un rendu monnaie");
+    }
   }
   return { renduMonnaie: excedent };
 }
 
-/** Encaissements nets d'un ticket : le rendu monnaie est déduit des espèces. */
+/**
+ * Encaissements nets d'un ticket : le rendu monnaie est déduit des espèces. Rendu sur un excédent
+ * de carte (1.1.0) : les espèces nettes sont négatives, c'est ce qui est sorti du tiroir.
+ */
 export function paiementsNets(paiements: Paiement[], renduMonnaie: Centimes): Paiement[] {
   if (renduMonnaie === 0) return paiements;
-  const nets = cumulerPaiements([paiements]).map((p) =>
-    p.mode === "ESPECES" ? { ...p, montant: p.montant - renduMonnaie } : p,
-  );
+  const nets = cumulerPaiements([paiements, [{ mode: "ESPECES", montant: -renduMonnaie }]]);
   return nets.filter((p) => p.montant !== 0);
 }
 

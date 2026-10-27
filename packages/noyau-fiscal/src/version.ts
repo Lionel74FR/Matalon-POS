@@ -11,7 +11,10 @@
  * Versions 0.x : développement, avant attestation. La 1.0.0 est la première
  * version attestée, mise en service au Moka le 16 octobre 2026 : même code
  * que la 0.7.0, gelé pour l'attestation (aucun changement de comportement).
+ * 1.1.0 (27 octobre 2026) : rendu monnaie en espèces sur un excédent de carte bancaire
+ * (pourboire passé au TPE, rendu au serveur depuis le tiroir) ; les ventes et règlements déjà
+ * scellés se lisent à l'identique.
  */
-export const VERSION_NOYAU_FISCAL = "1.0.0";
+export const VERSION_NOYAU_FISCAL = "1.1.0";
 
 export const NOM_LOGICIEL = "Matalon POS";

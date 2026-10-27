@@ -444,6 +444,16 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7d">
+    <label><input type="checkbox">Pourboire sur la carte</label>
+    <ol>
+      <li>Sur l'iPad, une note de 25,00 € : <span class="bouton">Encaisser</span>, tapez 27,00 au pavé, puis <span class="bouton">Carte bancaire</span> (passez 27,00 € au TPE).</li>
+      <li>Confirmez « rendre 2,00 € en espèces (pourboire) », puis <span class="bouton">Valider l'encaissement de 25,00 €</span>.</li>
+      <li>Le soir, au comptage de la Z, saisissez le total CB du TPE.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> l'écran affiche « À rendre en espèces (pourboire) 2,00 € », le tiroir s'ouvre et l'écran de fin montre « Rendu en espèces (pourboire CB) 2,00 € ». Le ticket reste à 25,00 € (CA et TVA), avec CB 27,00 € et rendu 2,00 €. Au comptage, la caisse attend 27,00 € de CB au TPE et 2,00 € de moins dans le tiroir : pas d'écart. Un titre-restaurant au-delà de la note est refusé.</p>
+  </section>
+
   <section class="scenario" data-id="s7c">
     <label><input type="checkbox">Administration : accès comptable</label>
     <ol>
