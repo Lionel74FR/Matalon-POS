@@ -3505,3 +3505,99 @@ a.bouton {
 .fidelite-alerte p {
   margin: 0;
 }
+
+/* Comptage au pavé de la fenêtre (28 octobre 2026) : plus de clavier d'iOS, qui figeait l'écran. */
+.saisie-pave {
+  height: 48px;
+  align-self: center;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  scroll-margin-bottom: 240px;
+}
+.saisie-pave .saisie-vide {
+  color: var(--sable);
+  opacity: 0.6;
+}
+.saisie-pave.actif {
+  border-color: var(--terre);
+  box-shadow: 0 0 0 2px var(--terre);
+}
+.saisie-pave[aria-invalid="true"] {
+  border-color: var(--rouge);
+}
+.coupures .coupure {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--sable);
+  text-align: center;
+}
+.coupures .saisie-pave {
+  justify-content: center;
+  padding: 0 4px;
+}
+.depense-ligne .saisie-pave {
+  height: 44px;
+}
+.comptage-repris {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso);
+  color: var(--mousse);
+}
+.pave-comptage {
+  position: sticky;
+  bottom: -18px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "champ champ" "touches actions";
+  gap: 8px 12px;
+  margin: 12px -22px -18px;
+  padding: 10px 22px 14px;
+  background: var(--espresso-2);
+  border-top: 1px solid var(--espresso-3);
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.35);
+}
+.pave-comptage-champ {
+  grid-area: champ;
+  color: var(--sable);
+  font-size: 0.9rem;
+}
+.pave-comptage-touches {
+  grid-area: touches;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.pave-comptage-touches .touche {
+  height: 52px;
+  font-size: 1.35rem;
+}
+.pave-comptage-actions {
+  grid-area: actions;
+  display: grid;
+  align-content: stretch;
+  gap: 6px;
+}
+@media (max-width: 700px) {
+  .pave-comptage {
+    grid-template-columns: 1fr;
+    grid-template-areas: "champ" "touches" "actions";
+  }
+  .pave-comptage-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}

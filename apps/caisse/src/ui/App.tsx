@@ -152,6 +152,30 @@ export function App() {
     })();
   }, [brancherSynchro]);
 
+  // iPad et iPhone (app posée sur l'écran d'accueil) : le clavier d'iOS fait défiler la page sous une
+  // fenêtre fixe, et elle peut rester décalée après sa fermeture, l'écran semblant figé (touchers à
+  // côté). On la remet en place dès que plus aucun champ n'a le focus (28 octobre 2026).
+  useEffect(() => {
+    let minuterie: ReturnType<typeof setTimeout> | undefined;
+    const remettre = () => {
+      clearTimeout(minuterie);
+      minuterie = setTimeout(() => {
+        const a = document.activeElement;
+        if (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || a instanceof HTMLSelectElement) return;
+        if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) {
+          window.scrollTo(0, 0);
+          document.documentElement.scrollTop = 0;
+          document.body.scrollTop = 0;
+        }
+      }, 100);
+    };
+    document.addEventListener("focusout", remettre);
+    return () => {
+      clearTimeout(minuterie);
+      document.removeEventListener("focusout", remettre);
+    };
+  }, []);
+
   // Rattrapage : toutes les minutes, au retour du réseau et au retour sur l'app.
   useEffect(() => {
     const relancer = () => void synchroniseur.current?.synchroniser();

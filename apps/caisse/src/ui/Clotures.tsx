@@ -16,6 +16,7 @@ import type { ReponseJournee } from "@matalon/serveur/partage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HEURE_BASCULE } from "../fiscal/caisse";
 import { chargerJournee, journeePourCloture, rendreVerrou } from "../fiscal/journee";
+import { oublierBrouillonComptage } from "../metier/brouillon-comptage";
 import { ErreurApi } from "../serveur/client";
 import { gabaritCloture, gabaritLectureX, LIBELLES_PAIEMENT } from "../impression/gabarits";
 import { comptageDeLaZ, depensesDuComptage, detailsComptage, type EtatJournee, type SaisieComptage } from "../metier/tresorerie";
@@ -260,6 +261,7 @@ export function Clotures(props: {
         const journee = etat.dateComptable ?? dateComptable(new Date(), HEURE_BASCULE);
         const comptage = await caisse.registre.journaliser("COMPTAGE_CAISSE", detailsComptage(etat.totaux, saisie, journee), responsable);
         const z = await caisse.registre.cloturerJournee(responsable, journeeZ?.contexte);
+        oublierBrouillonComptage(config.caisseId);
         setZEnCours(null);
         setLecture(null);
         // Envoyée tout de suite : le serveur rend le verrou en la recevant, les autres appareils la voient.

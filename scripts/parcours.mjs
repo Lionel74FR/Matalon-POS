@@ -4,7 +4,7 @@
 // Usage (dans apps/caisse) : pnpm build && node scripts/serveur-local.mjs 4180, puis à la racine :
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/parcours.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { rubriqueAdmin, totp } from "./preparer-caisse.mjs";
+import { rubriqueAdmin, totp, saisirPave } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -206,13 +206,13 @@ await clic("Clôturer la journée (Z)");
 const attenduAvant = (await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
 await clic("Ajouter une dépense");
 await p.getByLabel("Dépense 1 : objet").fill("Glaçons Metro");
-await p.getByLabel("Dépense 1 : montant").fill("12,50");
+await saisirPave(p, "Dépense 1 : montant", "12,50");
 const attendu = (await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
 const depenseDeduite = Math.round(Number(attenduAvant.replace(",", ".")) * 100) - Math.round(Number(attendu.replace(",", ".")) * 100) === 1250;
 await clic("Saisir le total directement");
-await champ("Espèces comptées").fill(attendu);
-await champ("Total CB du TPE").fill("0");
-await champ("Titres-restaurant carte du TPE").fill("0");
+await saisirPave(p, "Espèces comptées", attendu);
+await saisirPave(p, "Total CB du TPE", "0");
+await saisirPave(p, "Titres-restaurant carte du TPE", "0");
 await capture("10c-comptage");
 await p.getByRole("button", { name: /^Valider.*clôturer/ }).click();
 await p.getByText(/clôturée/).first().waitFor();

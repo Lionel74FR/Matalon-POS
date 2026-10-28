@@ -6,7 +6,7 @@
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/clotures-admin.mjs [dossier-captures]
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
-import { preparerServeur, rubriqueAdmin } from "./preparer-caisse.mjs";
+import { preparerServeur, rubriqueAdmin, saisirPave } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -43,9 +43,9 @@ await clic("Clôturer la journée (Z)");
 await p.locator(".comptage-lignes").first().waitFor();
 const attendu = Number((await p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "").replace(",", "."));
 await clic("Saisir le total directement");
-await champ("Espèces comptées").fill(String(attendu - 1).replace(".", ","));
-await champ("Total CB du TPE").fill("0");
-await champ("Titres-restaurant carte du TPE").fill("0");
+await saisirPave(p, "Espèces comptées", String(attendu - 1).replace(".", ","));
+await saisirPave(p, "Total CB du TPE", "0");
+await saisirPave(p, "Titres-restaurant carte du TPE", "0");
 await p.locator(".champ-motif input").fill("pièce perdue");
 await p.getByRole("button", { name: /^Valider.*clôturer/ }).click();
 await p.getByText(/clôturée/).first().waitFor();

@@ -99,3 +99,18 @@ export async function accepterConfirmations(page) {
     }).observe(document, { childList: true, subtree: true });
   });
 }
+
+/**
+ * Comptage de fin de journée (28 octobre 2026) : les montants se saisissent au pavé de la fenêtre,
+ * plus au clavier. Choisit le champ par son libellé puis touche chaque caractère (« 152,30 »).
+ */
+export async function saisirPave(page, libelle, texte) {
+  const champ = page.getByRole("button", { name: libelle, exact: true });
+  if ((await champ.getAttribute("aria-pressed")) !== "true") await champ.click();
+  const pave = page.getByRole("group", { name: /^Pavé : / });
+  await pave.waitFor();
+  for (const c of String(texte)) {
+    await pave.getByRole("button", { name: c === "," || c === "." ? "Virgule" : c, exact: true }).click();
+  }
+  if (!String(texte).length) await pave.getByRole("button", { name: "Effacer", exact: true }).click();
+}

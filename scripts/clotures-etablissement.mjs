@@ -6,7 +6,7 @@
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/clotures-etablissement.mjs [dossier-captures]
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, saisirPave } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -85,10 +85,10 @@ await clic(ipad, "Clôturer la journée (Z)");
 const refus = await ipad.getByText(/Une clôture est en cours sur « Salle »/).first().textContent({ timeout: 10000 });
 const attendu = (await iphone.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd").textContent()).replace(/[^\d,]/g, "");
 await clic(iphone, "Saisir le total directement");
-await champ(iphone, "Espèces comptées").fill(attendu);
-const cb = (await iphone.locator(".modale label.champ", { hasText: "Total CB du TPE" }).locator("small").textContent()).replace(/[^\d,]/g, "");
-await champ(iphone, "Total CB du TPE").fill(cb);
-await champ(iphone, "Titres-restaurant carte du TPE").fill("0");
+await saisirPave(iphone, "Espèces comptées", attendu);
+const cb = (await iphone.locator(".modale .champ", { hasText: "Total CB du TPE" }).locator("small").textContent()).replace(/[^\d,]/g, "");
+await saisirPave(iphone, "Total CB du TPE", cb);
+await saisirPave(iphone, "Titres-restaurant carte du TPE", "0");
 await iphone.screenshot({ path: `${sortie}/e02-comptage-iphone.png` });
 await iphone.getByRole("button", { name: /^Valider.*clôturer/ }).click();
 await iphone.getByText(/clôturée/).first().waitFor();

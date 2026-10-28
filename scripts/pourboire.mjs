@@ -5,7 +5,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/pourboire.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { preparerServeur } from "./preparer-caisse.mjs";
+import { preparerServeur, saisirPave } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
 const sortie = process.argv[2] ?? "captures";
@@ -71,14 +71,14 @@ await p.locator(".comptage-lignes").first().waitFor();
 r.encaisseEspeces = await texte(p.locator(".comptage-lignes div", { hasText: "Encaissé en espèces" }).locator("dd"));
 const attendu = centimes(await texte(p.locator(".comptage-lignes div", { hasText: "Attendu dans le tiroir" }).locator("dd")));
 r.attendu = attendu;
-r.cbCaisse = await texte(p.locator(".modale label.champ", { hasText: "Total CB du TPE" }).locator("small"));
+r.cbCaisse = await texte(p.locator(".modale .champ", { hasText: "Total CB du TPE" }).locator("small"));
 await p.screenshot({ path: `${sortie}/po04-comptage.png` });
 await clic("Saisir le total directement");
-await champ("Espèces comptées").fill(String(attendu / 100).replace(".", ","));
-await champ("Total CB du TPE").fill(String((total + 200) / 100).replace(".", ","));
-await champ("Titres-restaurant carte du TPE").fill("0");
+await saisirPave(p, "Espèces comptées", String(attendu / 100).replace(".", ","));
+await saisirPave(p, "Total CB du TPE", String((total + 200) / 100).replace(".", ","));
+await saisirPave(p, "Titres-restaurant carte du TPE", "0");
 // Sans vente en espèces, le tiroir a 2 € de moins que le fond du matin : on y laisse tout.
-await champ("Fond laissé dans le tiroir").fill(String(attendu / 100).replace(".", ","));
+await saisirPave(p, "Fond laissé dans le tiroir", String(attendu / 100).replace(".", ","));
 await p.getByRole("button", { name: /^Valider.*clôturer/ }).click();
 await p.getByText(/clôturée/).first().waitFor();
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 20000 });
