@@ -2,7 +2,7 @@ import { Check, Minus, Plus, Trash2 } from "lucide-react";
 import { AvecIcone } from "../icones";
 import { useState } from "react";
 import { avecQuantite, montantLigne, montantRemise, nomCourtSuite, SUITES, suiteDe, type LigneCommande, type Suite } from "../../metier/commande";
-import { Modale } from "../communs";
+import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { MOTIFS_REMISE_DEFAUT } from "@matalon/serveur/partage";
 
@@ -31,7 +31,10 @@ export function ModaleLigne(props: {
   const motifsEtablissement = config.motifsRemise?.length ? config.motifsRemise : MOTIFS_REMISE_DEFAUT;
   const MOTIFS = l.remise?.motif && !motifsEtablissement.includes(l.remise.motif) ? [...motifsEtablissement, l.remise.motif] : motifsEtablissement;
   const [quantite, setQuantite] = useState(l.quantite);
-  const [pourcentage, setPourcentage] = useState(l.remise?.pourcentage ?? 0);
+  const [pourcentage, setPourcentage] = useState(l.remise && !l.remise.enEuros ? l.remise.pourcentage : 0);
+  /** Remise en euros sur la ligne (29 octobre 2026) : montant saisi au pavé, en centimes. */
+  const [enEuros, setEnEuros] = useState(!!l.remise?.enEuros);
+  const [montantEuros, setMontantEuros] = useState(l.remise?.enEuros ? l.remise.montantTTC : 0);
   const [motif, setMotif] = useState(l.remise?.motif ?? "");
   const [erreur, setErreur] = useState("");
   const [note, setNote] = useState(l.note ?? "");
@@ -73,21 +76,32 @@ export function ModaleLigne(props: {
     retrait.suite();
   };
 
+  const brut = quantite * l.prixUnitaireTTC;
+  const avecRemise = enEuros ? montantEuros > 0 : pourcentage > 0;
+  const choisirPourcentage = (p: number) => {
+    setEnEuros(false);
+    setPourcentage(p);
+    setErreur("");
+  };
+
   const valider = async () => {
-    if (pourcentage > 0 && !motif) return setErreur("Choisissez le motif de la remise.");
+    if (enEuros && montantEuros > brut) return setErreur(`La remise dépasse le montant de la ligne (${euros(brut)}).`);
+    if (avecRemise && !motif) return setErreur("Choisissez le motif de la remise.");
     let accordeePar = l.remise?.accordeePar ?? utilisateur.id;
-    const remiseChangee = pourcentage !== (l.remise?.pourcentage ?? 0) || (pourcentage > 0 && motif !== l.remise?.motif);
-    if (remiseChangee && pourcentage > 0) {
-      const id = await demanderResponsable(`Remise de ${pourcentage === 100 ? "100 % (offert)" : `${pourcentage} %`} sur ${l.libelle}.`);
+    const remiseChangee = enEuros
+      ? !l.remise?.enEuros || montantEuros !== l.remise.montantTTC || motif !== l.remise.motif
+      : !!l.remise?.enEuros || pourcentage !== (l.remise?.pourcentage ?? 0) || (pourcentage > 0 && motif !== l.remise?.motif);
+    if (remiseChangee && avecRemise) {
+      const quoi = enEuros ? euros(montantEuros) : pourcentage === 100 ? "100 % (offert)" : `${pourcentage} %`;
+      const id = await demanderResponsable(`Remise de ${quoi} sur ${quantite > 1 ? `${quantite} × ` : ""}${l.libelle}.`);
       if (!id) return;
       accordeePar = id;
     }
     const unites = Math.max(0, l.quantite - quantite);
     const { suite: _, ...sansSuite } = l;
     const maj = avecQuantite({ ...sansSuite, ...(suite ? { suite } : {}), remise: undefined, note: note.trim() || undefined }, quantite);
-    if (pourcentage > 0) {
-      maj.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, pourcentage) };
-    }
+    if (enEuros && montantEuros > 0) maj.remise = { pourcentage: 0, enEuros: true, motif, accordeePar, montantTTC: montantEuros };
+    else if (!enEuros && pourcentage > 0) maj.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(brut, pourcentage) };
     retirer(unites, () => props.onChange(maj, unites));
   };
 
@@ -112,10 +126,9 @@ export function ModaleLigne(props: {
     );
   }
 
-  const apercu = avecQuantite(
-    pourcentage > 0 ? { ...l, remise: { pourcentage, motif: motif || "-", accordeePar: "", montantTTC: 0 } } : { ...l, remise: undefined },
-    quantite,
-  );
+  const apercu = enEuros
+    ? { ...l, quantite, remise: montantEuros > 0 ? { pourcentage: 0, enEuros: true, motif: motif || "-", accordeePar: "", montantTTC: Math.min(brut, montantEuros) } : undefined }
+    : avecQuantite(pourcentage > 0 ? { ...l, remise: { pourcentage, motif: motif || "-", accordeePar: "", montantTTC: 0 } } : { ...l, remise: undefined }, quantite);
 
   return (
     <Modale
@@ -175,16 +188,42 @@ export function ModaleLigne(props: {
       <section className="groupe-choix">
         <h3>Remise</h3>
         <div className="options">
-          <button className={`option${pourcentage === 0 ? " active" : ""}`} onClick={() => setPourcentage(0)}>
+          <button className={`option${!enEuros && pourcentage === 0 ? " active" : ""}`} onClick={() => choisirPourcentage(0)}>
             Aucune
           </button>
           {POURCENTAGES.map((p) => (
-            <button key={p} className={`option${pourcentage === p ? " active" : ""}`} onClick={() => setPourcentage(p)}>
+            <button key={p} className={`option${!enEuros && pourcentage === p ? " active" : ""}`} onClick={() => choisirPourcentage(p)}>
               {p === 100 ? "Offert" : `${p} %`}
             </button>
           ))}
+          <button
+            className={`option${enEuros ? " active" : ""}`}
+            onClick={() => {
+              setEnEuros(true);
+              setErreur("");
+            }}
+          >
+            En euros
+          </button>
         </div>
-        {pourcentage > 0 && (
+        {enEuros && (
+          <div className="remise-euros">
+            <div className="afficheur" aria-label="Montant de la remise">
+              {euros(montantEuros)}
+            </div>
+            <p className="explication">
+              {quantite > 1 ? `Sur l'ensemble des ${quantite} articles (${euros(brut)}).` : `Sur ${euros(brut)}.`}
+            </p>
+            <Pave
+              doubleZero
+              onTouche={(t) => {
+                setErreur("");
+                setMontantEuros((x) => appliquerToucheMontant(x, t));
+              }}
+            />
+          </div>
+        )}
+        {avecRemise && (
           <>
             <h3>Motif</h3>
             <div className="options">

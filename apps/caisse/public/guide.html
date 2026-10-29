@@ -444,6 +444,16 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7h">
+    <label><input type="checkbox">Remise en euros sur un article</label>
+    <ol>
+      <li>Sur une table, ajoutez 3 fois le même article, puis touchez sa ligne. Sous « Remise », touchez <span class="bouton">En euros</span> et frappez 2, 00 au pavé (comme à l'encaissement).</li>
+      <li>Choisissez un motif, puis <span class="bouton">Valider</span> (un responsable donne son code si un serveur est connecté).</li>
+      <li>Essayez un montant plus grand que la ligne. Puis transférez un seul des articles vers une autre table.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> « Sur l'ensemble des 3 articles », le bouton Valider affiche le nouveau total ; la ligne indique « Remise 2,00 € · motif ». Un montant au-delà de la ligne est refusé (« La remise dépasse le montant de la ligne »). Rouverte, la ligne est en euros au montant saisi. Au transfert, la remise se partage entre les deux tables (0,67 € et 1,33 €) sans rien perdre ; le ticket porte la remise et son motif.</p>
+  </section>
+
   <section class="scenario" data-id="s7g">
     <label><input type="checkbox">Transférer une partie des articles</label>
     <ol>

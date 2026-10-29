@@ -15,8 +15,12 @@ export interface LigneCommande {
   quantite: number;
   prixUnitaireTTC: number;
   tauxTVA: number;
-  /** Remise en pourcentage du montant de la ligne (100 = offert), recalculée si la quantité change. */
-  remise?: { pourcentage: number; montantTTC: number; motif: string; accordeePar: string };
+  /**
+   * Remise sur le montant de la ligne : en pourcentage (100 = offert), recalculée si la quantité
+   * change ; ou en euros (`enEuros`, 29 octobre 2026 : `pourcentage` à 0, `montantTTC` saisi), qui
+   * suit au prorata des unités quand la ligne est coupée (division, transfert) sans rien perdre.
+   */
+  remise?: { pourcentage: number; montantTTC: number; motif: string; accordeePar: string; enEuros?: boolean };
   /** Précision libre pour le service (« sans sucre », « allergie fruits à coque ») : ni prix ni ticket. */
   note?: string;
   ajouteePar: string;
@@ -231,8 +235,9 @@ export function diviserParArticles(
       payees.push(p);
       lignes.push(p);
     } else {
-      const p = { ...avecQuantite(l, q), uid: uid(), reglee };
-      lignes.push(avecQuantite(l, l.quantite - q), p);
+      const { reste, partie } = couperLigne(l, q);
+      const p = { ...partie, uid: uid(), reglee };
+      lignes.push(reste, p);
       payees.push(p);
     }
   }
@@ -269,9 +274,10 @@ export function modifierLigne(
       if (x.envoyee) lignes.push({ ...x, retiree });
     } else if (x.envoyee && nouvelle.quantite > x.quantite) {
       // Ligne déjà partie en production : le supplément devient une ligne à envoyer.
-      const { envoyee: _, ...reste } = nouvelle;
-      lignes.push(avecQuantite(nouvelle, x.quantite));
-      lignes.push({ ...avecQuantite(reste, nouvelle.quantite - x.quantite), uid: uid(), ajouteeLe: retiree.le, ajouteePar: par });
+      const { reste: dejaEnvoyee, partie: supplement } = couperLigne(nouvelle, nouvelle.quantite - x.quantite);
+      const { envoyee: _, ...aEnvoyer } = supplement;
+      lignes.push(dejaEnvoyee);
+      lignes.push({ ...aEnvoyer, uid: uid(), ajouteeLe: retiree.le, ajouteePar: par });
     } else {
       lignes.push(nouvelle);
       if (unitesRetirees > 0 && x.envoyee) lignes.push({ ...avecQuantite(x, unitesRetirees), uid: uid(), retiree });
@@ -292,11 +298,32 @@ export function totauxCommande(c: Commande): TotauxCommande {
   };
 }
 
-/** Change la quantité d'une ligne en recalculant sa remise. */
+/**
+ * Change la quantité d'une ligne en recalculant sa remise : le pourcentage s'applique au nouveau
+ * montant ; une remise en euros suit au prorata des unités, sans dépasser le montant de la ligne.
+ */
 export function avecQuantite(l: LigneCommande, quantite: number): LigneCommande {
   const suite = { ...l, quantite };
-  if (l.remise) suite.remise = { ...l.remise, montantTTC: montantRemise(quantite * l.prixUnitaireTTC, l.remise.pourcentage) };
+  if (l.remise) {
+    const brut = quantite * l.prixUnitaireTTC;
+    const montantTTC = l.remise.enEuros ? Math.min(brut, Math.round((l.remise.montantTTC * quantite) / l.quantite)) : montantRemise(brut, l.remise.pourcentage);
+    suite.remise = { ...l.remise, montantTTC };
+  }
   return suite;
+}
+
+/**
+ * Coupe une ligne : `partie` prend `quantite` unités, `reste` les autres. Une remise en euros se
+ * partage sans perte ni centime de trop (le reste reçoit ce que la partie ne prend pas) ; une
+ * remise en pourcentage se recalcule sur chaque morceau.
+ */
+export function couperLigne(l: LigneCommande, quantite: number): { reste: LigneCommande; partie: LigneCommande } {
+  const partie = avecQuantite(l, quantite);
+  const reste = avecQuantite(l, l.quantite - quantite);
+  if (l.remise?.enEuros && reste.remise && partie.remise) {
+    reste.remise = { ...reste.remise, montantTTC: Math.min(reste.quantite * l.prixUnitaireTTC, l.remise.montantTTC - partie.remise.montantTTC) };
+  }
+  return { reste, partie };
 }
 
 export function montantRemise(brutTTC: number, pourcentage: number): number {
@@ -365,8 +392,9 @@ export function transfererArticles(
     if (q === 0) restent.push(l);
     else if (q === l.quantite) partis.push(l);
     else {
-      restent.push(avecQuantite(l, l.quantite - q));
-      partis.push({ ...avecQuantite(l, q), uid: uid() });
+      const { reste, partie } = couperLigne(l, q);
+      restent.push(reste);
+      partis.push({ ...partie, uid: uid() });
     }
   }
   const suites = new Set(partis.map((l) => l.suite).filter((x): x is SuiteAttente => !!x));

@@ -1347,6 +1347,23 @@ code {
   background: var(--espresso);
 }
 
+/* Remise en euros sur une ligne : afficheur et pavé, sans clavier d'iOS (29 octobre 2026). */
+.remise-euros {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.remise-euros .afficheur {
+  width: min(100%, 272px);
+  margin-bottom: 0;
+}
+
+.remise-euros .explication {
+  margin: 0;
+}
+
 .apercu-recu {
   background: #fff;
   color: #111;
