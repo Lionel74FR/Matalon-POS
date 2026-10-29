@@ -60,6 +60,8 @@ import {
   posteValide,
   problemePlan,
   problemeMoments,
+  problemeMotifsRemise,
+  MOTIFS_REMISE_DEFAUT,
   type Derniers,
   type ElementDecor,
   type ZonePlan,
@@ -238,6 +240,7 @@ interface LigneEtablissement {
   zones: ZonePlan[] | null;
   plan_version: number | null;
   moments?: MomentJournee[] | null;
+  motifs_remise?: string[] | null;
 }
 
 const SELECT_ETABLISSEMENT = `select e.*, c.version as carte_version from etablissements e left join cartes c on c.id = e.carte_id`;
@@ -266,6 +269,7 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     planVersion: l.plan_version ?? 0,
     moments: l.moments ?? [],
     logo: l.logo_version ?? null,
+    motifsRemise: l.motifs_remise?.length ? l.motifs_remise : MOTIFS_REMISE_DEFAUT,
   };
 }
 
@@ -333,6 +337,22 @@ async function majMoments(env: Environnement, etablissementId: string, corps: Re
   const [maj] = await env.db.requete<{ id: string }>("update etablissements set moments = $2::jsonb, maj_le = $3 where id = $1 returning id", [
     etablissementId,
     JSON.stringify(moments),
+    horloge(env).toISOString(),
+  ]);
+  if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  return etablissement(env.db, etablissementId);
+}
+
+/** Motifs de remise et d'offert proposés en caisse, contrôlés comme dans l'administration. */
+async function majMotifsRemise(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
+  const brut = corps.motifs;
+  if (!Array.isArray(brut) || brut.some((m) => typeof m !== "string")) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Motifs invalides.");
+  const motifs = (brut as string[]).map((m) => m.trim().replace(/\s+/g, " "));
+  const probleme = problemeMotifsRemise(motifs);
+  if (probleme) throw new ErreurHttp(400, "MOTIFS_INVALIDES", probleme);
+  const [maj] = await env.db.requete<{ id: string }>("update etablissements set motifs_remise = $2::jsonb, maj_le = $3 where id = $1 returning id", [
+    etablissementId,
+    JSON.stringify(motifs),
     horloge(env).toISOString(),
   ]);
   if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
@@ -3439,6 +3459,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (p && m === "PUT") {
         const e = await majMoments(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
         await journaliserAdmin(env, admin.id, "moments_journee", { etablissement: e.id, moments: (e.moments ?? []).map((x) => `${x.nom} ${x.debut}-${x.fin}`).join(", ") });
+        return json(200, { etablissement: e });
+      }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/motifs-remise$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await majMotifsRemise(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
+        await journaliserAdmin(env, admin.id, "motifs_remise", { etablissement: e.id, motifs: (e.motifsRemise ?? []).join(", ") });
         return json(200, { etablissement: e });
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/postes$/.exec(chemin);

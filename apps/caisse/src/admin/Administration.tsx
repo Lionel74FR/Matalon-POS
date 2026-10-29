@@ -15,6 +15,7 @@ import { TableauStatistiques, type AccesStatistiques } from "../ui/Statistiques"
 import { CloturesAdmin } from "./CloturesAdmin";
 import { FideliteAdmin } from "./FideliteAdmin";
 import { LogoEtablissement } from "./Logo";
+import { MotifsRemise } from "./MotifsRemise";
 import { TicketsAdmin, type FiltreTickets } from "./TicketsAdmin";
 import { ModaleMoments } from "./Moments";
 import { Reservations } from "./Reservations";
@@ -721,6 +722,7 @@ function FicheEtablissement(props: {
           )}
           <Identite e={e} cartes={props.cartes} onChange={props.onChange} />
           <LogoEtablissement e={e} onChange={props.onChange} />
+          <MotifsRemise key={e.id} e={e} onChange={props.onChange} />
         </>
       )}
     </>

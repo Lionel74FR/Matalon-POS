@@ -4,8 +4,8 @@ import { useState } from "react";
 import { avecQuantite, montantLigne, montantRemise, nomCourtSuite, SUITES, suiteDe, type LigneCommande, type Suite } from "../../metier/commande";
 import { Modale } from "../communs";
 import { euros, useCaisse } from "../contexte";
+import { MOTIFS_REMISE_DEFAUT } from "@matalon/serveur/partage";
 
-const MOTIFS = ["Geste commercial", "Client habitué", "Erreur de service", "Repas du personnel", "Offert maison"];
 const POURCENTAGES = [10, 20, 50, 100];
 const NOTES_RAPIDES = ["Sans sucre", "Lait végétal", "Sans glace", "Allergie", "À servir après"];
 /** Motifs d'un retrait après envoi (article déjà parti en préparation). */
@@ -25,8 +25,11 @@ export function ModaleLigne(props: {
   onChange: (l: LigneCommande | null, unitesRetirees: number) => void;
   onFermer: () => void;
 }) {
-  const { caisse, utilisateur, demanderResponsable } = useCaisse();
+  const { caisse, config, utilisateur, demanderResponsable } = useCaisse();
   const l = props.ligne;
+  // Motifs réglés dans l'administration (Établissement › Remises et offerts) ; un motif déjà posé sur la ligne reste proposé.
+  const motifsEtablissement = config.motifsRemise?.length ? config.motifsRemise : MOTIFS_REMISE_DEFAUT;
+  const MOTIFS = l.remise?.motif && !motifsEtablissement.includes(l.remise.motif) ? [...motifsEtablissement, l.remise.motif] : motifsEtablissement;
   const [quantite, setQuantite] = useState(l.quantite);
   const [pourcentage, setPourcentage] = useState(l.remise?.pourcentage ?? 0);
   const [motif, setMotif] = useState(l.remise?.motif ?? "");

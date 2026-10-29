@@ -56,6 +56,8 @@ export interface Configuration {
   planVersion?: number;
   /** Programme de fidélité de l'établissement (lot 7a) ; null ou absent : la caisse ne propose pas la fidélité. */
   fidelite?: ProgrammeCaisse | null;
+  /** Motifs de remise et d'offert réglés dans l'administration (29 octobre 2026) ; absents : ceux livrés avec la caisse. */
+  motifsRemise?: string[];
 }
 
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
@@ -83,6 +85,7 @@ export function fusionnerReferentiel(
     ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
     ...(etat.appareils ? { appareils: etat.appareils } : {}),
     ...(etat.fidelite !== undefined ? { fidelite: etat.fidelite } : {}),
+    ...(etat.etablissement.motifsRemise ? { motifsRemise: etat.etablissement.motifsRemise } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
 }

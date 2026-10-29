@@ -484,6 +484,8 @@ export const MIGRATIONS: string[] = [
     expire_le text not null,
     utilisee_le text
   )`,
+  // Motifs de remise et d'offert de l'établissement (29 octobre 2026) ; null : ceux livrés avec la caisse.
+  `alter table etablissements add column if not exists motifs_remise jsonb`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

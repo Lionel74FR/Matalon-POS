@@ -156,6 +156,34 @@ export interface EtablissementApi {
   moments?: MomentJournee[];
   /** Logo déposé dans l'administration : sa version (servi à /logo/<établissement>?v=<version>) ; null : aucun. */
   logo?: string | null;
+  /** Motifs proposés pour une remise ou un offert en caisse (29 octobre 2026), dans l'ordre affiché. */
+  motifsRemise?: string[];
+}
+
+/** Motifs de remise et d'offert proposés tant que l'établissement n'a pas réglé les siens. */
+export const MOTIFS_REMISE_DEFAUT = ["Geste commercial", "Client habitué", "Erreur de service", "Repas du personnel", "Offert maison"];
+/** « Fidélité » est posé par la carte de fidélité : il ne se choisit pas à la main. */
+const MOTIFS_RESERVES = ["fidélité", "fidelite"];
+
+/**
+ * Contrôle des motifs de remise (mêmes règles à l'écran et au serveur) : 1 à 12 motifs, 2 à 40
+ * caractères, sans doublon. Les statistiques regroupent remises et offerts par motif.
+ */
+export function problemeMotifsRemise(motifs: string[]): string | null {
+  if (!motifs.length) return "Gardez au moins un motif.";
+  if (motifs.length > 12) return "12 motifs au plus.";
+  for (const m of motifs) {
+    if (m.trim().length < 2) return "Chaque motif compte au moins 2 caractères.";
+    if (m.trim().length > 40) return `« ${m.trim().slice(0, 40)}… » : 40 caractères au plus.`;
+    if (MOTIFS_RESERVES.includes(m.trim().toLowerCase())) return "« Fidélité » est réservé à la carte de fidélité.";
+  }
+  const vus = new Set<string>();
+  for (const m of motifs) {
+    const k = m.trim().toLowerCase();
+    if (vus.has(k)) return `« ${m.trim()} » figure deux fois.`;
+    vus.add(k);
+  }
+  return null;
 }
 
 /**
