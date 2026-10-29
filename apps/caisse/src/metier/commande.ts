@@ -338,6 +338,51 @@ export function transfererCommande(c: Commande, versTableId: string): Commande {
   return { ...reste, tableId: versTableId };
 }
 
+/** Une ligne se transfère à une autre table si elle reste à payer et ne porte pas une récompense de fidélité. */
+export function ligneTransferable(l: LigneCommande): boolean {
+  return !l.retiree && !l.reglee && !l.fidelite;
+}
+
+/**
+ * Transfert d'une partie des articles vers une autre table (29 octobre 2026) : `selection` donne,
+ * par ligne, le nombre d'unités qui partent. Une ligne prise en entier part telle quelle (envoi,
+ * suite, remise, note) ; prise en partie, elle est coupée et la remise suit au prorata. Les suites
+ * déjà réclamées le restent à l'arrivée. Couverts, note, acomptes, fidélité et tables assemblées
+ * restent à la table de départ. `cible` : commande déjà ouverte sur la table d'arrivée (regroupée).
+ * Hors fiscal : rien n'est encaissé.
+ */
+export function transfererArticles(
+  source: Commande,
+  cible: Commande | null,
+  versTableId: string,
+  selection: ReadonlyMap<string, number>,
+  par: string,
+): { depart: Commande; arrivee: Commande; partis: LigneCommande[] } {
+  const partis: LigneCommande[] = [];
+  const restent: LigneCommande[] = [];
+  for (const l of source.lignes) {
+    const q = ligneTransferable(l) ? Math.min(l.quantite, Math.max(0, Math.trunc(selection.get(l.uid) ?? 0))) : 0;
+    if (q === 0) restent.push(l);
+    else if (q === l.quantite) partis.push(l);
+    else {
+      restent.push(avecQuantite(l, l.quantite - q));
+      partis.push({ ...avecQuantite(l, q), uid: uid() });
+    }
+  }
+  const suites = new Set(partis.map((l) => l.suite).filter((x): x is SuiteAttente => !!x));
+  const reclames = (source.reclames ?? []).filter((r) => suites.has(r.suite));
+  const partie: Commande = {
+    ...nouvelleCommande(versTableId, par),
+    lignes: partis,
+    ...(reclames.length ? { reclames } : {}),
+  };
+  return {
+    depart: { ...source, lignes: restent },
+    arrivee: cible ? fusionnerCommandes(cible, { ...partie, ouverteLe: cible.ouverteLe }) : partie,
+    partis,
+  };
+}
+
 /**
  * Regroupe la commande d'une table sur celle d'une autre table déjà ouverte :
  * lignes et couverts additionnés, notes conservées, ouverture la plus ancienne.

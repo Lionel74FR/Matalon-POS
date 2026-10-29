@@ -61,6 +61,8 @@ interface ProprietesCommande {
   /** Tables occupées par d'autres commandes, pour l'assemblage. */
   occupeesAilleurs: Set<string>;
   onTransferer: (versTableId: string) => void;
+  /** Transfert d'une partie des articles (unités par ligne) vers une autre table. */
+  onTransfererArticles?: (versTableId: string, selection: Map<string, number>) => void;
   onChange: (c: Commande) => void;
   /** Mise à jour appliquée à la dernière version de la commande (après une impression). */
   onMaj: (f: (c: Commande) => Commande) => void;
@@ -398,10 +400,19 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           depuis={c.tableId}
           tablesOuvertes={props.tablesOuvertes}
           {...(c.jointes ? { jointes: c.jointes } : {})}
+          commande={c}
           onChoisir={(t) => {
             setTransfertOuvert(false);
             props.onTransferer(t);
           }}
+          {...(props.onTransfererArticles
+            ? {
+                onArticles: (t: string, selection: Map<string, number>) => {
+                  setTransfertOuvert(false);
+                  props.onTransfererArticles!(t, selection);
+                },
+              }
+            : {})}
           onFermer={() => setTransfertOuvert(false)}
         />
       )}

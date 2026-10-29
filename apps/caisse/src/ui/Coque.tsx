@@ -30,6 +30,7 @@ import {
   tablesDeCommande,
   totauxCommande,
   acomptesActifs,
+  transfererArticles,
   transfererCommande,
   type Commande,
 } from "../metier/commande";
@@ -253,6 +254,30 @@ export function Coque() {
     setVue({ nom: "commande", tableId: vers });
   };
 
+  /**
+   * Transfert d'une partie des articles (29 octobre 2026) : la table d'arrivée reçoit les articles
+   * choisis (ou les ajoute à sa commande), la table de départ garde le reste, ses couverts et sa note.
+   * Écrit sur le serveur comme toute commande partagée : les autres appareils voient les deux tables.
+   */
+  const transfererDesArticles = async (de: string, versChoisie: string, selection: Map<string, number>) => {
+    const source = commandes.get(de);
+    const vers = occupation.get(versChoisie) ?? versChoisie;
+    if (!source || de === vers) return;
+    const cible = commandes.get(vers) ?? null;
+    const { depart, arrivee, partis } = transfererArticles(source, cible, vers, selection, utilisateur.id);
+    if (!partis.length) return;
+    // L'arrivée d'abord : en cas de coupure entre les deux écritures, un article est en double, jamais perdu.
+    await partage.modifier(vers, arrivee);
+    await partage.modifier(de, depart);
+    const t = totauxCommande({ ...arrivee, lignes: partis });
+    await caisse.registre.journaliser(
+      "TRANSFERT_TABLE",
+      { de, vers, fusion: !!cible, partiel: true, nbArticles: t.nbArticles, totalTTC: t.totalTTC },
+      utilisateur.id,
+    );
+    notifier(`${t.nbArticles} article${t.nbArticles > 1 ? "s" : ""} de ${nomTable(config, de)} ${cible ? "ajouté" + (t.nbArticles > 1 ? "s" : "") + " à" : "transféré" + (t.nbArticles > 1 ? "s" : "") + " vers"} ${nomTable(config, vers)}.`);
+  };
+
   // Onglets du service dans la barre ; le reste (fin de journée, gestion) dans le menu.
   type Onglet = { vue: Vue["nom"]; libelle: string; icone: LucideIcon; responsable?: boolean; menu?: boolean };
   const onglets = ([
@@ -364,6 +389,7 @@ export function Coque() {
             tablesOuvertes={new Set(occupation.keys())}
             occupeesAilleurs={new Set([...occupation].filter(([, principale]) => principale !== vue.tableId).map(([id]) => id))}
             onTransferer={(vers) => void transferer(vue.tableId, vers)}
+            onTransfererArticles={(vers, selection) => void transfererDesArticles(vue.tableId, vers, selection)}
             onChange={(c) => void enregistrerCommande(c, vue.tableId)}
             onMaj={(f) => majCommande(vue.tableId, f)}
             onTerminee={() => {
