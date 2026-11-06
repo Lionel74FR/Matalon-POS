@@ -8,6 +8,7 @@ import { ErreurApi } from "../serveur/client";
 import { appliquerToucheMontant, Modale, Pave, Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { AvecIcone } from "./icones";
+import { prochainDuplicata } from "../metier/duplicata";
 
 /** Une dette se règle par carte ou en espèces (les titres-restaurant paient le repas du jour, pas une ardoise). */
 const MODES: ModePaiement[] = ["CB", "ESPECES"];
@@ -394,8 +395,7 @@ function ModaleNoteCompte(props: { vente: VenteOuverte; onFermer: () => void }) 
   }, [caisse, locale, v.caisseId, v.numero, v.hash]);
 
   const duplicata = async (t: Ticket) => {
-    const evts = await caisse.stockage.lister("evenements");
-    const n = evts.filter((e) => e.code === "REIMPRESSION_TICKET" && e.details.ticket === t.numero).length + 1;
+    const n = await prochainDuplicata(caisse, t.numero);
     await imprimer(gabaritNote(t, config, n), `Duplicata n° ${n}`);
     await caisse.registre.journaliser("REIMPRESSION_TICKET", { ticket: t.numero, duplicata: n, canal: imprimanteConfiguree ? "papier" : "ecran" }, utilisateur.id);
   };

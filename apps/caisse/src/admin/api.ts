@@ -157,6 +157,12 @@ export const api = {
   ajusterMembre: (programmeId: string, id: string, points: number, motif: string) =>
     appel<{ membre: MembreFidelite }>("POST", `/fidelite/${programmeId}/membres/${id}/ajustement`, { points, motif }),
   effacerMembre: (programmeId: string, id: string) => appel("POST", `/fidelite/${programmeId}/membres/${id}/effacement`, {}),
+  /** Numéro du prochain duplicata d'une note (appareils et administration). */
+  prochainDuplicata: (etablissementId: string, caisseId: string, numero: number) =>
+    appel<{ prochain: number }>("GET", `/etablissements/${etablissementId}/tickets/${caisseId}/${numero}/duplicata`),
+  /** Duplicata ressorti ici (PDF) ou envoyé au client (lien de la note) ; refusé si le numéro a été pris entre-temps. */
+  duplicataTicket: (etablissementId: string, caisseId: string, numero: number, corps: { canal: "pdf" } | { canal: "email"; email: string; url: string }, duplicata: number) =>
+    appel<{ duplicata: number }>("POST", `/etablissements/${etablissementId}/tickets/${caisseId}/${numero}/duplicata`, { ...corps, duplicata }),
   ticketsPeriode: (etablissementId: string, du: string, au: string) =>
     appel<ReponseTickets>("GET", `/etablissements/${etablissementId}/tickets?du=${du}&au=${au}`),
   statistiques: (etablissementId: string, du: string, au: string) =>

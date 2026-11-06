@@ -139,6 +139,7 @@ describe("Accès comptable", () => {
       ["POST", "/api/admin/acces", { nom: "X", email: "x@x.fr", etablissements: ["moka"] }],
       ["POST", "/api/admin/cles-acces/options", { code: "000000" }],
       ["PUT", "/api/admin/etablissements/moka/moments", { moments: [] }],
+      ["POST", "/api/admin/etablissements/moka/tickets/ipad-0a1b2c3d/1/duplicata", { canal: "pdf", duplicata: 1 }],
     ];
     for (const [m, chemin, corps] of ecritures) expect((await appel(m, chemin, corps, caroline)).statut).toBe(403);
 

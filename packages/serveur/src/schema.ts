@@ -486,6 +486,23 @@ export const MIGRATIONS: string[] = [
   )`,
   // Motifs de remise et d'offert de l'établissement (29 octobre 2026) ; null : ceux livrés avec la caisse.
   `alter table etablissements add column if not exists motifs_remise jsonb`,
+  // Duplicatas de notes ressortis depuis l'administration (6 novembre 2026) : numérotés à la suite de
+  // ceux des appareils (REIMPRESSION_TICKET), en ajout seul, comme le journal des appareils.
+  `create table if not exists duplicatas_admin (
+    caisse_id text not null references caisses(id),
+    ticket integer not null,
+    duplicata integer not null,
+    canal text not null check (canal in ('pdf', 'email')),
+    admin_id text,
+    horodatage text not null,
+    primary key (caisse_id, ticket, duplicata)
+  )`,
+  `do $$ begin
+    if not exists (select 1 from pg_trigger where tgname = 'duplicatas_admin_ajout_seul') then
+      create trigger duplicatas_admin_ajout_seul before update or delete on duplicatas_admin
+      for each row execute function interdire_modification_fiscale();
+    end if;
+  end $$`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

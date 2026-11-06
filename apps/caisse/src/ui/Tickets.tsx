@@ -13,6 +13,7 @@ import { RattachementFidelite } from "./modales/ModaleFidelite";
 import { ModaleCorrection } from "./modales/ModaleCorrection";
 import { DetailTicket } from "./DetailTicket";
 import { emettreAvoir, listerFactures } from "../metier/facture";
+import { prochainDuplicata as numeroDuplicata } from "../metier/duplicata";
 
 const MOTIFS_ANNULATION = ["Erreur de saisie", "Erreur de table", "Client parti sans consommer", "Réclamation client"];
 const MOTIFS_ANNULATION_REGLEMENT = ["Erreur de client", "Erreur de montant", "Paiement refusé"];
@@ -151,11 +152,8 @@ export function Tickets() {
   const appareil = (t: Ticket) => (locale(t) ? config.caisseNom : (appareils?.[t.caisseId] ?? t.caisseId));
   const plusieursAppareils = new Set(tickets.map((t) => t.caisseId)).size > 1;
 
-  /** Numéro du prochain duplicata d'un ticket, papier ou QR code confondus. */
-  const prochainDuplicata = async (t: Ticket) => {
-    const evts = await caisse.stockage.lister("evenements");
-    return evts.filter((e) => e.code === "REIMPRESSION_TICKET" && e.details.ticket === t.numero).length + 1;
-  };
+  /** Numéro du prochain duplicata d'un ticket, tous canaux confondus, administration comprise. */
+  const prochainDuplicata = (t: Ticket) => numeroDuplicata(caisse, t.numero);
 
   /** Vente du jour (pas encore couverte par une Z), non annulée, sans part en compte. */
   const corrigeable = (t: Ticket) =>

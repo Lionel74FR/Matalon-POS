@@ -110,6 +110,11 @@ export class ClientApi {
     return this.appel<{ envoye: true }>("POST", "/api/caisse/note-email", corps);
   }
 
+  /** Dernier duplicata d'un ticket de cette caisse connu du serveur (appareils et administration). */
+  dernierDuplicata(numero: number) {
+    return this.appel<{ dernier: number }>("GET", `/api/caisse/duplicatas/${numero}`);
+  }
+
   // ───────── Fidélité (lot 7a), en ligne ─────────
 
   /** Membre reconnu par son téléphone (null : inconnu), et le programme de l'établissement. */

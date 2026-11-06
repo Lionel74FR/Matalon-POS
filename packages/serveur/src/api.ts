@@ -3110,20 +3110,39 @@ function contexteResa(env: Environnement, requete: Request): ContexteResa {
 async function envoyerNoteEmail(env: Environnement, requete: Request): Promise<Response> {
   const c = await caisseAuthentifiee(env, requete);
   const corps = await lireJson<Record<string, unknown>>(requete);
-  const email = (typeof corps.email === "string" ? corps.email.trim().toLowerCase() : "").slice(0, 254);
-  if (!EMAIL_VALIDE.test(email)) throw new ErreurHttp(400, "EMAIL_INVALIDE", "Adresse e-mail invalide.");
-  const origine = new URL(requete.url).origin;
-  const lien = typeof corps.url === "string" ? corps.url : "";
-  if (!lien.startsWith(`${origine}/n#`) || lien.length > 8000) throw new ErreurHttp(400, "NOTE_INVALIDE", "Lien de note invalide.");
   const numero = Number(corps.numero);
   const total = Number(corps.totalTTC);
   const horodatage = typeof corps.horodatage === "string" && !Number.isNaN(Date.parse(corps.horodatage)) ? corps.horodatage : horloge(env).toISOString();
   if (!Number.isSafeInteger(numero) || numero < 1 || !Number.isSafeInteger(total)) throw new ErreurHttp(400, "NOTE_INVALIDE", "Note invalide.");
+  await envoyerLienNote(env, requete, c.etablissement_id, { email: corps.email, url: corps.url, numero, total, horodatage });
+  return json(200, { envoye: true });
+}
+
+/** Adresse du client contrôlée ; le lien doit être une note de cette installation. */
+function lireEnvoiNote(requete: Request, email: unknown, url: unknown): { email: string; lien: string } {
+  const adresse = (typeof email === "string" ? email.trim().toLowerCase() : "").slice(0, 254);
+  if (!EMAIL_VALIDE.test(adresse)) throw new ErreurHttp(400, "EMAIL_INVALIDE", "Adresse e-mail invalide.");
+  const origine = new URL(requete.url).origin;
+  const lien = typeof url === "string" ? url : "";
+  if (!lien.startsWith(`${origine}/n#`) || lien.length > 8000) throw new ErreurHttp(400, "NOTE_INVALIDE", "Lien de note invalide.");
+  return { email: adresse, lien };
+}
+
+/** E-mail de la note au client, depuis une caisse ou l'administration. */
+async function envoyerLienNote(
+  env: Environnement,
+  requete: Request,
+  etablissementId: string,
+  n: { email: unknown; url: unknown; numero: number; total: number; horodatage: string },
+): Promise<void> {
+  const { email, lien } = lireEnvoiNote(requete, n.email, n.url);
+  const { numero, total, horodatage } = n;
+  const origine = new URL(requete.url).origin;
   const resa = contexteResa(env, requete);
-  const envoi = await preparerEnvoi(resa, c.etablissement_id);
+  const envoi = await preparerEnvoi(resa, etablissementId);
   if (!envoi || !env.envoyerCourriel) throw new ErreurHttp(503, "ENVOI_NON_CONFIGURE", "L'envoi d'e-mails n'est pas réglé pour cet établissement (administration › Réservations › Services et réglages).");
-  const etab = await etablissement(env.db, c.etablissement_id);
-  const { reglages } = await lireReglages(env.db, c.etablissement_id);
+  const etab = await etablissement(env.db, etablissementId);
+  const { reglages } = await lireReglages(env.db, etablissementId);
   const quand = new Date(horodatage).toLocaleString("fr-FR", { timeZone: "Europe/Paris", dateStyle: "long", timeStyle: "short" });
   const montant = `${formaterEuros(total)} €`;
   const sujet = `Votre note ${etab.identite.enseigne} · n° ${numero}`;
@@ -3145,7 +3164,68 @@ async function envoyerNoteEmail(env: Environnement, requete: Request): Promise<R
   } catch (e) {
     throw new ErreurHttp(502, "ENVOI_REFUSE", `L'e-mail n'est pas parti : ${e instanceof Error ? e.message : String(e)}`);
   }
-  return json(200, { envoye: true });
+}
+
+// ───────── Duplicatas de notes depuis l'administration (6 novembre 2026) ─────────
+
+/**
+ * Dernier duplicata d'un ticket : ceux des appareils (REIMPRESSION_TICKET du journal répliqué, hors
+ * factures) et ceux de l'administration. Un nouveau duplicata prend le numéro suivant.
+ */
+async function dernierDuplicata(env: Environnement, caisseId: string, numero: number): Promise<number> {
+  const [a] = await env.db.requete<{ n: number | string | null }>(
+    `select max((contenu->'details'->>'duplicata')::int) as n from enregistrements
+     where caisse_id = $1 and chaine = 'evenements' and contenu->>'code' = 'REIMPRESSION_TICKET'
+       and contenu->'details'->>'ticket' = $2 and contenu->'details'->>'facture' is null
+       and jsonb_typeof(contenu->'details'->'duplicata') = 'number'`,
+    [caisseId, String(numero)],
+  );
+  const [b] = await env.db.requete<{ n: number | string | null }>("select max(duplicata) as n from duplicatas_admin where caisse_id = $1 and ticket = $2", [caisseId, numero]);
+  return Math.max(Number(a?.n ?? 0), Number(b?.n ?? 0));
+}
+
+async function ticketDeLEtablissement(env: Environnement, etablissementId: string, caisseId: string, numero: number): Promise<Ticket> {
+  const [l] = await env.db.requete<{ contenu: Ticket }>(
+    `select e.contenu from enregistrements e join caisses c on c.id = e.caisse_id
+     where c.etablissement_id = $1 and e.caisse_id = $2 and e.chaine = 'tickets' and e.numero = $3`,
+    [etablissementId, caisseId, numero],
+  );
+  if (!l) throw new ErreurHttp(404, "TICKET_INCONNU", "Ticket introuvable sur le serveur (pas encore synchronisé ?).");
+  return l.contenu;
+}
+
+/**
+ * Duplicata d'une note ressorti dans l'administration : en PDF (la note s'ouvre et s'enregistre) ou
+ * envoyé par e-mail au client (le lien de la note). Le numéro suit ceux des appareils ; il est
+ * gardé en ajout seul et l'action entre au journal de l'administration (l'adresse n'est pas gardée).
+ * `duplicata` : numéro lu avant de construire la note ; refusé s'il a été pris entre-temps.
+ */
+async function duplicataAdmin(env: Environnement, requete: Request, admin: { id: string }, etablissementId: string, caisseId: string, numero: number): Promise<Response> {
+  const ticket = await ticketDeLEtablissement(env, etablissementId, caisseId, numero);
+  if (ticket.reglement || ticket.type === "CORRECTION") throw new ErreurHttp(400, "DUPLICATA_IMPOSSIBLE", "Pas de note pour un règlement de compte ou une correction de paiement.");
+  const prochain = (await dernierDuplicata(env, caisseId, numero)) + 1;
+  if (requete.method === "GET") return json(200, { prochain });
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const canal = corps.canal === "email" ? "email" : corps.canal === "pdf" ? "pdf" : null;
+  if (!canal) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Canal du duplicata : pdf ou email.");
+  if (corps.duplicata !== prochain) throw new ErreurHttp(409, "DUPLICATA_PRIS", `Le duplicata n° ${String(corps.duplicata)} vient d'être pris : recommencez (n° ${prochain}).`);
+  if (canal === "email") {
+    await envoyerLienNote(env, requete, etablissementId, { email: corps.email, url: corps.url, numero, total: ticket.totalTTC, horodatage: ticket.horodatage });
+  }
+  try {
+    await env.db.requete("insert into duplicatas_admin (caisse_id, ticket, duplicata, canal, admin_id, horodatage) values ($1, $2, $3, $4, $5, $6)", [
+      caisseId,
+      numero,
+      prochain,
+      canal,
+      admin.id,
+      horloge(env).toISOString(),
+    ]);
+  } catch {
+    throw new ErreurHttp(409, "DUPLICATA_PRIS", `Le duplicata n° ${prochain} vient d'être pris : recommencez.`);
+  }
+  await journaliserAdmin(env, admin.id, "duplicata_ticket", { etablissement: etablissementId, caisse: caisseId, ticket: numero, duplicata: prochain, canal });
+  return json(200, { duplicata: prochain });
 }
 
 /** Contexte de la fidélité : e-mails envoyés avec la clé et l'expéditeur des réservations de l'établissement. */
@@ -3336,6 +3416,12 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       const limite = Math.min(500, Math.max(1, Number(url.searchParams.get("limite") ?? 120) || 120));
       return await cloturesEtablissement(env, c.etablissement_id, limite);
     }
+    // Dernier duplicata d'un ticket de cette caisse, administration comprise (numérotation suivie).
+    const duplicataCaisse = /^\/api\/caisse\/duplicatas\/(\d{1,9})$/.exec(chemin);
+    if (duplicataCaisse && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { dernier: await dernierDuplicata(env, c.id, Number(duplicataCaisse[1])) });
+    }
     const ticketCaisse = /^\/api\/caisse\/tickets\/([a-z0-9-]{1,60})\/(\d{1,9})$/.exec(chemin);
     if (ticketCaisse && m === "GET") {
       const c = await caisseAuthentifiee(env, requete);
@@ -3500,6 +3586,8 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         }
         return await ticketsEtablissement(env, id, 150, { du, au });
       }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/tickets\/([a-z0-9-]{1,60})\/(\d{1,9})\/duplicata$/.exec(chemin);
+      if (p && (m === "GET" || m === "POST")) return await duplicataAdmin(env, requete, admin, (await etablissement(env.db, p[1]!)).id, p[2]!, Number(p[3]));
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/alertes$/.exec(chemin);
       if (p && m === "GET") return await listeAlertes(env, (await etablissement(env.db, p[1]!)).id, new URL(requete.url).searchParams.get("toutes") === "1");
       p = /^\/api\/admin\/alertes\/(\d{1,15})\/vue$/.exec(chemin);

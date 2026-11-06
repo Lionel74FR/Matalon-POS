@@ -339,6 +339,47 @@ describe("information des clients sur leurs données", () => {
   });
 });
 
+describe("duplicata de la note depuis l'administration", () => {
+  it("numérote à la suite des appareils, ouvre en PDF ou envoie par e-mail, et la caisse en tient compte", async () => {
+    const { admin, registre, bearer, synchro } = await preparer();
+    const vente = await registre.enregistrerVente({ lignes: [{ ...CAFE, quantite: 2 }], paiements: [{ mode: "CB", montant: 800 }], operateurId: "u-lea" });
+    // Un duplicata papier sur l'appareil, puis une facture (sa propre suite, ignorée ici).
+    await registre.journaliser("REIMPRESSION_TICKET", { ticket: vente.numero, duplicata: 1, canal: "papier" }, "u-lea");
+    await registre.journaliser("REIMPRESSION_TICKET", { facture: "F-1", ticket: vente.numero, canal: "papier", duplicata: true }, "u-lea");
+    await synchro();
+    const chemin = `/api/admin/etablissements/moka/tickets/ipad-0a1b2c3d/${vente.numero}/duplicata`;
+    expect((await appel("GET", chemin, undefined, admin)).corps).toEqual({ prochain: 2 });
+
+    // En PDF : n° 2. Un numéro périmé est refusé.
+    expect((await appel("POST", chemin, { canal: "pdf", duplicata: 2 }, admin)).corps).toEqual({ duplicata: 2 });
+    const perime = await appel("POST", chemin, { canal: "pdf", duplicata: 2 }, admin);
+    expect([perime.statut, perime.corps.code]).toEqual([409, "DUPLICATA_PRIS"]);
+
+    // Par e-mail : n° 3, montant et date pris sur le ticket du serveur, adresse non gardée.
+    const lien = "https://pos.test/n#duplicata3";
+    const e = await appel("POST", chemin, { canal: "email", duplicata: 3, email: "Client@Exemple.fr", url: lien, }, admin);
+    expect(e.corps).toEqual({ duplicata: 3 });
+    expect(courriels).toHaveLength(1);
+    expect(courriels[0]!.a).toBe("client@exemple.fr");
+    expect(courriels[0]!.texte).toMatch(/ticket n° 1 du 15 octobre 2026 à 10:00, 8,00 € TTC/);
+    expect(courriels[0]!.texte).toContain(lien);
+    // E-mail refusé (lien d'un autre site) : rien n'est numéroté.
+    expect((await appel("POST", chemin, { canal: "email", duplicata: 4, email: "client@exemple.fr", url: "https://ailleurs.test/n#x" }, admin)).corps.code).toBe("NOTE_INVALIDE");
+    expect((await appel("GET", chemin, undefined, admin)).corps).toEqual({ prochain: 4 });
+
+    // Journal de l'administration, sans l'adresse ; table en ajout seul.
+    const journal = await db.requete<{ details: any }>("select details from journal_admin where action = 'duplicata_ticket' order by horodatage");
+    expect(journal.map((j) => `${j.details.ticket}:${j.details.duplicata}:${j.details.canal}`)).toEqual(["1:2:pdf", "1:3:email"]);
+    expect(JSON.stringify(await db.requete("select to_jsonb(j) from journal_admin j union all select to_jsonb(d) from duplicatas_admin d"))).not.toContain("client@exemple.fr");
+    await expect(db.requete("delete from duplicatas_admin")).rejects.toThrow(/ajout seul/);
+
+    // La caisse qui a encaissé reprend la suite : son prochain duplicata sera le n° 4.
+    expect((await appel("GET", `/api/caisse/duplicatas/${vente.numero}`, undefined, bearer)).corps).toEqual({ dernier: 3 });
+    // Pas de note pour un ticket inconnu ou d'un autre établissement.
+    expect((await appel("GET", "/api/admin/etablissements/moka/tickets/ipad-0a1b2c3d/99/duplicata", undefined, admin)).statut).toBe(404);
+  });
+});
+
 describe("logo de l'établissement", () => {
   const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
   it("se dépose dans l'administration, se sert en public avec sa version, figure en tête des e-mails, et se retire", async () => {

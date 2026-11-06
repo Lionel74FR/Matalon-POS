@@ -737,6 +737,24 @@ code.cle-api {
   word-break: break-all;
 }
 
+/* Duplicata de la note : PDF ou e-mail au client (6 novembre 2026). */
+.note-admin {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.note-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.note-admin .succes,
+.note-admin .erreur {
+  margin: 0;
+}
+
 /* ───────── Clôtures (consultation, exports) ───────── */
 
 .clotures-admin .filtres-ligne {

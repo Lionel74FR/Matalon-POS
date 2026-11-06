@@ -89,6 +89,8 @@ try {
   const note = decoderNote(location.hash);
   document.title = `Note ${note.e[0]} n° ${note.n}`;
   racine.append(rendre(note));
+  // Duplicata ressorti en PDF depuis l'administration (/n?pdf=1#…) : la fenêtre d'impression s'ouvre d'elle-même.
+  if (new URLSearchParams(location.search).has("pdf")) setTimeout(() => window.print(), 400);
 } catch (e) {
   racine.append(
     el(

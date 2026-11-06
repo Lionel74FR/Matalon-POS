@@ -10,6 +10,7 @@ import { euros } from "../ui/contexte";
 import { DetailTicket } from "../ui/DetailTicket";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import { api, type EtablissementAdmin } from "./api";
+import { ActionsNoteAdmin } from "./NoteAdmin";
 import { EntetePage } from "./Page";
 
 const decaler = (jour: string, n: number) => {
@@ -45,10 +46,10 @@ export interface FiltreTickets {
 }
 
 /**
- * Tickets de l'établissement dans l'administration : consultation seule. Résumé par
- * serveur (une ligne touchée filtre la liste), recherche, puis le détail de chaque ticket.
- * Annuler, corriger, facturer ou imprimer un duplicata se fait sur l'appareil qui a
- * encaissé : c'est lui qui scelle les enregistrements.
+ * Tickets de l'établissement dans l'administration : consultation, plus le duplicata de la note
+ * en PDF ou par e-mail (6 novembre 2026). Résumé par serveur (une ligne touchée filtre la liste),
+ * recherche, puis le détail de chaque ticket. Annuler, corriger ou facturer se fait sur l'appareil
+ * qui a encaissé : c'est lui qui scelle les enregistrements.
  */
 export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTickets | null }) {
   const { e } = props;
@@ -138,7 +139,7 @@ export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTick
     <EntetePage
       surtitre="Piloter"
       titre="Tickets"
-      aide="Tous les appareils, en consultation. Un ticket ne se modifie pas : l'annulation, la correction du paiement, la facture et le duplicata se font sur l'appareil qui a encaissé."
+      aide="Tous les appareils, en consultation. Un ticket ne se modifie pas : l'annulation, la correction du paiement et la facture se font sur l'appareil qui a encaissé. Le duplicata de la note se ressort ici, en PDF ou par e-mail au client, numéroté à la suite de ceux des appareils."
       actions={<BoutonIcone icone={RefreshCw} libelle="Actualiser les tickets" disabled={chargement} onClick={() => void charger()} />}
     />
     <section className="admin-section tickets-admin">
@@ -264,6 +265,7 @@ export function TicketsAdmin(props: { e: EtablissementAdmin; filtre?: FiltreTick
           )}
           {choisi.motif && <p className="explication">Motif : {choisi.motif}</p>}
           <DetailTicket ticket={choisi} tickets={tous} nomAppareil={appareil} />
+          {!choisi.reglement && choisi.type !== "CORRECTION" && <ActionsNoteAdmin key={cle(choisi)} e={e} ticket={choisi} nomTable={nomTable(choisi.tableId)} />}
           <p className="explication ticket-admin-empreinte">
             Journée comptable du {new Date(`${choisi.dateComptable}T12:00:00Z`).toLocaleDateString("fr-FR", { dateStyle: "long", timeZone: "UTC" })} ·
             empreinte {choisi.hash.slice(0, 16)}
