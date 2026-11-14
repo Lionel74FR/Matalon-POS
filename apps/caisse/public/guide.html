@@ -444,6 +444,16 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7j">
+    <label><input type="checkbox">La carte rouvre là où on l'a laissée</label>
+    <ol>
+      <li>Ouvrez une table, touchez le rayon <b>Cuisine</b> puis une catégorie (Salades), ajoutez un plat et encaissez.</li>
+      <li>Ouvrez une autre table libre, puis la <span class="bouton">Vente Directe</span>.</li>
+      <li>Fermez l'app et rouvrez-la, connectez-vous, ouvrez une table.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> chaque nouvelle commande s'ouvre sur Cuisine › Salades, même après le redémarrage. En choisissant un autre rayon (Bar), la commande suivante s'ouvre sur Bar. Chaque appareil garde sa propre position.</p>
+  </section>
+
   <section class="scenario" data-id="s7i">
     <label><input type="checkbox">Duplicata de la note depuis l'administration</label>
     <ol>

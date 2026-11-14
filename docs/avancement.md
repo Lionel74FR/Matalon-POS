@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 6 novembre 2026 (duplicata de la note en PDF ou par e-mail depuis l'administration ; 29 octobre : remise en euros sur un article ; transfert d'une partie des articles vers une autre table ; motifs de remise et d'offert).
+Dernière mise à jour : 14 novembre 2026 (la carte rouvre sur le rayon et la catégorie de la commande précédente ; 6 novembre : duplicata de la note en PDF ou par e-mail depuis l'administration ; 29 octobre : remise en euros sur un article ; transfert d'une partie des articles vers une autre table ; motifs de remise et d'offert).
 
 ## Règle de conduite
 
@@ -28,6 +28,7 @@ Dernière mise à jour : 6 novembre 2026 (duplicata de la note en PDF ou par e-m
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Carte de l'écran de commande (demande de Lionel du 14 novembre) : la commande suivante (autre table, nouvelle commande, Vente Directe) rouvre sur le rayon et la catégorie laissés à la précédente, même après un redémarrage de l'app. `metier/position-carte` (localStorage par appareil, `positionInitiale` : un rayon disparu de la carte ramène au premier) ; `PriseCommandeCarte` part de la position gardée et l'enregistre à chaque changement. Noyau fiscal inchangé. Tests `position-carte` et scénario `carte-position` (41 parcours) |
 | 182016b | Duplicata de la note depuis l'administration (demande de Lionel du 6 novembre) : détail d'un ticket (vente ou annulation) › « Note en PDF » (note dématérialisée ouverte dans un nouvel onglet, `/n?pdf=1#…` lance l'impression) et « Envoyer par e-mail » (lien de la note, `ActionsNoteAdmin`). Serveur : table `duplicatas_admin` en ajout seul (trigger), `dernierDuplicata` (journal des appareils répliqué, hors factures, et administration), route `GET/POST /api/admin/etablissements/:id/tickets/:caisse/:numero/duplicata` (numéro attendu, 409 s'il est pris ; e-mail avec le montant et la date du ticket du serveur ; journal `duplicata_ticket` sans l'adresse), `envoyerLienNote` commun avec la caisse ; refusée aux accès comptables. Caisse : `metier/duplicata.prochainDuplicata` suit aussi les duplicatas de l'administration (`GET /api/caisse/duplicatas/:numero`, 3 s au plus, journal local hors ligne ; factures exclues du compte). Noyau fiscal inchangé. Tests serveur et caisse, scénario `duplicata-admin` (40 parcours) |
 | d95e2c5 | Remise en euros sur un article (demande de Lionel du 29 octobre), à côté de la remise en % : `ModaleLigne` « En euros » (afficheur et pavé `Pave doubleZero`, sans clavier d'iOS ; montant sur toute la ligne, refusé au-delà de son montant ; motif et accord d'un responsable comme pour le pourcentage ; rouverte en euros). `LigneCommande.remise.enEuros` (`pourcentage` à 0) ; `avecQuantite` fait suivre une remise en euros au prorata des unités, plafonnée au montant ; `couperLigne` partage la remise sans perte (le reste prend ce que la partie ne prend pas) pour la division par articles, le transfert partiel et le supplément d'un article déjà envoyé (remise en % inchangée). Noyau fiscal inchangé (`remise.montantTTC` et motif). Tests `remise-euros` et scénario `remise-euros` (39 parcours) |
 | d57cc50 | Transfert d'une partie des articles (demande de Lionel du 29 octobre) : `transfererArticles` (lignes prises en entier ou coupées, remise au prorata, envoi et suite gardés, suites réclamées reprises ; couverts, note, acomptes, fidélité et tables assemblées restent ; lignes réglées, retirées ou à récompense exclues, `ligneTransferable`) ; `ModaleTransfert` : « Ne transférer que certains articles » (sélection commune avec la division, `SelectionArticles`), puis la table d'arrivée, libre ou regroupée ; tout choisir revient au transfert de la table ; table à acomptes transférée en entier. `Coque.transfererDesArticles` écrit l'arrivée puis le départ (commandes partagées) et journalise `TRANSFERT_TABLE` avec `partiel`. Noyau fiscal inchangé. Tests de `commande-transfert` et scénario `transfert-articles` (38 parcours) |
@@ -189,4 +190,4 @@ Dernière mise à jour : 6 novembre 2026 (duplicata de la note en PDF ou par e-m
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 40 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 41 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

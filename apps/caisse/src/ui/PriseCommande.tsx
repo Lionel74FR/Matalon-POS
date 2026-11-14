@@ -4,7 +4,7 @@ import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
 import {
@@ -38,6 +38,7 @@ import { ModaleFidelite } from "./modales/ModaleFidelite";
 import { ModaleLigne } from "./modales/ModaleLigne";
 import { ModaleAssembler, ModaleNoteCommande, ModaleTransfert } from "./modales/ModaleTransfert";
 import { productionActive, useEnvoiProduction, useReclame } from "./production";
+import { enregistrerPositionCarte, lirePositionCarte, positionInitiale } from "../metier/position-carte";
 
 const heure = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { timeZone: "Europe/Paris", timeStyle: "short" });
 
@@ -100,9 +101,12 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const c = props.commande;
   const CARTE = props.carte;
   const RAYONS = useMemo(() => [...new Set(CARTE.categories.map((x) => x.rayon))], [CARTE]);
-  const [rayon, setRayon] = useState(RAYONS[0]!);
+  // La carte rouvre sur le rayon et la catégorie laissés à la commande précédente (14 novembre 2026).
+  const [depart] = useState(() => positionInitiale(RAYONS, lirePositionCarte()));
+  const [rayon, setRayon] = useState(depart.rayon);
   const categories = useMemo(() => CARTE.categories.filter((x) => x.rayon === rayon), [CARTE, rayon]);
-  const [categorieId, setCategorieId] = useState<string | null>(null);
+  const [categorieId, setCategorieId] = useState<string | null>(depart.categorieId);
+  useEffect(() => enregistrerPositionCarte({ rayon, categorieId }), [rayon, categorieId]);
   const categorie: Categorie = categories.find((x) => x.id === categorieId) ?? categories[0]!;
   const [articleOuvert, setArticleOuvert] = useState<Article | null>(null);
   const [ligneOuverte, setLigneOuverte] = useState<LigneCommande | null>(null);
