@@ -27,6 +27,7 @@ import { EntetePage, TitreAvecAide } from "./Page";
 import { confirmer, informer, Panneau } from "./Panneau";
 import { Recherche } from "./Recherche";
 import { AccepterInvitation, FenetreAcces } from "./Acces";
+import { FenetreMotDePasse } from "./MotDePasse";
 import { BoutonAlertes, BoutonRecherche, defRubrique, familleDe, Marque, MenuCompte, MenuEtablissement, MenuLateral, OngletsMobile, TOUTES_RUBRIQUES, useMenuReduit, useTheme, type Rubrique, type Signal } from "./Coque";
 import {
   Archive,
@@ -414,6 +415,7 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
   const [fenetreCles, setFenetreCles] = useState(false);
   const [fenetreConfiguration, setFenetreConfiguration] = useState(false);
   const [fenetreAcces, setFenetreAcces] = useState(false);
+  const [fenetreMotDePasse, setFenetreMotDePasse] = useState(false);
 
   const recharger = useCallback(async () => {
     try {
@@ -497,7 +499,12 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
             onTheme={choisirTheme}
             {...(props.comptable
               ? {}
-              : { onCles: () => setFenetreCles(true), onAcces: () => setFenetreAcces(true), onConfiguration: () => setFenetreConfiguration(true) })}
+              : {
+                  onCles: () => setFenetreCles(true),
+                  onMotDePasse: () => setFenetreMotDePasse(true),
+                  onAcces: () => setFenetreAcces(true),
+                  onConfiguration: () => setFenetreConfiguration(true),
+                })}
             onDeconnexion={() => void api.deconnexion().finally(props.onDeconnecte)}
           />
         </div>
@@ -587,6 +594,7 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
       )}
       {fenetreAcces && donnees && <FenetreAcces etablissements={donnees.etablissements} onFermer={() => setFenetreAcces(false)} />}
       {fenetreConfiguration && <FenetreConfiguration onFermer={() => setFenetreConfiguration(false)} onImporte={() => void recharger()} />}
+      {fenetreMotDePasse && <FenetreMotDePasse onFermer={() => setFenetreMotDePasse(false)} />}
       {fenetreCles && <FenetreClesAcces cles={clesAcces.cles} onChange={clesAcces.setCles} onFermer={() => setFenetreCles(false)} />}
     </div>
   );

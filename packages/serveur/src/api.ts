@@ -2207,10 +2207,18 @@ async function connexionAdmin(env: Environnement, requete: Request): Promise<Res
 const DUREE_DEFI_MS = 5 * 60_000;
 const CLES_MAX = 10;
 
-/** Domaine et origine attendus : ceux de l'adresse servie (une clé créée sur un domaine ne vaut que pour lui). */
+/** Domaine des clés de la production : ses sous-domaines (test.matalon-pos.app) les partagent. */
+const DOMAINE_CLES = "matalon-pos.app";
+
+/**
+ * Domaine et origine attendus : ceux de l'adresse servie (une clé créée sur un domaine ne vaut que pour
+ * lui). Depuis le 15 novembre 2026, un sous-domaine de matalon-pos.app (le serveur de test, sur une
+ * copie de la production) reconnaît les clés de matalon-pos.app, que le navigateur accepte d'y utiliser.
+ * L'origine reste celle de l'adresse servie.
+ */
 function partieConfiante(requete: Request): { rpId: string; origine: string } {
   const u = new URL(requete.url);
-  return { rpId: u.hostname, origine: u.origin };
+  return { rpId: u.hostname.endsWith(`.${DOMAINE_CLES}`) ? DOMAINE_CLES : u.hostname, origine: u.origin };
 }
 
 async function nouveauDefi(env: Environnement, usage: "connexion" | "enregistrement", adminId: string | null): Promise<string> {
@@ -2370,6 +2378,39 @@ async function connexionCle(env: Environnement, requete: Request): Promise<Respo
   }
   await env.db.requete("update cles_acces_admin set compteur = $2, utilisee_le = $3 where id = $1", [c.id, compteur, horloge(env).toISOString()]);
   return ouvrirSession(env, c.admin_id, { methode: "cle", nom: c.nom });
+}
+
+/**
+ * Nouveau mot de passe du propriétaire (15 novembre 2026, mot de passe oublié) : connecté (clé d'accès
+ * ou mot de passe), il le change avec le code de son application d'authentification ; l'ancien n'est
+ * pas demandé. Les autres sessions sont fermées ; codes faux comptés comme à la connexion.
+ */
+async function changerMotDePasse(env: Environnement, requete: Request, admin: AdminSession): Promise<Response> {
+  if (admin.role !== "proprietaire") throw new ErreurHttp(403, "ACCES_COMPTABLE", "Réservé au propriétaire.");
+  const corps = await lireJson<Record<string, unknown>>(requete);
+  const nouveau = typeof corps.nouveau === "string" ? corps.nouveau : "";
+  if (nouveau.length < 12) throw new ErreurHttp(400, "MOT_DE_PASSE_FAIBLE", "Le mot de passe doit compter au moins 12 caractères.");
+  const maintenant = horloge(env);
+  const [a] = await env.db.requete<LigneAdmin>("select * from admins where id = $1", [admin.id]);
+  if (!a) throw new ErreurHttp(401, "NON_AUTHENTIFIE", "Connexion administrateur requise.");
+  if (a.bloque_jusqua && a.bloque_jusqua > maintenant.toISOString()) throw new ErreurHttp(429, "COMPTE_BLOQUE", "Trop d'essais : réessayez dans 15 minutes.");
+  if (!(await verifierTotp(a.totp_secret, String(corps.code ?? ""), maintenant.getTime()))) {
+    const echecs = a.echecs + 1;
+    await env.db.requete("update admins set echecs = $2, bloque_jusqua = $3 where id = $1", [
+      a.id,
+      echecs >= ECHECS_MAX ? 0 : echecs,
+      echecs >= ECHECS_MAX ? new Date(maintenant.getTime() + BLOCAGE_MS).toISOString() : null,
+    ]);
+    await journaliserAdmin(env, a.id, "mot_de_passe_refuse", {});
+    throw new ErreurHttp(401, "CODE_INVALIDE", "Code de vérification incorrect.");
+  }
+  const jeton = cookie(requete, COOKIE) ?? "";
+  await env.db.lot([
+    { texte: "update admins set mot_de_passe = $2, echecs = 0, bloque_jusqua = null where id = $1", params: [a.id, await hacherMotDePasse(nouveau)] },
+    { texte: "delete from sessions_admin where admin_id = $1 and jeton_hash <> $2", params: [a.id, await sha256(jeton)] },
+  ]);
+  await journaliserAdmin(env, a.id, "mot_de_passe_change", {});
+  return json(200, { ok: true });
 }
 
 async function deconnexionAdmin(env: Environnement, requete: Request): Promise<Response> {
@@ -3471,6 +3512,7 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       if (pa && m === "PUT" && !pa[2]) return await modifierAcces(env, requete, admin, pa[1]!);
       if (pa && m === "POST" && pa[2] === "/revoquer") return await revoquerAcces(env, admin, pa[1]!);
       if (pa && m === "POST" && pa[2] === "/lien") return await relancerAcces(env, admin, pa[1]!);
+      if (chemin === "/api/admin/mot-de-passe" && m === "POST") return await changerMotDePasse(env, requete, admin);
       if (chemin === "/api/admin/cles-acces" && m === "GET") return await listeClesAcces(env, admin.id);
       if (chemin === "/api/admin/cles-acces" && m === "POST") return await enregistrerCle(env, requete, admin);
       if (chemin === "/api/admin/cles-acces/options" && m === "POST") return await optionsEnregistrementCle(env, requete, admin);

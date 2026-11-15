@@ -111,6 +111,8 @@ export const api = {
   optionsConnexionCle: () => appel<{ options: OptionsConnexion }>("POST", "/cle-acces/options", {}),
   connexionCle: (reponse: unknown) => appel("POST", "/cle-acces/connexion", { reponse }),
   clesAcces: () => appel<{ cles: CleAccesAdmin[] }>("GET", "/cles-acces"),
+  /** Nouveau mot de passe du propriétaire connecté, avec le code de l'application d'authentification. */
+  changerMotDePasse: (code: string, nouveau: string) => appel<{ ok: true }>("POST", "/mot-de-passe", { code, nouveau }),
   optionsCleAcces: (code: string) => appel<{ options: OptionsCreation }>("POST", "/cles-acces/options", { code }),
   enregistrerCleAcces: (nom: string, reponse: unknown) => appel<{ cles: CleAccesAdmin[] }>("POST", "/cles-acces", { nom, reponse }),
   retirerCleAcces: (id: string) => appel<{ cles: CleAccesAdmin[] }>("DELETE", `/cles-acces/${id}`),
