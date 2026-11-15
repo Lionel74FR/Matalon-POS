@@ -130,6 +130,7 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
         const aCompleter = optionnel(ao.aCompleter, () => texte(ao.aCompleter, `${ou} : à compléter`, 200));
         if (aCompleter) article.aCompleter = aCompleter;
         if (ao.indisponible === true) article.indisponible = true;
+        if (ao.prixLibre === true) article.prixLibre = true;
         const fa = fiche(ao.fiche, ou);
         if (fa) article.fiche = fa;
         return article;

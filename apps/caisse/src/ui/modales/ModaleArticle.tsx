@@ -1,9 +1,9 @@
 import { Minus, Plus } from "lucide-react";
 import { AvecIcone } from "../icones";
-import { ligneDepuisArticle, ligneSupplement, tousLesArticles, type Article, type Catalogue, type ChoixFormule, optionsChoix } from "@matalon/catalogue";
-import { useMemo, useState } from "react";
+import { ligneDepuisArticle, ligneSupplement, type Article, type Catalogue, type ChoixFormule, optionsChoix, PRIX_LIBRE_MAX } from "@matalon/catalogue";
+import { useEffect, useMemo, useState } from "react";
 import type { LigneCommande } from "../../metier/commande";
-import { Modale } from "../communs";
+import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros } from "../contexte";
 
 type NouvelleLigne = Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">;
@@ -18,7 +18,7 @@ function optionsDuChoix(carte: Catalogue, choix: ChoixFormule): Array<{ libelle:
   );
 }
 
-/** Variante, suppléments ou composition d'une formule avant ajout à la commande. */
+/** Variante, suppléments, composition d'une formule ou prix saisi (prix libre) avant ajout à la commande. */
 export function ModaleArticle(props: {
   article: Article;
   carte: Catalogue;
@@ -34,12 +34,31 @@ export function ModaleArticle(props: {
     [a, props.carte],
   );
   const [selections, setSelections] = useState<Record<string, string>>({});
+  const [prixSaisi, setPrixSaisi] = useState(0);
+  const libre = !!a.prixLibre;
 
   const varianteManquante = !!a.variantes?.length && !varianteId;
   const choixManquant = choixFormule.find((c) => !selections[c.choix.id]);
-  const pret = !varianteManquante && !choixManquant;
+  const prixManquant = libre && (prixSaisi <= 0 || prixSaisi > PRIX_LIBRE_MAX);
+  const pret = !varianteManquante && !choixManquant && !prixManquant;
+
+  const toucherPrix = (t: string) => setPrixSaisi((x) => appliquerToucheMontant(x, t));
+  // Clavier physique (dalle tactile, PC) : chiffres, retour arrière, Entrée.
+  useEffect(() => {
+    if (!libre) return;
+    const touche = (e: KeyboardEvent) => {
+      if (/^\d$/.test(e.key)) toucherPrix(e.key);
+      else if (e.key === "Backspace") toucherPrix("effacer");
+      else if (e.key === "Enter") ajouter();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", touche);
+    return () => window.removeEventListener("keydown", touche);
+  });
 
   const prixUnitaire = (() => {
+    if (libre) return prixSaisi;
     const v = a.variantes?.find((x) => x.id === varianteId);
     const base = v?.prixTTC ?? a.prixTTC ?? 0;
     return base + (a.supplements ?? []).filter((s) => supplements.includes(s.id)).reduce((t, s) => t + s.prixTTC, 0);
@@ -61,6 +80,8 @@ export function ModaleArticle(props: {
         prixUnitaireTTC: a.prixTTC!,
         tauxTVA: a.tauxTVA,
       });
+    } else if (libre) {
+      lignes.push({ ...ligneDepuisArticle(a, { prixSaisi, quantite }), details: [] });
     } else {
       lignes.push({ ...ligneDepuisArticle(a, { ...(varianteId ? { varianteId } : {}), quantite }), details: [] });
     }
@@ -87,12 +108,31 @@ export function ModaleArticle(props: {
             </button>
           </div>
           <button className="bouton principal" disabled={!pret} onClick={ajouter}>
-            <AvecIcone icone={Plus}>{pret ? `Ajouter · ${euros(prixUnitaire * quantite)}` : varianteManquante ? "Choisissez une variante" : `Choisissez : ${choixManquant!.choix.nom}`}</AvecIcone>
+            <AvecIcone icone={Plus}>
+              {pret
+                ? `Ajouter · ${euros(prixUnitaire * quantite)}`
+                : prixManquant
+                  ? prixSaisi > PRIX_LIBRE_MAX
+                    ? `${euros(PRIX_LIBRE_MAX)} au plus`
+                    : "Saisissez le prix"
+                  : varianteManquante
+                    ? "Choisissez une variante"
+                    : `Choisissez : ${choixManquant!.choix.nom}`}
+            </AvecIcone>
           </button>
         </>
       }
     >
       {a.description && <p className="explication">{a.description}</p>}
+      {libre && (
+        <section className="groupe-choix prix-libre">
+          <h3>Prix unitaire</h3>
+          <div className="afficheur" aria-label="Prix saisi">
+            {euros(prixSaisi)}
+          </div>
+          <Pave doubleZero onTouche={toucherPrix} />
+        </section>
+      )}
       {a.variantes?.length ? (
         <section className="groupe-choix">
           <h3>Variante</h3>

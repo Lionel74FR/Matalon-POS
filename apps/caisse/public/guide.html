@@ -444,7 +444,7 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
-  <section class="scenario" data-id="s7k">
+  <section class="scenario" data-id="s7l">
     <label><input type="checkbox">Imprimante série (caisses du Chardon)</label>
     <ol>
       <li>Sur la dalle, fermez DominoFR. Dans Chrome, ouvrez la caisse, Menu › Réglages › <b>Imprimante série (port COM)</b> › <span class="bouton">Utiliser une imprimante série</span>, puis choisissez COM2 dans la fenêtre de Chrome.</li>
@@ -453,6 +453,16 @@
       <li>Sur l'iPad du Moka : Réglages, puis un ticket et un bon de production.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> l'essai sort coupé, avec les accents et « 12,50 € » lisibles (sinon cochez « Imprimer sans accents ») ; le tiroir s'ouvre ; la vente en espèces ouvre le tiroir et le duplicata s'imprime sur l'Oxhoo. Sur l'iPad, aucun réglage série n'apparaît et les tickets et bons sortent comme avant.</p>
+  </section>
+
+  <section class="scenario" data-id="s7k">
+    <label><input type="checkbox">Article à prix libre (saisi en caisse)</label>
+    <ol>
+      <li>Administration › Carte › <b>Cartes et prix</b> : ouvrez un article sans prix fixe (ex. « Divers soft »), cochez <span class="bouton">Prix saisi en caisse</span>, validez puis enregistrez la carte.</li>
+      <li>Sur l'iPad, ouvrez une table : la tuile affiche « Prix libre ». Touchez-la, frappez 12, 50 au pavé (ou au clavier de la dalle), mettez la quantité à 2, puis <span class="bouton">Ajouter</span> (ou Entrée).</li>
+      <li>Encaissez la table, puis regardez les alertes de l'administration.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> sans montant, le bouton reste sur « Saisissez le prix » et rien ne s'ajoute. Avec 12,50 € et 2, « Ajouter · 25,00 € » ; la ligne vaut 25,00 €. Le ticket porte 2 × 12,50 € au taux de l'article, et aucune alerte « autre prix que la carte » n'apparaît (seul un taux de TVA différent en lèverait une). Dans l'éditeur, le prix de l'article affiche « libre ».</p>
   </section>
 
   <section class="scenario" data-id="s7j">

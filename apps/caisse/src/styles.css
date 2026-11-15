@@ -3630,3 +3630,18 @@ a.bouton {
 .transfert-articles small {
   color: var(--sable);
 }
+
+.prix-libre {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.prix-libre h3 {
+  justify-self: start;
+}
+
+.prix-libre .afficheur {
+  width: min(100%, 272px);
+  margin-bottom: 0;
+}

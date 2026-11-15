@@ -108,9 +108,10 @@ export function trouverArticle(c: Catalogue, id: string): Article | undefined {
  * Prix et taux de la carte pour l'identifiant d'une ligne de ticket : article
  * (« a »), variante (« a:v ») ou supplément (« a+s »), comme les forment
  * `ligneDepuisArticle` et `ligneSupplement`. Null si l'article n'y est pas ou
- * n'a pas de prix.
+ * n'a pas de prix. Article à prix libre : `libre`, et tout prix vendu est le bon
+ * (`prixTTC` vaut alors 0, seul le taux compte).
  */
-export function prixCarte(c: Catalogue, articleId: string): { prixTTC: number; tauxTVA: number; nom: string } | null {
+export function prixCarte(c: Catalogue, articleId: string): { prixTTC: number; tauxTVA: number; nom: string; libre?: true } | null {
   const plus = articleId.indexOf("+");
   const deux = articleId.indexOf(":");
   const coupe = plus >= 0 ? plus : deux;
@@ -125,21 +126,30 @@ export function prixCarte(c: Catalogue, articleId: string): { prixTTC: number; t
     const prix = v?.prixTTC ?? a.prixTTC;
     return v && prix != null ? { prixTTC: prix, tauxTVA: a.tauxTVA, nom: v.libelle ?? `${a.nom} ${v.nom}` } : null;
   }
+  if (a.prixLibre) return { prixTTC: 0, tauxTVA: a.tauxTVA, nom: a.nom, libre: true };
   return a.prixTTC == null ? null : { prixTTC: a.prixTTC, tauxTVA: a.tauxTVA, nom: a.nom };
 }
 
 /** Articles qu'on ne peut pas encore encaisser : prix ou information manquants. */
 export function articlesACompleter(c: Catalogue): Array<{ id: string; nom: string; manque: string }> {
   return tousLesArticles(c)
-    .filter((a) => a.aCompleter || a.prixTTC == null)
+    .filter((a) => a.aCompleter || (a.prixTTC == null && !a.prixLibre))
     .map((a) => ({ id: a.id, nom: a.nom, manque: a.aCompleter ?? "prix manquant" }));
 }
 
-/** Ligne prête pour le noyau fiscal (forme de `SaisieLigne`), variante incluse. */
+/** Plafond d'un prix saisi en caisse pour un article à prix libre (centimes). */
+export const PRIX_LIBRE_MAX = 10_000_00;
+
+/** Ligne prête pour le noyau fiscal (forme de `SaisieLigne`), variante incluse ; `prixSaisi` pour un article à prix libre. */
 export function ligneDepuisArticle(
   article: Article,
-  options: { varianteId?: string; quantite?: number } = {},
+  options: { varianteId?: string; quantite?: number; prixSaisi?: number } = {},
 ): { articleId: string; libelle: string; quantite: number; prixUnitaireTTC: number; tauxTVA: number } {
+  if (article.prixLibre) {
+    const p = options.prixSaisi;
+    if (p == null || !Number.isSafeInteger(p) || p <= 0 || p > PRIX_LIBRE_MAX) throw new Error(`saisir le prix de ${article.nom}`);
+    return { articleId: article.id, libelle: article.nom, quantite: options.quantite ?? 1, prixUnitaireTTC: p, tauxTVA: article.tauxTVA };
+  }
   let variante: Variante | undefined;
   if (article.variantes?.length) {
     variante = article.variantes.find((v) => v.id === options.varianteId);
@@ -206,8 +216,14 @@ export function validerCatalogue(c: Catalogue): string[] {
       if (a.variantes?.length) erreurs.push(`${a.id} : une formule ne peut pas avoir de variantes`);
       if (a.prixTTC == null && !a.aCompleter) erreurs.push(`${a.id} : une formule doit avoir un prix`);
     }
+    if (a.prixLibre) {
+      if (a.prixTTC != null) erreurs.push(`${a.id} : un article à prix libre n'a pas de prix de carte`);
+      if (a.variantes?.length || a.supplements?.length || a.formule?.length) {
+        erreurs.push(`${a.id} : un article à prix libre n'a ni variante, ni supplément, ni formule`);
+      }
+    }
     const sansPrix = a.prixTTC == null && !(a.variantes ?? []).some((v) => v.prixTTC != null);
-    if (sansPrix && !a.aCompleter) erreurs.push(`${a.id} : prix manquant (ou indiquer ce qui reste à compléter)`);
+    if (sansPrix && !a.aCompleter && !a.prixLibre) erreurs.push(`${a.id} : prix manquant (ou indiquer ce qui reste à compléter)`);
   }
   for (const a of articles) {
     for (const choix of a.formule ?? []) {
