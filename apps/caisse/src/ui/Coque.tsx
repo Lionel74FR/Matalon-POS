@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AvecIcone, BoutonIcone } from "./icones";
-import { ID_COMPTOIR, imprimanteDe } from "../donnees/configuration";
+import { ID_COMPTOIR, sortieTickets } from "../donnees/configuration";
 import { PartageCommandes, type Reservation as ReservationTable } from "../donnees/partage";
 import {
   commandeAGarder,
@@ -369,7 +369,7 @@ export function Coque() {
           ticket. Réglez la date et l'heure dans les réglages de l'iPad ou de l'iPhone avant d'encaisser.
         </div>
       )}
-      {!imprimanteDe(config) && utilisateur.role === "responsable" && (
+      {!sortieTickets(config) && utilisateur.role === "responsable" && (
         <div className="bandeau-info">
           <span className="bandeau-texte">
             Caisse sans imprimante : les notes passent par QR code, les Z restent consultables dans Clôtures.

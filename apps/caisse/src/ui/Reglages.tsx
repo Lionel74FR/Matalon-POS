@@ -19,6 +19,7 @@ import {
 import { ErreurApi } from "../serveur/client";
 import { VERSION_APPLICATION } from "../fiscal/caisse";
 import { envoyerEpson } from "../impression/epson";
+import { ImprimanteSerie } from "./ImprimanteSerie";
 import { gabaritBon, gabaritTest } from "../impression/gabarits";
 import { nouvelleCommande } from "../metier/commande";
 import { EditeurPostes } from "./EditeurPostes";
@@ -183,8 +184,12 @@ export function Reglages(props: { onAssistant: () => void }) {
         </fieldset>
 
         <div>
+          <ImprimanteSerie />
           <fieldset>
             <legend>Imprimante Epson</legend>
+            {config.imprimanteSerie && (
+              <p className="aide-champ">Cet {NOM_APPAREIL} imprime ses tickets sur l'imprimante série ci-dessus ; l'imprimante Epson sert aux autres appareils.</p>
+            )}
             <div className="options" role="radiogroup" aria-label="Imprimante des tickets">
               <button role="radio" aria-checked={pourTous} className={`bouton${pourTous ? " actif" : ""}`} onClick={() => setPourTous(true)}>
                 Tout l'établissement

@@ -45,6 +45,12 @@ export interface Configuration {
   clients?: ClientApi[];
   /** Imprimantes de production de l'établissement : poste de la carte → imprimante. */
   postesProduction?: PostesProduction;
+  /**
+   * Imprimante des tickets branchée sur un port série de cet appareil (15 novembre 2026, caisses du
+   * Chardon sous Chrome) : prioritaire sur l'imprimante Epson pour les tickets de cet appareil, jamais
+   * partagée. `rang` : place du port parmi ceux autorisés dans Chrome. Absente : rien ne change.
+   */
+  imprimanteSerie?: { rang: number; bauds: number; sansAccents: boolean };
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */
   imprimanteEtablissement?: ImprimanteReseau | null;
   /** Dernière imprimante utilisée par cet appareil : survit à un retrait, pour la rétablir d'un toucher. */
@@ -94,6 +100,17 @@ export function fusionnerReferentiel(
 export function retenirImprimante(config: Configuration): Configuration {
   const i = imprimanteDe(config);
   return i ? { ...config, imprimanteConnue: { adresse: i.adresse, sansAccents: i.sansAccents } } : config;
+}
+
+/** Sortie des tickets de cet appareil : son imprimante série, sinon l'imprimante Epson (la sienne ou celle de l'établissement). */
+export type SortieTickets =
+  | ({ connexion: "serie" } & NonNullable<Configuration["imprimanteSerie"]>)
+  | ({ connexion: "reseau" } & NonNullable<ReturnType<typeof imprimanteDe>>);
+
+export function sortieTickets(config: Configuration): SortieTickets | null {
+  if (config.imprimanteSerie) return { connexion: "serie", ...config.imprimanteSerie };
+  const i = imprimanteDe(config);
+  return i ? { connexion: "reseau", ...i } : null;
 }
 
 /** Imprimante des tickets utilisée par cet appareil : la sienne, sinon celle de l'établissement. */
