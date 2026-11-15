@@ -82,6 +82,7 @@ URL=… node scripts/pourboire.mjs captures  # pourboire sur la carte (noyau 1.1
 URL=… node scripts/comptage-pave.mjs captures  # comptage de la Z au pavé (aucun champ natif pour les montants, « Suivant »), fenêtre qui ne se ferme pas d'un toucher à côté, saisie reprise après un rechargement en plein comptage, brouillon effacé après la Z, format iPhone
 URL=… node scripts/motifs-remise.mjs captures  # motifs de remise et d'offert réglés dans l'administration (« Camby » en tête, doublon refusé), reçus par l'iPad, cappuccino offert à Camby, « Offert · Camby » dans les statistiques
 URL=… node scripts/impression-serie.mjs captures  # imprimante série (Chardon) : port simulé, COM2 choisi, essai ESC/POS (PC858, €, coupe) après DTR/RTS baissés, tiroir en espèces, duplicata ; rien sur iPad
+URL=… node scripts/mot-de-passe.mjs captures  # mot de passe oublié : menu du compte › Mot de passe, avec le code, sans l'ancien ; l'ancien ne connecte plus
 URL=… node scripts/carte-position.mjs captures  # la carte rouvre sur le rayon et la catégorie laissés : table suivante, Vente Directe, après redémarrage
 URL=… node scripts/duplicata-admin.mjs captures  # duplicata depuis l'administration : note en PDF (n° 2, impression lancée), par e-mail (n° 3), l'iPad reprend la suite (n° 4), adresse gardée nulle part, iPhone
 URL=… node scripts/remise-euros.mjs captures  # remise en euros : 15 € refusé sur une ligne de 12 €, 2 € accepté (motif), rouverte en euros, pavé dans l'écran de l'iPhone, partage au transfert d'un article (0,67 € et 1,33 €), ticket du serveur (remise et motif)

@@ -13,6 +13,7 @@ import {
   Gift,
   House,
   KeyRound,
+  LockKeyhole,
   LayoutGrid,
   LogOut,
   Monitor,
@@ -295,6 +296,7 @@ export function MenuCompte(props: {
   theme: Theme;
   onTheme: (t: Theme) => void;
   onCles?: () => void;
+  onMotDePasse?: () => void;
   onAcces?: () => void;
   onConfiguration?: () => void;
   onDeconnexion: () => void;
@@ -358,6 +360,7 @@ export function MenuCompte(props: {
           </div>
           <hr />
           {props.onCles && item("Clés d'accès", KeyRound, props.onCles)}
+          {props.onMotDePasse && item("Mot de passe", LockKeyhole, props.onMotDePasse)}
           {props.onAcces && item("Accès à l'administration", UserCog, props.onAcces)}
           {props.onConfiguration && item("Configuration de l'installation", FileJson, props.onConfiguration)}
           {(props.onCles || props.onAcces || props.onConfiguration) && <hr />}

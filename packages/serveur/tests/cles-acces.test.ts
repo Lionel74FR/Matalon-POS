@@ -164,3 +164,47 @@ describe("Clés d'accès de l'administration", () => {
     expect(() => decoderCbor(new Uint8Array([0x58, 10, 1]))).toThrow(/tronqué/);
   });
 });
+
+describe("Serveur de test sur un sous-domaine de la production (15 novembre 2026)", () => {
+  it("test.matalon-pos.app reconnaît les clés créées pour matalon-pos.app, sans s'ouvrir à un autre domaine", async () => {
+    const prod = "matalon-pos.app";
+    const init = await appel("POST", "/api/admin/initialiser", { identifiant: "lionel", motDePasse: "un-mot-de-passe-solide" }, {}, prod);
+    const ok = await appel("POST", "/api/admin/confirmer", { identifiant: "lionel", motDePasse: "un-mot-de-passe-solide", code: await codeTotp(init.corps.secret, instant) }, {}, prod);
+    const cookie = { Cookie: ok.cookie! };
+    const options = await appel("POST", "/api/admin/cles-acces/options", { code: await codeTotp(init.corps.secret, instant) }, cookie, prod);
+    expect(options.corps.options.rp.id).toBe(prod);
+    const cle = new Authentificateur();
+    expect((await appel("POST", "/api/admin/cles-acces", { nom: "iPhone", reponse: await cle.creer(options.corps.options, `https://${prod}`) }, cookie, prod)).statut).toBe(200);
+
+    // Même base (copie de la production), adresse de test : la clé de matalon-pos.app ouvre la session.
+    const test = "test.matalon-pos.app";
+    const o = await appel("POST", "/api/admin/cle-acces/options", undefined, {}, test);
+    expect(o.corps.options.rpId).toBe(prod);
+    const connexion = await appel("POST", "/api/admin/cle-acces/connexion", { reponse: await cle.signer(o.corps.options, { origine: `https://${test}` }) }, {}, test);
+    expect(connexion.statut).toBe(200);
+    // L'origine signée doit rester celle de l'adresse servie ; un domaine qui finit seulement par le même texte ne partage rien.
+    const o2 = await appel("POST", "/api/admin/cle-acces/options", undefined, {}, test);
+    expect((await appel("POST", "/api/admin/cle-acces/connexion", { reponse: await cle.signer(o2.corps.options, { origine: `https://${prod}` }) }, {}, test)).corps.code).toBe("CLE_INCONNUE");
+    const imitation = "faux-matalon-pos.app";
+    const o3 = await appel("POST", "/api/admin/cle-acces/options", undefined, {}, imitation);
+    expect(o3.corps.options.rpId).toBe(imitation);
+  });
+});
+
+describe("Mot de passe du propriétaire (15 novembre 2026)", () => {
+  it("se change connecté, avec le code de vérification et sans l'ancien ; les autres sessions sont fermées", async () => {
+    const a = await admin();
+    const autre = await appel("POST", "/api/admin/connexion", { identifiant: "lionel", motDePasse: "un-mot-de-passe-solide", code: await codeTotp(a.secret, instant) });
+    expect((await appel("POST", "/api/admin/mot-de-passe", { code: await codeTotp(a.secret, instant), nouveau: "court" }, a.cookie)).corps.code).toBe("MOT_DE_PASSE_FAIBLE");
+    expect((await appel("POST", "/api/admin/mot-de-passe", { code: "000000", nouveau: "un-nouveau-mot-de-passe" }, a.cookie)).corps.code).toBe("CODE_INVALIDE");
+    expect((await appel("POST", "/api/admin/mot-de-passe", { code: "000000", nouveau: "un-nouveau-mot-de-passe" })).statut).toBe(401);
+    const r = await appel("POST", "/api/admin/mot-de-passe", { code: await codeTotp(a.secret, instant), nouveau: "un-nouveau-mot-de-passe" }, a.cookie);
+    expect(r.statut).toBe(200);
+    expect((await appel("GET", "/api/admin/statut", undefined, a.cookie)).corps.connecte).toBe(true);
+    expect((await appel("GET", "/api/admin/statut", undefined, { Cookie: autre.cookie! })).corps.connecte).toBe(false);
+    expect((await appel("POST", "/api/admin/connexion", { identifiant: "lionel", motDePasse: "un-mot-de-passe-solide", code: await codeTotp(a.secret, instant) })).statut).toBe(401);
+    expect((await appel("POST", "/api/admin/connexion", { identifiant: "lionel", motDePasse: "un-nouveau-mot-de-passe", code: await codeTotp(a.secret, instant) })).statut).toBe(200);
+    const journal = await db.requete<{ action: string }>("select action from journal_admin where action like 'mot_de_passe%' order by horodatage");
+    expect(journal.map((j) => j.action)).toEqual(["mot_de_passe_refuse", "mot_de_passe_change"]);
+  });
+});
