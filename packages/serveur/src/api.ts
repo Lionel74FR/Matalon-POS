@@ -1217,7 +1217,8 @@ function requeteAlerte(
  * Contrôle des prix à la réception des ventes : chaque ligne doit avoir le
  * prix et le taux de la carte, dans la version en vigueur au moment de la
  * vente, la précédente (appareil pas encore à jour) ou l'actuelle. Sinon une
- * alerte, jamais un refus : le ticket est scellé sur l'appareil.
+ * alerte, jamais un refus : le ticket est scellé sur l'appareil. Un article à
+ * prix libre n'est contrôlé que sur son taux.
  */
 async function alertesPrix(env: Environnement, c: LigneCaisse, tickets: Ticket[], maintenant: Date) {
   const ventes = tickets.filter((t) => t.type === "VENTE");
@@ -1239,7 +1240,7 @@ async function alertesPrix(env: Environnement, c: LigneCaisse, tickets: Ticket[]
       const base = { ticket: t.numero, ligne: i, articleId: l.articleId, libelle: l.libelle, prixVendu: l.prixUnitaireTTC, tauxVendu: l.tauxTVA, operateurId: t.operateurId };
       if (!attendus.length) {
         requetes.push(requeteAlerte(c.etablissement_id, c.id, "ARTICLE_HORS_CARTE", `Ticket n° ${t.numero} : « ${l.libelle} » vendu ${enEuros(l.prixUnitaireTTC)} n'est pas à la carte.`, base, cle, maintenant));
-      } else if (!attendus.some((a) => a.prixTTC === l.prixUnitaireTTC && a.tauxTVA === l.tauxTVA)) {
+      } else if (!attendus.some((a) => (a.libre || a.prixTTC === l.prixUnitaireTTC) && a.tauxTVA === l.tauxTVA)) {
         const a = attendus[0]!;
         const taux = a.tauxTVA !== l.tauxTVA ? `, TVA ${l.tauxTVA / 100} % au lieu de ${a.tauxTVA / 100} %` : "";
         requetes.push(
@@ -1247,7 +1248,9 @@ async function alertesPrix(env: Environnement, c: LigneCaisse, tickets: Ticket[]
             c.etablissement_id,
             c.id,
             "PRIX_DIFFERENT",
-            `Ticket n° ${t.numero} : « ${l.libelle} » vendu ${enEuros(l.prixUnitaireTTC)} au lieu de ${enEuros(a.prixTTC)} (carte)${taux}.`,
+            a.libre
+              ? `Ticket n° ${t.numero} : « ${l.libelle} » (prix libre) vendu avec une TVA de ${l.tauxTVA / 100} % au lieu de ${a.tauxTVA / 100} %.`
+              : `Ticket n° ${t.numero} : « ${l.libelle} » vendu ${enEuros(l.prixUnitaireTTC)} au lieu de ${enEuros(a.prixTTC)} (carte)${taux}.`,
             { ...base, prixCarte: a.prixTTC, tauxCarte: a.tauxTVA },
             cle,
             maintenant,

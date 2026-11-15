@@ -164,6 +164,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
 
   const toucherArticle = (a: Article) => {
     if (!articleVendable(CARTE, a)) return notifier(`${a.nom} est indisponible pour le moment.`, "erreur");
+    if (a.prixLibre) return setArticleOuvert(a);
     if (a.prixTTC == null && !a.variantes?.some((v) => v.prixTTC != null)) {
       return notifier(`${a.nom} n'a pas encore de prix : à compléter dans la carte.`, "erreur");
     }
@@ -351,12 +352,12 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           {categorie.articles.map((a) => (
             <button
               key={a.id}
-              className={`tuile${a.prixTTC == null && !a.variantes?.some((v) => v.prixTTC != null) ? " incomplete" : ""}${!articleVendable(CARTE, a) ? " indisponible" : ""}`}
+              className={`tuile${a.prixTTC == null && !a.prixLibre && !a.variantes?.some((v) => v.prixTTC != null) ? " incomplete" : ""}${!articleVendable(CARTE, a) ? " indisponible" : ""}`}
               onClick={() => toucherArticle(a)}
             >
               <span className="tuile-nom">{a.nom}</span>
               <span className="tuile-prix">
-                {!articleVendable(CARTE, a) ? "Indisponible" : a.prixTTC != null ? euros(a.prixTTC) : "Prix à venir"}
+                {!articleVendable(CARTE, a) ? "Indisponible" : a.prixLibre ? "Prix libre" : a.prixTTC != null ? euros(a.prixTTC) : "Prix à venir"}
                 {(a.variantes?.length || a.formule?.length) && <span className="tuile-plus"> · choix</span>}
               </span>
             </button>

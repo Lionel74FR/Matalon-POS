@@ -752,6 +752,22 @@ describe("alertes", () => {
     expect((await appel("GET", "/api/admin/etablissements/moka/alertes?toutes=1", undefined, { Cookie: cookie })).corps.alertes).toHaveLength(3);
     expect((await appel("GET", "/api/admin/etablissements/moka/alertes")).statut).toBe(401);
   });
+
+  it("ne contrôle que le taux d'un article à prix libre", async () => {
+    const cookie = await adminConnecte();
+    const lue = (await appel("GET", "/api/admin/cartes/carte-automne-2026", undefined, { Cookie: cookie })).corps;
+    const carte = structuredClone(lue.carte);
+    carte.categories[0].articles.push({ id: "divers-soft", nom: "Divers soft", prixTTC: null, tauxTVA: 1000, prixLibre: true });
+    expect((await appel("PUT", "/api/admin/cartes/carte-automne-2026", { carte, version: lue.version }, { Cookie: cookie })).statut).toBe(200);
+    const { registre, synchro } = await caisseRattachee(cookie);
+    const divers = { articleId: "divers-soft", libelle: "Divers soft", quantite: 1, tauxTVA: 1000 };
+    await registre.enregistrerVente({ lignes: [{ ...divers, prixUnitaireTTC: 1234 }], paiements: [{ mode: "CB", montant: 1234 }], operateurId: "u-lea" });
+    await registre.enregistrerVente({ lignes: [{ ...divers, prixUnitaireTTC: 350, tauxTVA: 2000 }], paiements: [{ mode: "CB", montant: 350 }], operateurId: "u-lea" });
+    expect((await synchro()).statut).toBe(200);
+    const alertes = (await appel("GET", "/api/admin/etablissements/moka/alertes", undefined, { Cookie: cookie })).corps.alertes;
+    expect(alertes).toHaveLength(1);
+    expect(alertes[0].message).toBe("Ticket n° 2 : « Divers soft » (prix libre) vendu avec une TVA de 20 % au lieu de 10 %.");
+  });
 });
 
 describe("statistiques", () => {

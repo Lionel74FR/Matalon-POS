@@ -656,13 +656,14 @@ export function EditeurCarte(props: {
                             a.variantes?.length && `${a.variantes.length} variantes`,
                             a.supplements?.length && `${a.supplements.length} suppléments`,
                             a.formule?.length && `formule à ${a.formule.length} choix`,
+                            a.prixLibre && "prix saisi en caisse",
                             a.aCompleter && "à compléter",
                           ]
                             .filter(Boolean)
                             .join(" · ")}
                         </small>
                       </td>
-                      <td className="nombre">{euros(a.prixTTC)}</td>
+                      <td className="nombre">{a.prixLibre ? "libre" : euros(a.prixTTC)}</td>
                       <td>{(a.tauxTVA / 100).toLocaleString("fr-FR")} %</td>
                       {stock && (
                         <td className={resumeFiche(a) === "sans fiche" || resumeFiche(a).includes("/") ? "cout-manquant" : ""}>{resumeFiche(a)}</td>
@@ -764,8 +765,12 @@ function FicheArticle(props: {
 
   const valider = () => {
     if (!a.nom.trim()) return setErreur("Le nom est obligatoire.");
-    const p = prix.trim() === "" ? null : centimesDepuisSaisie(prix);
-    if (prix.trim() !== "" && p == null) return setErreur("Prix illisible : saisissez par exemple 4,50.");
+    const libre = !!a.prixLibre;
+    if (libre && (a.variantes?.length || a.supplements?.length || a.formule?.length)) {
+      return setErreur("Un article à prix saisi en caisse n'a ni variante, ni supplément, ni formule.");
+    }
+    const p = libre || prix.trim() === "" ? null : centimesDepuisSaisie(prix);
+    if (!libre && prix.trim() !== "" && p == null) return setErreur("Prix illisible : saisissez par exemple 4,50.");
     const variantes: Variante[] = [];
     for (const v of a.variantes ?? []) {
       if (!v.nom.trim()) return setErreur("Chaque variante doit avoir un nom.");
@@ -782,7 +787,7 @@ function FicheArticle(props: {
       if (ps == null) return setErreur(`Prix obligatoire et lisible pour le supplément « ${x.nom} » (ex. 0,50).`);
       supplements.push({ ...x, prixTTC: ps });
     }
-    if (p == null && !variantes.some((v) => v.prixTTC != null) && !a.aCompleter?.trim()) {
+    if (!libre && p == null && !variantes.some((v) => v.prixTTC != null) && !a.aCompleter?.trim()) {
       return setErreur("Sans prix, indiquez dans « À compléter » ce qui manque (l'article ne s'encaisse pas).");
     }
     for (const c of a.formule ?? []) {
@@ -814,9 +819,20 @@ function FicheArticle(props: {
               <label className="champ">
                 <span>
                   Prix TTC
-                  <small>Vide : prix à fixer, l'article ne s'encaisse pas</small>
+                  <small>{a.prixLibre ? "Saisi en caisse à chaque vente" : "Vide : prix à fixer, l'article ne s'encaisse pas"}</small>
                 </span>
-                <input value={prix} inputMode="decimal" placeholder="0,00" onChange={(e) => setPrix(e.target.value)} />
+                <input value={a.prixLibre ? "" : prix} disabled={!!a.prixLibre} inputMode="decimal" placeholder={a.prixLibre ? "Libre" : "0,00"} onChange={(e) => setPrix(e.target.value)} />
+              </label>
+              <label className="case">
+                <input
+                  type="checkbox"
+                  checked={!!a.prixLibre}
+                  onChange={(e) => {
+                    const { prixLibre: _, ...reste } = a;
+                    setA(e.target.checked ? { ...reste, prixLibre: true } : reste);
+                  }}
+                />
+                Prix saisi en caisse (divers, prix variable)
               </label>
               <label className="champ">
                 <span>TVA</span>

@@ -42,8 +42,13 @@ export interface Article {
   id: string;
   nom: string;
   description?: string;
-  /** Prix TTC en centimes ; null tant qu'il n'est pas fixé (voir `aCompleter`). */
+  /** Prix TTC en centimes ; null tant qu'il n'est pas fixé (voir `aCompleter`) ou pour un prix libre. */
   prixTTC: number | null;
+  /**
+   * Prix saisi en caisse à chaque vente (divers, plat de l'ardoise, prix variable) :
+   * l'article n'a pas de prix de carte (`prixTTC` null), ni variante, ni supplément, ni formule.
+   */
+  prixLibre?: boolean;
   tauxTVA: number;
   variantes?: Variante[];
   supplements?: Supplement[];
