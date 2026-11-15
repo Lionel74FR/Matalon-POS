@@ -300,17 +300,21 @@ export function App() {
       );
       break;
     case "assistantImprimante":
+      // Dans le calque, comme depuis les Réglages : il tient compte de la barre d'état de l'iPhone,
+      // sous laquelle « Configurer plus tard » restait caché (retour de Lionel du 16 novembre).
       contenu = (
-        <AssistantImprimante
-          config={phase.caisse.config}
-          onTerminer={(imprimante) =>
-            void enregistrerConfiguration(caisseCourante.current ?? phase.caisse, {
-              ...(caisseCourante.current ?? phase.caisse).config,
-              imprimante,
-            }).then((caisse) => setPhase({ nom: "connexion", caisse }))
-          }
-          onPlusTard={() => setPhase({ nom: "connexion", caisse: phase.caisse })}
-        />
+        <div className="assistant-calque">
+          <AssistantImprimante
+            config={phase.caisse.config}
+            onTerminer={(imprimante) =>
+              void enregistrerConfiguration(caisseCourante.current ?? phase.caisse, {
+                ...(caisseCourante.current ?? phase.caisse).config,
+                imprimante,
+              }).then((caisse) => setPhase({ nom: "connexion", caisse }))
+            }
+            onPlusTard={() => setPhase({ nom: "connexion", caisse: phase.caisse })}
+          />
+        </div>
       );
       break;
     case "connexion":
