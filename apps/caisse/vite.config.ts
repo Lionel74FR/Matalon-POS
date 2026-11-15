@@ -12,6 +12,17 @@ function versionBuild(): string {
   }
 }
 
+/**
+ * Serveur de test (projet Vercel matalon-pos-test, test.matalon-pos.app) : icônes à part, « TEST »
+ * en bordeaux sur blanc, pour ne jamais confondre l'app de test avec la caisse officielle.
+ * MATALON_TEST=1 force ce choix pour une construction locale.
+ */
+const serveurDeTest =
+  process.env.MATALON_TEST === "1" ||
+  (process.env.VERCEL_URL ?? "").startsWith("matalon-pos-test-") ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ?? "").startsWith("test.");
+const icone = (nom: string) => (serveurDeTest ? nom.replace("icone", "icone-test") : nom);
+
 export default defineConfig({
   build: {
     rollupOptions: {
@@ -25,9 +36,13 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    {
+      name: "icones-du-serveur",
+      transformIndexHtml: (html) => (serveurDeTest ? html.replace(/\/icone(-180\.png|\.svg)/g, "/icone-test$1") : html),
+    },
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["icone.svg", "icone-180.png"],
+      includeAssets: [icone("icone.svg"), icone("icone-180.png")],
       manifest: {
         name: "Matalon POS",
         short_name: "Matalon POS",
@@ -38,9 +53,9 @@ export default defineConfig({
         background_color: "#2B1E18",
         theme_color: "#2B1E18",
         icons: [
-          { src: "icone-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icone-512.png", sizes: "512x512", type: "image/png" },
-          { src: "icone.svg", sizes: "any", type: "image/svg+xml" },
+          { src: icone("icone-192.png"), sizes: "192x192", type: "image/png" },
+          { src: icone("icone-512.png"), sizes: "512x512", type: "image/png" },
+          { src: icone("icone.svg"), sizes: "any", type: "image/svg+xml" },
         ],
       },
       workbox: {
