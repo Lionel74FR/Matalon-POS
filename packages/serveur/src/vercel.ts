@@ -1,6 +1,8 @@
 /**
  * Point d'entrée de la fonction Edge Vercel (région Paris).
- * DATABASE_URL est fournie par l'intégration Neon du projet Vercel.
+ * DATABASE_URL est fournie par l'intégration Neon du projet Vercel. DATABASE_URL_COPIE, facultative,
+ * la remplace sans toucher à l'intégration : le serveur de test l'utilise pour travailler sur une
+ * copie de la production (branche Neon `test-copie-prod`, 15 novembre 2026). Jamais en production.
  */
 import { neon } from "@neondatabase/serverless";
 import { traiter } from "./api.js";
@@ -11,7 +13,7 @@ let db: Db | null = null;
 
 function base(): Db {
   if (db) return db;
-  const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  const url = process.env.DATABASE_URL_COPIE || process.env.DATABASE_URL || process.env.POSTGRES_URL;
   if (!url) throw new Error("DATABASE_URL absente : reliez la base Neon au projet Vercel.");
   const sql = neon(url);
   db = {
