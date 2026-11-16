@@ -1,5 +1,5 @@
 import { ErreurHttp, type Db } from "./db.js";
-import type { EtatImpressionRelayee, ImpressionRelayee, RelaisImpression } from "./partage.js";
+import { adresseLocale, type DestinationReseau, type EtatImpressionRelayee, type ImpressionRelayee, type RelaisImpression } from "./partage.js";
 
 /**
  * Impression relayée par une dalle (16 novembre 2026, backlog n° 5) : un iPad ou un iPhone, qui ne peut
@@ -72,6 +72,14 @@ export async function deposerImpression(db: Db, c: Appareil, corps: Record<strin
   const relaisId = typeof corps.relaisId === "string" ? corps.relaisId : "";
   const titre = typeof corps.titre === "string" ? corps.titre.slice(0, 80) : "";
   const recu = lireRecu(corps.recu);
+  let destination: DestinationReseau | null = null;
+  if (corps.destination !== undefined && corps.destination !== null) {
+    const d = corps.destination as Record<string, unknown>;
+    if (!d || typeof d !== "object" || !adresseLocale(d.adresse) || typeof d.sansAccents !== "boolean") {
+      throw new ErreurHttp(400, "DESTINATION_INVALIDE", "Imprimante réseau : adresse IPv4 du réseau local attendue (192.168.x.x…).");
+    }
+    destination = { adresse: d.adresse, sansAccents: d.sansAccents };
+  }
   const relais = (await listeRelais(db, c.etablissement_id, maintenant)).find((r) => r.id === relaisId);
   if (!relais) throw new ErreurHttp(404, "RELAIS_INCONNU", "Cette dalle n'imprime plus pour les autres appareils : choisissez une autre sortie dans les Réglages.");
   if (!relais.enLigne) {
@@ -79,9 +87,9 @@ export async function deposerImpression(db: Db, c: Appareil, corps: Record<strin
   }
   const id = `ir-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
   await db.requete(
-    `insert into impressions_relayees (id, etablissement_id, relais_id, demandeur_id, titre, recu, etat, cree_le)
-     values ($1, $2, $3, $4, $5, $6::jsonb, 'attente', $7)`,
-    [id, c.etablissement_id, relais.id, c.id, titre, JSON.stringify(recu), maintenant.toISOString()],
+    `insert into impressions_relayees (id, etablissement_id, relais_id, demandeur_id, titre, recu, etat, cree_le, destination)
+     values ($1, $2, $3, $4, $5, $6::jsonb, 'attente', $7, $8::jsonb)`,
+    [id, c.etablissement_id, relais.id, c.id, titre, JSON.stringify(recu), maintenant.toISOString(), destination ? JSON.stringify(destination) : null],
   );
   return { id };
 }
@@ -95,15 +103,19 @@ export async function prendreImpressions(db: Db, c: Appareil, maintenant: Date):
   const vu = await db.requete<{ caisse_id: string }>("update relais_impression set vu_le = $2 where caisse_id = $1 returning caisse_id", [c.id, iso(t)]);
   if (!vu.length) return [];
   await db.requete("delete from impressions_relayees where etablissement_id = $1 and cree_le < $2", [c.etablissement_id, iso(t - PURGE_MS)]);
-  const lignes = await db.requete<{ id: string; titre: string; recu: unknown[] | string; cree_le: string }>(
+  const lignes = await db.requete<{ id: string; titre: string; recu: unknown[] | string; cree_le: string; destination: DestinationReseau | string | null }>(
     `update impressions_relayees set etat = 'prise', prise_le = $2
      where id in (select id from impressions_relayees where relais_id = $1 and etat = 'attente' and cree_le >= $3 order by cree_le, id limit 5)
-     returning id, titre, recu, cree_le`,
+     returning id, titre, recu, cree_le, destination`,
     [c.id, iso(t), iso(t - ATTENTE_MAX_MS)],
   );
   return lignes
     .sort((a, b) => a.cree_le.localeCompare(b.cree_le) || a.id.localeCompare(b.id))
-    .map((l) => ({ id: l.id, titre: l.titre, recu: typeof l.recu === "string" ? (JSON.parse(l.recu) as unknown[]) : l.recu }));
+    .map((l) => {
+      const recu = typeof l.recu === "string" ? (JSON.parse(l.recu) as unknown[]) : l.recu;
+      const destination = typeof l.destination === "string" ? (JSON.parse(l.destination) as DestinationReseau) : l.destination;
+      return { id: l.id, titre: l.titre, recu, ...(destination ? { destination } : {}) };
+    });
 }
 
 /** Compte rendu de la dalle relais : imprimé, ou l'erreur rencontrée. */

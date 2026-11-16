@@ -950,4 +950,20 @@ export interface ImpressionRelayee {
   id: string;
   titre: string;
   recu: unknown[];
+  /** Imprimante réseau ESC/POS que la dalle joint par son script local (additions) ; absente : son imprimante série. */
+  destination?: DestinationReseau;
+}
+
+/** Imprimante réseau ESC/POS du réseau local (Oxhoo de la salle du Chardon), port 9100. */
+export interface DestinationReseau {
+  adresse: string;
+  sansAccents: boolean;
+}
+
+/** Adresse IPv4 d'un réseau local (10/8, 172.16/12, 192.168/16) : seules visées par le script des dalles. */
+export function adresseLocale(a: unknown): a is string {
+  if (typeof a !== "string" || !/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) return false;
+  const o = a.split(".").map(Number);
+  if (o.some((x) => x > 255)) return false;
+  return o[0] === 10 || (o[0] === 172 && o[1]! >= 16 && o[1]! <= 31) || (o[0] === 192 && o[1] === 168);
 }

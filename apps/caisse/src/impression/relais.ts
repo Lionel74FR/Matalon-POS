@@ -2,6 +2,8 @@ import type { Configuration } from "../donnees/configuration";
 import type { ClientApi } from "../serveur/client";
 import { logoTicketSerie } from "./logo-serie";
 import { Recu, type ElementRecu } from "./recu";
+import { imprimerReseau } from "./reseau";
+import type { DestinationReseau } from "@matalon/serveur/partage";
 import { envoyerSerie } from "./serie";
 
 /**
@@ -26,8 +28,9 @@ export async function imprimerParRelais(
   titre: string,
   surEchec: (erreur: string) => void,
   attendre: (ms: number) => Promise<void> = (ms) => new Promise((fin) => setTimeout(fin, ms)),
+  destination?: DestinationReseau,
 ): Promise<void> {
-  const { id } = await client.deposerImpression({ relaisId, titre, recu: recu.elements });
+  const { id } = await client.deposerImpression({ relaisId, titre, recu: recu.elements, ...(destination ? { destination } : {}) });
   void (async () => {
     // Suivi : vite au début (le ticket sort en quelques secondes), puis plus lentement jusqu'aux délais du serveur.
     for (let essai = 0, ecoule = 0; ecoule < 190_000; essai++) {
@@ -72,8 +75,10 @@ export function demarrerRelais(o: {
         const config = o.config();
         const serie = config.imprimanteSerie;
         try {
-          if (!serie) throw new Error("Cette dalle n'a plus d'imprimante série.");
-          await envoyerSerie(Recu.depuis(i.recu as ElementRecu[]), { ...serie, logo: await logoTicketSerie(config) });
+          const recu = Recu.depuis(i.recu as ElementRecu[]);
+          if (i.destination) await imprimerReseau(recu, i.destination, config);
+          else if (!serie) throw new Error("Cette dalle n'a plus d'imprimante série.");
+          else await envoyerSerie(recu, { ...serie, logo: await logoTicketSerie(config) });
           await o.client.compteRenduImpression(i.id, true);
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);

@@ -326,7 +326,7 @@ export class ClientApi {
   }
 
   /** Confie un reçu à une dalle relais ; 409 RELAIS_HORS_LIGNE si elle ne répond pas. */
-  deposerImpression(corps: { relaisId: string; titre: string; recu: unknown[] }) {
+  deposerImpression(corps: { relaisId: string; titre: string; recu: unknown[]; destination?: { adresse: string; sansAccents: boolean } }) {
     return this.appel<{ id: string }>("POST", "/api/caisse/impressions", corps);
   }
 

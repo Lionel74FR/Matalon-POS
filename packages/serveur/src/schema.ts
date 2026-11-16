@@ -528,6 +528,8 @@ export const MIGRATIONS: string[] = [
     faite_le text
   )`,
   `create index if not exists impressions_relayees_file on impressions_relayees (relais_id, etat, cree_le)`,
+  // Imprimante réseau visée (additions sur l'Oxhoo de la salle) : { adresse, sansAccents } ; null : l'imprimante série de la dalle.
+  `alter table impressions_relayees add column if not exists destination jsonb`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',

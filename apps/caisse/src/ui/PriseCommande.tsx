@@ -191,7 +191,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   );
 
   const imprimerAddition = async () => {
-    await imprimer(gabaritAddition(c, config, utilisateur.id), "Addition");
+    await imprimer(gabaritAddition(c, config, utilisateur.id), "Addition", { addition: true });
     await caisse.registre.journaliser(
       "IMPRESSION_ADDITION",
       { table: c.tableId, totalTTC: totaux.totalTTC, nbArticles: totaux.nbArticles, canal: imprimanteConfiguree ? "papier" : "ecran" },

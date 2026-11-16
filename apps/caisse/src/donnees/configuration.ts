@@ -64,6 +64,12 @@ export interface Configuration {
    * ou un iPhone qui ne joint pas l'imprimante série de la dalle. Passe avant l'imprimante Epson.
    */
   imprimanteRelais?: { relaisId: string; nom: string };
+  /**
+   * Imprimante des additions (16 novembre 2026, backlog n° 5 : Oxhoo réseau de la salle du Chardon) :
+   * imprimante réseau ESC/POS jointe par le script d'une dalle. Sans `relaisId`, cet appareil (une dalle)
+   * a le script ; sinon la dalle relais `relaisId` imprime pour lui. Absente : les additions suivent les tickets.
+   */
+  imprimanteAdditions?: { adresse: string; sansAccents: boolean; relaisId?: string; relaisNom?: string };
   /** Version du logo de l'établissement (en tête du ticket sur l'imprimante série) ; null : aucun. */
   logo?: string | null;
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */

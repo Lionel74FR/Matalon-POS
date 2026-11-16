@@ -63,7 +63,7 @@ export default defineConfig({
         // L'administration se consulte en ligne, sur ordinateur : rien à garder sur l'iPad.
         globIgnores: ["admin.html", "assets/admin-*", "reserver.html", "assets/reserver-*", "reservation.js"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/^\/guide/, /^\/n(\.html)?$/, /^\/api\//, /^\/admin/, /^\/reserver/, /^\/donnees\//, /^\/logo\//],
+        navigateFallbackDenylist: [/^\/guide/, /^\/outils\//, /^\/n(\.html)?$/, /^\/api\//, /^\/admin/, /^\/reserver/, /^\/donnees\//, /^\/logo\//],
       },
     }),
   ],

@@ -19,6 +19,7 @@ import { envoyerEpson } from "../impression/epson";
 import { logoTicketSerie } from "../impression/logo-serie";
 import { envoyerSerie } from "../impression/serie";
 import { demarrerRelais, imprimerParRelais } from "../impression/relais";
+import { imprimerReseau } from "../impression/reseau";
 import type { Recu } from "../impression/recu";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Connexion } from "./Connexion";
@@ -225,7 +226,31 @@ export function App() {
       },
       notifier,
       imprimanteConfiguree: !!sortieTickets(caisse.config),
-      async imprimer(recu: Recu, titre: string) {
+      async imprimer(recu: Recu, titre: string, o?: { addition?: boolean }) {
+        const additions = o?.addition ? caisse.config.imprimanteAdditions : undefined;
+        if (additions) {
+          const { adresse, sansAccents, relaisId, relaisNom } = additions;
+          try {
+            if (!relaisId) await imprimerReseau(recu, { adresse, sansAccents }, caisse.config);
+            else {
+              await imprimerParRelais(
+                caisse.client,
+                relaisId,
+                recu,
+                titre,
+                (erreur) => {
+                  notifier(`« ${titre} » n'est pas sorti sur l'imprimante ${adresse} (dalle ${relaisNom ?? ""}) : ${erreur}`, "erreur");
+                  setApercu({ recu, titre, erreur });
+                },
+                undefined,
+                { adresse, sansAccents },
+              );
+            }
+          } catch (e) {
+            setApercu({ recu, titre, erreur: e instanceof Error ? e.message : String(e) });
+          }
+          return;
+        }
         const imprimante = sortieTickets(caisse.config);
         if (!imprimante) return setApercu({ recu, titre });
         try {

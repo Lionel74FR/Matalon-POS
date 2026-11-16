@@ -19,6 +19,7 @@ import {
 import { ErreurApi } from "../serveur/client";
 import { VERSION_APPLICATION } from "../fiscal/caisse";
 import { envoyerEpson } from "../impression/epson";
+import { ImprimanteAdditions } from "./ImprimanteAdditions";
 import { ImprimanteRelais } from "./ImprimanteRelais";
 import { ImprimanteSerie } from "./ImprimanteSerie";
 import { gabaritBon, gabaritTest } from "../impression/gabarits";
@@ -187,6 +188,7 @@ export function Reglages(props: { onAssistant: () => void }) {
         <div>
           <ImprimanteSerie />
           <ImprimanteRelais />
+          <ImprimanteAdditions />
           <fieldset>
             <legend>Imprimante Epson</legend>
             {config.imprimanteSerie && (

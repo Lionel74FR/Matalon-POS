@@ -12,8 +12,11 @@ export interface ContexteCaisse {
   notifier(message: string, ton?: "info" | "erreur"): void;
   /** Une adresse d'imprimante est enregistrée. Sans elle, rien ne s'imprime d'office. */
   imprimanteConfiguree: boolean;
-  /** Imprime ; sans imprimante ou en cas d'échec, affiche l'aperçu à l'écran. */
-  imprimer(recu: Recu, titre: string): Promise<void>;
+  /**
+   * Imprime ; sans imprimante ou en cas d'échec, affiche l'aperçu à l'écran. `addition` : sur
+   * l'imprimante des additions si cet appareil en a une (Oxhoo de la salle du Chardon).
+   */
+  imprimer(recu: Recu, titre: string, o?: { addition?: boolean }): Promise<void>;
   /**
    * Renvoie l'identifiant d'un responsable : l'utilisateur connecté s'il l'est,
    * sinon celui qui saisit son code PIN. `null` si la demande est annulée.

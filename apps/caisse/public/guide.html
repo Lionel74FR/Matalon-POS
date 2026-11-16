@@ -444,6 +444,18 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7p">
+    <label><input type="checkbox">Additions sur l'imprimante de la salle (Chardon)</label>
+    <ol>
+      <li>Sur la dalle relais : Menu › Réglages › <b>Imprimante des additions</b>, <span class="bouton">Télécharger le script</span>, puis dans Windows clic droit sur le fichier › « Exécuter avec PowerShell ».</li>
+      <li>Dans la caisse : adresse 192.168.1.248, <span class="bouton">Cette dalle (script installé)</span>, <span class="bouton">Vérifier le script</span> (acceptez l'accès au réseau local si Chrome le demande), puis <span class="bouton">Imprimer une addition d'essai</span>.</li>
+      <li>Ouvrez une table, ajoutez un article, touchez <span class="bouton">Addition</span>, puis encaissez.</li>
+      <li>Sur l'iPad : Réglages › Imprimante des additions, adresse 192.168.1.248, <span class="bouton">Par</span> la dalle ; puis une addition depuis une table.</li>
+      <li>Redémarrez la dalle, rouvrez la caisse, imprimez une addition.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> « Script lancé sur cette dalle » ; l'essai et les additions (dalle et iPad) sortent sur l'Oxhoo de la salle, avec le logo et la coupe ; le ticket de l'encaissement sort sur l'imprimante de la dalle comme avant. Après le redémarrage, le script s'est relancé seul. Au Moka, « Imprimante des additions » n'apparaît pas sur les iPad.</p>
+  </section>
+
   <section class="scenario" data-id="s7o">
     <label><input type="checkbox">Imprimer depuis l'iPad sur une dalle (Chardon)</label>
     <ol>

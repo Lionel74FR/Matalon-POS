@@ -119,6 +119,19 @@ describe("impression relayée par une dalle (backlog n° 5)", () => {
     expect((await appel("GET", "/api/caisse/impressions/attente", undefined, dalle)).corps.impressions).toEqual([]);
   });
 
+  it("transmet l'imprimante réseau visée (additions sur l'Oxhoo de la salle), du réseau local seulement", async () => {
+    const { dalle, ipad } = await preparer();
+    await appel("PUT", "/api/caisse/relais", { actif: true }, dalle);
+    const destination = { adresse: "192.168.1.248", sansAccents: false };
+    const id = (await appel("POST", "/api/caisse/impressions", { relaisId: "ipad-0000000d", titre: "Addition", recu, destination }, ipad)).corps.id;
+    expect((await appel("GET", "/api/caisse/impressions/attente", undefined, dalle)).corps.impressions).toEqual([{ id, titre: "Addition", recu, destination }]);
+    for (const adresse of ["8.8.8.8", "192.168.1.300", "localhost", "172.32.0.1"]) {
+      const r = await appel("POST", "/api/caisse/impressions", { relaisId: "ipad-0000000d", recu, destination: { adresse, sansAccents: false } }, ipad);
+      expect([adresse, r.corps.code]).toEqual([adresse, "DESTINATION_INVALIDE"]);
+    }
+    expect((await appel("POST", "/api/caisse/impressions", { relaisId: "ipad-0000000d", recu, destination: { adresse: "10.0.0.7", sansAccents: true } }, ipad)).statut).toBe(201);
+  });
+
   it("contrôle le reçu et oublie la dalle qui n'est plus relais", async () => {
     const { dalle, ipad } = await preparer();
     await appel("PUT", "/api/caisse/relais", { actif: true }, dalle);
