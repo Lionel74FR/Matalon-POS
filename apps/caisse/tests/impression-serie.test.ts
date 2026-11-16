@@ -22,7 +22,8 @@ describe("commandes ESC/POS", () => {
     expect(contient(b, Buffer.from(`Cappuccino${" ".repeat(34)}4,00\n`))).toBe(true);
     expect(contient(b, Buffer.from(`${"-".repeat(48)}\n`))).toBe(true);
     expect(contient(b, octets(0x1b, 0x64, 2))).toBe(true);
-    expect([...b.slice(-6)]).toEqual([0x1b, 0x64, 3, 0x1d, 0x56, 0]);
+    // 8 lignes vides avant la coupe : sinon la fin du ticket sort en haut du suivant (16 novembre).
+    expect([...b.slice(-11)]).toEqual([...Array(8).fill(0x0a), 0x1d, 0x56, 0]);
   });
 
   it("sans accents : pas de page de codes ; ouverture du tiroir seule : ni papier ni coupe", () => {

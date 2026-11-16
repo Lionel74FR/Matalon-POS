@@ -80,6 +80,8 @@ export function rasterDepuisRgba(rgba: ArrayLike<number>, largeur: number, haute
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
+/** Lignes vides avancées avant la coupe (distance tête-couteau, plus une marge sous le dernier texte). */
+export const LIGNES_AVANT_COUPE = 8;
 
 /** Commandes ESC/POS d'un reçu. Une simple ouverture de tiroir ne consomme ni papier ni coupe. */
 export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoRaster | null }): Uint8Array {
@@ -123,7 +125,11 @@ export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoRaster
   }
   if (r.elements.some((e) => e.type !== "tiroir")) {
     style(false, false);
-    out.push(ESC, 0x64, 3, GS, 0x56, 0);
+    // Le couteau est au-dessus de la tête : sans avance suffisante, la fin du ticket reste sous la coupe
+    // et sort en haut du ticket suivant (Oxhoo du Chardon, 16 novembre). Lignes vides en LF simples,
+    // comprises par toutes les imprimantes, puis coupe.
+    for (let i = 0; i < LIGNES_AVANT_COUPE; i++) out.push(LF);
+    out.push(GS, 0x56, 0);
   }
   return Uint8Array.from(out);
 }
