@@ -1,6 +1,6 @@
 <!--
 Copie du cahier des charges tenu dans Claude Docs :
-https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 133, copiée le 16 novembre 2026).
+https://claude.ai/code/artifact/396a6c87-7ab4-4603-8121-565fe62eec12 (révision 134, copiée le 16 novembre 2026).
 Le document Claude Docs fait foi. S'il a changé, recopier ici puis ajuster docs/avancement.md.
 -->
 
@@ -333,6 +333,8 @@ Le poste se compose d'un iPad, d'une imprimante ticket réseau qui pilote le tir
 | TPE | Paiement CB et titres-restaurant carte | Autonome : montant ressaisi sur le TPE, aucune intégration en V1 |
 
 Contrôle : à chaque clôture Z, le total CB de la caisse est comparé au total du TPE ; l'écart est saisi et tracé au journal.
+
+Imprimante série (16 novembre 2026, caisses du Chardon) : sur un ordinateur où la caisse est ouverte dans Chrome (dalle Windows), une imprimante branchée sur un port COM (Oxhoo TP85 sur COM2, 9600 bauds, 8N1, sans contrôle de flux) imprime les tickets, notes et clôtures de cet appareil et ouvre le tiroir, à la place de l'imprimante Epson. Le réglage est propre à l'appareil (Réglages › Imprimante série) et n'apparaît pas sur iPad ni iPhone. Ticket en ESC/POS avec accents et euro (ou sans accents), logo de l'établissement en tête à la place de son nom (envoyé avec chaque ticket, ou enregistré une fois dans l'imprimante pour aller plus vite), avance de 8 lignes avant la coupe. Le port ne sert qu'à un logiciel à la fois : l'ancien logiciel de caisse est fermé. Les imprimantes Epson et les bons de production ne changent pas.
 
 ## Sécurité, utilisateurs et données personnelles
 
