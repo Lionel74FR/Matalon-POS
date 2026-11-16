@@ -1,6 +1,5 @@
 import { Cable, Download, Image, Printer, RefreshCw, Vault } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NOM_APPAREIL } from "../donnees/appareil";
 import { sortieTickets } from "../donnees/configuration";
 import { definirLogoMemoire } from "../impression/escpos";
 import { gabaritTest } from "../impression/gabarits";
@@ -21,42 +20,68 @@ export function ImprimantesAppareil(props: { onAssistant: () => void }) {
   const liste = config.imprimantes ?? [];
   const appareils = { ...config.appareils, [config.caisseId]: config.caisseNom };
   const tickets = config.imprimanteTicketsId;
-  const additions = config.imprimanteAdditionsId ?? null;
   const ancienne = tickets === undefined ? sortieTickets(config) : null;
-  const choix = (valeur: string | null | undefined, nom: string, onChoisir: (id: string | null) => void, aucune: string) => (
-    <div className="options" role="radiogroup" aria-label={nom}>
-      {liste.map((i) => (
-        <button key={i.id} role="radio" aria-checked={valeur === i.id} className={`bouton${valeur === i.id ? " actif" : ""}`} onClick={() => onChoisir(i.id)}>
-          {i.nom}
-          <small> · {descriptionBranchement(i, appareils)}</small>
-        </button>
-      ))}
-      <button role="radio" aria-checked={valeur === null} className={`bouton${valeur === null ? " actif" : ""}`} onClick={() => onChoisir(null)}>
-        {aucune}
-      </button>
-    </div>
+  const choisie = liste.find((i) => i.id === tickets);
+  // Une imprimante déclarée sur cet iPad ou iPhone : il ne peut ni ouvrir un port COM ni lancer le script.
+  const impossibles = serieDisponible() ? [] : imprimantesPortees(config);
+  const TYPES = { epson: "Epson", serie: "série", reseau: "réseau" } as const;
+  const option = (i: ImprimanteEtablissement) => (
+    <option key={i.id} value={i.id}>
+      {i.nom} ({TYPES[i.branchement.type]})
+    </option>
   );
-  const epson = liste.find((i) => i.id === tickets)?.branchement.type === "epson";
+  const additions = liste.find((i) => i.id === config.imprimanteAdditionsId);
   return (
     <fieldset>
-      <legend>Imprimantes de cet {NOM_APPAREIL}</legend>
+      <legend>Imprimantes de cet appareil</legend>
       {liste.length === 0 ? (
         <p className="aide-champ">
-          Aucune imprimante dans l'établissement : ajoutez-les plus bas (« Imprimantes de l'établissement »), ou connectez une Epson avec l'assistant.
+          Aucune imprimante dans l'établissement : ajoutez-les dans la rubrique « Imprimantes », ou connectez une Epson avec l'assistant.
         </p>
       ) : (
-        <p className="aide-champ">Choisies sur chaque appareil dans la liste de l'établissement.</p>
+        <p className="aide-champ">Choisies sur chaque appareil, dans la liste de l'établissement (rubrique « Imprimantes »).</p>
       )}
-      <h3 className="sous-titre-reglages">Tickets, notes et clôtures</h3>
+      <label className="champ">
+        <span>
+          Tickets, notes et clôtures
+          <small>{choisie ? `${descriptionBranchement(choisie, appareils)} · tiroir` : "Sans imprimante : aperçu à l'écran et QR code"}</small>
+        </span>
+        <select
+          aria-label="Imprimante des tickets"
+          value={tickets ?? ""}
+          onChange={(e) => void majConfig({ ...config, imprimanteTicketsId: e.target.value || null })}
+        >
+          <option value="">{tickets === undefined ? "À choisir" : "Aucune"}</option>
+          {liste.map(option)}
+        </select>
+      </label>
       {ancienne && (
         <p className="aide-champ">
-          Réglage précédent en service ({ancienne.connexion === "serie" ? "imprimante série" : ancienne.connexion === "relais" ? `dalle ${ancienne.nom}` : ancienne.connexion === "reseau" ? ancienne.adresse : ""}) :
-          choisissez son imprimante dans la liste.
+          Réglage précédent encore en service (
+          {ancienne.connexion === "serie" ? "imprimante série" : ancienne.connexion === "relais" ? `dalle ${ancienne.nom}` : ancienne.connexion === "reseau" ? ancienne.adresse : ""}
+          ) : choisissez son imprimante ci-dessus.
         </p>
       )}
-      {choix(tickets, "Imprimante des tickets", (id) => void majConfig({ ...config, imprimanteTicketsId: id }), "Aucune (aperçu à l'écran, QR code)")}
-      <h3 className="sous-titre-reglages">Additions</h3>
-      {choix(additions, "Imprimante des additions", (id) => void majConfig({ ...config, imprimanteAdditionsId: id }), "Celle des tickets")}
+      <label className="champ">
+        <span>
+          Additions
+          <small>{additions ? descriptionBranchement(additions, appareils) : "Note provisoire remise à table"}</small>
+        </span>
+        <select
+          aria-label="Imprimante des additions"
+          value={config.imprimanteAdditionsId ?? ""}
+          onChange={(e) => void majConfig({ ...config, imprimanteAdditionsId: e.target.value || null })}
+        >
+          <option value="">Celle des tickets</option>
+          {liste.map(option)}
+        </select>
+      </label>
+      {impossibles.length > 0 && (
+        <p className="erreur">
+          {impossibles.map((i) => `« ${i.nom} »`).join(", ")} {impossibles.length > 1 ? "sont déclarées portées" : "est déclarée portée"} par cet appareil,
+          qui ne peut ni ouvrir un port COM ni lancer le script : choisissez une dalle dans la rubrique « Imprimantes ».
+        </p>
+      )}
       <div className="options">
         <button className="bouton" disabled={!sortieTickets(config)} onClick={() => void imprimer(gabaritTest(config), "Test")}>
           <AvecIcone icone={Printer}>Imprimer un essai</AvecIcone>
@@ -64,7 +89,7 @@ export function ImprimantesAppareil(props: { onAssistant: () => void }) {
         <button className="bouton" onClick={() => void imprimer(gabaritTest(config), "Addition d'essai", { addition: true })}>
           <AvecIcone icone={Printer}>Imprimer une addition d'essai</AvecIcone>
         </button>
-        <button className={`bouton${epson || !liste.length ? " principal" : ""}`} onClick={props.onAssistant}>
+        <button className="bouton discret" onClick={props.onAssistant}>
           <AvecIcone icone={Printer}>Assistant de connexion Epson</AvecIcone>
         </button>
       </div>
@@ -106,7 +131,7 @@ export function ImprimantesPortees() {
 
   return (
     <fieldset>
-      <legend>Imprimantes portées par cet {NOM_APPAREIL}</legend>
+      <legend>Imprimantes portées par cette dalle</legend>
       {portees.length === 0 ? (
         <p className="aide-champ">
           Pour une imprimante branchée sur un port COM de cet ordinateur (Oxhoo…), ou une imprimante réseau envoyée par lui, ajoutez-la à la liste de
@@ -114,7 +139,7 @@ export function ImprimantesPortees() {
         </p>
       ) : (
         <p className="aide-champ">
-          Les autres appareils impriment par cet {NOM_APPAREIL} : gardez la caisse ouverte, fenêtre visible. Le port COM ne sert qu'à un logiciel à
+          Les autres appareils impriment par cette dalle : gardez la caisse ouverte, fenêtre visible. Le port COM ne sert qu'à un logiciel à
           la fois : fermez l'ancien logiciel de caisse.
         </p>
       )}

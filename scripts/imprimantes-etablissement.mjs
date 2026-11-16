@@ -5,7 +5,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/imprimantes-etablissement.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
+import { choisirImprimantes, declarerImprimantes, ongletReglages } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -63,6 +63,7 @@ const attendreRecus = async (n) => {
 const ipad = await appareil("ipad", { viewport: { width: 1180, height: 820 }, hasTouch: true }, code, "Rattacher l'iPad");
 r.bandeauIpadAvant = await ipad.p.getByText("Caisse sans imprimante").count();
 await ipad.reglages();
+await ongletReglages(ipad.p, "Imprimantes");
 const postes = await ipad.p.locator(".postes-production select").count();
 await declarerImprimantes(
   ipad.p,
@@ -70,7 +71,7 @@ await declarerImprimantes(
     { nom: "Epson salle", type: "epson", adresse: SALLE },
     { nom: "Epson bar", type: "epson", adresse: BAR },
   ],
-  postes ? { [(await ipad.p.locator(".postes-production strong").first().textContent()).trim()]: "Epson bar" } : {},
+  postes ? { [((await ipad.p.locator(".postes-production .champ > span").first().textContent()) ?? "").trim()]: "Epson bar" } : {},
 );
 await choisirImprimantes(ipad.p, "Epson salle");
 await ipad.p.getByRole("button", { name: "Imprimer un essai", exact: true }).first().click();
@@ -92,7 +93,10 @@ const iphone = await appareil(
 );
 r.bandeauIphone = await iphone.p.getByText("Caisse sans imprimante").count();
 await iphone.reglages();
-r.listeIphone = await iphone.p.getByRole("radiogroup", { name: "Imprimante des tickets" }).getByRole("radio").allTextContents();
+await iphone.p.screenshot({ path: `${sortie}/ie02a-iphone-menu-reglages.png` });
+r.menuIphone = await iphone.p.locator(".menu-reglages-entree strong").allTextContents();
+await ongletReglages(iphone.p, "Cet appareil");
+r.listeIphone = await iphone.p.getByLabel("Imprimante des tickets", { exact: true }).locator("option").allTextContents();
 await choisirImprimantes(iphone.p, "Epson bar", "Epson salle");
 await iphone.p.getByRole("button", { name: "Imprimer un essai", exact: true }).first().click();
 await attendreRecus(2);
@@ -110,7 +114,8 @@ r.renommage = (await appel("PUT", "/etablissements/moka/imprimantes", { impriman
 await iphone.p.getByRole("tab", { name: "Salle" }).click().catch(() => undefined);
 await iphone.synchroniser();
 await iphone.reglages();
-r.choixIphone = await iphone.p.getByRole("radiogroup", { name: "Imprimante des tickets" }).getByRole("radio", { checked: true }).textContent();
+await ongletReglages(iphone.p, "Cet appareil");
+r.choixIphone = await iphone.p.getByLabel("Imprimante des tickets", { exact: true }).evaluate((s) => s.selectedOptions[0]?.textContent ?? "");
 await b.close();
 
 console.log(JSON.stringify({ ...r, recus, erreurs }, null, 2));
@@ -119,11 +124,13 @@ const ok =
   r.bandeauIpadApres === 0 &&
   r.bandeauIphone === 1 &&
   r.listeIphone.length === 3 &&
-  /^Epson salle/.test(r.listeIphone[0]) &&
+  JSON.stringify(r.menuIphone) === JSON.stringify(["Cet appareil", "Imprimantes", "Établissement", "Équipe"]) &&
+  r.listeIphone[0] === "À choisir" &&
+  r.listeIphone[1] === "Epson salle (Epson)" &&
   !r.debordementIphone &&
   JSON.stringify(r.serveur) === JSON.stringify(["Epson salle 10.0.0.30", "Epson bar 10.0.0.31"]) &&
   r.renommage === 2 &&
-  /^Epson comptoir/.test(r.choixIphone) &&
+  r.choixIphone === "Epson comptoir (Epson)" &&
   JSON.stringify(recus) === JSON.stringify(["ipad→10.0.0.30", "iphone→10.0.0.31", "iphone→10.0.0.30"]) &&
   !erreurs.length;
 if (!ok) process.exit(1);

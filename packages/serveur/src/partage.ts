@@ -305,6 +305,11 @@ export interface ReponseEtat {
   heure: string;
   /** Appareils en service de l'établissement (identifiant → nom). Seul, un appareil peut clôturer hors ligne. Depuis 0.7.0. */
   appareils?: Record<string, string>;
+  /**
+   * Appareils en service qui sont des ordinateurs (dalles, Chrome) : seuls à pouvoir porter une imprimante
+   * série ou réseau (16 novembre 2026).
+   */
+  ordinateurs?: string[];
   /** Programme de fidélité de l'établissement (lot 7a) ; null : aucun. */
   fidelite?: ProgrammeCaisse | null;
 }
@@ -1039,4 +1044,14 @@ export function erreurImprimantes(imprimantes: unknown, postes: unknown, dalles:
 /** Nouvel identifiant d'imprimante. */
 export function nouvelIdImprimante(): string {
   return `imp-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
+}
+
+/** Type d'un appareil rattaché, d'après sa description (« iPad · … ») ou l'ancien user agent brut. */
+export function typeDepuisDescription(appareil: string): "iPad" | "iPhone" | "Autre" {
+  const prefixe = /^(iPad|iPhone|Autre) · /.exec(appareil);
+  if (prefixe) return prefixe[1] as "iPad" | "iPhone" | "Autre";
+  if (/iPhone|iPod/.test(appareil)) return "iPhone";
+  // Avant cette description, un iPad envoyait le user agent d'un Mac : seul un rattachement à l'iPad était prévu.
+  if (/iPad|Macintosh/.test(appareil)) return "iPad";
+  return "Autre";
 }

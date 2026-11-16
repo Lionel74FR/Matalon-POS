@@ -1,4 +1,5 @@
-import { KeyRound, Printer, RefreshCw, Save, UserCheck, UserPlus, UserX } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, KeyRound, Printer, RefreshCw, Save, Smartphone, UserCheck, UserPlus, UserX, Users } from "lucide-react";
+import { serieDisponible } from "../impression/serie";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { VERSION_NOYAU_FISCAL } from "@matalon/noyau-fiscal";
@@ -43,7 +44,23 @@ export function messageServeur(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+type OngletReglages = "appareil" | "imprimantes" | "etablissement" | "equipe";
+const CLE_ONGLET = "matalon-reglages-onglet";
+
 export function Reglages(props: { onAssistant: () => void }) {
+  // Onglets (16 novembre 2026, ergonomie revue avec Lionel) ; le dernier ouvert est gardé le temps de la session.
+  const [onglet, setOnglet] = useState<OngletReglages>(() => {
+    const o = sessionStorage.getItem(CLE_ONGLET);
+    return o === "imprimantes" || o === "etablissement" || o === "equipe" ? o : "appareil";
+  });
+  const choisirOnglet = (o: OngletReglages) => {
+    setOnglet(o);
+    setMenu(false);
+    sessionStorage.setItem(CLE_ONGLET, o);
+  };
+  // iPhone (écran étroit) : menu des réglages, puis la rubrique choisie avec un retour au menu.
+  const etroit = useEcranEtroit();
+  const [menu, setMenu] = useState(true);
   const { caisse, config, majConfig, notifier, imprimer, synchro, synchroniser, utilisateur, demanderPinResponsable } = useCaisse();
   const carte = carteDe(config);
   const [envoi, setEnvoi] = useState(false);
@@ -130,7 +147,6 @@ export function Reglages(props: { onAssistant: () => void }) {
     try {
       const { etablissement: e } = await caisse.client.enregistrerImprimantes({ imprimantes, postes });
       await majConfig({ ...config, ...imprimantesRecues(config, e) });
-      notifier("Imprimantes enregistrées pour tous les appareils de l'établissement.");
     } catch (e) {
       throw new Error(messageServeur(e));
     }
@@ -153,30 +169,171 @@ export function Reglages(props: { onAssistant: () => void }) {
     }
   };
 
+  const ordinateurs = new Set(config.ordinateurs ?? Object.keys(config.appareils ?? {}));
+  if (serieDisponible()) ordinateurs.add(config.caisseId);
+  const tous = { ...config.appareils, [config.caisseId]: config.caisseNom };
+  const dalles = Object.fromEntries(Object.entries(tous).filter(([id]) => ordinateurs.has(id)));
+  const ONGLETS: Array<[OngletReglages, string, typeof Save, string]> = [
+    ["appareil", "Cet appareil", Smartphone, "Imprimantes des tickets et des additions, synchronisation"],
+    ["imprimantes", "Imprimantes", Printer, "Liste de l'établissement, postes de production"],
+    ["etablissement", "Établissement", Building2, "En-tête des notes, seuil de note"],
+    ["equipe", "Équipe", Users, "Serveurs, responsables, codes PIN"],
+  ];
+
+  if (etroit && menu) {
+    return (
+      <div className="page reglages">
+        <header className="page-tete">
+          <h1>Réglages</h1>
+        </header>
+        <nav className="menu-reglages" aria-label="Réglages">
+          {ONGLETS.map(([id, libelle, Icone, aide]) => (
+            <button key={id} className="menu-reglages-entree" onClick={() => choisirOnglet(id)}>
+              <Icone className="icone" size={22} aria-hidden="true" />
+              <span>
+                <strong>{libelle}</strong>
+                <small>{aide}</small>
+              </span>
+              <ChevronRight className="icone" size={18} aria-hidden="true" />
+            </button>
+          ))}
+        </nav>
+      </div>
+    );
+  }
+
   return (
     <div className="page reglages">
-      <header className="page-tete">
-        <h1>Réglages</h1>
-        <button className="bouton principal" disabled={envoi} onClick={() => void enregistrer()}>
-          <AvecIcone icone={Save}>{envoi ? "Enregistrement…" : "Enregistrer les réglages"}</AvecIcone>
+      {etroit && (
+        <button className="bouton discret retour-reglages" onClick={() => setMenu(true)}>
+          <AvecIcone icone={ChevronLeft}>Réglages</AvecIcone>
         </button>
+      )}
+      <header className="page-tete">
+        <h1>{etroit ? ONGLETS.find(([id]) => id === onglet)![1] : "Réglages"}</h1>
+        {onglet === "etablissement" && (
+          <button className="bouton principal" disabled={envoi} onClick={() => void enregistrer()}>
+            <AvecIcone icone={Save}>{envoi ? "Enregistrement…" : "Enregistrer les réglages"}</AvecIcone>
+          </button>
+        )}
       </header>
-
-      <div className="formulaire-colonnes">
-        <fieldset>
-          <legend>Établissement (en-tête des notes)</legend>
-          <p className="aide-champ">Commun à toutes les caisses de l'établissement. La modification demande une connexion Internet.</p>
-          {CHAMPS.map(([cle, libelle]) => (
-            <label key={cle} className="champ">
-              <span>{libelle}</span>
-              <input value={etablissement[cle] ?? ""} onChange={(e) => setEtablissement({ ...etablissement, [cle]: e.target.value })} />
-            </label>
+      {!etroit && (
+        <div className="stock-caisse-onglets onglets-reglages" role="tablist" aria-label="Réglages">
+          {ONGLETS.map(([id, libelle, icone]) => (
+            <button key={id} role="tab" aria-selected={onglet === id} className={`option${onglet === id ? " active" : ""}`} onClick={() => choisirOnglet(id)}>
+              <AvecIcone icone={icone}>{libelle}</AvecIcone>
+            </button>
           ))}
-        </fieldset>
+        </div>
+      )}
 
-        <div>
-          <ImprimantesAppareil onAssistant={props.onAssistant} />
-          <ImprimantesPortees />
+      {onglet === "appareil" && (
+        <div className="formulaire-colonnes">
+          <div>
+            <ImprimantesAppareil onAssistant={props.onAssistant} />
+            <ImprimantesPortees />
+          </div>
+        <fieldset>
+          <legend>Cette caisse</legend>
+          <dl className="totaux">
+            <div>
+              <dt>Caisse</dt>
+              <dd>
+                {config.caisseNom} · {config.caisseId}
+              </dd>
+            </div>
+            <div>
+              <dt>Établissement</dt>
+              <dd>
+                {config.etablissementId} · carte {config.carteId}
+              </dd>
+            </div>
+            <div>
+              <dt>Synchronisation</dt>
+              <dd className={["divergence", "revoquee", "erreur"].includes(synchro.statut) ? "erreur" : ""}>
+                {synchro.statut === "synchronise"
+                  ? "À jour"
+                  : synchro.statut === "hors_ligne"
+                    ? "Hors ligne"
+                    : synchro.statut === "en_attente"
+                      ? "En attente"
+                      : synchro.message}
+                {synchro.enAttente > 0 && ` · ${synchro.enAttente} à envoyer`}
+                {synchro.derniereSynchro && ` · dernière le ${new Date(synchro.derniereSynchro).toLocaleString("fr-FR")}`}{" "}
+                <button className="bouton discret" onClick={() => void synchroniser()}>
+                  <AvecIcone icone={RefreshCw}>Synchroniser</AvecIcone>
+                </button>
+              </dd>
+            </div>
+            <div>
+              <dt>Mise en service</dt>
+              <dd>{new Date(config.installeeLe).toLocaleDateString("fr-FR")}</dd>
+            </div>
+            <div>
+              <dt>Empreinte de la clé</dt>
+              <dd>
+                <code>{caisse.cle.empreinte.slice(0, 32)}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd>
+                Noyau fiscal {VERSION_NOYAU_FISCAL} · application {VERSION_APPLICATION}
+              </dd>
+            </div>
+            <div>
+              <dt>Stockage protégé</dt>
+              <dd className={persistant ? "" : "erreur"}>
+                {persistant == null
+                  ? "Inconnu"
+                  : persistant
+                    ? `Oui, l'${NOM_APPAREIL} ne purgera pas les données`
+                    : "Non : installez la caisse sur l'écran d'accueil (Partager › Sur l'écran d'accueil)"}
+              </dd>
+            </div>
+            <div>
+              <dt>Seuil de note</dt>
+              <dd>
+                {euros(config.seuilNoteAutomatique)} · {config.noteAutomatique === false ? "proposée à l'encaissement" : "imprimée d'office"}
+              </dd>
+            </div>
+          </dl>
+        </fieldset>
+        </div>
+      )}
+
+      {onglet === "imprimantes" && (
+        <fieldset>
+          <legend>Imprimantes de l'établissement</legend>
+          <p className="aide-champ">
+            Réglées une fois pour tous les appareils : les postes de production y choisissent leur imprimante, et chaque appareil celle de ses
+            tickets et de ses additions (rubrique « Cet appareil »). Une imprimante série ou réseau est portée par une dalle : les autres appareils
+            impriment par elle.
+          </p>
+          <EditeurImprimantes
+            imprimantes={config.imprimantes ?? []}
+            postes={config.postesImprimantes ?? {}}
+            postesCarte={carte ? postesDeLaCarte(carte) : []}
+            appareils={dalles}
+            nomsAppareils={tous}
+            onEnregistrer={enregistrerImprimantes}
+            onTester={(i) => void testerImprimante(i)}
+          />
+        </fieldset>
+      )}
+
+      {onglet === "etablissement" && (
+        <div className="formulaire-colonnes">
+          <fieldset>
+            <legend>En-tête des notes</legend>
+            <p className="aide-champ">Commun à toutes les caisses de l'établissement. La modification demande une connexion Internet.</p>
+            {CHAMPS.map(([cle, libelle]) => (
+              <label key={cle} className="champ">
+                <span>{libelle}</span>
+                <input value={etablissement[cle] ?? ""} onChange={(e) => setEtablissement({ ...etablissement, [cle]: e.target.value })} />
+              </label>
+            ))}
+          </fieldset>
           <fieldset>
             <legend>Notes</legend>
             <label className="champ">
@@ -197,131 +354,63 @@ export function Reglages(props: { onAssistant: () => void }) {
             )}
           </fieldset>
         </div>
-      </div>
+      )}
 
-      <fieldset>
-        <legend>Imprimantes de l'établissement</legend>
-        <p className="aide-champ">
-          Réglées une fois pour tous les appareils. Les postes de production (bar, cuisine) y choisissent leur imprimante : « Envoyer » sur la commande
-          imprime les nouveaux articles, le reste part à l'encaissement. Chaque appareil choisit ensuite celle de ses tickets et de ses additions.
-        </p>
-        <EditeurImprimantes
-          imprimantes={config.imprimantes ?? []}
-          postes={config.postesImprimantes ?? {}}
-          postesCarte={carte ? postesDeLaCarte(carte) : []}
-          appareils={{ ...config.appareils, [config.caisseId]: config.caisseNom }}
-          onEnregistrer={enregistrerImprimantes}
-          onTester={(i) => void testerImprimante(i)}
-        />
-      </fieldset>
-
-      <fieldset>
-        <legend>Équipe</legend>
-        <table className="tableau">
-          <tbody>
-            {config.utilisateurs.map((u) => (
-              <tr key={u.id} className={u.actif ? "" : "annule"}>
-                <td>{u.nom}</td>
-                <td>{u.role === "responsable" ? "Responsable" : "Serveur"}</td>
-                <td className="nombre">
-                  <BoutonIcone icone={KeyRound} variante="discret" libelle={`Changer le code PIN de ${u.nom}`} onClick={() => void changerPin(u)} />
-                  <BoutonIcone
-                    icone={u.actif ? UserX : UserCheck}
-                    variante="discret"
-                    libelle={`${u.actif ? "Désactiver" : "Réactiver"} ${u.nom}`}
-                    onClick={() => void basculerActif(u)}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="ajout-utilisateur">
-          <input placeholder="Prénom" value={nouveau.nom} onChange={(e) => setNouveau({ ...nouveau, nom: e.target.value })} />
-          <select value={nouveau.role} onChange={(e) => setNouveau({ ...nouveau, role: e.target.value as Role })}>
-            <option value="serveur">Serveur</option>
-            <option value="responsable">Responsable</option>
-          </select>
-          <input
-            placeholder="Code PIN"
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={nouveau.pin}
-            onChange={(e) => setNouveau({ ...nouveau, pin: e.target.value.replace(/\D/g, "") })}
-          />
-          <button className="bouton" onClick={() => void ajouterUtilisateur()}>
-            <AvecIcone icone={UserPlus}>Ajouter à l'équipe</AvecIcone>
-          </button>
-        </div>
-      </fieldset>
-
-      <fieldset>
-        <legend>Cette caisse</legend>
-        <dl className="totaux">
-          <div>
-            <dt>Caisse</dt>
-            <dd>
-              {config.caisseNom} · {config.caisseId}
-            </dd>
+      {onglet === "equipe" && (
+        <fieldset>
+          <legend>Équipe</legend>
+          <table className="tableau">
+            <tbody>
+              {config.utilisateurs.map((u) => (
+                <tr key={u.id} className={u.actif ? "" : "annule"}>
+                  <td>{u.nom}</td>
+                  <td>{u.role === "responsable" ? "Responsable" : "Serveur"}</td>
+                  <td className="nombre">
+                    <BoutonIcone icone={KeyRound} variante="discret" libelle={`Changer le code PIN de ${u.nom}`} onClick={() => void changerPin(u)} />
+                    <BoutonIcone
+                      icone={u.actif ? UserX : UserCheck}
+                      variante="discret"
+                      libelle={`${u.actif ? "Désactiver" : "Réactiver"} ${u.nom}`}
+                      onClick={() => void basculerActif(u)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="ajout-utilisateur">
+            <input placeholder="Prénom" value={nouveau.nom} onChange={(e) => setNouveau({ ...nouveau, nom: e.target.value })} />
+            <select value={nouveau.role} onChange={(e) => setNouveau({ ...nouveau, role: e.target.value as Role })}>
+              <option value="serveur">Serveur</option>
+              <option value="responsable">Responsable</option>
+            </select>
+            <input
+              placeholder="Code PIN"
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              value={nouveau.pin}
+              onChange={(e) => setNouveau({ ...nouveau, pin: e.target.value.replace(/\D/g, "") })}
+            />
+            <button className="bouton" onClick={() => void ajouterUtilisateur()}>
+              <AvecIcone icone={UserPlus}>Ajouter à l'équipe</AvecIcone>
+            </button>
           </div>
-          <div>
-            <dt>Établissement</dt>
-            <dd>
-              {config.etablissementId} · carte {config.carteId}
-            </dd>
-          </div>
-          <div>
-            <dt>Synchronisation</dt>
-            <dd className={["divergence", "revoquee", "erreur"].includes(synchro.statut) ? "erreur" : ""}>
-              {synchro.statut === "synchronise"
-                ? "À jour"
-                : synchro.statut === "hors_ligne"
-                  ? "Hors ligne"
-                  : synchro.statut === "en_attente"
-                    ? "En attente"
-                    : synchro.message}
-              {synchro.enAttente > 0 && ` · ${synchro.enAttente} à envoyer`}
-              {synchro.derniereSynchro && ` · dernière le ${new Date(synchro.derniereSynchro).toLocaleString("fr-FR")}`}{" "}
-              <button className="bouton discret" onClick={() => void synchroniser()}>
-                <AvecIcone icone={RefreshCw}>Synchroniser</AvecIcone>
-              </button>
-            </dd>
-          </div>
-          <div>
-            <dt>Mise en service</dt>
-            <dd>{new Date(config.installeeLe).toLocaleDateString("fr-FR")}</dd>
-          </div>
-          <div>
-            <dt>Empreinte de la clé</dt>
-            <dd>
-              <code>{caisse.cle.empreinte.slice(0, 32)}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Version</dt>
-            <dd>
-              Noyau fiscal {VERSION_NOYAU_FISCAL} · application {VERSION_APPLICATION}
-            </dd>
-          </div>
-          <div>
-            <dt>Stockage protégé</dt>
-            <dd className={persistant ? "" : "erreur"}>
-              {persistant == null
-                ? "Inconnu"
-                : persistant
-                  ? `Oui, l'${NOM_APPAREIL} ne purgera pas les données`
-                  : "Non : installez la caisse sur l'écran d'accueil (Partager › Sur l'écran d'accueil)"}
-            </dd>
-          </div>
-          <div>
-            <dt>Seuil de note</dt>
-            <dd>
-              {euros(config.seuilNoteAutomatique)} · {config.noteAutomatique === false ? "proposée à l'encaissement" : "imprimée d'office"}
-            </dd>
-          </div>
-        </dl>
-      </fieldset>
+        </fieldset>
+      )}
     </div>
   );
+}
+
+/** Écran étroit (iPhone) : les réglages passent par un menu plutôt que par des onglets. */
+function useEcranEtroit(): boolean {
+  const requete = "(max-width: 600px)";
+  const [etroit, setEtroit] = useState(() => typeof matchMedia !== "undefined" && matchMedia(requete).matches);
+  useEffect(() => {
+    const m = matchMedia(requete);
+    const suivre = () => setEtroit(m.matches);
+    m.addEventListener("change", suivre);
+    return () => m.removeEventListener("change", suivre);
+  }, []);
+  return etroit;
 }

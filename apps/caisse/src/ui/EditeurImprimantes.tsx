@@ -15,8 +15,10 @@ export function EditeurImprimantes(props: {
   postes: Record<string, string>;
   /** Postes nommés dans la carte de l'établissement. */
   postesCarte: string[];
-  /** Appareils de l'établissement (identifiant → nom) : les dalles qui peuvent porter une imprimante. */
+  /** Ordinateurs (dalles) de l'établissement, identifiant → nom : seuls à pouvoir porter une imprimante. */
   appareils: Record<string, string>;
+  /** Noms de tous les appareils (pour nommer une dalle qui ne peut plus porter d'imprimante). */
+  nomsAppareils?: Record<string, string>;
   onEnregistrer: (imprimantes: ImprimanteEtablissement[], postes: Record<string, string>) => Promise<void>;
   /** Bon d'essai (caisse seulement : l'administration n'est pas sur le réseau de l'établissement). */
   onTester?: (imprimante: ImprimanteEtablissement) => void;
@@ -80,98 +82,106 @@ export function EditeurImprimantes(props: {
       {liste.length === 0 ? (
         <p className="aide-champ">Aucune imprimante. Ajoutez celles de l'établissement : Epson réseau, imprimante série d'une dalle, imprimante réseau envoyée par une dalle.</p>
       ) : (
-        <table className="tableau">
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Branchement</th>
-              <th>Adresse ou dalle</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {liste.map((i) => {
-              const b = i.branchement;
-              return (
-                <tr key={i.id}>
-                  <td>
-                    <input aria-label={`Nom de l'imprimante ${i.nom}`} value={i.nom} onChange={(e) => maj(i.id, { nom: e.target.value })} />
-                  </td>
-                  <td>
-                    <select aria-label={`Branchement de ${i.nom}`} value={b.type} onChange={(e) => changerType(i, e.target.value as BranchementImprimante["type"])}>
-                      <option value="epson">Epson réseau</option>
-                      <option value="serie">Série sur une dalle</option>
-                      <option value="reseau">Réseau par une dalle (script)</option>
-                    </select>
-                  </td>
-                  <td className="imprimante-lieu">
-                    {b.type !== "serie" && (
-                      <input
-                        aria-label={`Adresse IP de ${i.nom}`}
-                        value={b.adresse}
-                        placeholder={b.type === "epson" ? "192.168.1.50" : "192.168.1.248"}
-                        inputMode="decimal"
-                        onChange={(e) => maj(i.id, { branchement: { ...b, adresse: e.target.value } })}
-                      />
+        <div className="liste-imprimantes" role="table" aria-label="Imprimantes de l'établissement">
+          <div className="imprimante-ligne entete" role="row">
+            <span role="columnheader">Nom</span>
+            <span role="columnheader">Branchement</span>
+            <span role="columnheader">Adresse IP</span>
+            <span role="columnheader">Dalle qui la porte</span>
+            <span role="columnheader">Accents</span>
+            <span role="columnheader" />
+          </div>
+          {liste.map((i) => {
+            const b = i.branchement;
+            const dalleInvalide = b.type !== "epson" && !props.appareils[b.dalleId];
+            return (
+              <div key={i.id} className="imprimante-ligne" role="row">
+                <input aria-label={`Nom de l'imprimante ${i.nom}`} value={i.nom} onChange={(e) => maj(i.id, { nom: e.target.value })} />
+                <select aria-label={`Branchement de ${i.nom}`} value={b.type} onChange={(e) => changerType(i, e.target.value as BranchementImprimante["type"])}>
+                  <option value="epson">Epson réseau</option>
+                  <option value="serie">Série sur une dalle</option>
+                  <option value="reseau">Réseau par une dalle (script)</option>
+                </select>
+                {b.type === "serie" ? (
+                  <span className="sans-objet">port COM de la dalle</span>
+                ) : (
+                  <input
+                    aria-label={`Adresse IP de ${i.nom}`}
+                    value={b.adresse}
+                    placeholder={b.type === "epson" ? "192.168.1.50" : "192.168.1.248"}
+                    inputMode="decimal"
+                    onChange={(e) => maj(i.id, { branchement: { ...b, adresse: e.target.value } })}
+                  />
+                )}
+                {b.type === "epson" ? (
+                  <span className="sans-objet">en direct</span>
+                ) : (
+                  <select
+                    aria-label={`Dalle de ${i.nom}`}
+                    aria-invalid={dalleInvalide}
+                    value={b.dalleId}
+                    onChange={(e) => maj(i.id, { branchement: { ...b, dalleId: e.target.value } })}
+                  >
+                    {dalleInvalide && (
+                      <option value={b.dalleId}>
+                        {props.nomsAppareils?.[b.dalleId] ? `${props.nomsAppareils[b.dalleId]} : pas une dalle, à changer` : "Choisir la dalle…"}
+                      </option>
                     )}
-                    {b.type === "reseau" && (
-                      <a className="lien-script" href={URL_SCRIPT_RESEAU} download title="Script à lancer sur la dalle (clic droit › Exécuter avec PowerShell)">
-                        Script de la dalle
-                      </a>
-                    )}
-                    {b.type !== "epson" && (
-                      <select aria-label={`Dalle de ${i.nom}`} value={b.dalleId} onChange={(e) => maj(i.id, { branchement: { ...b, dalleId: e.target.value } })}>
-                        {!props.appareils[b.dalleId] && <option value={b.dalleId}>Choisir la dalle…</option>}
-                        {dalles.map(([id, nom]) => (
-                          <option key={id} value={id}>
-                            {nom}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td className="imprimante-actions">
-                    <label className="case">
-                      <input type="checkbox" checked={i.sansAccents} onChange={(e) => maj(i.id, { sansAccents: e.target.checked })} />
-                      Sans accents
-                    </label>
-                    {props.onTester && (
-                      <BoutonIcone
-                        icone={Printer}
-                        variante="discret"
-                        libelle={`Imprimer un essai sur ${i.nom}`}
-                        disabled={modifie}
-                        onClick={() => props.onTester!(i)}
-                      />
-                    )}
-                    <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer ${i.nom}`} onClick={() => retirer(i)} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    {dalles.map(([id, nom]) => (
+                      <option key={id} value={id}>
+                        {nom}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <label className="case">
+                  <input type="checkbox" checked={!i.sansAccents} onChange={(e) => maj(i.id, { sansAccents: !e.target.checked })} />
+                  <span>Avec accents</span>
+                </label>
+                <span className="imprimante-actions">
+                  {props.onTester && (
+                    <BoutonIcone icone={Printer} variante="discret" libelle={`Imprimer un essai sur ${i.nom}`} disabled={modifie} onClick={() => props.onTester!(i)} />
+                  )}
+                  <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer ${i.nom}`} onClick={() => retirer(i)} />
+                </span>
+                {dalleInvalide && (
+                  <p className="erreur imprimante-note">
+                    Seul un ordinateur (dalle, caisse ouverte dans Chrome) peut porter « {i.nom} » : un iPad ou un iPhone n'a ni port COM ni script.
+                  </p>
+                )}
+                {b.type === "reseau" && !dalleInvalide && (
+                  <p className="aide-champ imprimante-note">
+                    Le script doit tourner sur {props.appareils[b.dalleId]} :{" "}
+                    <a href={URL_SCRIPT_RESEAU} download>
+                      télécharger le script
+                    </a>
+                    , puis clic droit › « Exécuter avec PowerShell » sur la dalle.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
       <button className="bouton" onClick={ajouter}>
         <AvecIcone icone={Plus}>Ajouter une imprimante</AvecIcone>
       </button>
 
       <h3 className="sous-titre-reglages">Postes de production</h3>
+      <p className="aide-champ">« Envoyer » sur une commande imprime les nouveaux articles au poste de leur catégorie ; le reste part à l'encaissement.</p>
       {noms.length === 0 ? (
         <p className="aide-champ">
           Aucun poste dans la carte. Dans l'éditeur de carte, indiquez pour chaque catégorie son poste de production (« Bar », « Cuisine »), puis
           revenez ici lui choisir une imprimante.
         </p>
       ) : (
-        <table className="tableau postes-production">
-          <tbody>
+        <div className="postes-production">
             {noms.map((nom) => (
-              <tr key={nom}>
-                <td>
-                  <strong>{nom}</strong>
-                  {!props.postesCarte.includes(nom) && <small className="aide-champ"> · n'est plus dans la carte</small>}
-                </td>
-                <td>
+              <label key={nom} className="champ">
+                <span>
+                  {nom}
+                  {!props.postesCarte.includes(nom) && <small>n'est plus dans la carte</small>}
+                </span>
                   <select
                     aria-label={`Imprimante du poste ${nom}`}
                     value={postes[nom] ?? ""}
@@ -187,11 +197,9 @@ export function EditeurImprimantes(props: {
                       </option>
                     ))}
                   </select>
-                </td>
-              </tr>
+              </label>
             ))}
-          </tbody>
-        </table>
+        </div>
       )}
       {erreur && <p className="erreur">{erreur}</p>}
       {fait && <p className="succes">{fait}</p>}

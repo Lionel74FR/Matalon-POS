@@ -88,6 +88,8 @@ describe("imprimantes de l'établissement (16 novembre 2026)", () => {
 
     const refus = async (liste: unknown, postes: unknown = {}) => (await appel("PUT", "/api/caisse/imprimantes", { imprimantes: liste, postes }, ipad)).corps.message;
     expect(await refus([{ ...imprimantes[1], branchement: { type: "serie", dalleId: "ipad-99999999" } }])).toContain("choisissez la dalle");
+    // Un iPad n'a ni port COM ni script : il ne porte pas d'imprimante.
+    expect(await refus([{ ...imprimantes[1], branchement: { type: "serie", dalleId: "ipad-0000000e" } }])).toContain("choisissez la dalle");
     expect(await refus([{ ...imprimantes[2], branchement: { type: "reseau", adresse: "8.8.8.8", dalleId: "ipad-0000000d" } }])).toContain("réseau local");
     expect(await refus([imprimantes[0], { ...imprimantes[1], nom: "epson CUISINE" }])).toContain("Deux imprimantes");
     expect(await refus(imprimantes, { Bar: "imp-inconnue" })).toContain("imprimante inconnue");

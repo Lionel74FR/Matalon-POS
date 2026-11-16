@@ -67,6 +67,7 @@ await connecter();
 
 // ── 2. Ajout d'un serveur depuis l'iPad : code du responsable demandé et vérifié par le serveur ──
 await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Réglages" }).click());
+await p.getByRole("tablist", { name: "Réglages" }).getByRole("tab", { name: "Équipe" }).click();
 await p.getByPlaceholder("Prénom").fill("Tom");
 await p.getByPlaceholder("Code PIN").fill("5678");
 await clic("Ajouter à l'équipe");

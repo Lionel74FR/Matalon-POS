@@ -59,6 +59,7 @@ import {
   type ClientApi,
   posteValide,
   erreurImprimantes,
+  typeDepuisDescription,
   type ImprimanteEtablissement,
   problemePlan,
   problemeMoments,
@@ -395,10 +396,10 @@ async function majPostes(env: Environnement, etablissementId: string, corps: Rec
   return etablissement(env.db, etablissementId);
 }
 
-/** Appareils de l'établissement qui peuvent porter une imprimante (dalles : tout appareil non révoqué). */
+/** Appareils de l'établissement qui peuvent porter une imprimante : les ordinateurs (dalles) en service. */
 async function dallesEtablissement(env: Environnement, etablissementId: string): Promise<Set<string>> {
-  const l = await env.db.requete<{ id: string }>("select id from caisses where etablissement_id = $1 and revoquee_le is null", [etablissementId]);
-  return new Set(l.map((c) => c.id));
+  const l = await env.db.requete<{ id: string; appareil: string }>("select id, appareil from caisses where etablissement_id = $1 and revoquee_le is null", [etablissementId]);
+  return new Set(l.filter((c) => typeDepuisDescription(c.appareil) === "Autre").map((c) => c.id));
 }
 
 /**
@@ -1070,12 +1071,16 @@ async function etatCaisse(env: Environnement, requete: Request): Promise<Respons
     derniers: await derniers(env.db, c.id),
     heure: horloge(env).toISOString(),
     fidelite: await programmeCaisse(env.db, c.etablissement_id),
-    appareils: Object.fromEntries(
-      (await env.db.requete<{ id: string; nom: string }>("select id, nom from caisses where etablissement_id = $1 and revoquee_le is null order by id", [c.etablissement_id])).map((x) => [
-        x.id,
-        x.nom,
-      ]),
-    ),
+    ...(await (async () => {
+      const enService = await env.db.requete<{ id: string; nom: string; appareil: string }>(
+        "select id, nom, appareil from caisses where etablissement_id = $1 and revoquee_le is null order by id",
+        [c.etablissement_id],
+      );
+      return {
+        appareils: Object.fromEntries(enService.map((x) => [x.id, x.nom])),
+        ordinateurs: enService.filter((x) => typeDepuisDescription(x.appareil) === "Autre").map((x) => x.id),
+      };
+    })()),
   };
   return json(200, reponse);
 }

@@ -6,7 +6,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/impression-serie.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
+import { choisirImprimantes, declarerImprimantes, ongletReglages } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -87,6 +87,7 @@ p.on("pageerror", (e) => erreurs.push(`dalle : ${e.message}`));
 const clic = await connexion(p, code, "Rattacher l'iPad");
 await reglages(p);
 await declarerImprimantes(p, [{ nom: "Oxhoo bar", type: "serie", dalle: "Dalle 1" }]);
+await ongletReglages(p, "Cet appareil");
 const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
 await bloc.getByRole("button", { name: "Choisir le port" }).click();
 await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();

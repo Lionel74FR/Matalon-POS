@@ -7,7 +7,7 @@
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/impression-additions.mjs [dossier-captures]
 import { createServer } from "node:http";
 import { chromium } from "playwright";
-import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
+import { choisirImprimantes, declarerImprimantes, ongletReglages } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -120,6 +120,8 @@ await declarerImprimantes(p, [
   { nom: "Oxhoo bar", type: "serie", dalle: "Dalle bar" },
   { nom: "Oxhoo salle", type: "reseau", adresse: "192.168.1.248", dalle: "Dalle bar" },
 ]);
+await p.screenshot({ path: `${sortie}/ia00-onglet-imprimantes.png` });
+await ongletReglages(p, "Cet appareil");
 const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
 await bloc.getByRole("button", { name: "Choisir le port" }).click();
 await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();
@@ -147,7 +149,6 @@ for (const x of "1234") await ipad.locator(".pave .touche", { hasText: new RegEx
 const plusTard = ipad.getByRole("button", { name: "Plus tard", exact: true });
 await plusTard.waitFor({ timeout: 3000 }).then(() => plusTard.click()).catch(() => undefined);
 await reglages(ipad);
-await ipad.getByRole("radiogroup", { name: "Imprimante des additions" }).getByRole("radio", { name: /^Oxhoo salle/ }).waitFor();
 await choisirImprimantes(ipad, "Oxhoo bar", "Oxhoo salle");
 r.ipadScriptCache = (await ipad.getByRole("button", { name: "Vérifier le script" }).count()) === 0;
 await ipad.screenshot({ path: `${sortie}/ia02-ipad-additions.png` });

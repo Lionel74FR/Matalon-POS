@@ -17,14 +17,7 @@ export function descriptionAppareil(nav: Pick<Navigator, "userAgent" | "maxTouch
 }
 
 /** Type d'un appareil rattaché, d'après la description reçue (ou l'ancien user agent brut). */
-export function typeDepuisDescription(appareil: string): TypeAppareil {
-  const prefixe = /^(iPad|iPhone|Autre) · /.exec(appareil);
-  if (prefixe) return prefixe[1] as TypeAppareil;
-  if (/iPhone|iPod/.test(appareil)) return "iPhone";
-  // Avant cette description, un iPad envoyait le user agent d'un Mac : seul un rattachement à l'iPad était prévu.
-  if (/iPad|Macintosh/.test(appareil)) return "iPad";
-  return "Autre";
-}
+export { typeDepuisDescription } from "@matalon/serveur/partage";
 
 /** Nom de cet appareil dans les messages (« l'iPad », « l'iPhone »). */
 export const NOM_APPAREIL: "iPad" | "iPhone" =

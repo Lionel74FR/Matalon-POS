@@ -82,6 +82,8 @@ export interface Configuration {
    * a le script ; sinon la dalle relais `relaisId` imprime pour lui. Absente : les additions suivent les tickets.
    */
   imprimanteAdditions?: { adresse: string; sansAccents: boolean; relaisId?: string; relaisNom?: string };
+  /** Appareils en service qui sont des ordinateurs (dalles) : seuls à porter une imprimante. */
+  ordinateurs?: string[];
   /** Imprimantes de l'établissement (16 novembre 2026), reçues du serveur. */
   imprimantes?: ImprimanteEtablissement[];
   /** Poste de production → imprimante de `imprimantes`. */
@@ -115,7 +117,7 @@ export interface Configuration {
 /** Applique le référentiel reçu du serveur ; renvoie `null` si rien n'a changé. */
 export function fusionnerReferentiel(
   config: Configuration,
-  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients" | "appareils" | "fidelite">,
+  etat: Pick<ReponseEtat, "caisse" | "etablissement" | "utilisateurs" | "clients" | "appareils" | "ordinateurs" | "fidelite">,
 ): Configuration | null {
   const serveur = etat.clients;
   const clients = serveur
@@ -136,6 +138,7 @@ export function fusionnerReferentiel(
     ...(etat.etablissement.imprimanteTickets?.adresse && !config.imprimante.adresse ? { imprimanteConnue: etat.etablissement.imprimanteTickets } : {}),
     ...(etat.etablissement.zones ? { zones: etat.etablissement.zones, planVersion: etat.etablissement.planVersion ?? 0 } : {}),
     ...(etat.appareils ? { appareils: etat.appareils } : {}),
+    ...(etat.ordinateurs ? { ordinateurs: etat.ordinateurs } : {}),
     ...(etat.fidelite !== undefined ? { fidelite: etat.fidelite } : {}),
     ...(etat.etablissement.motifsRemise ? { motifsRemise: etat.etablissement.motifsRemise } : {}),
     ...(etat.etablissement.logo !== undefined ? { logo: etat.etablissement.logo } : {}),

@@ -3731,26 +3731,90 @@ a.bouton {
   font-size: 0.85rem;
 }
 
-/* Imprimantes de l'établissement (16 novembre 2026) : la liste et les postes, défilant sur iPhone. */
+/* Réglages en onglets et imprimantes de l'établissement (16 novembre 2026). */
+.onglets-reglages {
+  margin-bottom: 16px;
+}
 .imprimantes-etablissement {
   display: grid;
-  gap: 10px;
-  overflow-x: auto;
+  gap: 12px;
 }
 .imprimantes-etablissement > .bouton {
   justify-self: start;
 }
-.imprimantes-etablissement td.imprimante-lieu {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.liste-imprimantes {
+  display: grid;
+  gap: 8px;
 }
-.imprimantes-etablissement td.imprimante-actions {
+.imprimante-ligne {
+  display: grid;
+  grid-template-columns: minmax(9em, 1.1fr) minmax(11em, 1.2fr) minmax(9em, 1fr) minmax(10em, 1.1fr) auto auto;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--espresso);
+}
+.imprimante-ligne.entete {
+  background: none;
+  padding-block: 0;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+.imprimante-ligne input:not([type="checkbox"]),
+.imprimante-ligne select,
+.reglages .champ select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso-2);
+  color: var(--mousse);
+}
+.reglages .champ select {
+  min-height: 48px;
+  background: var(--espresso);
+}
+.imprimante-ligne input:focus,
+.imprimante-ligne select:focus,
+.reglages .champ select:focus {
+  border-color: var(--terre);
+  outline: none;
+}
+.imprimante-ligne .sans-objet {
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+.imprimante-ligne .case {
+  margin: 0;
   white-space: nowrap;
 }
-.imprimantes-etablissement input,
-.imprimantes-etablissement select {
-  min-width: 9em;
+.imprimante-ligne .imprimante-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.imprimante-ligne .imprimante-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.imprimante-ligne select[aria-invalid="true"] {
+  border-color: var(--rouge);
+}
+.imprimantes-etablissement .postes-production {
+  display: grid;
+  gap: 4px;
+  max-width: 640px;
+}
+@media (max-width: 900px) {
+  .imprimante-ligne {
+    grid-template-columns: 1fr 1fr;
+  }
+  .imprimante-ligne.entete {
+    display: none;
+  }
 }
 .sous-titre-reglages {
   font-size: 0.95rem;
@@ -3759,8 +3823,33 @@ a.bouton {
 .imprimante-portee + .imprimante-portee {
   margin-top: 8px;
 }
-.imprimantes-etablissement .lien-script {
-  align-self: center;
+/* Menu des réglages sur iPhone (16 novembre 2026). */
+.menu-reglages {
+  display: grid;
+  gap: 8px;
+}
+.menu-reglages-entree {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--rayon);
+  background: var(--espresso-2);
+  color: var(--mousse);
+  text-align: left;
+  font: inherit;
+}
+.menu-reglages-entree span {
+  display: grid;
+  gap: 2px;
+}
+.menu-reglages-entree small {
+  color: var(--sable);
   font-size: 0.85rem;
-  white-space: nowrap;
+}
+.retour-reglages {
+  justify-self: start;
+  margin-bottom: 4px;
 }

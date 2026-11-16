@@ -124,6 +124,7 @@ await p.keyboard.press("Escape");
 // ── Réglages : note plus imprimée d'office ; l'encaissement rappelle de la remettre ──
 await p.getByRole("button", { name: /^Menu/ }).click();
 await p.getByRole("menuitem", { name: "Réglages" }).click();
+await p.getByRole("tablist", { name: "Réglages" }).getByRole("tab", { name: "Établissement" }).click();
 await p.getByLabel(/Note due à partir de/).fill("5");
 await p.getByLabel("Imprimer la note d'office à partir de ce montant").uncheck();
 await clic("Enregistrer les réglages");

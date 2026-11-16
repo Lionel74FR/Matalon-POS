@@ -5,7 +5,7 @@
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/impression-relayee.mjs [dossier-captures]
 import { chromium } from "playwright";
-import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
+import { choisirImprimantes, declarerImprimantes, ongletReglages } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -93,6 +93,7 @@ await declarerImprimantes(p, [
   { nom: "Oxhoo bar", type: "serie", dalle: "Dalle bar" },
   { nom: "Oxhoo cave", type: "serie", dalle: "Dalle bar" },
 ]);
+await ongletReglages(p, "Cet appareil");
 const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
 await bloc.getByRole("button", { name: "Choisir le port" }).first().click();
 await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();
@@ -106,8 +107,9 @@ for (const x of "1234") await ipad.locator(".pave .touche", { hasText: new RegEx
 const plusTard = ipad.getByRole("button", { name: "Plus tard", exact: true });
 await plusTard.waitFor({ timeout: 3000 }).then(() => plusTard.click()).catch(() => undefined);
 await reglages(ipad);
-const choix = ipad.getByRole("radiogroup", { name: "Imprimante des tickets" }).getByRole("radio", { name: /^Oxhoo bar/ });
-await choix.waitFor();
+await ongletReglages(ipad, "Cet appareil");
+const choix = ipad.getByLabel("Imprimante des tickets", { exact: true }).locator("option", { hasText: /^Oxhoo bar/ });
+await choix.waitFor({ state: "attached" });
 r.choix = await texte(choix);
 await choisirImprimantes(ipad, "Oxhoo bar", "Oxhoo cave");
 await ipad.getByRole("button", { name: "Imprimer un essai", exact: true }).first().click();
@@ -131,6 +133,7 @@ r.tiroir = w.map((x) => [...x].join(" "));
 
 // ── Addition sur l'Oxhoo cave, dont la dalle n'a pas choisi le port : aperçu et erreur sur l'iPad ──
 await reglages(ipad);
+await ongletReglages(ipad, "Cet appareil");
 await ipad.getByRole("button", { name: "Imprimer une addition d'essai" }).click();
 await ipad.locator(".apercu-recu").first().waitFor({ timeout: 15000 });
 r.erreur = await texte(ipad.getByRole("dialog").last());
@@ -140,7 +143,7 @@ await b.close();
 console.log(JSON.stringify({ ...r, erreur: r.erreur.slice(0, 300), erreurs }, null, 2));
 const ok =
   r.ipadSansImprimante &&
-  /Oxhoo bar · série sur Dalle bar/.test(r.choix) &&
+  /^Oxhoo bar \(série\)$/.test(r.choix) &&
   r.essai.ecrit &&
   r.essai.test &&
   r.essai.coupe === "29 86 0" &&
