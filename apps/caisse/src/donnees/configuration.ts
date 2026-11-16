@@ -51,6 +51,8 @@ export interface Configuration {
    * partagée. `rang` : place du port parmi ceux autorisés dans Chrome. Absente : rien ne change.
    */
   imprimanteSerie?: { rang: number; bauds: number; sansAccents: boolean };
+  /** Version du logo de l'établissement (en tête du ticket sur l'imprimante série) ; null : aucun. */
+  logo?: string | null;
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */
   imprimanteEtablissement?: ImprimanteReseau | null;
   /** Dernière imprimante utilisée par cet appareil : survit à un retrait, pour la rétablir d'un toucher. */
@@ -92,6 +94,7 @@ export function fusionnerReferentiel(
     ...(etat.appareils ? { appareils: etat.appareils } : {}),
     ...(etat.fidelite !== undefined ? { fidelite: etat.fidelite } : {}),
     ...(etat.etablissement.motifsRemise ? { motifsRemise: etat.etablissement.motifsRemise } : {}),
+    ...(etat.etablissement.logo !== undefined ? { logo: etat.etablissement.logo } : {}),
   };
   return canonique(suivante) === canonique(config) ? null : suivante;
 }

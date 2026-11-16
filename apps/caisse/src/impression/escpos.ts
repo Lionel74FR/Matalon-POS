@@ -52,12 +52,37 @@ export function encoderPc858(texte: string, o: { sansAccents: boolean }): number
   return octets;
 }
 
+/** Image noir et blanc pour la commande GS v 0 : `points` ligne par ligne, 8 points par octet, bit fort à gauche. */
+export interface LogoRaster {
+  largeurOctets: number;
+  hauteur: number;
+  points: Uint8Array;
+}
+
+/**
+ * Image RGBA (canvas) en points noirs : un pixel est noir s'il est sombre une fois posé sur du papier
+ * blanc (la transparence compte comme du blanc).
+ */
+export function rasterDepuisRgba(rgba: ArrayLike<number>, largeur: number, hauteur: number): LogoRaster {
+  const largeurOctets = Math.ceil(largeur / 8);
+  const points = new Uint8Array(largeurOctets * hauteur);
+  for (let y = 0; y < hauteur; y++) {
+    for (let x = 0; x < largeur; x++) {
+      const i = (y * largeur + x) * 4;
+      const alpha = rgba[i + 3]! / 255;
+      const lum = alpha * (0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!) + (1 - alpha) * 255;
+      if (lum < 128) points[y * largeurOctets + (x >> 3)]! |= 0x80 >> (x & 7);
+    }
+  }
+  return { largeurOctets, hauteur, points };
+}
+
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
 
 /** Commandes ESC/POS d'un reçu. Une simple ouverture de tiroir ne consomme ni papier ni coupe. */
-export function versEscPos(r: Recu, o: { sansAccents: boolean }): Uint8Array {
+export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoRaster | null }): Uint8Array {
   const out: number[] = [ESC, 0x40];
   if (!o.sansAccents) out.push(ESC, 0x74, 19);
   const style = (gras: boolean, grand: boolean) => out.push(ESC, 0x45, gras ? 1 : 0, GS, 0x21, grand ? 0x11 : 0x00);
@@ -65,6 +90,14 @@ export function versEscPos(r: Recu, o: { sansAccents: boolean }): Uint8Array {
   for (const e of r.elements) {
     switch (e.type) {
       case "texte": {
+        if (e.enseigne && o.logo) {
+          // Logo centré à la place de l'enseigne (GS v 0, densité normale).
+          const { largeurOctets: l, hauteur: h, points } = o.logo;
+          out.push(ESC, 0x61, 1, GS, 0x76, 0x30, 0, l & 0xff, l >> 8, h & 0xff, h >> 8);
+          for (const b of points) out.push(b);
+          out.push(LF, ESC, 0x61, 0);
+          break;
+        }
         out.push(ESC, 0x61, e.align === "centre" ? 1 : e.align === "droite" ? 2 : 0);
         style(e.gras, e.grand);
         ligne(e.texte);

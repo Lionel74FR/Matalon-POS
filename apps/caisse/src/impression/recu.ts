@@ -3,7 +3,15 @@
  * Epson (ePOS-Print XML) et à l'aperçu à l'écran.
  */
 export type ElementRecu =
-  | { type: "texte"; texte: string; align: "gauche" | "centre" | "droite"; gras: boolean; grand: boolean }
+  | {
+      type: "texte";
+      texte: string;
+      align: "gauche" | "centre" | "droite";
+      gras: boolean;
+      grand: boolean;
+      /** Enseigne en tête du ticket : remplacée par le logo de l'établissement sur l'imprimante série. */
+      enseigne?: boolean;
+    }
   | { type: "colonnes"; gauche: string; droite: string; gras: boolean; grand: boolean }
   | { type: "filet" }
   | { type: "saut"; lignes: number }
@@ -15,8 +23,8 @@ export const LARGEUR = 48;
 export class Recu {
   readonly elements: ElementRecu[] = [];
 
-  texte(texte: string, o: { align?: "gauche" | "centre" | "droite"; gras?: boolean; grand?: boolean } = {}): this {
-    this.elements.push({ type: "texte", texte, align: o.align ?? "gauche", gras: o.gras ?? false, grand: o.grand ?? false });
+  texte(texte: string, o: { align?: "gauche" | "centre" | "droite"; gras?: boolean; grand?: boolean; enseigne?: boolean } = {}): this {
+    this.elements.push({ type: "texte", texte, align: o.align ?? "gauche", gras: o.gras ?? false, grand: o.grand ?? false, ...(o.enseigne ? { enseigne: true } : {}) });
     return this;
   }
 

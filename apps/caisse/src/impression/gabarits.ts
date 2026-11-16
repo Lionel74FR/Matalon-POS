@@ -35,7 +35,7 @@ export const nomUtilisateur = (config: Configuration, id: string | null) =>
 function entete(r: Recu, config: Configuration): void {
   const e = config.etablissement;
   if (MODE_TEST) r.texte("CAISSE DE TEST - SANS VALEUR", { align: "centre", gras: true }).filet();
-  r.texte(e.enseigne, { align: "centre", gras: true, grand: true }).saut();
+  r.texte(e.enseigne, { align: "centre", gras: true, grand: true, enseigne: true }).saut();
   for (const l of [e.raisonSociale, e.adresse, e.codePostalVille, e.telephone && `Tél. ${e.telephone}`]) {
     if (l) r.texte(l, { align: "centre" });
   }

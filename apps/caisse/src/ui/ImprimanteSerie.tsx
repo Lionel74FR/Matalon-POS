@@ -2,6 +2,7 @@ import { Cable, Printer, Unplug, Vault } from "lucide-react";
 import { useEffect, useState } from "react";
 import { gabaritTest } from "../impression/gabarits";
 import { Recu } from "../impression/recu";
+import { logoSerie } from "../impression/logo-serie";
 import { BAUDS_PAR_DEFAUT, choisirPort, envoyerSerie, portsAutorises, serieDisponible } from "../impression/serie";
 import { useCaisse } from "./contexte";
 import { AvecIcone } from "./icones";
@@ -72,7 +73,7 @@ export function ImprimanteSerie() {
             )}
           </p>
           <div className="options">
-            <button className="bouton" disabled={enCours} onClick={() => void agir(() => envoyerSerie(gabaritTest(config), s), "Essai envoyé à l'imprimante série.")}>
+            <button className="bouton" disabled={enCours} onClick={() => void agir(async () => envoyerSerie(gabaritTest(config), { ...s, logo: await logoSerie(config) }), "Essai envoyé à l'imprimante série.")}>
               <AvecIcone icone={Printer}>Imprimer un essai</AvecIcone>
             </button>
             <button className="bouton" disabled={enCours} onClick={() => void agir(() => envoyerSerie(new Recu().ouvrirTiroir(), s), "Ouverture du tiroir envoyée.")}>

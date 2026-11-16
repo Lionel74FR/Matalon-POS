@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { encoderPc858, versEscPos } from "../src/impression/escpos";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { encoderPc858, rasterDepuisRgba, versEscPos } from "../src/impression/escpos";
 import { Recu } from "../src/impression/recu";
-import { envoyerSerie, serieDisponible } from "../src/impression/serie";
+import { delaiVidange, envoyerSerie, serieDisponible } from "../src/impression/serie";
 
 // Impression série des caisses du Chardon (15 novembre 2026) : Oxhoo TP85, RS232, ESC/POS PC858.
 const octets = (...n: number[]) => Uint8Array.from(n);
@@ -28,6 +28,30 @@ describe("commandes ESC/POS", () => {
   it("sans accents : pas de page de codes ; ouverture du tiroir seule : ni papier ni coupe", () => {
     expect([...versEscPos(new Recu().texte("é"), { sansAccents: true }).slice(0, 4)]).toEqual([0x1b, 0x40, 0x1b, 0x61]);
     expect([...versEscPos(new Recu().ouvrirTiroir(), { sansAccents: false })]).toEqual([0x1b, 0x40, 0x1b, 0x74, 19, 0x1b, 0x70, 0, 25, 250]);
+  });
+});
+
+describe("logo en tête du ticket série", () => {
+  it("passe l'image en points noirs : sombre et opaque = noir, transparent ou clair = blanc", () => {
+    // 10 × 2 pixels : ligne 1 noire opaque, ligne 2 noire transparente sauf le dernier pixel, gris clair au milieu.
+    const rgba: number[] = [];
+    for (let x = 0; x < 10; x++) rgba.push(0, 0, 0, 255);
+    for (let x = 0; x < 10; x++) rgba.push(...(x === 9 ? [0, 0, 0, 255] : x === 4 ? [200, 200, 200, 255] : [0, 0, 0, 0]));
+    const r = rasterDepuisRgba(rgba, 10, 2);
+    expect([r.largeurOctets, r.hauteur]).toEqual([2, 2]);
+    expect([...r.points]).toEqual([0xff, 0xc0, 0x00, 0x40]);
+  });
+
+  it("remplace l'enseigne par le logo (GS v 0 centré), garde le texte sans logo ou ailleurs qu'en tête", () => {
+    const recu = new Recu().texte("Au Chardon", { align: "centre", gras: true, grand: true, enseigne: true }).texte("Merci", { align: "centre", grand: true });
+    const logo = { largeurOctets: 2, hauteur: 1, points: Uint8Array.from([0xaa, 0x55]) };
+    const avec = [...versEscPos(recu, { sansAccents: false, logo })];
+    const debut = avec.indexOf(0x76) - 1;
+    expect(avec.slice(debut - 3, debut + 10)).toEqual([0x1b, 0x61, 1, 0x1d, 0x76, 0x30, 0, 2, 0, 1, 0, 0xaa, 0x55]);
+    const texte = (o: number[]) => String.fromCharCode(...o.filter((b) => b >= 0x20 && b < 0x7f));
+    expect(texte(avec)).not.toContain("Au Chardon");
+    expect(texte(avec)).toContain("Merci");
+    expect(texte([...versEscPos(recu, { sansAccents: false })])).toContain("Au Chardon");
   });
 });
 
@@ -67,6 +91,27 @@ describe("pilote Web Serial", () => {
       expect.stringMatching(/^COM2 write \d+$/),
       "COM2 close",
     ]);
+  });
+
+  it("attend que tout soit sorti sur la ligne avant de refermer le port (ticket tronqué au total, 16 novembre)", async () => {
+    expect(delaiVidange(2000, 9600)).toBe(2584); // 2 000 octets à 9 600 bauds : 2,08 s + 0,5 s de marge
+    expect(delaiVidange(10, 115200)).toBe(501);
+    installer([port("COM2")]);
+    vi.useFakeTimers();
+    try {
+      const recu = new Recu();
+      for (let i = 0; i < 40; i++) recu.colonnes(`Article ${i}`, "12,50 €");
+      const fin = envoyerSerie(recu.colonnes("TOTAL", "500,00 €", { grand: true }), { rang: 0, bauds: 9600, sansAccents: false });
+      await vi.advanceTimersByTimeAsync(0);
+      const ecrits = Number(journal.find((l) => l.startsWith("COM2 write"))!.split(" ")[2]);
+      await vi.advanceTimersByTimeAsync(delaiVidange(ecrits, 9600) - 10);
+      expect(journal).not.toContain("COM2 close");
+      await vi.advanceTimersByTimeAsync(20);
+      await fin;
+      expect(journal.at(-1)).toBe("COM2 close");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("utilise le port gardé parmi plusieurs autorisés, et dit quand le port est occupé ou absent", async () => {

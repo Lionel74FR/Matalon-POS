@@ -1,5 +1,5 @@
 import { ErreurImpression } from "./epson";
-import { versEscPos } from "./escpos";
+import { versEscPos, type LogoRaster } from "./escpos";
 import type { Recu } from "./recu";
 
 /**
@@ -52,6 +52,15 @@ export async function choisirPort(): Promise<number> {
   return rang < 0 ? ports.length - 1 : rang;
 }
 
+/**
+ * Temps d'émission des octets sur la ligne série (10 bits par octet en 8N1), plus une marge, avant de refermer
+ * le port : Chrome sous Windows abandonne ce qui n'est pas encore sorti à la fermeture (essai du 16 novembre
+ * 2026 sur la dalle du Chardon : ticket tronqué au total).
+ */
+export function delaiVidange(nbOctets: number, bauds: number): number {
+  return Math.ceil((nbOctets * 10 * 1000) / bauds) + 500;
+}
+
 /** File des impressions : le port ne s'ouvre qu'une fois à la fois. */
 let file: Promise<unknown> = Promise.resolve();
 
@@ -84,6 +93,7 @@ async function ecrire(octets: Uint8Array, o: { rang: number; bauds?: number }): 
     try {
       await writer.write(octets);
       await writer.close();
+      await new Promise((fin) => setTimeout(fin, delaiVidange(octets.length, o.bauds ?? BAUDS_PAR_DEFAUT)));
     } finally {
       writer.releaseLock();
     }
@@ -95,6 +105,6 @@ async function ecrire(octets: Uint8Array, o: { rang: number; bauds?: number }): 
 }
 
 /** Imprime un reçu sur l'imprimante série (commandes ESC/POS, page PC858). */
-export function envoyerSerie(r: Recu, o: { rang: number; bauds?: number; sansAccents: boolean }): Promise<void> {
-  return envoyerOctets(versEscPos(r, { sansAccents: o.sansAccents }), o);
+export function envoyerSerie(r: Recu, o: { rang: number; bauds?: number; sansAccents: boolean; logo?: LogoRaster | null }): Promise<void> {
+  return envoyerOctets(versEscPos(r, { sansAccents: o.sansAccents, logo: o.logo ?? null }), o);
 }
