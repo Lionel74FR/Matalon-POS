@@ -1,6 +1,7 @@
 import { erreurImprimantes, nouvelIdImprimante, type BranchementImprimante, type ImprimanteEtablissement } from "@matalon/serveur/partage";
 import { Plus, Printer, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { URL_SCRIPT_RESEAU } from "../impression/reseau";
 import { AvecIcone, BoutonIcone } from "./icones";
 
 /**
@@ -112,6 +113,11 @@ export function EditeurImprimantes(props: {
                         inputMode="decimal"
                         onChange={(e) => maj(i.id, { branchement: { ...b, adresse: e.target.value } })}
                       />
+                    )}
+                    {b.type === "reseau" && (
+                      <a className="lien-script" href={URL_SCRIPT_RESEAU} download title="Script à lancer sur la dalle (clic droit › Exécuter avec PowerShell)">
+                        Script de la dalle
+                      </a>
                     )}
                     {b.type !== "epson" && (
                       <select aria-label={`Dalle de ${i.nom}`} value={b.dalleId} onChange={(e) => maj(i.id, { branchement: { ...b, dalleId: e.target.value } })}>

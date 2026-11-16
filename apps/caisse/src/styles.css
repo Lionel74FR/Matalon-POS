@@ -3759,3 +3759,8 @@ a.bouton {
 .imprimante-portee + .imprimante-portee {
   margin-top: 8px;
 }
+.imprimantes-etablissement .lien-script {
+  align-self: center;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}

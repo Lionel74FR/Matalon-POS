@@ -90,7 +90,7 @@ await declarerImprimantes(p, [{ nom: "Oxhoo bar", type: "serie", dalle: "Dalle 1
 const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
 await bloc.getByRole("button", { name: "Choisir le port" }).click();
 await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();
-r.etat = await texte(bloc.locator(".sous-titre-reglages"));
+r.etat = await texte(bloc.locator(".sous-titre-reglages").first());
 await choisirImprimantes(p, "Oxhoo bar");
 r.bandeauParti = await p.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).waitFor({ state: "detached", timeout: 3000 }).then(() => true, () => false);
 await bloc.getByRole("button", { name: "Imprimer un essai" }).click();

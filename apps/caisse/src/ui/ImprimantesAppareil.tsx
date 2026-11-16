@@ -228,6 +228,33 @@ export function ImprimantesPortees() {
           </div>
         );
       })}
+      {!portees.some((i) => i.branchement.type === "reseau") && (
+        <div className="imprimante-portee">
+          <h3 className="sous-titre-reglages">Script d'impression réseau</h3>
+          <p className="aide-champ">
+            Pour une imprimante réseau envoyée par cet ordinateur (Oxhoo de la salle) : téléchargez le script, puis dans Windows clic droit ›
+            « Exécuter avec PowerShell ». Déclarez ensuite l'imprimante dans la liste (« Réseau par une dalle », « {config.caisseNom} »).
+          </p>
+          <div className="options">
+            <a className="bouton" href={URL_SCRIPT_RESEAU} download>
+              <AvecIcone icone={Download}>Télécharger le script</AvecIcone>
+            </a>
+            <button
+              className="bouton"
+              disabled={enCours}
+              onClick={() =>
+                void agir(async () => {
+                  if ((await etatScriptReseau()) === null) {
+                    throw new Error("Le script ne répond pas sur cet ordinateur : installez-le, ou autorisez Chrome à accéder au réseau local.");
+                  }
+                }, "Script lancé sur cet ordinateur.")
+              }
+            >
+              <AvecIcone icone={RefreshCw}>Vérifier le script</AvecIcone>
+            </button>
+          </div>
+        </div>
+      )}
       {message && <p className={message.erreur ? "erreur" : "succes"} role="status">{message.texte}</p>}
     </fieldset>
   );
