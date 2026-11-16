@@ -84,6 +84,29 @@ export function rasterDepuisRgba(rgba: ArrayLike<number>, largeur: number, haute
   return { largeurOctets, hauteur, points };
 }
 
+/**
+ * Enregistre le logo dans la mémoire de l'imprimante (FS q, image n° 1), pour qu'un ticket n'envoie plus
+ * que FS p (16 novembre 2026 : à 9 600 bauds, le logo ralentissait chaque ticket de 3 secondes). Format
+ * en colonnes : pour chaque colonne de points, de haut en bas, 8 points par octet, bit fort en haut ;
+ * hauteur complétée à un multiple de 8.
+ */
+export function definirLogoMemoire(logo: LogoRaster): Uint8Array {
+  const x = logo.largeurOctets;
+  const y = Math.ceil(logo.hauteur / 8);
+  const out: number[] = [0x1b, 0x40, 0x1c, 0x71, 1, x & 0xff, x >> 8, y & 0xff, y >> 8];
+  for (let col = 0; col < x * 8; col++) {
+    for (let bloc = 0; bloc < y; bloc++) {
+      let octet = 0;
+      for (let b = 0; b < 8; b++) {
+        const ligne = bloc * 8 + b;
+        if (ligne < logo.hauteur && logo.points[ligne * x + (col >> 3)]! & (0x80 >> (col & 7))) octet |= 0x80 >> b;
+      }
+      out.push(octet);
+    }
+  }
+  return Uint8Array.from(out);
+}
+
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
@@ -91,7 +114,10 @@ const LF = 0x0a;
 export const LIGNES_AVANT_COUPE = 8;
 
 /** Commandes ESC/POS d'un reçu. Une simple ouverture de tiroir ne consomme ni papier ni coupe. */
-export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoRaster | null }): Uint8Array {
+/** Logo du ticket : l'image à envoyer, « memoire » s'il est enregistré dans l'imprimante, null : aucun. */
+export type LogoTicket = LogoRaster | "memoire" | null;
+
+export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket }): Uint8Array {
   const out: number[] = [ESC, 0x40];
   if (!o.sansAccents) out.push(ESC, 0x74, 19);
   const style = (gras: boolean, grand: boolean) => out.push(ESC, 0x45, gras ? 1 : 0, GS, 0x21, grand ? 0x11 : 0x00);
@@ -99,7 +125,12 @@ export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoRaster
   for (const e of r.elements) {
     switch (e.type) {
       case "texte": {
-        if (e.enseigne && o.logo) {
+        if (e.enseigne && o.logo === "memoire") {
+          // Logo enregistré dans l'imprimante (FS p 1 0), centré.
+          out.push(ESC, 0x61, 1, 0x1c, 0x70, 1, 0, LF, ESC, 0x61, 0);
+          break;
+        }
+        if (e.enseigne && o.logo && o.logo !== "memoire") {
           // Logo centré à la place de l'enseigne (GS v 0, densité normale).
           const { largeurOctets: l, hauteur: h, points } = o.logo;
           out.push(ESC, 0x61, 1, GS, 0x76, 0x30, 0, l & 0xff, l >> 8, h & 0xff, h >> 8);

@@ -1,5 +1,5 @@
 import type { Configuration } from "../donnees/configuration";
-import { rasterDepuisRgba, type LogoRaster } from "./escpos";
+import { rasterDepuisRgba, type LogoRaster, type LogoTicket } from "./escpos";
 
 /**
  * Logo de l'établissement pour l'imprimante série (16 novembre 2026, demande de Lionel : le logo en tête
@@ -18,6 +18,22 @@ let cache: { cle: string; raster: LogoRaster } | null = null;
 
 const enBase64 = (o: Uint8Array) => btoa(Array.from(o, (b) => String.fromCharCode(b)).join(""));
 const depuisBase64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+/** Identifie un logo (établissement et version) ; null : pas de logo. */
+export function cleLogo(config: Pick<Configuration, "etablissementId" | "logo">): string | null {
+  return config.logo ? `${config.etablissementId}:${config.logo}` : null;
+}
+
+/**
+ * Logo d'un ticket série : « memoire » si ce logo-là est enregistré dans l'imprimante (envoi instantané),
+ * sinon l'image à envoyer avec le ticket.
+ */
+export async function logoTicketSerie(config: Pick<Configuration, "etablissementId" | "logo" | "imprimanteSerie">): Promise<LogoTicket> {
+  const cle = cleLogo(config);
+  if (!cle) return null;
+  if (config.imprimanteSerie?.logoMemoire === cle) return "memoire";
+  return logoSerie(config);
+}
 
 /** Logo prêt à imprimer, ou null (pas de logo, ou illisible : l'enseigne s'imprime en texte). */
 export async function logoSerie(config: Pick<Configuration, "etablissementId" | "logo">): Promise<LogoRaster | null> {

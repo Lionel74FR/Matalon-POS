@@ -1,9 +1,10 @@
-import { Cable, Printer, Unplug, Vault } from "lucide-react";
+import { Cable, Image, Printer, Unplug, Vault } from "lucide-react";
 import { useEffect, useState } from "react";
 import { gabaritTest } from "../impression/gabarits";
 import { Recu } from "../impression/recu";
-import { logoSerie } from "../impression/logo-serie";
-import { BAUDS_PAR_DEFAUT, choisirPort, envoyerSerie, portsAutorises, serieDisponible } from "../impression/serie";
+import { definirLogoMemoire } from "../impression/escpos";
+import { cleLogo, logoSerie, logoTicketSerie } from "../impression/logo-serie";
+import { BAUDS_PAR_DEFAUT, choisirPort, envoyerOctets, envoyerSerie, portsAutorises, serieDisponible } from "../impression/serie";
 import { useCaisse } from "./contexte";
 import { AvecIcone } from "./icones";
 
@@ -47,6 +48,19 @@ export function ImprimanteSerie() {
       notifier("Imprimante série choisie pour les tickets de cet appareil.");
     }, "Port choisi : imprimez un essai pour vérifier.");
 
+  const cle = cleLogo(config);
+  const enMemoire = !!cle && s?.logoMemoire === cle;
+  const enregistrerLogo = () =>
+    agir(async () => {
+      if (!s || !cle) return;
+      const logo = await logoSerie(config);
+      if (!logo) throw new Error("Logo illisible : vérifiez la connexion, puis réessayez.");
+      await envoyerOctets(definirLogoMemoire(logo), s);
+      const suite = { ...config, imprimanteSerie: { ...s, logoMemoire: cle } };
+      await majConfig(suite);
+      await envoyerSerie(gabaritTest(suite), { ...s, logo: "memoire" });
+    }, "Logo enregistré dans l'imprimante : l'essai doit sortir avec le logo. Sinon, touchez « Envoyer le logo avec chaque ticket ».");
+
   return (
     <fieldset>
       <legend>Imprimante série (port COM)</legend>
@@ -63,6 +77,7 @@ export function ImprimanteSerie() {
         <>
           <p className="explication imprimante-serie-etat">
             Tickets de cet appareil sur l'imprimante série · {s.bauds} bauds · {s.sansAccents ? "sans accents" : "accents et euro (PC858)"}
+            {cle && (enMemoire ? " · logo enregistré dans l'imprimante" : " · logo envoyé avec chaque ticket (environ 3 secondes)")}
             {ports !== null && ports !== 1 && (
               <>
                 <br />
@@ -73,12 +88,31 @@ export function ImprimanteSerie() {
             )}
           </p>
           <div className="options">
-            <button className="bouton" disabled={enCours} onClick={() => void agir(async () => envoyerSerie(gabaritTest(config), { ...s, logo: await logoSerie(config) }), "Essai envoyé à l'imprimante série.")}>
+            <button className="bouton" disabled={enCours} onClick={() => void agir(async () => envoyerSerie(gabaritTest(config), { ...s, logo: await logoTicketSerie(config) }), "Essai envoyé à l'imprimante série.")}>
               <AvecIcone icone={Printer}>Imprimer un essai</AvecIcone>
             </button>
             <button className="bouton" disabled={enCours} onClick={() => void agir(() => envoyerSerie(new Recu().ouvrirTiroir(), s), "Ouverture du tiroir envoyée.")}>
               <AvecIcone icone={Vault}>Ouvrir le tiroir</AvecIcone>
             </button>
+            {cle && !enMemoire && (
+              <button className="bouton" disabled={enCours} onClick={() => void enregistrerLogo()}>
+                <AvecIcone icone={Image}>Enregistrer le logo dans l'imprimante</AvecIcone>
+              </button>
+            )}
+            {enMemoire && (
+              <button
+                className="bouton"
+                disabled={enCours}
+                onClick={() =>
+                  void agir(async () => {
+                    const { logoMemoire: _, ...reste } = s;
+                    await majConfig({ ...config, imprimanteSerie: reste });
+                  }, "Le logo partira de nouveau avec chaque ticket (plus lent).")
+                }
+              >
+                <AvecIcone icone={Image}>Envoyer le logo avec chaque ticket</AvecIcone>
+              </button>
+            )}
             <button className="bouton" disabled={enCours} onClick={() => void choisir()}>
               <AvecIcone icone={Cable}>Changer de port</AvecIcone>
             </button>

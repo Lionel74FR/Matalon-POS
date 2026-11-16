@@ -50,7 +50,13 @@ export interface Configuration {
    * Chardon sous Chrome) : prioritaire sur l'imprimante Epson pour les tickets de cet appareil, jamais
    * partagée. `rang` : place du port parmi ceux autorisés dans Chrome. Absente : rien ne change.
    */
-  imprimanteSerie?: { rang: number; bauds: number; sansAccents: boolean };
+  imprimanteSerie?: {
+    rang: number;
+    bauds: number;
+    sansAccents: boolean;
+    /** Logo enregistré dans l'imprimante (clé de `cleLogo`) : les tickets ne l'envoient plus. */
+    logoMemoire?: string;
+  };
   /** Version du logo de l'établissement (en tête du ticket sur l'imprimante série) ; null : aucun. */
   logo?: string | null;
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */

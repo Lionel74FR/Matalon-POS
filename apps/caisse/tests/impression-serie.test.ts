@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { encoderPc858, rasterDepuisRgba, versEscPos } from "../src/impression/escpos";
+import { definirLogoMemoire, encoderPc858, rasterDepuisRgba, versEscPos } from "../src/impression/escpos";
 import { Recu } from "../src/impression/recu";
 import { delaiVidange, envoyerSerie, serieDisponible } from "../src/impression/serie";
 
@@ -49,6 +49,25 @@ describe("logo en tête du ticket série", () => {
     expect([...r.points]).toEqual([0x80]);
     // Image toute blanche : rien à imprimer.
     expect([...rasterDepuisRgba([255, 255, 255, 255], 1, 1).points]).toEqual([0]);
+  });
+
+  it("enregistre le logo dans l'imprimante (FS q, colonnes) puis l'imprime par FS p sans renvoyer l'image", () => {
+    // 16 × 2 points : ligne 0 = 0x80 0x01 (premier et dernier point), ligne 1 = 0x80 0x00.
+    const logo = { largeurOctets: 2, hauteur: 2, points: Uint8Array.from([0x80, 0x01, 0x80, 0x00]) };
+    const nv = [...definirLogoMemoire(logo)];
+    expect(nv.slice(0, 9)).toEqual([0x1b, 0x40, 0x1c, 0x71, 1, 2, 0, 1, 0]);
+    // 16 colonnes d'un octet : colonne 0 = points des lignes 0 et 1, colonne 15 = point de la ligne 0.
+    const donnees = nv.slice(9);
+    expect(donnees).toHaveLength(16);
+    expect(donnees[0]).toBe(0xc0);
+    expect(donnees[15]).toBe(0x80);
+    expect(donnees.slice(1, 15).every((o) => o === 0)).toBe(true);
+
+    const recu = new Recu().texte("Au Chardon", { align: "centre", gras: true, grand: true, enseigne: true }).texte("Merci");
+    const b = [...versEscPos(recu, { sansAccents: false, logo: "memoire" })];
+    const i = b.indexOf(0x1c);
+    expect(b.slice(i - 3, i + 4)).toEqual([0x1b, 0x61, 1, 0x1c, 0x70, 1, 0]);
+    expect(b.length).toBeLessThan(60);
   });
 
   it("remplace l'enseigne par le logo (GS v 0 centré), garde le texte sans logo ou ailleurs qu'en tête", () => {

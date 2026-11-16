@@ -16,7 +16,7 @@ import {
   type Caisse,
 } from "../fiscal/caisse";
 import { envoyerEpson } from "../impression/epson";
-import { logoSerie } from "../impression/logo-serie";
+import { logoTicketSerie } from "../impression/logo-serie";
 import { envoyerSerie } from "../impression/serie";
 import type { Recu } from "../impression/recu";
 import { AssistantImprimante } from "./AssistantImprimante";
@@ -215,7 +215,7 @@ export function App() {
         const imprimante = sortieTickets(caisse.config);
         if (!imprimante) return setApercu({ recu, titre });
         try {
-          if (imprimante.connexion === "serie") await envoyerSerie(recu, { ...imprimante, logo: await logoSerie(caisse.config) });
+          if (imprimante.connexion === "serie") await envoyerSerie(recu, { ...imprimante, logo: await logoTicketSerie(caisse.config) });
           else await envoyerEpson(imprimante.adresse, recu, { sansAccents: imprimante.sansAccents });
         } catch (e) {
           setApercu({ recu, titre, erreur: e instanceof Error ? e.message : String(e) });

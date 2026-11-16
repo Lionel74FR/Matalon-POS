@@ -1,5 +1,5 @@
 import { ErreurImpression } from "./epson";
-import { versEscPos, type LogoRaster } from "./escpos";
+import { versEscPos, type LogoTicket } from "./escpos";
 import type { Recu } from "./recu";
 
 /**
@@ -105,6 +105,6 @@ async function ecrire(octets: Uint8Array, o: { rang: number; bauds?: number }): 
 }
 
 /** Imprime un reçu sur l'imprimante série (commandes ESC/POS, page PC858). */
-export function envoyerSerie(r: Recu, o: { rang: number; bauds?: number; sansAccents: boolean; logo?: LogoRaster | null }): Promise<void> {
+export function envoyerSerie(r: Recu, o: { rang: number; bauds?: number; sansAccents: boolean; logo?: LogoTicket }): Promise<void> {
   return envoyerOctets(versEscPos(r, { sansAccents: o.sansAccents, logo: o.logo ?? null }), o);
 }
