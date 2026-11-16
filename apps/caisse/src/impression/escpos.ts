@@ -60,18 +60,25 @@ export interface LogoRaster {
 }
 
 /**
- * Image RGBA (canvas) en points noirs : un pixel est noir s'il est sombre une fois posé sur du papier
- * blanc (la transparence compte comme du blanc).
+ * Image RGBA (canvas) en points noirs. Chaque pixel est posé sur du papier blanc (la transparence compte
+ * comme du blanc) ; le seuil est à mi-chemin entre le pixel le plus foncé et le blanc, pour qu'un logo
+ * de couleur claire (le doré du Chardon, 16 novembre) s'imprime aussi bien qu'un logo noir.
  */
 export function rasterDepuisRgba(rgba: ArrayLike<number>, largeur: number, hauteur: number): LogoRaster {
   const largeurOctets = Math.ceil(largeur / 8);
   const points = new Uint8Array(largeurOctets * hauteur);
+  const lum = new Float32Array(largeur * hauteur);
+  let min = 255;
+  for (let p = 0; p < lum.length; p++) {
+    const alpha = rgba[p * 4 + 3]! / 255;
+    lum[p] = alpha * (0.299 * rgba[p * 4]! + 0.587 * rgba[p * 4 + 1]! + 0.114 * rgba[p * 4 + 2]!) + (1 - alpha) * 255;
+    if (lum[p]! < min) min = lum[p]!;
+  }
+  if (min > 245) return { largeurOctets, hauteur, points };
+  const seuil = (min + 255) / 2;
   for (let y = 0; y < hauteur; y++) {
     for (let x = 0; x < largeur; x++) {
-      const i = (y * largeur + x) * 4;
-      const alpha = rgba[i + 3]! / 255;
-      const lum = alpha * (0.299 * rgba[i]! + 0.587 * rgba[i + 1]! + 0.114 * rgba[i + 2]!) + (1 - alpha) * 255;
-      if (lum < 128) points[y * largeurOctets + (x >> 3)]! |= 0x80 >> (x & 7);
+      if (lum[y * largeur + x]! < seuil) points[y * largeurOctets + (x >> 3)]! |= 0x80 >> (x & 7);
     }
   }
   return { largeurOctets, hauteur, points };

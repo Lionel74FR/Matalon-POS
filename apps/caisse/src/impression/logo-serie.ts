@@ -3,11 +3,15 @@ import { rasterDepuisRgba, type LogoRaster } from "./escpos";
 
 /**
  * Logo de l'établissement pour l'imprimante série (16 novembre 2026, demande de Lionel : le logo en tête
- * du ticket à la place du gros titre). Ramené à 256 × 96 points au plus : à 9 600 bauds, il ajoute
- * environ 3 secondes au ticket. Gardé en mémoire et sur l'appareil, par version, pour imprimer hors ligne.
+ * du ticket à la place du gros titre). Ramené à 288 × 160 points et 25 600 points au plus (un logo rond
+ * de 2 cm) : à 9 600 bauds, il ajoute environ 3 secondes au ticket. Gardé en mémoire et sur l'appareil,
+ * par version, pour imprimer hors ligne.
  */
-export const LOGO_LARGEUR_MAX = 256;
-export const LOGO_HAUTEUR_MAX = 96;
+export const LOGO_LARGEUR_MAX = 288;
+export const LOGO_HAUTEUR_MAX = 160;
+const LOGO_POINTS_MAX = 160 * 160;
+/** Format du logo gardé sur l'appareil : changé quand la conversion change, pour la refaire. */
+const FORMAT = 2;
 const CLE = "matalon-logo-serie";
 
 let cache: { cle: string; raster: LogoRaster } | null = null;
@@ -18,7 +22,7 @@ const depuisBase64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt
 /** Logo prêt à imprimer, ou null (pas de logo, ou illisible : l'enseigne s'imprime en texte). */
 export async function logoSerie(config: Pick<Configuration, "etablissementId" | "logo">): Promise<LogoRaster | null> {
   if (!config.logo) return null;
-  const cle = `${config.etablissementId}:${config.logo}`;
+  const cle = `${FORMAT}:${config.etablissementId}:${config.logo}`;
   if (cache?.cle === cle) return cache.raster;
   try {
     const lu = JSON.parse(localStorage.getItem(CLE) ?? "null") as { cle: string; l: number; h: number; d: string } | null;
@@ -33,7 +37,7 @@ export async function logoSerie(config: Pick<Configuration, "etablissementId" | 
     const reponse = await fetch(`/api/public/logo/${encodeURIComponent(config.etablissementId)}?v=${encodeURIComponent(config.logo)}`);
     if (!reponse.ok) return null;
     const image = await createImageBitmap(await reponse.blob());
-    const e = Math.min(1, LOGO_LARGEUR_MAX / image.width, LOGO_HAUTEUR_MAX / image.height);
+    const e = Math.min(1, LOGO_LARGEUR_MAX / image.width, LOGO_HAUTEUR_MAX / image.height, Math.sqrt(LOGO_POINTS_MAX / (image.width * image.height)));
     const largeur = Math.max(1, Math.round(image.width * e));
     const hauteur = Math.max(1, Math.round(image.height * e));
     const canvas = document.createElement("canvas");

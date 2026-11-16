@@ -43,6 +43,14 @@ describe("logo en tête du ticket série", () => {
     expect([...r.points]).toEqual([0xff, 0xc0, 0x00, 0x40]);
   });
 
+  it("imprime un logo de couleur claire sur fond transparent (le doré du Chardon)", () => {
+    // 3 pixels : doré opaque, doré à moitié transparent (bord adouci), transparent.
+    const r = rasterDepuisRgba([200, 160, 40, 255, 200, 160, 40, 64, 0, 0, 0, 0], 3, 1);
+    expect([...r.points]).toEqual([0x80]);
+    // Image toute blanche : rien à imprimer.
+    expect([...rasterDepuisRgba([255, 255, 255, 255], 1, 1).points]).toEqual([0]);
+  });
+
   it("remplace l'enseigne par le logo (GS v 0 centré), garde le texte sans logo ou ailleurs qu'en tête", () => {
     const recu = new Recu().texte("Au Chardon", { align: "centre", gras: true, grand: true, enseigne: true }).texte("Merci", { align: "centre", grand: true });
     const logo = { largeurOctets: 2, hauteur: 1, points: Uint8Array.from([0xaa, 0x55]) };
