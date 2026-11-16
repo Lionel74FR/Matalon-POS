@@ -30,7 +30,7 @@ async function appareil(nom, options, codeRattachement, bouton) {
   return { p, clic };
 }
 const table = (a, n) => a.p.getByRole("button", { name: new RegExp(`^Table ${n},`) });
-const ajouter = (a, article) => a.p.locator(".tuile", { hasText: article }).first().click();
+const ajouter = (a, article) => a.p.locator(".tuile", { has: a.p.locator(".tuile-nom", { hasText: new RegExp(`^${article}$`) }) }).first().click();
 const texte = async (loc) => ((await loc.textContent()) ?? "").replace(/\s+/g, " ").trim();
 const toast = async (a, motif) => {
   const t = a.p.locator(".toast", { hasText: motif }).first();

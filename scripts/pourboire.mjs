@@ -56,7 +56,7 @@ await clic("Terminé");
 
 // ── Un titre-restaurant ne donne jamais de rendu ──
 await clic("Vente Directe");
-await p.locator(".tuile", { hasText: "Espresso" }).first().click();
+await p.locator(".tuile", { has: p.locator(".tuile-nom", { hasText: /^Espresso$/ }) }).first().click();
 await clic("Encaisser");
 const totalEspresso = centimes(await texte(p.locator(".encaissement-etat .ligne-montant").first().locator("strong")));
 for (const x of String(totalEspresso + 100)) await p.locator(".encaissement-saisie .pave .touche", { hasText: new RegExp(`^${x}$`) }).first().click();

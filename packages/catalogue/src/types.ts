@@ -77,6 +77,8 @@ export interface Categorie {
    * sa catégorie) : ce ne sont que des tuiles de plus.
    */
   raccourcis?: string[];
+  /** Tuiles qui ouvrent d'autres catégories (dossiers de Domino : « Vin au verre », « Mojito »…), avant les articles. */
+  liens?: string[];
 }
 
 export interface Catalogue {

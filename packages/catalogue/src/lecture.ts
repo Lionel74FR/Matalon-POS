@@ -71,12 +71,16 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
     const raccourcis = optionnel(co.raccourcis, () =>
       liste(co.raccourcis, `${ouCat} : articles d'autres catégories`, LIMITES_CARTE.articlesParCategorie).map((r) => ident(r, `${ouCat} : article d'une autre catégorie`)),
     );
+    const liens = optionnel(co.liens, () =>
+      liste(co.liens, `${ouCat} : liens vers d'autres catégories`, LIMITES_CARTE.categories).map((r) => ident(r, `${ouCat} : lien vers une catégorie`)),
+    );
     return {
       id: ident(co.id, `${ouCat} : identifiant`),
       nom: nomCat,
       rayon: texte(co.rayon, `${ouCat} : rayon`, 40),
       ...(poste ? { poste } : {}),
       ...(raccourcis?.length ? { raccourcis } : {}),
+      ...(liens?.length ? { liens } : {}),
       articles: liste(co.articles, `${ouCat} : articles`, LIMITES_CARTE.articlesParCategorie).map((a, j): Article => {
         const ao = objet(a, `${ouCat}, article ${j + 1}`);
         const nom = texte(ao.nom, `${ouCat}, article ${j + 1} : nom`);

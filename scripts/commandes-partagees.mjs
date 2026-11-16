@@ -29,7 +29,7 @@ async function appareil(nom, options, codeRattachement, bouton) {
   return { p, clic };
 }
 const table = (a, n) => a.p.getByRole("button", { name: new RegExp(`^Table ${n},`) });
-const ajouter = (a, article) => a.p.locator(".tuile", { hasText: article }).first().click();
+const ajouter = (a, article) => a.p.locator(".tuile", { has: a.p.locator(".tuile-nom", { hasText: new RegExp(`^${article}$`) }) }).first().click();
 const lignes = async (a) => (await a.p.locator(".ticket-ligne").allTextContents()).map((t) => t.replace(/\s+/g, " ").trim());
 
 const ipad = await appareil("ipad", { viewport: { width: 1180, height: 820 }, hasTouch: true }, code, "Rattacher l'iPad");

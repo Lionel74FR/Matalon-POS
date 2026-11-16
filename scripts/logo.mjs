@@ -83,7 +83,7 @@ const image = await fetch(r.email);
 r.image = [image.status, image.headers.get("content-type")];
 
 // Retrait : le nom revient.
-await a.getByRole("button", { name: "Retirer" }).click();
+await a.getByRole("button", { name: "Retirer", exact: true }).click();
 await section.locator(".admin-ok", { hasText: "retiré" }).waitFor();
 await site.reload();
 await site.locator(".entete .nom-etab").waitFor();

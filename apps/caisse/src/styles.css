@@ -2036,6 +2036,23 @@ a.bouton {
   .grille-articles {
     grid-area: articles;
   }
+  /* Recherche : la loupe en tête de la colonne des rayons, le champ à la place des catégories. */
+  .barre-rayons {
+    grid-area: rayons;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .barre-rayons .rayons {
+    flex: 1;
+  }
+  .bouton-recherche-carte {
+    order: -1;
+    width: 100%;
+    min-height: 52px;
+  }
+  .recherche-carte {
+    grid-area: categories;
+  }
 }
 
 /* ───────── Téléphone (iPhone en portrait) ───────── */
@@ -3644,4 +3661,72 @@ a.bouton {
 .prix-libre .afficheur {
   width: min(100%, 272px);
   margin-bottom: 0;
+}
+
+/* Recherche d'un article dans toute la carte (16 novembre 2026). */
+.barre-rayons {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.barre-rayons .rayons {
+  flex: 1;
+  min-width: 0;
+}
+
+.bouton-recherche-carte {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+}
+
+.bouton-recherche-carte.actif {
+  color: var(--espresso);
+  background: var(--mousse);
+}
+
+.recherche-carte {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 14px;
+  min-height: 48px;
+  border-radius: var(--rayon-petit);
+  background: var(--espresso-2);
+  color: var(--sable);
+}
+
+.recherche-carte input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 1.05rem;
+  outline: none;
+}
+
+.recherche-vide {
+  grid-column: 1 / -1;
+  color: var(--sable);
+  opacity: 0.8;
+}
+
+/* Tuile qui ouvre une autre catégorie (dossier de Domino). */
+.tuile.tuile-lien {
+  background: transparent;
+  box-shadow: inset 0 0 0 3px var(--teinte);
+  color: #fff;
+}
+
+.tuile.tuile-lien .tuile-prix {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--police-texte);
+  font-size: 0.85rem;
 }
