@@ -68,11 +68,15 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
     const nomCat = texte(co.nom, `catégorie ${i + 1} : nom`);
     const ouCat = `catégorie « ${nomCat || i + 1} »`;
     const poste = optionnel(co.poste, () => texte(co.poste, `${ouCat} : poste de production`, 30));
+    const raccourcis = optionnel(co.raccourcis, () =>
+      liste(co.raccourcis, `${ouCat} : articles d'autres catégories`, LIMITES_CARTE.articlesParCategorie).map((r) => ident(r, `${ouCat} : article d'une autre catégorie`)),
+    );
     return {
       id: ident(co.id, `${ouCat} : identifiant`),
       nom: nomCat,
       rayon: texte(co.rayon, `${ouCat} : rayon`, 40),
       ...(poste ? { poste } : {}),
+      ...(raccourcis?.length ? { raccourcis } : {}),
       articles: liste(co.articles, `${ouCat} : articles`, LIMITES_CARTE.articlesParCategorie).map((a, j): Article => {
         const ao = objet(a, `${ouCat}, article ${j + 1}`);
         const nom = texte(ao.nom, `${ouCat}, article ${j + 1} : nom`);

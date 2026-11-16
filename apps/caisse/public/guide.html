@@ -444,6 +444,16 @@
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
   </section>
 
+  <section class="scenario" data-id="s7m">
+    <label><input type="checkbox">Un article dans plusieurs catégories</label>
+    <ol>
+      <li>Administration › Cartes et prix › <span class="bouton">Modifier</span> › catégorie « Cafés ». Sous « Aussi dans « Cafés » », choisissez « Spritz Aperol » dans « Ajouter un article d'une autre catégorie », puis <span class="bouton">Enregistrer</span>.</li>
+      <li>Sur l'iPad, ouvrez une table › Cafés, puis Bar › Spritz.</li>
+      <li>Touchez « Spritz Aperol » dans Cafés et envoyez la table.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> le Spritz apparaît à la suite des cafés et reste dans Spritz ; il s'ajoute au prix de la carte et son bon part au poste de sa catégorie (Spritz). Un changement de prix fait dans Spritz vaut aussi dans Cafés. Retirer le Spritz de la carte le retire de Cafés.</p>
+  </section>
+
   <section class="scenario" data-id="s7l">
     <label><input type="checkbox">Cartes propres à chaque établissement</label>
     <ol>

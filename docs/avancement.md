@@ -1,7 +1,7 @@
 # Avancement — Matalon POS
 
 À relire en début de session avec `docs/cahier-des-charges.md`, et à mettre à jour à chaque commit qui fait avancer un lot.
-Dernière mise à jour : 16 novembre 2026 (cartes propres à chaque établissement ; assistant de l'imprimante sous la barre d'état de l'iPhone ; 15 novembre : icône « TEST » de l'app de test ; article à prix libre, saisi en caisse ; mot de passe de l'administration ; clés d'accès valables sur test.matalon-pos.app ; serveur de test sur une copie de la production ; 14 novembre : la carte rouvre sur le rayon et la catégorie de la commande précédente ; 6 novembre : duplicata de la note en PDF ou par e-mail depuis l'administration ; 29 octobre : remise en euros sur un article ; transfert d'une partie des articles vers une autre table ; motifs de remise et d'offert).
+Dernière mise à jour : 16 novembre 2026 (article dans plusieurs catégories ; cartes propres à chaque établissement ; assistant de l'imprimante sous la barre d'état de l'iPhone ; 15 novembre : icône « TEST » de l'app de test ; article à prix libre, saisi en caisse ; mot de passe de l'administration ; clés d'accès valables sur test.matalon-pos.app ; serveur de test sur une copie de la production ; 14 novembre : la carte rouvre sur le rayon et la catégorie de la commande précédente ; 6 novembre : duplicata de la note en PDF ou par e-mail depuis l'administration ; 29 octobre : remise en euros sur un article ; transfert d'une partie des articles vers une autre table ; motifs de remise et d'offert).
 
 ## Règle de conduite
 
@@ -28,6 +28,7 @@ Dernière mise à jour : 16 novembre 2026 (cartes propres à chaque établisseme
 
 | Commit | Contenu |
 | --- | --- |
+| (ce commit) | Article dans plusieurs catégories (Lionel, 16 novembre : écran « Nuit » du Chardon) : `Categorie.raccourcis` (identifiants d'articles d'autres catégories, dans l'ordre) lu par `lireCatalogue`, contrôlé par `validerCatalogue` (article connu, pas déjà dans la catégorie, pas en double) ; `tuilesDeCategorie` (articles puis raccourcis, catégorie d'origine gardée) en caisse ; `nettoyerRaccourcis` après chaque modification de l'éditeur et à la fusion de catégories. Éditeur : bloc « Aussi dans … » (ajout par liste groupée par catégorie, ordre, retrait). Rien ne change pour les lignes, les bons (poste de la catégorie d'origine), les statistiques ni le noyau fiscal. Tests `raccourcis` (catalogue, 3) et scénario `raccourcis` (45 parcours) |
 | 5ebd86e | Cartes propres à chaque établissement (Lionel, 16 novembre : plusieurs cartes par établissement, aucune partagée, copie d'une carte d'un autre établissement) : colonne `cartes.etablissement_id` ; reprise `rattacherCartes` (au démarrage et après un import de configuration) : une carte partagée reste au premier établissement créé, chacun des autres reçoit sa copie qu'il met en service ; `POST /api/admin/cartes` exige `etablissementId` (copie de n'importe quelle carte) ; création d'un établissement : `carteId` = carte de départ copiée en `carte-<id>` (vide sinon) ; une carte d'un autre établissement est refusée en service (`CARTE_AUTRE_ETABLISSEMENT`, administration et appareils) ; le contenu porte toujours l'établissement de la carte. Administration : « Cartes et prix » de l'établissement (plus « Groupe ») avec « En service » / « Mettre en service », nouvelle carte, « Copier une carte d'un autre établissement » ; fiche : choix parmi ses cartes ; nouvel établissement : « Carte de départ » copiée. Tests serveur (+2) et scénario `cartes-etablissement` (44 parcours) |
 | c50810b | Mise en service sur iPhone (retour de Lionel du 16 novembre : l'imprimante semblait obligatoire) : l'assistant de l'imprimante ouvert après le rattachement passe dans le même calque que depuis les Réglages (`assistant-calque`, marge de la barre d'état) ; son en-tête, avec « Configurer plus tard », n'est plus caché sous l'heure et la batterie |
 | ec0087d | Icône de l'app de test (Lionel, 15 novembre) : le M et « TEST » en bordeaux sur blanc (`icone-test.svg`, PNG 180 plein cadre pour iOS, 192 et 512 arrondis), choisis à la construction quand le projet Vercel est matalon-pos-test (`VERCEL_URL` commençant par « matalon-pos-test- », domaine de production en « test. », ou `MATALON_TEST=1`) : pages (favicon, icône d'écran d'accueil) et manifeste de la PWA. La production garde ses icônes |
@@ -113,6 +114,7 @@ Dernière mise à jour : 16 novembre 2026 (cartes propres à chaque établisseme
 
 ## Décisions techniques à ne pas défaire
 
+- Raccourcis (16 novembre) : un article n'existe qu'une fois dans la carte ; une catégorie en reprend d'autres par identifiant (`raccourcis`). Ne pas dupliquer d'article pour le montrer ailleurs.
 - Cartes (16 novembre, décision de Lionel) : une carte appartient à un seul établissement (`cartes.etablissement_id`) ; un établissement n'a en service qu'une de ses cartes. Ne pas réintroduire de carte partagée : copier.
 - Prix libre (15 novembre) : un article à prix libre garde `prixTTC` à null et n'a ni variante, ni supplément, ni formule ; le prix saisi part tel quel dans la ligne (`prixUnitaireTTC`), le contrôle des prix vendus ne porte que sur son taux. Ne pas en faire un « prix à compléter » : ce dernier reste bloqué en caisse.
 - Duplicata depuis l'administration (6 novembre) : un seul compteur de duplicatas par ticket, appareils et administration confondus ; l'administration lit le numéro puis l'envoie, le serveur refuse un numéro déjà pris. La note est construite dans le navigateur de l'administration avec le même format que la caisse (`note/format`), à partir du ticket du serveur.
@@ -197,4 +199,4 @@ Dernière mise à jour : 16 novembre 2026 (cartes propres à chaque établisseme
 
 ## Tests
 
-`pnpm typecheck && pnpm test`, puis les 44 parcours de bout en bout du README (serveur local relancé à vide entre chaque).
+`pnpm typecheck && pnpm test`, puis les 45 parcours de bout en bout du README (serveur local relancé à vide entre chaque).

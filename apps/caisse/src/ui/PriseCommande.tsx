@@ -3,7 +3,7 @@ import { unite } from "@matalon/serveur/fidelite";
 import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
-import { articleVendable, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
+import { articleVendable, tuilesDeCategorie, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useEffect, useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
@@ -349,7 +349,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
           </div>
         )}
         <div className={`grille-articles teinte-${TEINTES[rayon] ?? "cafe"}`}>
-          {categorie.articles.map((a) => (
+          {tuilesDeCategorie(CARTE, categorie.id).map((a) => (
             <button
               key={a.id}
               className={`tuile${a.prixTTC == null && !a.prixLibre && !a.variantes?.some((v) => v.prixTTC != null) ? " incomplete" : ""}${!articleVendable(CARTE, a) ? " indisponible" : ""}`}

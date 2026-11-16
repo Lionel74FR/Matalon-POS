@@ -5,6 +5,7 @@ import {
   fusionnerCategories,
   identifiantDepuisNom,
   lireCatalogue,
+  nettoyerRaccourcis,
   tousLesArticles,
   validerCatalogue,
   type Article,
@@ -230,6 +231,70 @@ export function ListeCartes(props: {
   );
 }
 
+// ───────── Articles repris d'autres catégories ─────────
+
+/**
+ * Articles d'autres catégories proposés aussi dans celle-ci (16 novembre 2026, écran « Nuit » du Chardon) :
+ * des tuiles de plus, l'article restant défini dans sa catégorie (prix, TVA, fiche, poste).
+ */
+function RaccourcisCategorie(props: { carte: Catalogue; categorie: Categorie; onChange: (raccourcis: string[]) => void }) {
+  const { carte, categorie } = props;
+  const liste = categorie.raccourcis ?? [];
+  const parId = new Map(tousLesArticles(carte).map((a) => [a.id, a]));
+  const nomCategorie = (id: string) => carte.categories.find((c) => c.id === id)?.nom ?? id;
+  const proposables = carte.categories.filter((c) => c.id !== categorie.id && c.articles.some((a) => !liste.includes(a.id)));
+  return (
+    <div className="editeur-raccourcis">
+      <h3>Aussi dans « {categorie.nom} »</h3>
+      <p className="explication">
+        Articles d'autres catégories affichés à la suite dans cette catégorie, en caisse. Prix, TVA et fiche restent ceux de leur
+        catégorie : une modification vaut partout.
+      </p>
+      {liste.length > 0 && (
+        <table className="tableau admin-tableau editeur-table">
+          <tbody>
+            {liste.map((id, i) => {
+              const a = parId.get(id);
+              if (!a) return null;
+              return (
+                <tr key={id}>
+                  <td>
+                    {a.nom}
+                    <small>{nomCategorie(a.categorieId)}</small>
+                  </td>
+                  <td className="nombre">{a.prixLibre ? "libre" : euros(a.prixTTC)}</td>
+                  <td className="editeur-ordre">
+                    <BoutonIcone icone={ArrowUp} taille={18} variante="discret" libelle={`Monter ${a.nom} (repris)`} onClick={() => props.onChange(deplacer(liste, i, -1))} />
+                    <BoutonIcone icone={ArrowDown} taille={18} variante="discret" libelle={`Descendre ${a.nom} (repris)`} onClick={() => props.onChange(deplacer(liste, i, 1))} />
+                    <BoutonIcone icone={X} taille={18} variante="discret" libelle={`Retirer ${a.nom} de ${categorie.nom}`} onClick={() => props.onChange(liste.filter((x) => x !== id))} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <label className="champ">
+        <span>Ajouter un article d'une autre catégorie</span>
+        <select value="" onChange={(e) => e.target.value && props.onChange([...liste, e.target.value])}>
+          <option value="">Choisir un article…</option>
+          {proposables.map((c) => (
+            <optgroup key={c.id} label={`${c.rayon} › ${c.nom}`}>
+              {c.articles
+                .filter((a) => !liste.includes(a.id))
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nom}
+                  </option>
+                ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 // ───────── Éditeur ─────────
 
 /**
@@ -328,8 +393,9 @@ export function EditeurCarte(props: {
     return min === max ? pourcent(min) : `${pourcent(min)} – ${pourcent(max)}`;
   };
   const idsArticles = () => [...tousLesArticles(carte).map((a) => a.id), ...tousLesArticles(origine.carte).map((a) => a.id)];
+  // Un article supprimé ou revenu dans une catégorie qui le reprenait quitte aussi ses raccourcis.
   const majCategories = (f: (cats: Categorie[]) => Categorie[]) => {
-    setCarte({ ...carte, categories: f(carte.categories) });
+    setCarte(nettoyerRaccourcis({ ...carte, categories: f(carte.categories) }));
     setEtat("");
   };
   const majCategorie = (id: string, f: (c: Categorie) => Categorie) => majCategories((cats) => cats.map((c) => (c.id === id ? f(c) : c)));
@@ -789,6 +855,10 @@ export function EditeurCarte(props: {
                 </button>
               </form>
               {erreurAjout && <p className="erreur">{erreurAjout}</p>}
+              <RaccourcisCategorie carte={carte} categorie={categorie} onChange={(raccourcis) => majCategorie(categorie.id, (c) => {
+                const { raccourcis: _, ...reste } = c;
+                return raccourcis.length ? { ...reste, raccourcis } : reste;
+              })} />
             </>
           )}
         </section>
