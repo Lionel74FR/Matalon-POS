@@ -23,6 +23,13 @@ export const LARGEUR = 48;
 export class Recu {
   readonly elements: ElementRecu[] = [];
 
+  /** Reçu reconstitué à partir de ses éléments (reçu confié à une dalle relais). */
+  static depuis(elements: readonly ElementRecu[]): Recu {
+    const r = new Recu();
+    r.elements.push(...elements);
+    return r;
+  }
+
   texte(texte: string, o: { align?: "gauche" | "centre" | "droite"; gras?: boolean; grand?: boolean; enseigne?: boolean } = {}): this {
     this.elements.push({ type: "texte", texte, align: o.align ?? "gauche", gras: o.gras ?? false, grand: o.grand ?? false, ...(o.enseigne ? { enseigne: true } : {}) });
     return this;

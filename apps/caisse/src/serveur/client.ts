@@ -4,6 +4,9 @@ import type { Catalogue } from "@matalon/catalogue";
 import type { Recette } from "@matalon/stock";
 import type { LienFidelite, MembreFidelite, RecompenseFidelite, ReponseMembreCaisse, UtilisationFidelite } from "@matalon/serveur/fidelite";
 import type {
+  EtatImpressionRelayee,
+  ImpressionRelayee,
+  RelaisImpression,
   CommandePartagee,
   CommandeFournisseur,
   DocumentStock,
@@ -308,5 +311,35 @@ export class ClientApi {
 
   enregistrerEtablissement(corps: { identite: IdentiteEtablissement; seuilNote: number; noteAutomatique?: boolean }) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/etablissement", corps);
+  }
+
+  // ───────── Impression relayée par une dalle (backlog n° 5), en ligne ─────────
+
+  /** Dalles qui impriment pour les autres appareils de l'établissement. */
+  relais() {
+    return this.appel<{ relais: RelaisImpression[] }>("GET", "/api/caisse/relais");
+  }
+
+  /** Inscrit ou retire cet appareil (une dalle avec imprimante série) comme relais. */
+  inscrireRelais(actif: boolean) {
+    return this.appel<{ relais: RelaisImpression[] }>("PUT", "/api/caisse/relais", { actif });
+  }
+
+  /** Confie un reçu à une dalle relais ; 409 RELAIS_HORS_LIGNE si elle ne répond pas. */
+  deposerImpression(corps: { relaisId: string; titre: string; recu: unknown[] }) {
+    return this.appel<{ id: string }>("POST", "/api/caisse/impressions", corps);
+  }
+
+  etatImpression(id: string) {
+    return this.appel<{ etat: EtatImpressionRelayee; erreur?: string }>("GET", `/api/caisse/impressions/${encodeURIComponent(id)}`);
+  }
+
+  /** Relais : impressions à sortir (prises par cette dalle), et passage qui la tient pour en ligne. */
+  impressionsEnAttente() {
+    return this.appel<{ impressions: ImpressionRelayee[] }>("GET", "/api/caisse/impressions/attente");
+  }
+
+  compteRenduImpression(id: string, ok: boolean, erreur?: string) {
+    return this.appel<{ ok: true }>("POST", `/api/caisse/impressions/${encodeURIComponent(id)}/resultat`, ok ? { ok } : { ok, erreur });
   }
 }

@@ -142,6 +142,7 @@ import {
   modifierCommande,
   solderCommande,
 } from "./commandes-serveur.js";
+import { deposerImpression, etatImpression, inscrireRelais, listeRelais, prendreImpressions, rendreCompte } from "./relais.js";
 import { ajouterJours, calculerStatistiques, DATE_VALIDE, JOURS_MAX_STATISTIQUES, joursEntre, periodePrecedente } from "./statistiques.js";
 import {
   enregistrerReglages,
@@ -3526,6 +3527,33 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       return json(200, {
         etablissement: await majImprimanteTickets(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete), { adminId: null, caisseId: c.id }),
       });
+    }
+    if (chemin === "/api/caisse/relais" && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { relais: await listeRelais(env.db, c.etablissement_id, horloge(env)) });
+    }
+    if (chemin === "/api/caisse/relais" && m === "PUT") {
+      const c = await caisseAuthentifiee(env, requete);
+      await inscrireRelais(env.db, c, (await lireJson<Record<string, unknown>>(requete)).actif === true, horloge(env));
+      return json(200, { relais: await listeRelais(env.db, c.etablissement_id, horloge(env)) });
+    }
+    if (chemin === "/api/caisse/impressions" && m === "POST") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(201, await deposerImpression(env.db, c, await lireJson<Record<string, unknown>>(requete), horloge(env)));
+    }
+    if (chemin === "/api/caisse/impressions/attente" && m === "GET") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { impressions: await prendreImpressions(env.db, c, horloge(env)) });
+    }
+    const pimp = /^\/api\/caisse\/impressions\/([a-z0-9-]{1,20})(\/resultat)?$/.exec(chemin);
+    if (pimp && m === "GET" && !pimp[2]) {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, await etatImpression(env.db, c, pimp[1]!, horloge(env)));
+    }
+    if (pimp && m === "POST" && pimp[2]) {
+      const c = await caisseAuthentifiee(env, requete);
+      await rendreCompte(env.db, c, pimp[1]!, await lireJson<Record<string, unknown>>(requete), horloge(env));
+      return json(200, { ok: true });
     }
     if (chemin === "/api/caisse/postes" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);

@@ -15,7 +15,7 @@ import { AvecIcone } from "./icones";
  * navigateur n'a pas de port série (iPad, iPhone) : rien n'y change.
  */
 export function ImprimanteSerie() {
-  const { config, majConfig, notifier } = useCaisse();
+  const { caisse, config, majConfig, notifier } = useCaisse();
   const s = config.imprimanteSerie;
   const [ports, setPorts] = useState<number | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -123,12 +123,30 @@ export function ImprimanteSerie() {
                 void agir(async () => {
                   const { imprimanteSerie: _, ...reste } = config;
                   await majConfig(reste);
+                  if (s.relais) await caisse.client.inscrireRelais(false).catch(() => undefined);
                 }, "Les tickets de cet appareil repartent sur l'imprimante Epson.")
               }
             >
               <AvecIcone icone={Unplug}>Ne plus l'utiliser</AvecIcone>
             </button>
           </div>
+          <label className="case">
+            <input
+              type="checkbox"
+              checked={!!s.relais}
+              disabled={enCours}
+              onChange={(e) => {
+                const relais = e.target.checked;
+                void agir(async () => {
+                  // Le serveur d'abord : sans lui, les iPad ne verraient pas la dalle.
+                  await caisse.client.inscrireRelais(relais);
+                  const { relais: _, ...sans } = s;
+                  await majConfig({ ...config, imprimanteSerie: relais ? { ...s, relais: true } : sans });
+                }, relais ? "Cette dalle imprime aussi pour les iPad et iPhone : gardez la caisse ouverte." : "Cette dalle n'imprime plus que pour elle-même.");
+              }}
+            />
+            Imprimer aussi pour les iPad et iPhone de l'établissement (garder la caisse ouverte sur cette dalle)
+          </label>
           <label className="case">
             <input type="checkbox" checked={s.sansAccents} onChange={(e) => void majConfig({ ...config, imprimanteSerie: { ...s, sansAccents: e.target.checked } })} />
             Imprimer sans accents (si l'euro ou les accents sortent mal)

@@ -18,6 +18,7 @@ import {
 import { envoyerEpson } from "../impression/epson";
 import { logoTicketSerie } from "../impression/logo-serie";
 import { envoyerSerie } from "../impression/serie";
+import { demarrerRelais, imprimerParRelais } from "../impression/relais";
 import type { Recu } from "../impression/recu";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Connexion } from "./Connexion";
@@ -192,12 +193,25 @@ export function App() {
     };
   }, []);
 
+  // Dalle relais (backlog n° 5) : imprime pour les iPad et iPhone, même écran de connexion affiché.
+  const caisseOuverte = phase.nom === "caisse" || phase.nom === "connexion" ? phase.caisse : null;
+  const configRelais = useRef<Configuration | null>(null);
+  configRelais.current = caisseOuverte?.config ?? null;
+  const estRelais = !!caisseOuverte?.config.imprimanteSerie?.relais;
+  const clientRelais = caisseOuverte?.client;
+  useEffect(() => {
+    if (!estRelais || !clientRelais) return;
+    return demarrerRelais({ client: clientRelais, config: () => configRelais.current!, notifier: (m, t) => notifierRef.current(m, t) });
+  }, [estRelais, clientRelais]);
+
   const compteur = useRef(0);
   const notifier = useCallback((message: string, ton: "info" | "erreur" = "info") => {
     const id = ++compteur.current;
     setToasts((t) => [...t, { id, message, ton }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ton === "erreur" ? 7000 : 3500);
   }, []);
+  const notifierRef = useRef(notifier);
+  notifierRef.current = notifier;
 
   const contexte = useMemo<ContexteCaisse | null>(() => {
     if (phase.nom !== "caisse") return null;
@@ -216,7 +230,12 @@ export function App() {
         if (!imprimante) return setApercu({ recu, titre });
         try {
           if (imprimante.connexion === "serie") await envoyerSerie(recu, { ...imprimante, logo: await logoTicketSerie(caisse.config) });
-          else await envoyerEpson(imprimante.adresse, recu, { sansAccents: imprimante.sansAccents });
+          else if (imprimante.connexion === "relais") {
+            await imprimerParRelais(caisse.client, imprimante.relaisId, recu, titre, (erreur) => {
+              notifier(`« ${titre} » n'est pas sorti sur la dalle ${imprimante.nom} : ${erreur}`, "erreur");
+              setApercu({ recu, titre, erreur });
+            });
+          } else await envoyerEpson(imprimante.adresse, recu, { sansAccents: imprimante.sansAccents });
         } catch (e) {
           setApercu({ recu, titre, erreur: e instanceof Error ? e.message : String(e) });
         }

@@ -56,7 +56,14 @@ export interface Configuration {
     sansAccents: boolean;
     /** Logo enregistré dans l'imprimante (clé de `cleLogo`) : les tickets ne l'envoient plus. */
     logoMemoire?: string;
+    /** Cette dalle imprime aussi pour les iPad et iPhone de l'établissement (impression relayée, backlog n° 5). */
+    relais?: boolean;
   };
+  /**
+   * Tickets de cet appareil imprimés par une dalle relais (16 novembre 2026, backlog n° 5) : pour un iPad
+   * ou un iPhone qui ne joint pas l'imprimante série de la dalle. Passe avant l'imprimante Epson.
+   */
+  imprimanteRelais?: { relaisId: string; nom: string };
   /** Version du logo de l'établissement (en tête du ticket sur l'imprimante série) ; null : aucun. */
   logo?: string | null;
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */
@@ -111,13 +118,18 @@ export function retenirImprimante(config: Configuration): Configuration {
   return i ? { ...config, imprimanteConnue: { adresse: i.adresse, sansAccents: i.sansAccents } } : config;
 }
 
-/** Sortie des tickets de cet appareil : son imprimante série, sinon l'imprimante Epson (la sienne ou celle de l'établissement). */
+/**
+ * Sortie des tickets de cet appareil : son imprimante série, sinon une dalle relais, sinon l'imprimante
+ * Epson (la sienne ou celle de l'établissement).
+ */
 export type SortieTickets =
   | ({ connexion: "serie" } & NonNullable<Configuration["imprimanteSerie"]>)
+  | ({ connexion: "relais" } & NonNullable<Configuration["imprimanteRelais"]>)
   | ({ connexion: "reseau" } & NonNullable<ReturnType<typeof imprimanteDe>>);
 
 export function sortieTickets(config: Configuration): SortieTickets | null {
   if (config.imprimanteSerie) return { connexion: "serie", ...config.imprimanteSerie };
+  if (config.imprimanteRelais) return { connexion: "relais", ...config.imprimanteRelais };
   const i = imprimanteDe(config);
   return i ? { connexion: "reseau", ...i } : null;
 }

@@ -932,3 +932,22 @@ export interface EtatEnvoi {
   /** Service d'envoi branché par l'hébergement. */
   branche: boolean;
 }
+
+/** Dalle qui imprime pour les autres appareils de l'établissement (impression relayée, 16 novembre 2026). */
+export interface RelaisImpression {
+  /** Identifiant de l'appareil (caisse) relais. */
+  id: string;
+  nom: string;
+  vuLe: string;
+  /** Vue il y a moins de 30 secondes. */
+  enLigne: boolean;
+}
+
+export type EtatImpressionRelayee = "attente" | "prise" | "faite" | "echec";
+
+/** Reçu confié à une dalle relais : `recu` est la liste d'éléments du reçu de la caisse (`ElementRecu[]`). */
+export interface ImpressionRelayee {
+  id: string;
+  titre: string;
+  recu: unknown[];
+}

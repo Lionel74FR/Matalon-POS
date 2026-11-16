@@ -506,6 +506,28 @@ export const MIGRATIONS: string[] = [
       for each row execute function interdire_modification_fiscale();
     end if;
   end $$`,
+  // Impression relayée par une dalle (16 novembre 2026, backlog n° 5) : dalles relais de l'établissement
+  // et file des reçus déposés par les iPad et iPhone. Données de travail hors fiscal, purgées au bout d'un jour.
+  `create table if not exists relais_impression (
+    caisse_id text primary key references caisses(id),
+    etablissement_id text not null references etablissements(id),
+    inscrit_le text not null,
+    vu_le text not null
+  )`,
+  `create table if not exists impressions_relayees (
+    id text primary key,
+    etablissement_id text not null references etablissements(id),
+    relais_id text not null references caisses(id),
+    demandeur_id text not null references caisses(id),
+    titre text not null default '',
+    recu jsonb not null,
+    etat text not null check (etat in ('attente', 'prise', 'faite', 'echec')),
+    erreur text,
+    cree_le text not null,
+    prise_le text,
+    faite_le text
+  )`,
+  `create index if not exists impressions_relayees_file on impressions_relayees (relais_id, etat, cree_le)`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
   `insert into etablissements (id, enseigne, adresse, code_postal_ville, telephone, carte_id, tables, cree_le, maj_le)
    select 'moka', 'Moka', '6 rue Vaugelas', '74000 Annecy', '04 56 19 02 68', 'carte-automne-2026',
