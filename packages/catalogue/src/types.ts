@@ -71,6 +71,12 @@ export interface Categorie {
   /** Poste de production (« Bar », « Cuisine ») : imprimante où partent ses bons. Absent : aucun bon. */
   poste?: string;
   articles: Article[];
+  /**
+   * Articles d'autres catégories proposés aussi dans celle-ci (16 novembre 2026 : écran « Nuit » du Chardon),
+   * à la suite des siens, dans cet ordre. L'article reste défini une seule fois (prix, TVA, fiche, poste de
+   * sa catégorie) : ce ne sont que des tuiles de plus.
+   */
+  raccourcis?: string[];
 }
 
 export interface Catalogue {
@@ -78,7 +84,7 @@ export interface Catalogue {
   nom: string;
   /** Origine de la carte (document fourni, édition dans l'administration). */
   source: string;
-  /** Établissement pour lequel la carte a été créée (indicatif : plusieurs peuvent la partager). */
+  /** Établissement à qui la carte appartient (une carte n'est jamais partagée, 16 novembre 2026). */
   etablissementId: string;
   categories: Categorie[];
 }

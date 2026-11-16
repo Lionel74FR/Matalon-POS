@@ -15,6 +15,32 @@ export function tousLesArticles(c: Catalogue): Array<Article & { categorieId: st
   return c.categories.flatMap((cat) => cat.articles.map((a) => ({ ...a, categorieId: cat.id })));
 }
 
+/**
+ * Tuiles d'une catégorie : ses articles, puis ceux d'autres catégories qu'elle reprend (`raccourcis`).
+ * `categorieId` reste toujours la catégorie de l'article (poste de production, statistiques).
+ */
+export function tuilesDeCategorie(c: Catalogue, categorieId: string): Array<Article & { categorieId: string; raccourci: boolean }> {
+  const cat = c.categories.find((x) => x.id === categorieId);
+  if (!cat) return [];
+  const parId = new Map(tousLesArticles(c).map((a) => [a.id, a]));
+  const repris = (cat.raccourcis ?? []).map((id) => parId.get(id)).filter((a): a is Article & { categorieId: string } => !!a && a.categorieId !== cat.id);
+  return [...cat.articles.map((a) => ({ ...a, categorieId: cat.id, raccourci: false })), ...repris.map((a) => ({ ...a, raccourci: true }))];
+}
+
+/** Retire des raccourcis les articles disparus, ceux revenus dans la catégorie même et les doublons. */
+export function nettoyerRaccourcis(c: Catalogue): Catalogue {
+  const categorieDe = new Map(tousLesArticles(c).map((a) => [a.id, a.categorieId]));
+  return {
+    ...c,
+    categories: c.categories.map((cat) => {
+      if (!cat.raccourcis) return cat;
+      const raccourcis = [...new Set(cat.raccourcis)].filter((id) => categorieDe.has(id) && categorieDe.get(id) !== cat.id);
+      const { raccourcis: _, ...reste } = cat;
+      return raccourcis.length ? { ...reste, raccourcis } : reste;
+    }),
+  };
+}
+
 /** Un emplacement de fiche technique de la carte : article, variante ou supplément, avec son prix de vente. */
 export interface EmplacementFiche {
   /** Clé de vente : « article », « article:variante », « article+supplément » (comme les lignes de ticket). */
@@ -189,6 +215,16 @@ export function validerCatalogue(c: Catalogue): string[] {
     if (!cat.rayon?.trim()) erreurs.push(`catégorie ${cat.nom} : rayon manquant`);
   }
   const articles = tousLesArticles(c);
+  const categorieDe = new Map(articles.map((a) => [a.id, a.categorieId]));
+  for (const cat of c.categories) {
+    const vus = new Set<string>();
+    for (const id of cat.raccourcis ?? []) {
+      if (!categorieDe.has(id)) erreurs.push(`catégorie ${cat.nom} : article ${id} introuvable`);
+      else if (categorieDe.get(id) === cat.id) erreurs.push(`catégorie ${cat.nom} : ${id} y est déjà`);
+      if (vus.has(id)) erreurs.push(`catégorie ${cat.nom} : ${id} en double`);
+      vus.add(id);
+    }
+  }
   for (const a of articles) {
     if (ids.has(a.id)) erreurs.push(`identifiant en double : ${a.id}`);
     ids.add(a.id);
@@ -299,18 +335,18 @@ export function fusionnerCategories(c: Catalogue, sourceId: string, cibleId: str
   const raison = fusionImpossible(source, cible);
   if (raison) throw new Error(`Fusion impossible : ${raison}.`);
   const redirige = (ids?: string[]) => (ids ? [...new Set(ids.map((x) => (x === sourceId ? cibleId : x)))] : ids);
-  return {
+  return nettoyerRaccourcis({
     ...c,
     categories: c.categories
       .filter((x) => x.id !== sourceId)
-      .map((x) => (x.id === cibleId ? { ...x, articles: [...x.articles, ...source.articles] } : x))
+      .map((x) => (x.id === cibleId ? { ...x, articles: [...x.articles, ...source.articles], raccourcis: [...(x.raccourcis ?? []), ...(source.raccourcis ?? [])] } : x))
       .map((x) => ({
         ...x,
         articles: x.articles.map((a) =>
           a.formule ? { ...a, formule: a.formule.map((ch) => (ch.categories ? { ...ch, categories: redirige(ch.categories) } : ch)) } : a,
         ),
       })),
-  };
+  });
 }
 
 /** Postes de production cités par la carte, dans l'ordre d'apparition. */
