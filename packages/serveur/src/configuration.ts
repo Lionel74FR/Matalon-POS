@@ -1,4 +1,5 @@
 import { ErreurHttp, type Db } from "./db.js";
+import { rattacherCartes } from "./schema.js";
 
 /**
  * Configuration d'une installation, pour la mise en service : tout ce qui
@@ -126,7 +127,7 @@ export async function importerConfiguration(db: Db, c: unknown): Promise<Record<
     { texte: "delete from etablissements" },
     inserer("etablissements"),
     inserer("utilisateurs"),
-    inserer("cartes", " on conflict (id) do update set nom = excluded.nom, contenu = excluded.contenu, version = excluded.version, maj_le = excluded.maj_le, maj_par = excluded.maj_par"),
+    inserer("cartes", " on conflict (id) do update set nom = excluded.nom, contenu = excluded.contenu, version = excluded.version, maj_le = excluded.maj_le, maj_par = excluded.maj_par, etablissement_id = excluded.etablissement_id"),
     inserer("stock_referentiel", " on conflict (id) do update set contenu = excluded.contenu, version = excluded.version, maj_le = excluded.maj_le, maj_par = excluded.maj_par"),
     inserer("prix_achats"),
     inserer("stock_documents"),
@@ -139,5 +140,7 @@ export async function importerConfiguration(db: Db, c: unknown): Promise<Record<
     recaler("stock_mouvements", "id"),
     recaler("reservations", "seq"),
   ]);
+  // Configuration exportée avant que les cartes n'appartiennent aux établissements.
+  await rattacherCartes(db);
   return resumeConfiguration(conf as Configuration);
 }

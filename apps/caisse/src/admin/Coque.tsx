@@ -91,7 +91,7 @@ export const FAMILLES: Array<{ nom: string; liste: DefRubrique[] }> = [
   },
   {
     nom: "Carte",
-    liste: [{ id: "cartes", libelle: "Cartes et prix", icone: BookOpen, aide: "Communes au groupe", groupe: true }],
+    liste: [{ id: "cartes", libelle: "Cartes et prix", icone: BookOpen, aide: "Celle en service et celles en préparation" }],
   },
   {
     nom: "Réglages",

@@ -108,6 +108,9 @@ export const MIGRATIONS: string[] = [
     maj_le text not null,
     maj_par text
   )`,
+  // Chaque carte appartient à un établissement (16 novembre 2026, décision de Lionel : plusieurs cartes par
+  // établissement, aucune partagée). Null le temps de la reprise (`rattacherCartes`) ou pour une carte orpheline.
+  `alter table cartes add column if not exists etablissement_id text references etablissements(id) on delete set null`,
   // Clients des comptes (ardoises). Créés par une caisse (même hors ligne : le ticket en compte porte le client) ou par l'administration.
   `create table if not exists clients (
     id text primary key,
@@ -524,11 +527,54 @@ export function migrer(db: Db): Promise<void> {
         [carte.id, carte.nom, JSON.stringify(carte), new Date().toISOString()],
       );
     }
+    await rattacherCartes(db);
   })().catch((e) => {
     enCours = null;
     throw e;
   });
   return enCours;
+}
+
+/**
+ * Donne un établissement à chaque carte qui n'en a pas (reprise du 16 novembre 2026, et après un import
+ * de configuration) : celui qui l'utilise. Une carte utilisée par plusieurs établissements reste au premier
+ * créé ; chacun des autres reçoit sa copie, qu'il utilise désormais. Une carte que personne n'utilise va à
+ * l'établissement inscrit dans son contenu s'il existe, sinon elle reste orpheline (copiable, jamais en service).
+ */
+export async function rattacherCartes(db: Db): Promise<void> {
+  const orphelines = await db.requete<{ id: string; nom: string; contenu: Record<string, unknown> }>(
+    "select id, nom, contenu from cartes where etablissement_id is null order by id",
+  );
+  if (!orphelines.length) return;
+  const etabs = await db.requete<{ id: string; enseigne: string; carte_id: string }>("select id, enseigne, carte_id from etablissements order by cree_le, id");
+  const pris = new Set((await db.requete<{ id: string }>("select id from cartes")).map((c) => c.id));
+  const maintenant = new Date().toISOString();
+  for (const c of orphelines) {
+    const usagers = etabs.filter((e) => e.carte_id === c.id);
+    const proprietaire = usagers[0]?.id ?? etabs.find((e) => e.id === c.contenu.etablissementId)?.id ?? null;
+    if (!proprietaire) continue;
+    const requetes: Array<{ texte: string; params: unknown[] }> = [
+      {
+        texte: "update cartes set etablissement_id = $2, contenu = jsonb_set(contenu, '{etablissementId}', to_jsonb($2::text)) where id = $1 and etablissement_id is null",
+        params: [c.id, proprietaire],
+      },
+    ];
+    for (const e of usagers.slice(1)) {
+      let id = `${c.id}-${e.id}`.slice(0, 60).replace(/-+$/, "");
+      for (let n = 2; pris.has(id); n++) id = `${`${c.id}-${e.id}`.slice(0, 56).replace(/-+$/, "")}-${n}`;
+      pris.add(id);
+      const nom = `${c.nom} (${e.enseigne})`.slice(0, 80);
+      const contenu = { ...c.contenu, id, nom, etablissementId: e.id, source: `Copie de « ${c.nom} » (reprise)` };
+      requetes.push(
+        {
+          texte: "insert into cartes (id, nom, contenu, version, maj_le, maj_par, etablissement_id) values ($1, $2, $3::jsonb, 1, $4, 'reprise', $5)",
+          params: [id, nom, JSON.stringify(contenu), maintenant, e.id],
+        },
+        { texte: "update etablissements set carte_id = $2 where id = $1", params: [e.id, id] },
+      );
+    }
+    await db.lot(requetes);
+  }
 }
 
 /** Réinitialise le cache de migration (tests). */

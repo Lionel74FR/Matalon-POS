@@ -296,15 +296,77 @@ describe("cartes", () => {
 
   it("crée une carte par copie et l'attribue à un établissement", async () => {
     const cookie = await adminConnecte();
-    const copie = await appel("POST", "/api/admin/cartes", { id: "carte-hiver-2026", nom: "Carte hiver 2026", depuis: "carte-automne-2026" }, { Cookie: cookie });
+    const copie = await appel("POST", "/api/admin/cartes", { id: "carte-hiver-2026", nom: "Carte hiver 2026", etablissementId: "moka", depuis: "carte-automne-2026" }, { Cookie: cookie });
     expect(copie.statut).toBe(201);
-    expect(copie.corps.carte).toMatchObject({ id: "carte-hiver-2026", nom: "Carte hiver 2026" });
-    expect((await appel("POST", "/api/admin/cartes", { id: "carte-hiver-2026", nom: "x" }, { Cookie: cookie })).statut).toBe(409);
-    const vide = await appel("POST", "/api/admin/cartes", { id: "carte-vide", nom: "Vide" }, { Cookie: cookie });
+    expect(copie.corps.carte).toMatchObject({ id: "carte-hiver-2026", nom: "Carte hiver 2026", etablissementId: "moka" });
+    expect((await appel("POST", "/api/admin/cartes", { id: "carte-hiver-2026", nom: "x", etablissementId: "moka" }, { Cookie: cookie })).statut).toBe(409);
+    expect((await appel("POST", "/api/admin/cartes", { id: "carte-sans", nom: "Sans" }, { Cookie: cookie })).statut).toBe(400);
+    expect((await appel("POST", "/api/admin/cartes", { id: "carte-sans", nom: "Sans", etablissementId: "inconnu" }, { Cookie: cookie })).statut).toBe(400);
+    const vide = await appel("POST", "/api/admin/cartes", { id: "carte-vide", nom: "Vide", etablissementId: "moka" }, { Cookie: cookie });
     expect(vide.corps.carte.categories).toEqual([]);
     const maj = await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, tables: [], seuilNote: 2500, carteId: "carte-hiver-2026" }, { Cookie: cookie });
     expect(maj.corps.etablissement).toMatchObject({ carteId: "carte-hiver-2026", carteVersion: 1 });
     expect((await appel("PUT", "/api/admin/etablissements/moka", { identite: { enseigne: "Moka" }, carteId: "inexistante" }, { Cookie: cookie })).statut).toBe(400);
+    const liste = (await appel("GET", "/api/admin/cartes", undefined, { Cookie: cookie })).corps.cartes;
+    expect(liste.map((c: any) => [c.id, c.etablissementId, c.etablissements])).toEqual([
+      ["carte-automne-2026", "moka", []],
+      ["carte-hiver-2026", "moka", ["moka"]],
+      ["carte-vide", "moka", []],
+    ]);
+  });
+
+  it("donne à chaque établissement ses cartes : copie à la création, aucune carte d'un autre en service", async () => {
+    const cookie = await adminConnecte();
+    const corps = { id: "chardon", identite: { enseigne: "Au Chardon" }, carteId: "carte-automne-2026", tables: [], seuilNote: 2500 };
+    const cree = await appel("POST", "/api/admin/etablissements", corps, { Cookie: cookie });
+    expect(cree.statut).toBe(201);
+    expect(cree.corps.etablissement.carteId).toBe("carte-chardon");
+    const copie = (await appel("GET", "/api/admin/cartes/carte-chardon", undefined, { Cookie: cookie })).corps.carte;
+    expect(copie).toMatchObject({ nom: "Carte Au Chardon", etablissementId: "chardon" });
+    expect(copie.source).toMatch(/^Copie de « .+ »$/);
+    expect(copie.categories.length).toBeGreaterThan(0);
+    // Carte vide quand rien n'est choisi ; identifiant suivant si « carte-<id> » est pris.
+    await appel("POST", "/api/admin/cartes", { id: "carte-bao", nom: "Bao", etablissementId: "moka" }, { Cookie: cookie });
+    const bao = await appel("POST", "/api/admin/etablissements", { id: "bao", identite: { enseigne: "Bao" }, tables: [], seuilNote: 2500 }, { Cookie: cookie });
+    expect(bao.corps.etablissement.carteId).toBe("carte-bao-2");
+    expect((await appel("GET", "/api/admin/cartes/carte-bao-2", undefined, { Cookie: cookie })).corps.carte.categories).toEqual([]);
+    // La carte du Moka ne se met pas en service au Chardon, ni par l'administration ni par un appareil.
+    const refus = await appel("PUT", "/api/admin/etablissements/chardon", { identite: { enseigne: "Au Chardon" }, carteId: "carte-automne-2026" }, { Cookie: cookie });
+    expect([refus.statut, refus.corps.code]).toEqual([400, "CARTE_AUTRE_ETABLISSEMENT"]);
+    // Copiée pour le Chardon, elle s'y met en service ; l'original ne bouge pas.
+    expect((await appel("POST", "/api/admin/cartes", { id: "chardon-hiver", nom: "Hiver", etablissementId: "chardon", depuis: "carte-automne-2026" }, { Cookie: cookie })).statut).toBe(201);
+    expect((await appel("PUT", "/api/admin/etablissements/chardon", { identite: { enseigne: "Au Chardon" }, carteId: "chardon-hiver" }, { Cookie: cookie })).statut).toBe(200);
+    const liste = (await appel("GET", "/api/admin/etablissements", undefined, { Cookie: cookie })).corps;
+    expect(liste.etablissements.map((e: any) => [e.id, e.carteId])).toEqual(expect.arrayContaining([["moka", "carte-automne-2026"], ["chardon", "chardon-hiver"]]));
+    expect(liste.cartes.find((c: any) => c.id === "chardon-hiver").etablissementId).toBe("chardon");
+    // L'éditeur ne change pas d'établissement en réécrivant le contenu.
+    const lue = (await appel("GET", "/api/admin/cartes/chardon-hiver", undefined, { Cookie: cookie })).corps;
+    const ecrite = await appel("PUT", "/api/admin/cartes/chardon-hiver", { carte: { ...lue.carte, etablissementId: "moka" }, version: lue.version }, { Cookie: cookie });
+    expect(ecrite.corps.carte.etablissementId).toBe("chardon");
+  });
+
+  it("reprend les cartes partagées : la carte reste au premier établissement, les autres reçoivent leur copie", async () => {
+    const cookie = await adminConnecte();
+    await appel("POST", "/api/admin/etablissements", { id: "chardon", identite: { enseigne: "Chardon" }, tables: [], seuilNote: 2500 }, { Cookie: cookie });
+    // État d'avant le 16 novembre : le Chardon utilise la carte du Moka, aucune carte n'a d'établissement.
+    await db.requete("update cartes set etablissement_id = null");
+    await db.requete("update etablissements set carte_id = 'carte-automne-2026' where id = 'chardon'");
+    await db.requete("update etablissements set cree_le = '2026-10-01T00:00:00.000Z' where id = 'moka'");
+    const { rattacherCartes } = await import("../src/schema.js");
+    await rattacherCartes(db);
+    await rattacherCartes(db); // sans effet la seconde fois
+    const cartes = await db.requete<{ id: string; etablissement_id: string; nom: string; contenu: any }>("select id, etablissement_id, nom, contenu from cartes order by id");
+    expect(cartes.map((c) => [c.id, c.etablissement_id, c.contenu.etablissementId])).toEqual([
+      ["carte-automne-2026", "moka", "moka"],
+      ["carte-automne-2026-chardon", "chardon", "chardon"],
+      ["carte-chardon", "chardon", "chardon"],
+    ]);
+    expect(cartes[1]!.nom).toMatch(/\(Chardon\)$/);
+    const etabs = await db.requete<{ id: string; carte_id: string }>("select id, carte_id from etablissements order by id");
+    expect(etabs).toEqual([
+      { id: "chardon", carte_id: "carte-automne-2026-chardon" },
+      { id: "moka", carte_id: "carte-automne-2026" },
+    ]);
   });
 });
 

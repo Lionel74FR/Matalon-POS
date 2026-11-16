@@ -14,7 +14,7 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Copy, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ReponseStock, ReponseVentesCarte, ResumeCarte } from "@matalon/serveur/partage";
 import { Couts, foodCost } from "@matalon/stock";
@@ -70,18 +70,55 @@ function deplacer<T>(liste: T[], i: number, sens: -1 | 1): T[] {
 
 // ───────── Liste des cartes ─────────
 
-export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: string) => void; onCree: (id: string) => void }) {
+/**
+ * Cartes de l'établissement (16 novembre 2026 : chaque carte appartient à un établissement, aucune n'est
+ * partagée) : celle en service et celles en préparation, une nouvelle carte (vide ou copie d'une des siennes)
+ * et la copie d'une carte d'un autre établissement.
+ */
+export function ListeCartes(props: {
+  cartes: ResumeCarte[];
+  etablissement: { id: string; enseigne: string; carteId: string };
+  etablissements: Array<{ id: string; enseigne: string }>;
+  onOuvrir: (id: string) => void;
+  onCree: (id: string) => void;
+  onMettreEnService: (id: string) => Promise<void>;
+}) {
+  const { etablissement: e } = props;
+  const siennes = props.cartes.filter((c) => c.etablissementId === e.id);
+  const autres = props.cartes.filter((c) => c.etablissementId !== e.id);
+  const enseigne = (id: string | null) => props.etablissements.find((x) => x.id === id)?.enseigne ?? "Sans établissement";
   const [nom, setNom] = useState("");
-  const [depuis, setDepuis] = useState(props.cartes[0]?.id ?? "");
+  const [depuis, setDepuis] = useState("");
+  const [source, setSource] = useState("");
+  const [nomCopie, setNomCopie] = useState("");
   const [erreur, setErreur] = useState("");
-  const creer = async (e: FormEvent) => {
-    e.preventDefault();
-    const id = identifiantDepuisNom(nom, props.cartes.map((c) => c.id));
+  const [erreurCopie, setErreurCopie] = useState("");
+  const [enCours, setEnCours] = useState("");
+  const creer = async (ev: FormEvent, nomCarte: string, origine: string, signaler: (m: string) => void) => {
+    ev.preventDefault();
+    signaler("");
+    const id = identifiantDepuisNom(nomCarte, props.cartes.map((c) => c.id));
     try {
-      await api.creerCarte({ id, nom: nom.trim(), ...(depuis ? { depuis } : {}) });
+      await api.creerCarte({ id, nom: nomCarte.trim(), etablissementId: e.id, ...(origine ? { depuis: origine } : {}) });
       props.onCree(id);
     } catch (x) {
-      setErreur(message(x));
+      signaler(message(x));
+    }
+  };
+  const mettreEnService = async (c: ResumeCarte) => {
+    const ok = await confirmer({
+      titre: `Mettre « ${c.nom} » en service ?`,
+      message: `Elle remplace « ${siennes.find((x) => x.id === e.carteId)?.nom ?? e.carteId} » sur les appareils de ${e.enseigne}, à leur synchronisation suivante. L'ancienne reste dans la liste.`,
+      confirmer: "Mettre en service",
+    });
+    if (!ok) return;
+    setEnCours(c.id);
+    try {
+      await props.onMettreEnService(c.id);
+    } catch (x) {
+      await informer("Carte non mise en service", message(x));
+    } finally {
+      setEnCours("");
     }
   };
   return (
@@ -89,8 +126,8 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
       <EntetePage
         surtitre="Carte"
         titre="Cartes et prix"
-        portee="Communes au groupe"
-        aide="Une carte peut servir à plusieurs établissements ; chacun choisit la sienne dans sa fiche (Réglages › Établissement). Une modification enregistrée arrive sur les iPad à la synchronisation suivante, en moins d'une minute quand ils sont en ligne."
+        portee={e.enseigne}
+        aide="Chaque établissement a ses cartes : celle en service sur ses appareils et celles qu'il prépare (saison suivante, nouvelle formule). Une modification enregistrée arrive sur les appareils à la synchronisation suivante, en moins d'une minute quand ils sont en ligne. Pour partir de la carte d'un autre établissement, copiez-la : la copie ne garde aucun lien avec l'original."
       />
       <section className="admin-section">
         <table className="tableau admin-tableau">
@@ -98,13 +135,13 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
             <tr>
               <th>Carte</th>
               <th className="nombre">Articles</th>
-              <th>Établissements</th>
+              <th>État</th>
               <th>Dernière modification</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {props.cartes.map((c) => (
+            {siennes.map((c) => (
               <tr key={c.id}>
                 <td>
                   <strong>{c.nom}</strong>
@@ -114,7 +151,15 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
                   </small>
                 </td>
                 <td className="nombre">{c.nbArticles}</td>
-                <td>{c.etablissements.join(", ") || "—"}</td>
+                <td className="carte-etat">
+                  {c.id === e.carteId ? (
+                    <span className="carte-en-service">En service</span>
+                  ) : (
+                    <button className="bouton" disabled={!!enCours} onClick={() => void mettreEnService(c)}>
+                      <AvecIcone icone={Check}>{enCours === c.id ? "Mise en service…" : "Mettre en service"}</AvecIcone>
+                    </button>
+                  )}
+                </td>
                 <td>
                   {new Date(c.majLe).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
                   {c.majPar ? ` · ${c.majPar}` : ""}
@@ -129,15 +174,15 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
           </tbody>
         </table>
       </section>
-      <form className="admin-section" onSubmit={(e) => void creer(e)}>
+      <form className="admin-section" onSubmit={(ev) => void creer(ev, nom, depuis, setErreur)}>
         <h2 className="titre-icone">
           <AvecIcone icone={Plus} taille={22}>Nouvelle carte</AvecIcone>
         </h2>
         <div className="admin-ligne">
-          <input placeholder="Nom (ex. Carte hiver 2026)" value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={80} />
-          <select value={depuis} onChange={(e) => setDepuis(e.target.value)} aria-label="Point de départ">
+          <input placeholder="Nom (ex. Carte hiver 2026)" value={nom} onChange={(ev) => setNom(ev.target.value)} required maxLength={80} />
+          <select value={depuis} onChange={(ev) => setDepuis(ev.target.value)} aria-label="Point de départ">
             <option value="">Carte vide</option>
-            {props.cartes.map((c) => (
+            {siennes.map((c) => (
               <option key={c.id} value={c.id}>
                 Copie de {c.nom}
               </option>
@@ -149,6 +194,38 @@ export function ListeCartes(props: { cartes: ResumeCarte[]; onOuvrir: (id: strin
         </div>
         {erreur && <p className="erreur">{erreur}</p>}
       </form>
+      {autres.length > 0 && (
+        <form className="admin-section" onSubmit={(ev) => void creer(ev, nomCopie, source, setErreurCopie)}>
+          <h2 className="titre-icone">
+            <AvecIcone icone={Copy} taille={22}>Copier une carte d'un autre établissement</AvecIcone>
+          </h2>
+          <p className="explication">La copie appartient à {e.enseigne} : la modifier ne change rien à l'original, et inversement.</p>
+          <div className="admin-ligne">
+            <select
+              value={source}
+              required
+              aria-label="Carte à copier"
+              onChange={(ev) => {
+                setSource(ev.target.value);
+                const c = autres.find((x) => x.id === ev.target.value);
+                if (c) setNomCopie(c.nom);
+              }}
+            >
+              <option value="">Carte à copier…</option>
+              {autres.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {enseigne(c.etablissementId)} · {c.nom}
+                </option>
+              ))}
+            </select>
+            <input placeholder="Nom de la copie" aria-label="Nom de la copie" value={nomCopie} onChange={(ev) => setNomCopie(ev.target.value)} required maxLength={80} />
+            <button className="bouton principal" disabled={!source}>
+              <AvecIcone icone={Copy}>Copier</AvecIcone>
+            </button>
+          </div>
+          {erreurCopie && <p className="erreur">{erreurCopie}</p>}
+        </form>
+      )}
     </>
   );
 }
@@ -168,6 +245,8 @@ export function EditeurCarte(props: {
   libelleRetour?: string;
   /** Article à ouvrir dès la carte lue (recherche de l'administration). */
   article?: string;
+  /** Établissement de la carte : ses coûts d'achat chiffrent les fiches (sinon celui qui l'a en service). */
+  etablissementId?: string;
 }) {
   const acces = useAccesEdition();
   const [origine, setOrigine] = useState<{ carte: Catalogue; version: number } | null>(null);
@@ -189,11 +268,11 @@ export function EditeurCarte(props: {
       .stock()
       .then((s) => {
         setStock(s);
-        setEtab(s.etablissements.find((e) => e.carteId === props.id)?.id ?? s.etablissements[0]?.id ?? "");
+        setEtab(props.etablissementId ?? s.etablissements.find((e) => e.carteId === props.id)?.id ?? s.etablissements[0]?.id ?? "");
       })
       .catch(() => setStock(null));
     acces.ventesCarte(props.id).then(setVentes, () => setVentes(null));
-  }, [props.id, acces]);
+  }, [props.id, props.etablissementId, acces]);
   const couts = useMemo(() => (stock ? new Couts(stock.referentiel, stock.prix, etab) : null), [stock, etab]);
   const nomEtab = stock?.etablissements.find((e) => e.id === etab)?.enseigne ?? "";
 

@@ -1472,14 +1472,23 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
     identite.mentionsLegales,
   ];
   if (creation) {
-    const carteId = texte(corps.carteId, "carteId", 60);
-    await exigerCarte(env.db, carteId);
-    await env.db.requete(
-      `insert into etablissements (id, enseigne, raison_sociale, adresse, code_postal_ville, telephone, siret, tva_intracom,
+    // Carte de départ (« carteId », facultative : carte vide sinon), copiée pour le nouvel établissement :
+    // une carte n'appartient qu'à un établissement (16 novembre 2026).
+    const depuis = typeof corps.carteId === "string" && corps.carteId ? (await exigerCarte(env.db, texte(corps.carteId, "carteId", 60))).contenu : null;
+    const pris = new Set((await env.db.requete<{ id: string }>("select id from cartes where id like $1", [`carte-${id}%`])).map((c) => c.id));
+    let carteId = `carte-${id}`.slice(0, 60);
+    for (let n = 2; pris.has(carteId); n++) carteId = `${`carte-${id}`.slice(0, 56)}-${n}`;
+    const nom = `Carte ${identite.enseigne}`.slice(0, 80);
+    const carte = nouvelleCarte(carteId, nom, id, depuis);
+    await env.db.lot([
+      {
+        texte: `insert into etablissements (id, enseigne, raison_sociale, adresse, code_postal_ville, telephone, siret, tva_intracom,
          tables, seuil_note, cree_le, maj_le, mentions_legales, carte_id)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $11, coalesce($12, ''), $13)`,
-      [...valeurs, carteId],
-    );
+        params: [...valeurs, carteId],
+      },
+      { texte: INSERER_CARTE, params: [carteId, nom, JSON.stringify(carte), maintenant, "création de l'établissement", id] },
+    ]);
   } else {
     const [maj] = await env.db.requete<{ id: string }>(
       `update etablissements set enseigne = $2, raison_sociale = $3, adresse = $4, code_postal_ville = $5, telephone = $6,
@@ -1493,7 +1502,10 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
     }
     if (corps.carteId !== undefined) {
       const carteId = texte(corps.carteId, "carteId", 60);
-      await exigerCarte(env.db, carteId);
+      const carte = await exigerCarte(env.db, carteId);
+      if (carte.etablissement_id !== id) {
+        throw new ErreurHttp(400, "CARTE_AUTRE_ETABLISSEMENT", "Cette carte appartient à un autre établissement : copiez-la d'abord (Carte › Cartes et prix).");
+      }
       await env.db.requete("update etablissements set carte_id = $2 where id = $1", [id, carteId]);
     }
   }
@@ -1501,8 +1513,11 @@ async function majEtablissement(env: Environnement, id: string, corps: Record<st
 
 // ───────── Cartes ─────────
 
-async function exigerCarte(db: Db, id: string): Promise<{ contenu: Catalogue; version: number }> {
-  const [c] = await db.requete<{ contenu: Catalogue; version: number }>("select contenu, version from cartes where id = $1", [id]);
+async function exigerCarte(db: Db, id: string): Promise<{ contenu: Catalogue; version: number; etablissement_id: string | null }> {
+  const [c] = await db.requete<{ contenu: Catalogue; version: number; etablissement_id: string | null }>(
+    "select contenu, version, etablissement_id from cartes where id = $1",
+    [id],
+  );
   if (!c) throw new ErreurHttp(400, "CARTE_INCONNUE", "Carte inconnue.");
   return c;
 }
@@ -1517,8 +1532,8 @@ async function carteCaisse(env: Environnement, requete: Request): Promise<Respon
 }
 
 async function listeCartes(env: Environnement): Promise<Response> {
-  const lignes = await env.db.requete<{ id: string; nom: string; version: number; maj_le: string; maj_par: string | null; contenu: Catalogue }>(
-    "select id, nom, version, maj_le, maj_par, contenu from cartes order by nom",
+  const lignes = await env.db.requete<{ id: string; nom: string; version: number; maj_le: string; maj_par: string | null; contenu: Catalogue; etablissement_id: string | null }>(
+    "select id, nom, version, maj_le, maj_par, contenu, etablissement_id from cartes order by nom",
   );
   const etabs = await env.db.requete<{ id: string; carte_id: string }>("select id, carte_id from etablissements");
   const cartes: ResumeCarte[] = lignes.map((l) => ({
@@ -1528,6 +1543,7 @@ async function listeCartes(env: Environnement): Promise<Response> {
     majLe: l.maj_le,
     majPar: l.maj_par,
     nbArticles: nombreArticles(l.contenu),
+    etablissementId: l.etablissement_id,
     etablissements: etabs.filter((e) => e.carte_id === l.id).map((e) => e.id),
   }));
   return json(200, { cartes });
@@ -1569,7 +1585,9 @@ async function enregistrerCarteDe(env: Environnement, corps: { carte?: unknown; 
   if (typeof corps.version !== "number" || !Number.isSafeInteger(corps.version)) {
     throw new ErreurHttp(400, "CHAMP_INVALIDE", "Version de la carte manquante : rechargez la carte.");
   }
-  const carte = carteValide(corps.carte, id);
+  const [proprio] = await env.db.requete<{ etablissement_id: string | null }>("select etablissement_id from cartes where id = $1", [id]);
+  // Le contenu porte toujours l'établissement de la carte, quoi qu'en dise l'éditeur.
+  const carte = { ...carteValide(corps.carte, id), ...(proprio?.etablissement_id ? { etablissementId: proprio.etablissement_id } : {}) };
   await controlerFiches(env, carte);
   const [maj] = await env.db.requete<{ version: number }>(
     `update cartes set nom = $2, contenu = $3::jsonb, version = version + 1, maj_le = $4, maj_par = $5
@@ -1586,7 +1604,22 @@ async function enregistrerCarteDe(env: Environnement, corps: { carte?: unknown; 
   return { carte, version: maj.version };
 }
 
-/** Nouvelle carte, vide ou copiée d'une autre (carte de saison, autre établissement). */
+/**
+ * Contenu d'une nouvelle carte de l'établissement `proprietaire` : vide, ou copie d'une autre carte (carte de
+ * saison, carte d'un autre établissement). La copie ne garde aucun lien avec l'original.
+ */
+function nouvelleCarte(id: string, nom: string, proprietaire: string, depuis: Catalogue | null): Catalogue {
+  return carteValide(
+    depuis
+      ? { ...depuis, id, nom, etablissementId: proprietaire, source: `Copie de « ${depuis.nom} »` }
+      : { id, nom, source: "Administration", etablissementId: proprietaire, categories: [] },
+    id,
+  );
+}
+
+const INSERER_CARTE = "insert into cartes (id, nom, contenu, version, maj_le, maj_par, etablissement_id) values ($1, $2, $3::jsonb, 1, $4, $5, $6)";
+
+/** Nouvelle carte d'un établissement, vide ou copiée d'une autre (de lui ou d'un autre établissement). */
 async function creerCarte(env: Environnement, requete: Request, admin: { id: string; identifiant: string }): Promise<Response> {
   controlerOrigine(requete);
   const corps = await lireJson<Record<string, unknown>>(requete);
@@ -1594,20 +1627,22 @@ async function creerCarte(env: Environnement, requete: Request, admin: { id: str
   if (!/^[a-z0-9][a-z0-9-]{1,59}$/.test(id)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Identifiant de carte : minuscules, chiffres et tirets.");
   const nom = texte(corps.nom, "nom", 80);
   if (!nom) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Le nom de la carte est obligatoire.");
+  const proprietaire = texte(corps.etablissementId, "etablissementId", 60);
+  const [etab] = await env.db.requete<{ id: string }>("select id from etablissements where id = $1", [proprietaire]);
+  if (!etab) throw new ErreurHttp(400, "ETABLISSEMENT_INCONNU", "Établissement de la carte inconnu.");
   const depuis = typeof corps.depuis === "string" && corps.depuis ? (await exigerCarte(env.db, corps.depuis)).contenu : null;
-  const carte = carteValide(
-    depuis
-      ? { ...depuis, id, nom, source: `Copie de « ${depuis.nom} »` }
-      : { id, nom, source: "Administration", etablissementId: "", categories: [] },
-    id,
-  );
+  const carte = nouvelleCarte(id, nom, proprietaire, depuis);
   // Insertion conditionnelle : deux créations simultanées du même identifiant donnent un 409, pas une erreur serveur.
-  const [cree] = await env.db.requete<{ id: string }>(
-    "insert into cartes (id, nom, contenu, version, maj_le, maj_par) values ($1, $2, $3::jsonb, 1, $4, $5) on conflict (id) do nothing returning id",
-    [id, nom, JSON.stringify(carte), horloge(env).toISOString(), admin.identifiant],
-  );
+  const [cree] = await env.db.requete<{ id: string }>(`${INSERER_CARTE} on conflict (id) do nothing returning id`, [
+    id,
+    nom,
+    JSON.stringify(carte),
+    horloge(env).toISOString(),
+    admin.identifiant,
+    proprietaire,
+  ]);
   if (!cree) throw new ErreurHttp(409, "DEJA_EXISTANT", "Une carte porte déjà cet identifiant.");
-  await journaliserAdmin(env, admin.id, "carte_creee", { carte: id, depuis: depuis?.id ?? null });
+  await journaliserAdmin(env, admin.id, "carte_creee", { carte: id, etablissement: proprietaire, depuis: depuis?.id ?? null });
   const reponse: ReponseCarte = { carte, version: 1 };
   return json(201, reponse);
 }
@@ -2763,7 +2798,9 @@ async function listeEtablissements(env: Environnement): Promise<Response> {
       ),
     });
   }
-  const cartes = await env.db.requete<{ id: string; nom: string }>("select id, nom from cartes order by nom");
+  const cartes = (
+    await env.db.requete<{ id: string; nom: string; etablissement_id: string | null }>("select id, nom, etablissement_id from cartes order by nom")
+  ).map((c) => ({ id: c.id, nom: c.nom, etablissementId: c.etablissement_id }));
   return json(200, { etablissements: resultat, cartes });
 }
 

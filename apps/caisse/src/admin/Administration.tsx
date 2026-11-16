@@ -531,6 +531,7 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
           ) : choisi === "nouveau" || !etablissement ? (
             <NouvelEtablissement
               cartes={donnees.cartes}
+              etablissements={donnees.etablissements.map((x) => ({ id: x.id, enseigne: x.identite.enseigne }))}
               onCree={(id) => {
                 aller({ etab: id, rubrique: "identite" });
                 void recharger();
@@ -541,6 +542,7 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
               <EditeurCarte
                 key={carteOuverte}
                 id={carteOuverte}
+                etablissementId={etablissement.id}
                 {...(cible ? { article: cible } : {})}
                 onRetour={() => aller({ rubrique: "cartes" })}
                 onEnregistre={() => void recharger()}
@@ -549,10 +551,16 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
             ) : (
               <ListeCartes
                 cartes={cartes}
+                etablissement={{ id: etablissement.id, enseigne: etablissement.identite.enseigne, carteId: etablissement.carteId }}
+                etablissements={donnees.etablissements.map((x) => ({ id: x.id, enseigne: x.identite.enseigne }))}
                 onOuvrir={setCarteOuverte}
                 onCree={(id) => {
                   void recharger();
                   setCarteOuverte(id);
+                }}
+                onMettreEnService={async (id) => {
+                  await api.modifierEtablissement(etablissement.id, { identite: etablissement.identite, carteId: id, seuilNote: etablissement.seuilNote });
+                  await recharger();
                 }}
               />
             )
@@ -603,11 +611,15 @@ function Tableau(props: { identifiant: string; comptable: boolean; nom: string; 
 const identiteIncomplete = (e: EtablissementAdmin) =>
   !e.identite.raisonSociale || !e.identite.siret || !e.identite.tvaIntracom || !e.identite.adresse || !e.identite.mentionsLegales;
 
-function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>; onCree: (id: string) => void }) {
+function NouvelEtablissement(props: {
+  cartes: Array<{ id: string; nom: string; etablissementId: string | null }>;
+  etablissements: Array<{ id: string; enseigne: string }>;
+  onCree: (id: string) => void;
+}) {
   const [enseigne, setEnseigne] = useState("");
   const [id, setId] = useState("");
   const [idModifie, setIdModifie] = useState(false);
-  const [carteId, setCarteId] = useState(props.cartes[0]?.id ?? "");
+  const [carteId, setCarteId] = useState("");
   const { enCours, erreur, setErreur, envoyer } = useEnvoi();
   const identifiantAuto = enseigne
     .normalize("NFD")
@@ -621,7 +633,7 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
     e.preventDefault();
     if (!ID_ETABLISSEMENT_VALIDE.test(ident)) return setErreur("Identifiant : minuscules, chiffres et tirets, 2 caractères minimum.");
     void envoyer(async () => {
-      await api.creerEtablissement({ id: ident, identite: { enseigne: enseigne.trim() }, carteId, tables: genererTables(10), seuilNote: 2500 });
+      await api.creerEtablissement({ id: ident, identite: { enseigne: enseigne.trim() }, ...(carteId ? { carteId } : {}), tables: genererTables(10), seuilNote: 2500 });
       props.onCree(ident);
     });
   };
@@ -648,11 +660,12 @@ function NouvelEtablissement(props: { cartes: Array<{ id: string; nom: string }>
           required
         />
       </Champ>
-      <Champ libelle="Carte">
+      <Champ libelle="Carte de départ" aide="Copiée pour le nouvel établissement : elle sera la sienne">
         <select value={carteId} onChange={(e) => setCarteId(e.target.value)}>
+          <option value="">Carte vide</option>
           {props.cartes.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.nom}
+              Copie de {props.etablissements.find((x) => x.id === c.etablissementId)?.enseigne ?? "Sans établissement"} · {c.nom}
             </option>
           ))}
         </select>
@@ -674,7 +687,7 @@ function FicheEtablissement(props: {
   /** Accès comptable : statistiques sans lien vers les tickets ni réglage des moments. */
   comptable: boolean;
   rubrique: Rubrique;
-  cartes: Array<{ id: string; nom: string }>;
+  cartes: Array<{ id: string; nom: string; etablissementId: string | null }>;
   onChange: () => Promise<void>;
   /** Tickets ouverts depuis les statistiques : une personne, une période. */
   filtreTickets: FiltreTickets | null;
@@ -1520,7 +1533,7 @@ function ComptesClients(props: { etablissementId: string; surtitre?: string; ouv
   );
 }
 
-function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; nom: string }>; onChange: () => Promise<void> }) {
+function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; nom: string; etablissementId: string | null }>; onChange: () => Promise<void> }) {
   const { e } = props;
   const [identite, setIdentite] = useState(e.identite);
   const [carteId, setCarteId] = useState(e.carteId);
@@ -1556,9 +1569,9 @@ function Identite(props: { e: EtablissementAdmin; cartes: Array<{ id: string; no
           ))}
         </div>
         <div>
-          <Champ libelle="Carte">
+          <Champ libelle="Carte en service" aide="Ses cartes : les autres se copient dans Carte › Cartes et prix">
             <select value={carteId} onChange={(ev) => setCarteId(ev.target.value)}>
-              {props.cartes.map((c) => (
+              {props.cartes.filter((c) => c.etablissementId === e.id).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nom}
                 </option>
