@@ -15,28 +15,68 @@ export function tousLesArticles(c: Catalogue): Array<Article & { categorieId: st
   return c.categories.flatMap((cat) => cat.articles.map((a) => ({ ...a, categorieId: cat.id })));
 }
 
+/** Ordre alphabétique français, sans tenir compte des accents ni des majuscules (« Écume » avec les E). */
+export const ordreAlphabetique = (a: { nom: string }, b: { nom: string }): number =>
+  a.nom.localeCompare(b.nom, "fr", { sensitivity: "base", numeric: true });
+
 /**
- * Tuiles d'une catégorie : ses articles, puis ceux d'autres catégories qu'elle reprend (`raccourcis`).
- * `categorieId` reste toujours la catégorie de l'article (poste de production, statistiques).
+ * Tuiles d'une catégorie, par ordre alphabétique (16 novembre 2026, choix de Lionel) : ses articles et ceux
+ * d'autres catégories qu'elle reprend (`raccourcis`), mêlés. `categorieId` reste toujours la catégorie de
+ * l'article (poste de production, statistiques).
  */
 export function tuilesDeCategorie(c: Catalogue, categorieId: string): Array<Article & { categorieId: string; raccourci: boolean }> {
   const cat = c.categories.find((x) => x.id === categorieId);
   if (!cat) return [];
   const parId = new Map(tousLesArticles(c).map((a) => [a.id, a]));
   const repris = (cat.raccourcis ?? []).map((id) => parId.get(id)).filter((a): a is Article & { categorieId: string } => !!a && a.categorieId !== cat.id);
-  return [...cat.articles.map((a) => ({ ...a, categorieId: cat.id, raccourci: false })), ...repris.map((a) => ({ ...a, raccourci: true }))];
+  return [...cat.articles.map((a) => ({ ...a, categorieId: cat.id, raccourci: false })), ...repris.map((a) => ({ ...a, raccourci: true }))].sort(ordreAlphabetique);
 }
 
-/** Retire des raccourcis les articles disparus, ceux revenus dans la catégorie même et les doublons. */
+/** Texte sans accents ni majuscules, pour chercher « gin » dans « Gin Mare » ou « jager » dans « Jägermeister ». */
+export function sansAccents(t: string): string {
+  return t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/œ/gi, "oe").toLowerCase();
+}
+
+/**
+ * Articles dont le nom contient tous les mots cherchés (sans accents ni majuscules), ceux qui commencent
+ * par le texte d'abord, puis dans l'ordre de la carte. Moins de 2 caractères : rien.
+ */
+export function rechercherArticles(c: Catalogue, texte: string, max = 40): Array<Article & { categorieId: string }> {
+  const t = sansAccents(texte.trim());
+  if (t.length < 2) return [];
+  const mots = t.split(/\s+/);
+  const trouves = tousLesArticles(c).filter((a) => {
+    const nom = sansAccents(a.nom);
+    return mots.every((m) => nom.includes(m));
+  });
+  const debut = trouves.filter((a) => sansAccents(a.nom).startsWith(t)).sort(ordreAlphabetique);
+  return [...debut, ...trouves.filter((a) => !debut.includes(a)).sort(ordreAlphabetique)].slice(0, max);
+}
+
+/** Catégories ouvertes par les tuiles-liens d'une catégorie, par ordre alphabétique (en tête des tuiles). */
+export function liensDeCategorie(c: Catalogue, categorieId: string): Categorie[] {
+  const cat = c.categories.find((x) => x.id === categorieId);
+  return (cat?.liens ?? [])
+    .map((id) => c.categories.find((x) => x.id === id))
+    .filter((x): x is Categorie => !!x && x.id !== categorieId)
+    .sort(ordreAlphabetique);
+}
+
+/**
+ * Retire des raccourcis les articles disparus, ceux revenus dans la catégorie même et les doublons ;
+ * des liens, les catégories disparues, la catégorie elle-même et les doublons.
+ */
 export function nettoyerRaccourcis(c: Catalogue): Catalogue {
   const categorieDe = new Map(tousLesArticles(c).map((a) => [a.id, a.categorieId]));
+  const categories = new Set(c.categories.map((x) => x.id));
   return {
     ...c,
     categories: c.categories.map((cat) => {
-      if (!cat.raccourcis) return cat;
-      const raccourcis = [...new Set(cat.raccourcis)].filter((id) => categorieDe.has(id) && categorieDe.get(id) !== cat.id);
-      const { raccourcis: _, ...reste } = cat;
-      return raccourcis.length ? { ...reste, raccourcis } : reste;
+      if (!cat.raccourcis && !cat.liens) return cat;
+      const raccourcis = [...new Set(cat.raccourcis ?? [])].filter((id) => categorieDe.has(id) && categorieDe.get(id) !== cat.id);
+      const liens = [...new Set(cat.liens ?? [])].filter((id) => categories.has(id) && id !== cat.id);
+      const { raccourcis: _r, liens: _l, ...reste } = cat;
+      return { ...reste, ...(raccourcis.length ? { raccourcis } : {}), ...(liens.length ? { liens } : {}) };
     }),
   };
 }
@@ -224,6 +264,13 @@ export function validerCatalogue(c: Catalogue): string[] {
       if (vus.has(id)) erreurs.push(`catégorie ${cat.nom} : ${id} en double`);
       vus.add(id);
     }
+    const liens = new Set<string>();
+    for (const id of cat.liens ?? []) {
+      if (!c.categories.some((x) => x.id === id)) erreurs.push(`catégorie ${cat.nom} : catégorie ${id} introuvable`);
+      else if (id === cat.id) erreurs.push(`catégorie ${cat.nom} : lien vers elle-même`);
+      if (liens.has(id)) erreurs.push(`catégorie ${cat.nom} : lien ${id} en double`);
+      liens.add(id);
+    }
   }
   for (const a of articles) {
     if (ids.has(a.id)) erreurs.push(`identifiant en double : ${a.id}`);
@@ -339,7 +386,12 @@ export function fusionnerCategories(c: Catalogue, sourceId: string, cibleId: str
     ...c,
     categories: c.categories
       .filter((x) => x.id !== sourceId)
-      .map((x) => (x.id === cibleId ? { ...x, articles: [...x.articles, ...source.articles], raccourcis: [...(x.raccourcis ?? []), ...(source.raccourcis ?? [])] } : x))
+      .map((x) =>
+        x.id === cibleId
+          ? { ...x, articles: [...x.articles, ...source.articles], raccourcis: [...(x.raccourcis ?? []), ...(source.raccourcis ?? [])], liens: [...(x.liens ?? []), ...(source.liens ?? [])] }
+          : x,
+      )
+      .map((x) => (x.liens ? { ...x, liens: redirige(x.liens) } : x))
       .map((x) => ({
         ...x,
         articles: x.articles.map((a) =>

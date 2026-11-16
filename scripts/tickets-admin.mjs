@@ -42,7 +42,7 @@ await clic("Vente Directe");
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await encaisserCB();
 await p.getByRole("button", { name: /^Table 2,/ }).click();
-await p.locator(".tuile", { hasText: "Espresso" }).first().click();
+await p.locator(".tuile", { has: p.locator(".tuile-nom", { hasText: /^Espresso$/ }) }).first().click();
 await p.locator(".tuile", { hasText: "Cortado" }).first().click();
 await encaisserCB();
 await p.getByRole("button", { name: /^Quitter/ }).click();

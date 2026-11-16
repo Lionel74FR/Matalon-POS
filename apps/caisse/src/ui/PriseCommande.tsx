@@ -1,9 +1,9 @@
-import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, Gift, Link2, Printer, Send, Split, StickyNote, Users } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, BellRing, BookOpen, CreditCard, DoorOpen, FolderOpen, Gift, Link2, Printer, Search, Send, Split, StickyNote, Users, X } from "lucide-react";
 import { unite } from "@matalon/serveur/fidelite";
 import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
-import { articleVendable, tuilesDeCategorie, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
+import { articleVendable, liensDeCategorie, rechercherArticles, tuilesDeCategorie, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useEffect, useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
@@ -109,6 +109,9 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   useEffect(() => enregistrerPositionCarte({ rayon, categorieId }), [rayon, categorieId]);
   const categorie: Categorie = categories.find((x) => x.id === categorieId) ?? categories[0]!;
   const [articleOuvert, setArticleOuvert] = useState<Article | null>(null);
+  /** Recherche d'un article par son nom dans toute la carte (16 novembre 2026) ; null : fermée. */
+  const [recherche, setRecherche] = useState<string | null>(null);
+  const rayonDe = useMemo(() => new Map(CARTE.categories.map((x) => [x.id, x.rayon])), [CARTE]);
   const [ligneOuverte, setLigneOuverte] = useState<LigneCommande | null>(null);
   const [couvertsOuvert, setCouvertsOuvert] = useState(false);
   /** Encaissement ouvert : la table entière, une sélection d'articles, ou en parts. */
@@ -171,6 +174,21 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
     if (a.variantes?.length || a.supplements?.length || a.formule?.length) return setArticleOuvert(a);
     ajouter({ articleId: a.id, libelle: a.nom, details: [], quantite: 1, prixUnitaireTTC: a.prixTTC!, tauxTVA: a.tauxTVA });
   };
+
+  /** Tuile d'article ; `teinte` : celle de son rayon, hors de la catégorie affichée (recherche). */
+  const tuile = (a: Article, teinte?: string) => (
+    <button
+      key={a.id}
+      className={`tuile${teinte ? ` teinte-${teinte}` : ""}${a.prixTTC == null && !a.prixLibre && !a.variantes?.some((v) => v.prixTTC != null) ? " incomplete" : ""}${!articleVendable(CARTE, a) ? " indisponible" : ""}`}
+      onClick={() => toucherArticle(a)}
+    >
+      <span className="tuile-nom">{a.nom}</span>
+      <span className="tuile-prix">
+        {!articleVendable(CARTE, a) ? "Indisponible" : a.prixLibre ? "Prix libre" : a.prixTTC != null ? euros(a.prixTTC) : "Prix à venir"}
+        {(a.variantes?.length || a.formule?.length) && <span className="tuile-plus"> · choix</span>}
+      </span>
+    </button>
+  );
 
   const imprimerAddition = async () => {
     await imprimer(gabaritAddition(c, config, utilisateur.id), "Addition");
@@ -319,49 +337,88 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
       </aside>
 
       <section className="carte" aria-label="Carte">
-        <div className="rayons" role="tablist">
-          {RAYONS.map((r) => (
-            <button
-              key={r}
-              role="tab"
-              aria-selected={r === rayon}
-              className={`rayon teinte-${TEINTES[r] ?? "cafe"}`}
-              onClick={() => {
-                setRayon(r);
-                setCategorieId(null);
-              }}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
-        {categories.length > 1 && (
-          <div className="categories">
-            {categories.map((cat) => (
+        <div className="barre-rayons">
+          <div className="rayons" role="tablist">
+            {RAYONS.map((r) => (
               <button
-                key={cat.id}
-                className={`pastille${cat.id === categorie.id ? " active" : ""}`}
-                onClick={() => setCategorieId(cat.id)}
+                key={r}
+                role="tab"
+                aria-selected={r === rayon && recherche === null}
+                className={`rayon teinte-${TEINTES[r] ?? "cafe"}`}
+                onClick={() => {
+                  setRayon(r);
+                  setCategorieId(null);
+                  setRecherche(null);
+                }}
               >
-                {cat.nom}
+                {r}
               </button>
             ))}
           </div>
+          <button
+            className={`rayon bouton-recherche-carte${recherche !== null ? " actif" : ""}`}
+            aria-label="Rechercher un article"
+            aria-pressed={recherche !== null}
+            onClick={() => setRecherche((x) => (x === null ? "" : null))}
+          >
+            <Search size={22} aria-hidden="true" />
+          </button>
+        </div>
+        {recherche !== null ? (
+          <div className="recherche-carte">
+            <Search size={20} aria-hidden="true" />
+            <input
+              autoFocus
+              value={recherche}
+              onChange={(e) => setRecherche(e.target.value)}
+              placeholder="Nom de l'article"
+              aria-label="Article à chercher"
+              enterKeyHint="search"
+            />
+            <BoutonIcone icone={X} variante="discret" libelle="Fermer la recherche" onClick={() => setRecherche(null)} />
+          </div>
+        ) : (
+          categories.length > 1 && (
+            <div className="categories">
+              {categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  className={`pastille${cat.id === categorie.id ? " active" : ""}`}
+                  onClick={() => setCategorieId(cat.id)}
+                >
+                  {cat.nom}
+                </button>
+              ))}
+            </div>
+          )
         )}
         <div className={`grille-articles teinte-${TEINTES[rayon] ?? "cafe"}`}>
-          {tuilesDeCategorie(CARTE, categorie.id).map((a) => (
-            <button
-              key={a.id}
-              className={`tuile${a.prixTTC == null && !a.prixLibre && !a.variantes?.some((v) => v.prixTTC != null) ? " incomplete" : ""}${!articleVendable(CARTE, a) ? " indisponible" : ""}`}
-              onClick={() => toucherArticle(a)}
-            >
-              <span className="tuile-nom">{a.nom}</span>
-              <span className="tuile-prix">
-                {!articleVendable(CARTE, a) ? "Indisponible" : a.prixLibre ? "Prix libre" : a.prixTTC != null ? euros(a.prixTTC) : "Prix à venir"}
-                {(a.variantes?.length || a.formule?.length) && <span className="tuile-plus"> · choix</span>}
-              </span>
-            </button>
-          ))}
+          {recherche !== null ? (
+            <>
+              {rechercherArticles(CARTE, recherche).map((a) => tuile(a, TEINTES[rayonDe.get(a.categorieId) ?? ""] ?? "cafe"))}
+              {recherche.trim().length >= 2 && !rechercherArticles(CARTE, recherche).length && <p className="recherche-vide">Aucun article ne s'appelle ainsi.</p>}
+              {recherche.trim().length < 2 && <p className="recherche-vide">Tapez au moins deux lettres du nom.</p>}
+            </>
+          ) : (
+            <>
+              {liensDeCategorie(CARTE, categorie.id).map((cible) => (
+                <button
+                  key={`lien-${cible.id}`}
+                  className={`tuile tuile-lien teinte-${TEINTES[cible.rayon] ?? "cafe"}`}
+                  onClick={() => {
+                    setRayon(cible.rayon);
+                    setCategorieId(cible.id);
+                  }}
+                >
+                  <span className="tuile-nom">{cible.nom}</span>
+                  <span className="tuile-prix">
+                    <FolderOpen size={16} aria-hidden="true" /> {cible.articles.length + (cible.raccourcis?.length ?? 0)} articles
+                  </span>
+                </button>
+              ))}
+              {tuilesDeCategorie(CARTE, categorie.id).map((a) => tuile(a))}
+            </>
+          )}
         </div>
       </section>
 

@@ -97,7 +97,7 @@ for (const x of "1234") await p.locator(".pave .touche", { hasText: new RegExp(`
 await p.getByRole("dialog", { name: "Fond de caisse" }).waitFor();
 await p.getByRole("button", { name: "Plus tard" }).click();
 await p.getByRole("button", { name: "Vente Directe" }).click();
-const tuile = (nom) => p.locator(".tuile", { hasText: nom }).first();
+const tuile = (nom) => p.locator(".tuile", { has: p.locator(".tuile-nom", { hasText: new RegExp(`^${nom}$`) }) }).first();
 const avant = {
   espresso: await tuile("Espresso").textContent(),
   ristretto: await tuile("Ristretto").count(),

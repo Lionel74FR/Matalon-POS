@@ -750,3 +750,35 @@
 .editeur-raccourcis .champ {
   max-width: 420px;
 }
+
+/* Recherche d'un article en tête de la liste des catégories. */
+.editeur-cats-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.editeur-recherche {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.editeur-recherche ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.editeur-recherche small {
+  display: block;
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+.editeur-raccourcis h3:not(:first-child) {
+  margin-top: 14px;
+}

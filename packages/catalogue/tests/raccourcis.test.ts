@@ -27,6 +27,9 @@ describe("un article dans plusieurs catégories", () => {
       ["corona", "bieres", true],
     ]);
     expect(tuilesDeCategorie(c, "softs").map((a) => a.id)).toEqual(["coca"]);
+    // Toujours par ordre alphabétique en caisse, articles repris mêlés, accents ignorés.
+    c.categories[2]!.articles.unshift({ id: "zubrowka", nom: "Zubrowka", prixTTC: 800, tauxTVA: 2000 }, { id: "eau", nom: "Évian", prixTTC: 450, tauxTVA: 1000 });
+    expect(tuilesDeCategorie(c, "nuit").map((a) => a.nom)).toEqual(["Anderson", "Coca-Cola", "Corona", "Évian", "Zubrowka"]);
   });
 
   it("refuse un article inconnu, déjà dans la catégorie ou repris deux fois", () => {
@@ -48,5 +51,42 @@ describe("un article dans plusieurs catégories", () => {
     expect(nettoyerRaccourcis(c).categories[2]!.raccourcis).toEqual(["corona"]);
     c.categories[0]!.articles = [];
     expect("raccourcis" in nettoyerRaccourcis(c).categories[2]!).toBe(false);
+  });
+});
+
+describe("liens vers d'autres catégories et recherche", () => {
+  it("lit, valide et nettoie les liens ; la fusion les redirige", async () => {
+    const { liensDeCategorie } = await import("../src/index.js");
+    const c = carte();
+    c.categories[2]!.liens = ["bieres", "softs"];
+    expect(validerCatalogue(c)).toEqual([]);
+    expect(liensDeCategorie(c, "nuit").map((x) => x.id)).toEqual(["bieres", "softs"]);
+    c.categories[2]!.liens = ["bieres", "bieres", "nuit", "fantome"];
+    const erreurs = validerCatalogue(c);
+    expect(erreurs).toContain("catégorie Nuit : lien bieres en double");
+    expect(erreurs).toContain("catégorie Nuit : lien vers elle-même");
+    expect(erreurs).toContain("catégorie Nuit : catégorie fantome introuvable");
+    expect(nettoyerRaccourcis(c).categories[2]!.liens).toEqual(["bieres"]);
+    const relu = lireCatalogue({ ...carte(), categories: carte().categories.map((x) => (x.id === "nuit" ? { ...x, liens: ["softs"] } : x)) });
+    expect(relu.catalogue!.categories[2]!.liens).toEqual(["softs"]);
+    const avecLien = carte();
+    avecLien.categories[0]!.liens = ["softs"];
+    avecLien.categories[2]!.liens = ["softs"];
+    avecLien.categories[2]!.articles[0]!.tauxTVA = 1000;
+    // Softs fusionnée dans Nuit : le lien de Bières vers Softs pointe vers Nuit, celui de Nuit vers elle-même disparaît.
+    const f = fusionnerCategories(avecLien, "softs", "nuit");
+    expect(f.categories.find((x) => x.id === "bieres")!.liens).toEqual(["nuit"]);
+    expect("liens" in f.categories.find((x) => x.id === "nuit")!).toBe(false);
+  });
+
+  it("cherche un article par son nom, sans accents ni majuscules, le début du nom d'abord", async () => {
+    const { rechercherArticles } = await import("../src/index.js");
+    const c = carte();
+    c.categories[1]!.articles.push({ id: "coca-zero", nom: "Coca zéro", prixTTC: 450, tauxTVA: 1000 }, { id: "rhum-coca", nom: "Rhum coca", prixTTC: 900, tauxTVA: 2000 });
+    const trouves = rechercherArticles(c, "COCA").map((a) => a.id);
+    expect(trouves.slice(0, 2).sort()).toEqual(["coca", "coca-zero"]);
+    expect(trouves[2]).toBe("rhum-coca");
+    expect(rechercherArticles(c, "zero coca").map((a) => a.id)).toEqual(["coca-zero"]);
+    expect(rechercherArticles(c, "c")).toEqual([]);
   });
 });

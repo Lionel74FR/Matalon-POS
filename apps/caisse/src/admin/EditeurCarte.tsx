@@ -6,6 +6,8 @@ import {
   identifiantDepuisNom,
   lireCatalogue,
   nettoyerRaccourcis,
+  ordreAlphabetique,
+  rechercherArticles,
   tousLesArticles,
   validerCatalogue,
   type Article,
@@ -15,7 +17,7 @@ import {
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Copy, Merge, Pencil, Plus, Printer, RotateCw, Save, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Copy, FolderOpen, Merge, Pencil, Plus, Printer, RotateCw, Save, Search, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ReponseStock, ReponseVentesCarte, ResumeCarte } from "@matalon/serveur/partage";
 import { Couts, foodCost } from "@matalon/stock";
@@ -237,23 +239,61 @@ export function ListeCartes(props: {
  * Articles d'autres catégories proposés aussi dans celle-ci (16 novembre 2026, écran « Nuit » du Chardon) :
  * des tuiles de plus, l'article restant défini dans sa catégorie (prix, TVA, fiche, poste).
  */
-function RaccourcisCategorie(props: { carte: Catalogue; categorie: Categorie; onChange: (raccourcis: string[]) => void }) {
+function RaccourcisCategorie(props: { carte: Catalogue; categorie: Categorie; onChange: (cle: "raccourcis" | "liens", ids: string[]) => void }) {
   const { carte, categorie } = props;
   const liste = categorie.raccourcis ?? [];
+  const liens = categorie.liens ?? [];
+  const changer = (ids: string[]) => props.onChange("raccourcis", ids);
+  const changerLiens = (ids: string[]) => props.onChange("liens", ids);
+  const ciblesPossibles = carte.categories.filter((c) => c.id !== categorie.id && !liens.includes(c.id));
   const parId = new Map(tousLesArticles(carte).map((a) => [a.id, a]));
   const nomCategorie = (id: string) => carte.categories.find((c) => c.id === id)?.nom ?? id;
   const proposables = carte.categories.filter((c) => c.id !== categorie.id && c.articles.some((a) => !liste.includes(a.id)));
   return (
     <div className="editeur-raccourcis">
+      <h3>Tuiles vers d'autres catégories</h3>
+      <p className="explication">Comme les dossiers de Domino : en caisse, ces tuiles viennent en tête de « {categorie.nom} », par ordre alphabétique, et ouvrent la catégorie choisie.</p>
+      {liens.length > 0 && (
+        <table className="tableau admin-tableau editeur-table">
+          <tbody>
+            {[...liens].sort((x, y) => ordreAlphabetique({ nom: nomCategorie(x) }, { nom: nomCategorie(y) })).map((id) => {
+              const cible = carte.categories.find((c) => c.id === id);
+              if (!cible) return null;
+              return (
+                <tr key={id}>
+                  <td>
+                    <FolderOpen className="icone en-ligne" size={16} aria-hidden="true" /> {cible.nom}
+                    <small>{cible.rayon}</small>
+                  </td>
+                  <td className="editeur-ordre">
+                    <BoutonIcone icone={X} taille={18} variante="discret" libelle={`Retirer le lien vers ${cible.nom}`} onClick={() => changerLiens(liens.filter((x) => x !== id))} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      <label className="champ">
+        <span>Ajouter une tuile vers une catégorie</span>
+        <select value="" onChange={(e) => e.target.value && changerLiens([...liens, e.target.value])}>
+          <option value="">Choisir une catégorie…</option>
+          {ciblesPossibles.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.rayon} › {c.nom}
+            </option>
+          ))}
+        </select>
+      </label>
       <h3>Aussi dans « {categorie.nom} »</h3>
       <p className="explication">
-        Articles d'autres catégories affichés à la suite dans cette catégorie, en caisse. Prix, TVA et fiche restent ceux de leur
-        catégorie : une modification vaut partout.
+        Articles d'autres catégories affichés aussi dans celle-ci, en caisse, mêlés aux siens par ordre alphabétique. Prix, TVA et
+        fiche restent ceux de leur catégorie : une modification vaut partout.
       </p>
       {liste.length > 0 && (
         <table className="tableau admin-tableau editeur-table">
           <tbody>
-            {liste.map((id, i) => {
+            {[...liste].sort((x, y) => ordreAlphabetique({ nom: parId.get(x)?.nom ?? x }, { nom: parId.get(y)?.nom ?? y })).map((id) => {
               const a = parId.get(id);
               if (!a) return null;
               return (
@@ -264,9 +304,7 @@ function RaccourcisCategorie(props: { carte: Catalogue; categorie: Categorie; on
                   </td>
                   <td className="nombre">{a.prixLibre ? "libre" : euros(a.prixTTC)}</td>
                   <td className="editeur-ordre">
-                    <BoutonIcone icone={ArrowUp} taille={18} variante="discret" libelle={`Monter ${a.nom} (repris)`} onClick={() => props.onChange(deplacer(liste, i, -1))} />
-                    <BoutonIcone icone={ArrowDown} taille={18} variante="discret" libelle={`Descendre ${a.nom} (repris)`} onClick={() => props.onChange(deplacer(liste, i, 1))} />
-                    <BoutonIcone icone={X} taille={18} variante="discret" libelle={`Retirer ${a.nom} de ${categorie.nom}`} onClick={() => props.onChange(liste.filter((x) => x !== id))} />
+                    <BoutonIcone icone={X} taille={18} variante="discret" libelle={`Retirer ${a.nom} de ${categorie.nom}`} onClick={() => changer(liste.filter((x) => x !== id))} />
                   </td>
                 </tr>
               );
@@ -276,7 +314,7 @@ function RaccourcisCategorie(props: { carte: Catalogue; categorie: Categorie; on
       )}
       <label className="champ">
         <span>Ajouter un article d'une autre catégorie</span>
-        <select value="" onChange={(e) => e.target.value && props.onChange([...liste, e.target.value])}>
+        <select value="" onChange={(e) => e.target.value && changer([...liste, e.target.value])}>
           <option value="">Choisir un article…</option>
           {proposables.map((c) => (
             <optgroup key={c.id} label={`${c.rayon} › ${c.nom}`}>
@@ -323,6 +361,8 @@ export function EditeurCarte(props: {
   const [erreurs, setErreurs] = useState<string[]>([]);
   const [etat, setEtat] = useState<"" | "envoi" | "enregistre" | "conflit">("");
   const [erreurAjout, setErreurAjout] = useState("");
+  /** Recherche d'un article par son nom, en tête de la liste des catégories (16 novembre 2026) ; null : fermée. */
+  const [recherche, setRecherche] = useState<string | null>(null);
   const [erreurRayon, setErreurRayon] = useState("");
   /** Stock et ventes : fiches techniques, coûts et part du CA couverte (facultatifs : l'éditeur marche sans). */
   const [stock, setStock] = useState<ReponseStock | null>(null);
@@ -610,7 +650,41 @@ export function EditeurCarte(props: {
 
       <div className="editeur-colonnes">
         <aside className="admin-section editeur-categories">
-          <h2>Catégories</h2>
+          <div className="editeur-cats-tete">
+            <h2>Catégories</h2>
+            <BoutonIcone
+              icone={Search}
+              taille={18}
+              variante="discret"
+              libelle={recherche === null ? "Chercher un article" : "Fermer la recherche"}
+              onClick={() => setRecherche((x) => (x === null ? "" : null))}
+            />
+          </div>
+          {recherche !== null && (
+            <div className="editeur-recherche">
+              <input autoFocus value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Nom de l'article" aria-label="Article à chercher" />
+              {recherche.trim().length >= 2 && (
+                <ul>
+                  {rechercherArticles(carte, recherche, 30).map((a) => (
+                    <li key={a.id}>
+                      <button
+                        className="editeur-cat-nom"
+                        onClick={() => {
+                          const { categorieId, ...article } = a;
+                          setCatId(categorieId);
+                          setArticleOuvert({ catId: categorieId, article: structuredClone(article), nouveau: false });
+                        }}
+                      >
+                        {a.nom}
+                        <small>{carte.categories.find((c) => c.id === a.categorieId)?.nom}</small>
+                      </button>
+                    </li>
+                  ))}
+                  {!rechercherArticles(carte, recherche, 1).length && <li className="explication">Aucun article ne s'appelle ainsi.</li>}
+                </ul>
+              )}
+            </div>
+          )}
           {rayons.map((rayon, ri) => (
             <div key={rayon} className="editeur-rayon">
               {rayonEdite?.ancien === rayon ? (
@@ -778,6 +852,7 @@ export function EditeurCarte(props: {
                   </select>
                 </label>
               </div>
+              <p className="explication">En caisse, les tuiles de la catégorie sont classées par ordre alphabétique.</p>
               <table className="tableau admin-tableau editeur-table">
                 <thead>
                   <tr>
@@ -786,11 +861,10 @@ export function EditeurCarte(props: {
                     <th>TVA</th>
                     {stock && <th>Food cost</th>}
                     <th>En caisse</th>
-                    <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {categorie.articles.map((a, i) => (
+                  {[...categorie.articles].sort(ordreAlphabetique).map((a) => (
                     <tr key={a.id} className={a.indisponible ? "annule" : ""}>
                       <td>
                         <button className="lien-article" onClick={() => setArticleOuvert({ catId: categorie.id, article: structuredClone(a), nouveau: false })}>
@@ -832,10 +906,6 @@ export function EditeurCarte(props: {
                           {a.indisponible ? "Indisponible" : "Disponible"}
                         </label>
                       </td>
-                      <td className="editeur-ordre">
-                        <BoutonIcone icone={ArrowUp} taille={18} variante="discret" libelle={`Monter ${a.nom}`} onClick={() => majCategorie(categorie.id, (c) => ({ ...c, articles: deplacer(c.articles, i, -1) }))} />
-                        <BoutonIcone icone={ArrowDown} taille={18} variante="discret" libelle={`Descendre ${a.nom}`} onClick={() => majCategorie(categorie.id, (c) => ({ ...c, articles: deplacer(c.articles, i, 1) }))} />
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -855,10 +925,16 @@ export function EditeurCarte(props: {
                 </button>
               </form>
               {erreurAjout && <p className="erreur">{erreurAjout}</p>}
-              <RaccourcisCategorie carte={carte} categorie={categorie} onChange={(raccourcis) => majCategorie(categorie.id, (c) => {
-                const { raccourcis: _, ...reste } = c;
-                return raccourcis.length ? { ...reste, raccourcis } : reste;
-              })} />
+              <RaccourcisCategorie
+                carte={carte}
+                categorie={categorie}
+                onChange={(cle, ids) =>
+                  majCategorie(categorie.id, (c) => {
+                    const { [cle]: _, ...reste } = c;
+                    return ids.length ? { ...reste, [cle]: ids } : reste;
+                  })
+                }
+              />
             </>
           )}
         </section>
