@@ -323,6 +323,9 @@ export interface ResumeCarte {
   majLe: string;
   majPar: string | null;
   nbArticles: number;
+  /** Établissement à qui la carte appartient (null : carte orpheline, copiable seulement). */
+  etablissementId: string | null;
+  /** Établissements qui l'ont en service (le sien, ou personne). */
   etablissements: string[];
 }
 

@@ -1045,3 +1045,19 @@ code.cle-api {
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Cartes et prix : carte en service sur les appareils de l'établissement. */
+.carte-en-service {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--a-ok-fond);
+  color: var(--a-ok);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.carte-etat .bouton {
+  white-space: nowrap;
+}

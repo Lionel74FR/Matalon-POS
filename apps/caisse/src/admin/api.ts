@@ -116,7 +116,7 @@ export const api = {
   optionsCleAcces: (code: string) => appel<{ options: OptionsCreation }>("POST", "/cles-acces/options", { code }),
   enregistrerCleAcces: (nom: string, reponse: unknown) => appel<{ cles: CleAccesAdmin[] }>("POST", "/cles-acces", { nom, reponse }),
   retirerCleAcces: (id: string) => appel<{ cles: CleAccesAdmin[] }>("DELETE", `/cles-acces/${id}`),
-  etablissements: () => appel<{ etablissements: EtablissementAdmin[]; cartes: Array<{ id: string; nom: string }> }>("GET", "/etablissements"),
+  etablissements: () => appel<{ etablissements: EtablissementAdmin[]; cartes: Array<{ id: string; nom: string; etablissementId: string | null }> }>("GET", "/etablissements"),
   // Accès à l'administration : comptables invitées par le propriétaire.
   acces: () => appel<{ acces: AccesAdminApi[] }>("GET", "/acces"),
   inviterComptable: (nom: string, email: string, etablissements: string[]) =>
@@ -127,7 +127,7 @@ export const api = {
   lireInvitation: (jeton: string) => appel<{ invitation: InvitationAdminApi }>("POST", "/invitation", { jeton }),
   optionsInvitation: (jeton: string) => appel<{ invitation: InvitationAdminApi; options: OptionsCreation }>("POST", "/invitation", { jeton, options: true }),
   accepterInvitation: (jeton: string, nom: string, reponse: unknown) => appel("POST", "/invitation/accepter", { jeton, nom, reponse }),
-  creerEtablissement: (corps: { id: string; identite: Partial<IdentiteEtablissement>; carteId: string; tables: Table[]; seuilNote: number }) =>
+  creerEtablissement: (corps: { id: string; identite: Partial<IdentiteEtablissement>; carteId?: string; tables: Table[]; seuilNote: number }) =>
     appel("POST", "/etablissements", corps),
   modifierEtablissement: (id: string, corps: { identite: IdentiteEtablissement; carteId: string; seuilNote: number; noteAutomatique?: boolean }) =>
     appel("PUT", `/etablissements/${id}`, corps),
@@ -173,7 +173,7 @@ export const api = {
   cartes: () => appel<{ cartes: ResumeCarte[] }>("GET", "/cartes"),
   carte: (id: string) => appel<ReponseCarte>("GET", `/cartes/${id}`),
   enregistrerCarte: (id: string, carte: Catalogue, version: number) => appel<ReponseCarte>("PUT", `/cartes/${id}`, { carte, version }),
-  creerCarte: (corps: { id: string; nom: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
+  creerCarte: (corps: { id: string; nom: string; etablissementId: string; depuis?: string }) => appel<ReponseCarte>("POST", "/cartes", corps),
   enregistrerPlan: (etablissementId: string, plan: { zones: ZonePlan[]; tables: Table[]; version: number }) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/plan`, plan),
   enregistrerImprimanteTickets: (etablissementId: string, imprimante: { adresse: string; sansAccents: boolean } | null) =>
