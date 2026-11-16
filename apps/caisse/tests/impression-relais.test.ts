@@ -37,7 +37,7 @@ describe("dalle relais", () => {
       }),
       compteRenduImpression: async (id: string, ok: boolean, erreur?: string) => (appels.push(`compte ${id} ${ok}${erreur ? ` ${erreur}` : ""}`), { ok: true as const }),
     } as unknown as ClientApi;
-    let config = { etablissementId: "chardon", logo: null, imprimanteSerie: { rang: 0, bauds: 115200, sansAccents: false, relais: true } } as unknown as Configuration;
+    let config = { etablissementId: "chardon", caisseNom: "Dalle bar", logo: null, imprimanteSerie: { rang: 0, bauds: 115200, sansAccents: false, relais: true } } as unknown as Configuration;
     const arreter = demarrerRelais({ client, config: () => config, notifier: (m) => void notes.push(m), periode: 50 });
     try {
       await attendreQue(() => appels.some((a) => a.startsWith("compte")));
@@ -49,7 +49,7 @@ describe("dalle relais", () => {
       config = { ...config, imprimanteSerie: undefined };
       tour = 0;
       await attendreQue(() => appels.length === 3);
-      expect(appels[2]).toBe("compte ir-000000000001 false Cette dalle n'a plus d'imprimante série.");
+      expect(appels[2]).toBe("compte ir-000000000001 false Dalle bar : Cette dalle n'a plus d'imprimante série.");
       expect(notes[0]).toContain("Ticket 12");
     } finally {
       arreter();
@@ -68,7 +68,7 @@ describe("iPad qui imprime par une dalle", () => {
   it("confie le reçu et ne dit rien quand la dalle l'a imprimé", async () => {
     const c = client([{ etat: "attente" }, { etat: "prise" }, { etat: "faite" }]);
     const surEchec = vi.fn();
-    await imprimerParRelais(c, "ipad-0000000d", new Recu().texte("Note"), "Note", surEchec, sansPause);
+    await imprimerParRelais(c, { relaisId: "ipad-0000000d" }, new Recu().texte("Note"), "Note", surEchec, sansPause);
     expect(c.deposerImpression).toHaveBeenCalledWith({ relaisId: "ipad-0000000d", titre: "Note", recu: [expect.objectContaining({ texte: "Note" })] });
     await new Promise((fin) => setTimeout(fin, 10));
     expect(surEchec).not.toHaveBeenCalled();
@@ -76,11 +76,11 @@ describe("iPad qui imprime par une dalle", () => {
 
   it("signale l'échec de la dalle, et rejette tout de suite si elle ne répond pas", async () => {
     const surEchec = vi.fn();
-    await imprimerParRelais(client([{ etat: "prise" }, { etat: "echec", erreur: "Port COM occupé." }]), "d", new Recu().texte("x"), "Ticket", surEchec, sansPause);
+    await imprimerParRelais(client([{ etat: "prise" }, { etat: "echec", erreur: "Port COM occupé." }]), { relaisId: "d" }, new Recu().texte("x"), "Ticket", surEchec, sansPause);
     await vi.waitFor(() => expect(surEchec).toHaveBeenCalledWith("Port COM occupé."));
     const horsLigne = client([], async () => {
       throw new Error("La dalle « Bar » ne répond pas");
     });
-    await expect(imprimerParRelais(horsLigne, "d", new Recu().texte("x"), "Ticket", surEchec, sansPause)).rejects.toThrow(/ne répond pas/);
+    await expect(imprimerParRelais(horsLigne, { relaisId: "d" }, new Recu().texte("x"), "Ticket", surEchec, sansPause)).rejects.toThrow(/ne répond pas/);
   });
 });

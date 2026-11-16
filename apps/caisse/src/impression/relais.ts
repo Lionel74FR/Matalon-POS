@@ -3,6 +3,7 @@ import type { ClientApi } from "../serveur/client";
 import { logoTicketSerie } from "./logo-serie";
 import { Recu, type ElementRecu } from "./recu";
 import { imprimerReseau } from "./reseau";
+import { imprimerIci } from "./imprimantes";
 import type { DestinationReseau } from "@matalon/serveur/partage";
 import { envoyerSerie } from "./serie";
 
@@ -23,14 +24,14 @@ export const PASSAGE_RELAIS_MS = 3000;
  */
 export async function imprimerParRelais(
   client: ClientApi,
-  relaisId: string,
+  cible: { relaisId: string } | { imprimanteId: string },
   recu: Recu,
   titre: string,
   surEchec: (erreur: string) => void,
   attendre: (ms: number) => Promise<void> = (ms) => new Promise((fin) => setTimeout(fin, ms)),
   destination?: DestinationReseau,
 ): Promise<void> {
-  const { id } = await client.deposerImpression({ relaisId, titre, recu: recu.elements, ...(destination ? { destination } : {}) });
+  const { id } = await client.deposerImpression({ ...cible, titre, recu: recu.elements, ...(destination ? { destination } : {}) });
   void (async () => {
     // Suivi : vite au début (le ticket sort en quelques secondes), puis plus lentement jusqu'aux délais du serveur.
     for (let essai = 0, ecoule = 0; ecoule < 190_000; essai++) {
@@ -76,14 +77,19 @@ export function demarrerRelais(o: {
         const serie = config.imprimanteSerie;
         try {
           const recu = Recu.depuis(i.recu as ElementRecu[]);
-          if (i.destination) await imprimerReseau(recu, i.destination, config);
+          if (i.imprimanteId) {
+            const imprimante = config.imprimantes?.find((x) => x.id === i.imprimanteId);
+            if (!imprimante) throw new Error("Imprimante inconnue sur cette dalle : elle n'a pas encore reçu la liste à jour.");
+            await imprimerIci(config, imprimante, recu);
+          } else if (i.destination) await imprimerReseau(recu, i.destination, config);
           else if (!serie) throw new Error("Cette dalle n'a plus d'imprimante série.");
           else await envoyerSerie(recu, { ...serie, logo: await logoTicketSerie(config) });
           await o.client.compteRenduImpression(i.id, true);
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
           o.notifier(`Impression pour un autre appareil (${i.titre || "reçu"}) : ${message}`, "erreur");
-          await o.client.compteRenduImpression(i.id, false, message).catch(() => undefined);
+          // L'appareil qui a demandé l'impression voit d'où vient l'erreur.
+          await o.client.compteRenduImpression(i.id, false, `${config.caisseNom} : ${message}`).catch(() => undefined);
         }
       }
     } catch {

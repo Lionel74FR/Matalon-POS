@@ -1,14 +1,25 @@
 import type { Catalogue } from "@matalon/catalogue";
 import { useCallback, useRef } from "react";
 import type { Configuration } from "../donnees/configuration";
-import { envoyerEpson } from "../impression/epson";
+import { imprimanteParId, imprimerSur, type ImprimanteEtablissement } from "../impression/imprimantes";
 import { gabaritBon } from "../impression/gabarits";
 import { nomSuite, reclamer, type Commande, type SuiteAttente } from "../metier/commande";
 import { aEnvoyerDans, bonsAEnvoyer, bonsReclame, validerEnvoi, type Bon } from "../metier/production";
 import { useCaisse } from "./contexte";
 
+/**
+ * Imprimante d'un poste : celle de la liste de l'établissement (16 novembre 2026), ou l'ancienne Epson
+ * du poste tant que le serveur n'envoie pas la liste.
+ */
+function imprimantePoste(config: Configuration, poste: string): ImprimanteEtablissement | null {
+  if (config.imprimantes) return imprimanteParId(config, config.postesImprimantes?.[poste]);
+  const p = config.postesProduction?.[poste];
+  return p?.adresse.trim() ? { id: `ancien-${poste}`, nom: poste, branchement: { type: "epson", adresse: p.adresse.trim() }, sansAccents: p.sansAccents } : null;
+}
+
 /** Imprimantes de production en service : au moins un poste relié à une imprimante. */
 export function productionActive(config: Configuration): boolean {
+  if (config.imprimantes) return Object.keys(config.postesImprimantes ?? {}).some((poste) => imprimantePoste(config, poste));
   return Object.values(config.postesProduction ?? {}).some((p) => p.adresse.trim() !== "");
 }
 
@@ -21,7 +32,7 @@ export function productionActive(config: Configuration): boolean {
  * commande, ou null s'il n'y avait rien à envoyer.
  */
 export function useEnvoiProduction() {
-  const { config, utilisateur, notifier } = useCaisse();
+  const { caisse, config, utilisateur, notifier } = useCaisse();
   const enCours = useRef(false);
   return useCallback(
     async (c: Commande, carte: Catalogue, o: { annulationsSeules?: boolean } = {}): Promise<((c: Commande) => Commande) | null> => {
@@ -36,13 +47,20 @@ export function useEnvoiProduction() {
       try {
         // Un bon après l'autre : plusieurs postes peuvent partager une imprimante.
         for (const bon of bons) {
-          const p = config.postesProduction?.[bon.poste];
-          if (!p?.adresse.trim()) {
+          const imprimante = imprimantePoste(config, bon.poste);
+          if (!imprimante) {
             sansImprimante.add(bon.poste);
             continue;
           }
           try {
-            await envoyerEpson(p.adresse.trim(), gabaritBon(bon, c, config, utilisateur.id), { sansAccents: p.sansAccents });
+            await imprimerSur({
+              config,
+              client: caisse.client,
+              imprimante,
+              recu: gabaritBon(bon, c, config, utilisateur.id),
+              titre: `Bon ${bon.poste}`,
+              surEchec: (e) => notifier(`${bon.poste} : bon non sorti sur « ${imprimante.nom} » (${e}). À préparer d'après l'écran.`, "erreur"),
+            });
           } catch (e) {
             echecs.add(bon);
             notifier(`${bon.poste} : bon non imprimé (${e instanceof Error ? e.message : String(e)}). Il repartira au prochain envoi.`, "erreur");
@@ -60,7 +78,7 @@ export function useEnvoiProduction() {
       }
       return (derniere) => validerEnvoi(derniere, prevu, echecs, utilisateur.id);
     },
-    [config, utilisateur.id, notifier],
+    [caisse.client, config, utilisateur.id, notifier],
   );
 }
 
@@ -72,7 +90,7 @@ export function useEnvoiProduction() {
  * et le bouton reste là pour réessayer.
  */
 export function useReclame() {
-  const { config, utilisateur, notifier } = useCaisse();
+  const { caisse, config, utilisateur, notifier } = useCaisse();
   const envoyer = useEnvoiProduction();
   return useCallback(
     async (c: Commande, carte: Catalogue, suite: SuiteAttente): Promise<(c: Commande) => Commande> => {
@@ -82,10 +100,17 @@ export function useReclame() {
       const imprimes: string[] = [];
       if (productionActive(config)) {
         for (const bon of bonsReclame(c, carte, suite)) {
-          const p = config.postesProduction?.[bon.poste];
-          if (!p?.adresse.trim()) continue;
+          const imprimante = imprimantePoste(config, bon.poste);
+          if (!imprimante) continue;
           try {
-            await envoyerEpson(p.adresse.trim(), gabaritBon(bon, reclamer(c, suite, par), config, par), { sansAccents: p.sansAccents });
+            await imprimerSur({
+              config,
+              client: caisse.client,
+              imprimante,
+              recu: gabaritBon(bon, reclamer(c, suite, par), config, par),
+              titre: `Réclame ${bon.poste}`,
+              surEchec: (e) => notifier(`${bon.poste} : réclame non sortie sur « ${imprimante.nom} » (${e}). Réclamez à nouveau.`, "erreur"),
+            });
             imprimes.push(bon.poste);
           } catch (e) {
             echecs.push(bon.poste);
@@ -99,6 +124,6 @@ export function useReclame() {
         return echecs.length ? envoyee : reclamer(envoyee, suite, par);
       };
     },
-    [config, utilisateur.id, notifier, envoyer],
+    [caisse.client, config, utilisateur.id, notifier, envoyer],
   );
 }

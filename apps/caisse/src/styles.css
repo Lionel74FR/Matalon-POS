@@ -3730,3 +3730,32 @@ a.bouton {
   font-family: var(--police-texte);
   font-size: 0.85rem;
 }
+
+/* Imprimantes de l'établissement (16 novembre 2026) : la liste et les postes, défilant sur iPhone. */
+.imprimantes-etablissement {
+  display: grid;
+  gap: 10px;
+  overflow-x: auto;
+}
+.imprimantes-etablissement > .bouton {
+  justify-self: start;
+}
+.imprimantes-etablissement td.imprimante-lieu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.imprimantes-etablissement td.imprimante-actions {
+  white-space: nowrap;
+}
+.imprimantes-etablissement input,
+.imprimantes-etablissement select {
+  min-width: 9em;
+}
+.sous-titre-reglages {
+  font-size: 0.95rem;
+  margin: 12px 0 4px;
+}
+.imprimante-portee + .imprimante-portee {
+  margin-top: 8px;
+}

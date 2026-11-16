@@ -5,6 +5,7 @@
 // le scénario intercepte les requêtes ePOS-Print et vérifie ce que chacune a reçu.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/production.mjs [dossier-captures]
+import { declarerImprimantes } from "./imprimantes-e2e.mjs";
 import { chromium } from "playwright";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
@@ -65,12 +66,9 @@ await p.getByRole("button", { name: "Retour à la salle" }).click();
 
 // ── Réglages : une imprimante par poste, bon d'essai ──
 await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Réglages" }).click());
-await p.getByLabel("Adresse IP de l'imprimante Bar").fill(BAR);
-await p.getByLabel("Adresse IP de l'imprimante Cuisine").fill(CUISINE);
-await clic("Enregistrer les imprimantes");
-await p.getByText("Imprimantes de production enregistrées").waitFor();
-await p.getByRole("button", { name: "Imprimer un bon d'essai sur Cuisine" }).click();
-await p.getByText("Bon d'essai envoyé à Cuisine").waitFor();
+await declarerImprimantes(p, [{ nom: "Bar", type: "epson", adresse: BAR }, { nom: "Cuisine", type: "epson", adresse: CUISINE }], { Bar: "Bar", Cuisine: "Cuisine" });
+await p.getByRole("button", { name: "Imprimer un essai sur Cuisine" }).click();
+await p.getByText("Bon d'essai envoyé à « Cuisine »").waitFor();
 await p.locator(".postes-production").screenshot({ path: `${sortie}/p01-postes.png` });
 const essai = recus.at(-1);
 

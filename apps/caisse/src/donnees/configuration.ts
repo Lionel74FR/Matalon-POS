@@ -1,7 +1,19 @@
 import { canonique, sha256Hex } from "@matalon/noyau-fiscal";
 import { CARTES, type Catalogue } from "@matalon/catalogue";
 import type { ProgrammeCaisse } from "@matalon/serveur/fidelite";
-import type { ClientApi, IdentiteEtablissement, ImprimanteReseau, PostesProduction, ReponseEtat, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type {
+  ClientApi,
+  IdentiteEtablissement,
+  ImprimanteEtablissement,
+  ImprimanteReseau,
+  PostesProduction,
+  ReponseEtat,
+  Role,
+  Table,
+  UtilisateurApi,
+  ZonePlan,
+} from "@matalon/serveur/partage";
+import type { PortSerie } from "../impression/imprimantes";
 
 export type { Role, Table };
 export type Utilisateur = UtilisateurApi;
@@ -70,6 +82,19 @@ export interface Configuration {
    * a le script ; sinon la dalle relais `relaisId` imprime pour lui. Absente : les additions suivent les tickets.
    */
   imprimanteAdditions?: { adresse: string; sansAccents: boolean; relaisId?: string; relaisNom?: string };
+  /** Imprimantes de l'établissement (16 novembre 2026), reçues du serveur. */
+  imprimantes?: ImprimanteEtablissement[];
+  /** Poste de production → imprimante de `imprimantes`. */
+  postesImprimantes?: Record<string, string>;
+  /**
+   * Imprimante des tickets (notes, clôtures, tiroir) choisie sur cet appareil dans `imprimantes` ; null :
+   * aucune ; absente : pas encore choisie (les anciens réglages servent encore).
+   */
+  imprimanteTicketsId?: string | null;
+  /** Imprimante des additions choisie sur cet appareil ; null ou absente : celle des tickets. */
+  imprimanteAdditionsId?: string | null;
+  /** Ports COM de cet appareil pour les imprimantes série qu'il porte (identifiant → port). */
+  portsSerie?: Record<string, PortSerie>;
   /** Version du logo de l'établissement (en tête du ticket sur l'imprimante série) ; null : aucun. */
   logo?: string | null;
   /** Imprimante des tickets commune à l'établissement (reçue du serveur). */
@@ -115,6 +140,7 @@ export function fusionnerReferentiel(
     ...(etat.etablissement.motifsRemise ? { motifsRemise: etat.etablissement.motifsRemise } : {}),
     ...(etat.etablissement.logo !== undefined ? { logo: etat.etablissement.logo } : {}),
   };
+  Object.assign(suivante, imprimantesRecues(suivante, etat.etablissement));
   return canonique(suivante) === canonique(config) ? null : suivante;
 }
 
@@ -125,15 +151,59 @@ export function retenirImprimante(config: Configuration): Configuration {
 }
 
 /**
- * Sortie des tickets de cet appareil : son imprimante série, sinon une dalle relais, sinon l'imprimante
- * Epson (la sienne ou celle de l'établissement).
+ * Liste des imprimantes reçue du serveur (16 novembre 2026). Tant que cet appareil n'a rien choisi, ses
+ * anciens réglages désignent l'imprimante de la liste qui leur correspond (reprise sans intervention :
+ * l'Epson du Moka, la dalle et son port COM, la dalle relais, l'Oxhoo des additions).
+ */
+export function imprimantesRecues(
+  config: Configuration,
+  e: { imprimantes?: ImprimanteEtablissement[]; postesImprimantes?: Record<string, string> },
+): Partial<Configuration> {
+  if (!e.imprimantes) return {};
+  const liste = e.imprimantes;
+  const maj: Partial<Configuration> = { imprimantes: liste, postesImprimantes: e.postesImprimantes ?? {} };
+  const portee = (type: "serie" | "reseau", dalleId: string, adresse?: string) =>
+    liste.find((i) => i.branchement.type === type && i.branchement.dalleId === dalleId && (adresse === undefined || ("adresse" in i.branchement && i.branchement.adresse === adresse)));
+  if (config.imprimanteTicketsId === undefined) {
+    let choisie: ImprimanteEtablissement | undefined;
+    if (config.imprimanteSerie) {
+      choisie = portee("serie", config.caisseId);
+      if (choisie) {
+        const { rang, bauds, logoMemoire } = config.imprimanteSerie;
+        maj.portsSerie = { ...config.portsSerie, [choisie.id]: { rang, bauds, ...(logoMemoire ? { logoMemoire } : {}) } };
+      }
+    } else if (config.imprimanteRelais) choisie = portee("serie", config.imprimanteRelais.relaisId);
+    else {
+      const i = imprimanteDe(config);
+      if (i) choisie = liste.find((x) => x.branchement.type === "epson" && x.branchement.adresse === i.adresse);
+    }
+    if (choisie) maj.imprimanteTicketsId = choisie.id;
+  }
+  if (config.imprimanteAdditionsId === undefined && config.imprimanteAdditions) {
+    const a = config.imprimanteAdditions;
+    const choisie = portee("reseau", a.relaisId ?? config.caisseId, a.adresse);
+    if (choisie) maj.imprimanteAdditionsId = choisie.id;
+  }
+  return maj;
+}
+
+/**
+ * Sortie des tickets de cet appareil : l'imprimante choisie dans la liste de l'établissement ; tant que
+ * rien n'est choisi, les anciens réglages (son imprimante série, une dalle relais, l'Epson).
  */
 export type SortieTickets =
+  | { connexion: "liste"; imprimante: ImprimanteEtablissement }
   | ({ connexion: "serie" } & NonNullable<Configuration["imprimanteSerie"]>)
   | ({ connexion: "relais" } & NonNullable<Configuration["imprimanteRelais"]>)
   | ({ connexion: "reseau" } & NonNullable<ReturnType<typeof imprimanteDe>>);
 
 export function sortieTickets(config: Configuration): SortieTickets | null {
+  // Choix fait sur cet appareil dans la liste de l'établissement.
+  if (config.imprimanteTicketsId !== undefined) {
+    const i = config.imprimantes?.find((x) => x.id === config.imprimanteTicketsId);
+    return i ? { connexion: "liste", imprimante: i } : null;
+  }
+  // Anciens réglages, tant que rien n'est choisi.
   if (config.imprimanteSerie) return { connexion: "serie", ...config.imprimanteSerie };
   if (config.imprimanteRelais) return { connexion: "relais", ...config.imprimanteRelais };
   const i = imprimanteDe(config);

@@ -123,6 +123,7 @@ export async function rattacher(
     ...(r.etablissement.postesProduction ? { postesProduction: r.etablissement.postesProduction } : {}),
     ...(r.etablissement.imprimanteTickets !== undefined ? { imprimanteEtablissement: r.etablissement.imprimanteTickets } : {}),
     ...(r.etablissement.zones ? { zones: r.etablissement.zones, planVersion: r.etablissement.planVersion ?? 0 } : {}),
+    ...(r.etablissement.imprimantes ? { imprimantes: r.etablissement.imprimantes, postesImprimantes: r.etablissement.postesImprimantes ?? {} } : {}),
   };
   const connexion: ConnexionServeur = {
     jeton: r.jeton,

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { genererTables } from "../donnees/configuration";
 import type { ClientApi, PostesProduction, ReponseComptes, ResumeCarte } from "@matalon/serveur/partage";
 import { postesDeLaCarte } from "@matalon/catalogue";
-import { EditeurPostes } from "../ui/EditeurPostes";
+import { EditeurImprimantes } from "../ui/EditeurImprimantes";
 import { EditeurPlan } from "../ui/EditeurPlan";
 import { nouvelIdClient } from "../donnees/clients";
 import type { AlerteApi } from "@matalon/serveur/partage";
@@ -724,8 +724,7 @@ function FicheEtablissement(props: {
       {rubrique === "imprimantes" && (
         <>
           <EntetePage surtitre={surtitre} titre="Imprimantes" />
-          <ImprimanteTickets e={e} onChange={props.onChange} />
-          <ImprimantesProduction e={e} onChange={props.onChange} />
+          <ImprimantesEtablissement e={e} onChange={props.onChange} />
         </>
       )}
       {rubrique === "reservations" && <Reservations etablissements={[e]} onglet={props.sous} onOnglet={props.onSous} />}
@@ -1290,111 +1289,37 @@ function PlanDeSalle(props: { e: EtablissementAdmin; onChange: () => Promise<voi
   );
 }
 
-/** Postes de production de la carte de l'établissement → imprimantes de son réseau. */
-/** Imprimante des tickets commune aux appareils de l'établissement (un appareil peut en garder une à lui). */
-function ImprimanteTickets(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
-  const actuelle = props.e.imprimanteTickets ?? null;
-  const [adresse, setAdresse] = useState(actuelle?.adresse ?? "");
-  const [sansAccents, setSansAccents] = useState(actuelle?.sansAccents ?? false);
-  const [historique, setHistorique] = useState<AdresseImprimante[]>([]);
-  const [fait, setFait] = useState("");
-  const { enCours, erreur, setErreur, envoyer } = useEnvoi();
-  // Réglée entre-temps depuis une caisse : le formulaire suit, pour ne jamais renvoyer une valeur périmée.
-  useEffect(() => {
-    setAdresse(actuelle?.adresse ?? "");
-    setSansAccents(actuelle?.sansAccents ?? false);
-  }, [actuelle?.adresse, actuelle?.sansAccents]);
-  useEffect(() => {
-    api
-      .historiqueImprimanteTickets(props.e.id)
-      .then((r) => setHistorique(r.historique))
-      .catch(() => setHistorique([]));
-  }, [props.e.id, actuelle?.adresse]);
-  const enregistrer = (ev: FormEvent) => {
-    ev.preventDefault();
-    setFait("");
-    const a = adresse.trim();
-    if (a && !/^\d{1,3}(\.\d{1,3}){3}$/.test(a)) return setErreur("Adresse IP attendue, par exemple 192.168.1.50.");
-    void envoyer(async () => {
-      if (
-        !a &&
-        actuelle &&
-        !(await confirmer({
-          titre: `Retirer l'imprimante ${actuelle.adresse} ?`,
-          message: "Les appareils qui n'ont pas d'imprimante à eux n'imprimeront plus les notes, factures et Z.",
-          confirmer: "Retirer l'imprimante",
-          danger: true,
-        }))
-      )
-        return;
-      const r = await api.enregistrerImprimanteTickets(props.e.id, a ? { adresse: a, sansAccents } : null);
-      setHistorique(r.historique);
-      await props.onChange();
-      setFait(a ? "Enregistrée : les appareils la reçoivent à leur prochaine synchronisation." : "Retirée.");
-    });
-  };
-  const anciennes = historique.filter((h) => h.adresse !== actuelle?.adresse);
-  return (
-    <form className="admin-section" onSubmit={enregistrer}>
-      <TitreAvecAide titre="Imprimante des tickets" nom="Imprimante des tickets">
-        Notes, factures, Z et reçus. Commune à tous les iPad et iPhone de l'établissement, sauf ceux à qui on a donné leur propre
-        imprimante dans leurs Réglages. Sur chaque appareil, l'assistant de connexion fait accepter une fois le certificat de
-        l'imprimante (étape « Autoriser »).
-      </TitreAvecAide>
-      <Champ libelle="Adresse IP" aide="Page d'état de l'imprimante (bouton Feed au démarrage)">
-        <input value={adresse} onChange={(ev) => setAdresse(ev.target.value)} placeholder="192.168.1.50" inputMode="decimal" />
-      </Champ>
-      <label className="case">
-        <input type="checkbox" checked={sansAccents} onChange={(ev) => setSansAccents(ev.target.checked)} /> Imprimer sans accents
-      </label>
-      {anciennes.length > 0 && (
-        <div className="imprimante-historique">
-          <span>Adresses déjà utilisées :</span>
-          {anciennes.map((h) => (
-            <button
-              key={h.adresse}
-              type="button"
-              className="bouton"
-              title={`Dernière utilisation le ${dateHeure(h.le)}`}
-              onClick={() => {
-                setAdresse(h.adresse);
-                setSansAccents(h.sansAccents);
-              }}
-            >
-              <AvecIcone icone={RotateCw}>{h.adresse}</AvecIcone>
-            </button>
-          ))}
-        </div>
-      )}
-      {erreur && <p className="erreur">{erreur}</p>}
-      {fait && <p className="succes">{fait}</p>}
-      <div className="options">
-        <button className="bouton principal" disabled={enCours}>
-          <AvecIcone icone={Save}>Enregistrer</AvecIcone>
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function ImprimantesProduction(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
+/**
+ * Imprimantes de l'établissement (16 novembre 2026) : la liste, et l'imprimante de chaque poste de
+ * production. Chaque appareil choisit dans ses Réglages celle de ses tickets et de ses additions.
+ */
+function ImprimantesEtablissement(props: { e: EtablissementAdmin; onChange: () => Promise<void> }) {
   const [postesCarte, setPostesCarte] = useState<string[] | null>(null);
   const { erreur, envoyer } = useEnvoi();
   useEffect(() => {
     void envoyer(async () => setPostesCarte(postesDeLaCarte((await api.carte(props.e.carteId)).carte)));
   }, [envoyer, props.e.carteId, props.e.carteVersion]);
-  const enregistrer = async (postes: PostesProduction) => {
-    await api.enregistrerPostes(props.e.id, postes);
-    await props.onChange();
-  };
+  const appareils = Object.fromEntries(props.e.caisses.filter((c) => !c.revoqueeLe).map((c) => [c.id, c.nom]));
   return (
     <section className="admin-section">
-      <TitreAvecAide titre="Imprimantes de production" nom="Imprimantes de production">
-        Les catégories de la carte désignent leur poste (bar, cuisine) ; indiquez ici l'adresse IP de l'imprimante de chaque poste sur
-        le réseau de l'établissement. Le bon d'essai s'imprime depuis les Réglages d'une caisse, sur place.
+      <TitreAvecAide titre="Imprimantes" nom="Imprimantes">
+        Les imprimantes de l'établissement, réglées une fois : Epson sur le réseau, imprimante série branchée sur une dalle, ou imprimante réseau
+        envoyée par le script d'une dalle. Les postes de production de la carte y choisissent la leur ; chaque appareil choisit dans ses
+        Réglages celle de ses tickets et celle de ses additions. Les essais s'impriment depuis les Réglages d'une caisse, sur place.
       </TitreAvecAide>
       {erreur && <p className="erreur">{erreur}</p>}
-      {postesCarte && <EditeurPostes postesCarte={postesCarte} valeur={props.e.postesProduction ?? {}} onEnregistrer={enregistrer} />}
+      {postesCarte && (
+        <EditeurImprimantes
+          imprimantes={props.e.imprimantes ?? []}
+          postes={props.e.postesImprimantes ?? {}}
+          postesCarte={postesCarte}
+          appareils={appareils}
+          onEnregistrer={async (imprimantes, postes) => {
+            await api.enregistrerImprimantes(props.e.id, imprimantes, postes);
+            await props.onChange();
+          }}
+        />
+      )}
     </section>
   );
 }

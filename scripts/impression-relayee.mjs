@@ -1,11 +1,11 @@
-// Impression relayée par une dalle (backlog n° 5, 16 novembre 2026) : l'iPad, qui ne joint pas l'Oxhoo
-// série de la dalle, lui confie ses reçus par le serveur. Sans dalle relais, rien n'apparaît sur l'iPad
-// (Moka inchangé) ; la dalle coche « Imprimer aussi pour les iPad et iPhone » ; l'iPad la choisit, son
-// essai et le tiroir d'une vente en espèces sortent sur le port série de la dalle ; une dalle qui
-// n'imprime plus pour les autres : l'iPad montre l'aperçu et l'erreur.
+// Impression relayée par une dalle (backlog n° 5, 16 novembre 2026) : l'Oxhoo série de la dalle est dans la
+// liste de l'établissement ; l'iPad, qui ne joint pas son port, la choisit pour ses tickets : son essai et
+// le tiroir d'une vente en espèces sortent sur le port série de la dalle, qui relaie d'office. Une
+// imprimante de la dalle dont le port n'est pas choisi : l'iPad montre l'aperçu et l'erreur de la dalle.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/impression-relayee.mjs [dossier-captures]
 import { chromium } from "playwright";
+import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -74,48 +74,47 @@ const attendreEcriture = async (p, n) => {
   return ecritures(p);
 };
 
-// ── iPad, avant toute dalle relais : rien de nouveau dans les Réglages ──
+// ── iPad, avant toute imprimante : rien à choisir ──
 const ci = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
 await ci.addInitScript(() => delete Navigator.prototype.serial);
 const ipad = await ci.newPage();
 ipad.on("pageerror", (e) => erreurs.push(`ipad : ${e.message}`));
 const clicIpad = await connexion(ipad, codeIpad, "Rattacher l'iPad");
-await reglages(ipad);
-await ipad.waitForTimeout(500);
-r.ipadSansDalle = (await ipad.getByText("Imprimer sur une dalle").count()) === 0;
-await ipad.keyboard.press("Escape");
+r.ipadSansImprimante = (await ipad.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).count()) === 1;
 
-// ── Dalle : imprimante série, relais pour les iPad ──
+// ── Dalle : l'Oxhoo de son port COM dans la liste, et une seconde sans port ──
 const cd = await b.newContext({ viewport: { width: 1366, height: 768 } });
 await cd.addInitScript(simulerPorts);
 const p = await cd.newPage();
 p.on("pageerror", (e) => erreurs.push(`dalle : ${e.message}`));
 await connexion(p, code, "Rattacher l'iPad");
 await reglages(p);
-const bloc = p.locator("fieldset", { hasText: "Imprimante série (port COM)" });
-await bloc.getByRole("button", { name: "Utiliser une imprimante série" }).click();
-await bloc.locator(".imprimante-serie-etat").waitFor();
-await bloc.getByLabel(/Imprimer aussi pour les iPad et iPhone/).click();
-await bloc.locator(".succes", { hasText: "imprime aussi pour les iPad" }).waitFor();
+await declarerImprimantes(p, [
+  { nom: "Oxhoo bar", type: "serie", dalle: "Dalle bar" },
+  { nom: "Oxhoo cave", type: "serie", dalle: "Dalle bar" },
+]);
+const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
+await bloc.getByRole("button", { name: "Choisir le port" }).first().click();
+await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();
+await choisirImprimantes(p, "Oxhoo bar");
 await p.screenshot({ path: `${sortie}/ir01-dalle-relais.png` });
 
-// ── iPad : choisit la dalle, essai ──
+// ── iPad : choisit l'Oxhoo de la dalle, essai ──
 await ipad.reload();
 await ipad.locator(".carte-personne", { hasText: "Lionel" }).click();
 for (const x of "1234") await ipad.locator(".pave .touche", { hasText: new RegExp(`^${x}$`) }).last().click();
 const plusTard = ipad.getByRole("button", { name: "Plus tard", exact: true });
 await plusTard.waitFor({ timeout: 3000 }).then(() => plusTard.click()).catch(() => undefined);
 await reglages(ipad);
-const dalle = ipad.locator("fieldset", { hasText: "Imprimer sur une dalle" });
-await dalle.getByRole("radio", { name: /Dalle bar/ }).waitFor();
-r.choix = await texte(dalle.getByRole("radio", { name: /Dalle bar/ }));
-await dalle.getByRole("radio", { name: /Dalle bar/ }).click();
-await dalle.getByRole("button", { name: "Imprimer un essai sur la dalle" }).click();
+const choix = ipad.getByRole("radiogroup", { name: "Imprimante des tickets" }).getByRole("radio", { name: /^Oxhoo bar/ });
+await choix.waitFor();
+r.choix = await texte(choix);
+await choisirImprimantes(ipad, "Oxhoo bar", "Oxhoo cave");
+await ipad.getByRole("button", { name: "Imprimer un essai", exact: true }).first().click();
 await ipad.screenshot({ path: `${sortie}/ir02-ipad-dalle.png` });
 let w = await attendreEcriture(p, 1);
 r.essai = { ecrit: w.length === 1, test: w[0]?.toString("latin1").includes("Test") ?? false, coupe: [...(w[0] ?? [])].slice(-3).join(" ") };
 r.ipadSansApercu = (await ipad.locator(".apercu-recu").count()) === 0;
-await ipad.keyboard.press("Escape");
 r.ipadBandeauParti = (await ipad.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).count()) === 0;
 
 // ── Vente en espèces sur l'iPad : le tiroir de la dalle s'ouvre ──
@@ -130,20 +129,18 @@ await clicIpad("Terminé");
 w = await attendreEcriture(p, 1);
 r.tiroir = w.map((x) => [...x].join(" "));
 
-// ── La dalle n'imprime plus pour les autres : l'iPad montre l'aperçu et l'erreur ──
-await bloc.getByLabel(/Imprimer aussi pour les iPad et iPhone/).click();
-await bloc.locator(".succes", { hasText: "n'imprime plus que pour elle-même" }).waitFor();
+// ── Addition sur l'Oxhoo cave, dont la dalle n'a pas choisi le port : aperçu et erreur sur l'iPad ──
 await reglages(ipad);
-await ipad.locator("fieldset", { hasText: "Imprimer sur une dalle" }).getByRole("button", { name: "Imprimer un essai sur la dalle" }).click();
-await ipad.locator(".apercu-recu").first().waitFor({ timeout: 10000 });
+await ipad.getByRole("button", { name: "Imprimer une addition d'essai" }).click();
+await ipad.locator(".apercu-recu").first().waitFor({ timeout: 15000 });
 r.erreur = await texte(ipad.getByRole("dialog").last());
 await ipad.screenshot({ path: `${sortie}/ir03-ipad-erreur.png` });
 await b.close();
 
 console.log(JSON.stringify({ ...r, erreur: r.erreur.slice(0, 300), erreurs }, null, 2));
 const ok =
-  r.ipadSansDalle &&
-  /Dalle bar · en ligne/.test(r.choix) &&
+  r.ipadSansImprimante &&
+  /Oxhoo bar · série sur Dalle bar/.test(r.choix) &&
   r.essai.ecrit &&
   r.essai.test &&
   r.essai.coupe === "29 86 0" &&
@@ -151,6 +148,6 @@ const ok =
   r.ipadBandeauParti &&
   r.tiroir.length === 1 &&
   r.tiroir[0] === "27 64 27 116 19 27 112 0 25 250" &&
-  /n'imprime plus pour les autres appareils/.test(r.erreur) &&
+  /Dalle bar : Port COM de « Oxhoo cave » pas encore choisi/.test(r.erreur) &&
   !erreurs.length;
 if (!ok) process.exit(1);

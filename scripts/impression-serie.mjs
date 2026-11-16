@@ -1,11 +1,12 @@
 // Impression série des caisses du Chardon (backlog n° 4, 15 novembre 2026) : sur une dalle Windows sous
-// Chrome (port série simulé : COM1 tireuse, COM2 imprimante Oxhoo), Réglages › Imprimante série › choisir
+// Chrome (port série simulé : COM1 tireuse, COM2 imprimante Oxhoo), Réglages › Imprimantes de l'établissement (« Oxhoo bar », série sur la dalle), port choisi
 // COM2 ; l'essai part en ESC/POS (ESC @, PC858, €, coupe GS V 0) après DTR et RTS baissés ; une vente
 // en espèces ouvre le tiroir sur ce port ; un duplicata s'y imprime. Sur l'iPad (pas de port série), le
 // réglage n'apparaît pas et rien ne change.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/impression-serie.mjs [dossier-captures]
 import { chromium } from "playwright";
+import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -75,7 +76,7 @@ const ipad = await ci.newPage();
 ipad.on("pageerror", (e) => erreurs.push(`ipad : ${e.message}`));
 await connexion(ipad, codeIpad, "Rattacher l'iPad");
 await reglages(ipad);
-r.ipadSansReglage = (await ipad.getByText("Imprimante série (port COM)").count()) === 0;
+r.ipadSansReglage = (await ipad.getByText(/^Imprimantes portées par/).count()) === 0;
 r.ipadBandeau = (await ipad.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).count()) === 1;
 
 // ── Dalle Windows sous Chrome ──
@@ -85,11 +86,13 @@ const p = await cd.newPage();
 p.on("pageerror", (e) => erreurs.push(`dalle : ${e.message}`));
 const clic = await connexion(p, code, "Rattacher l'iPad");
 await reglages(p);
-const bloc = p.locator("fieldset", { hasText: "Imprimante série (port COM)" });
-await bloc.getByRole("button", { name: "Utiliser une imprimante série" }).click();
-await bloc.locator(".imprimante-serie-etat").waitFor();
-r.etat = await texte(bloc.locator(".imprimante-serie-etat"));
-r.bandeauParti = (await p.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).count()) === 0;
+await declarerImprimantes(p, [{ nom: "Oxhoo bar", type: "serie", dalle: "Dalle 1" }]);
+const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
+await bloc.getByRole("button", { name: "Choisir le port" }).click();
+await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();
+r.etat = await texte(bloc.locator(".sous-titre-reglages"));
+await choisirImprimantes(p, "Oxhoo bar");
+r.bandeauParti = await p.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).waitFor({ state: "detached", timeout: 3000 }).then(() => true, () => false);
 await bloc.getByRole("button", { name: "Imprimer un essai" }).click();
 await bloc.locator(".succes", { hasText: "Essai envoyé" }).waitFor();
 await p.screenshot({ path: `${sortie}/is01-reglages.png` });
@@ -135,7 +138,7 @@ console.log(JSON.stringify({ ...r, erreurs }, null, 2));
 const ok =
   r.ipadSansReglage &&
   r.ipadBandeau &&
-  /imprimante série · 9600 bauds · accents et euro/.test(r.etat) &&
+  /Oxhoo bar · série · 9600 bauds/.test(r.etat) &&
   r.bandeauParti &&
   JSON.stringify(r.essai.port) === JSON.stringify(["COM2"]) &&
   r.essai.ordre === "open,signals,write,close" &&

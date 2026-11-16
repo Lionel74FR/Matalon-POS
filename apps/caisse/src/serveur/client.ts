@@ -4,6 +4,7 @@ import type { Catalogue } from "@matalon/catalogue";
 import type { Recette } from "@matalon/stock";
 import type { LienFidelite, MembreFidelite, RecompenseFidelite, ReponseMembreCaisse, UtilisationFidelite } from "@matalon/serveur/fidelite";
 import type {
+  ImprimanteEtablissement,
   EtatImpressionRelayee,
   ImpressionRelayee,
   RelaisImpression,
@@ -300,6 +301,11 @@ export class ClientApi {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/imprimante", { imprimante });
   }
 
+  /** Imprimantes de l'établissement et postes de production (poste → imprimante). */
+  enregistrerImprimantes(corps: { imprimantes: ImprimanteEtablissement[]; postes: Record<string, string> }) {
+    return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/imprimantes", corps);
+  }
+
   enregistrerPostes(postes: PostesProduction) {
     return this.appel<{ etablissement: EtablissementApi }>("PUT", "/api/caisse/postes", { postes });
   }
@@ -326,7 +332,7 @@ export class ClientApi {
   }
 
   /** Confie un reçu à une dalle relais ; 409 RELAIS_HORS_LIGNE si elle ne répond pas. */
-  deposerImpression(corps: { relaisId: string; titre: string; recu: unknown[]; destination?: { adresse: string; sansAccents: boolean } }) {
+  deposerImpression(corps: ({ relaisId: string } | { imprimanteId: string }) & { titre: string; recu: unknown[]; destination?: { adresse: string; sansAccents: boolean } }) {
     return this.appel<{ id: string }>("POST", "/api/caisse/impressions", corps);
   }
 

@@ -1,5 +1,6 @@
 import { CARTES } from "@matalon/catalogue";
 import type { Db } from "./db.js";
+import { nouvelIdImprimante, type ImprimanteEtablissement, type ImprimanteReseau, type PostesProduction } from "./partage.js";
 
 /**
  * Schéma de la base. Chaque instruction est idempotente : elles sont
@@ -528,6 +529,11 @@ export const MIGRATIONS: string[] = [
     faite_le text
   )`,
   `create index if not exists impressions_relayees_file on impressions_relayees (relais_id, etat, cree_le)`,
+  // Imprimantes de l'établissement (16 novembre 2026) : liste où les postes et les appareils choisissent ;
+  // reprises des anciens réglages (imprimante des tickets, postes) au démarrage (`repriseImprimantes`).
+  `alter table etablissements add column if not exists imprimantes jsonb`,
+  `alter table etablissements add column if not exists postes_imprimantes jsonb`,
+  `alter table impressions_relayees add column if not exists imprimante_id text`,
   // Imprimante réseau visée (additions sur l'Oxhoo de la salle) : { adresse, sansAccents } ; null : l'imprimante série de la dalle.
   `alter table impressions_relayees add column if not exists destination jsonb`,
   // Premier établissement du groupe. Son identité légale se complète dans l'administration.
@@ -552,6 +558,7 @@ export function migrer(db: Db): Promise<void> {
       );
     }
     await rattacherCartes(db);
+    await reprendreImprimantes(db);
   })().catch((e) => {
     enCours = null;
     throw e;
@@ -598,6 +605,46 @@ export async function rattacherCartes(db: Db): Promise<void> {
       );
     }
     await db.lot(requetes);
+  }
+}
+
+/**
+ * Anciens réglages → liste des imprimantes : chaque adresse Epson (imprimante des tickets, postes) devient
+ * une imprimante, une seule par adresse ; chaque poste pointe vers la sienne. Les imprimantes déjà
+ * listées sont gardées.
+ */
+export function repriseImprimantes(
+  existantes: ImprimanteEtablissement[],
+  postes: PostesProduction,
+  tickets: ImprimanteReseau | null,
+): { imprimantes: ImprimanteEtablissement[]; postesImprimantes: Record<string, string> } {
+  const imprimantes = [...existantes];
+  const pour = (adresse: string, sansAccents: boolean, nom: string): string => {
+    const deja = imprimantes.find((i) => i.branchement.type === "epson" && i.branchement.adresse === adresse);
+    if (deja) return deja.id;
+    let n = nom;
+    for (let k = 2; imprimantes.some((i) => i.nom.toLowerCase() === n.toLowerCase()); k++) n = `${nom} ${k}`;
+    const i: ImprimanteEtablissement = { id: nouvelIdImprimante(), nom: n.slice(0, 30), branchement: { type: "epson", adresse }, sansAccents };
+    imprimantes.push(i);
+    return i.id;
+  };
+  if (tickets?.adresse) pour(tickets.adresse, tickets.sansAccents, "Tickets");
+  const postesImprimantes: Record<string, string> = {};
+  for (const [poste, p] of Object.entries(postes)) if (p.adresse.trim()) postesImprimantes[poste] = pour(p.adresse.trim(), p.sansAccents, poste);
+  return { imprimantes, postesImprimantes };
+}
+
+async function reprendreImprimantes(db: Db): Promise<void> {
+  const lignes = await db.requete<{ id: string; postes_production: PostesProduction | null; imprimante_tickets: ImprimanteReseau | null }>(
+    "select id, postes_production, imprimante_tickets from etablissements where imprimantes is null",
+  );
+  for (const l of lignes) {
+    const r = repriseImprimantes([], l.postes_production ?? {}, l.imprimante_tickets);
+    await db.requete("update etablissements set imprimantes = $2::jsonb, postes_imprimantes = $3::jsonb where id = $1 and imprimantes is null", [
+      l.id,
+      JSON.stringify(r.imprimantes),
+      JSON.stringify(r.postesImprimantes),
+    ]);
   }
 }
 

@@ -1,5 +1,12 @@
 import { ErreurHttp, type Db } from "./db.js";
-import { adresseLocale, type DestinationReseau, type EtatImpressionRelayee, type ImpressionRelayee, type RelaisImpression } from "./partage.js";
+import {
+  adresseLocale,
+  type DestinationReseau,
+  type EtatImpressionRelayee,
+  type ImpressionRelayee,
+  type ImprimanteEtablissement,
+  type RelaisImpression,
+} from "./partage.js";
 
 /**
  * Impression relayée par une dalle (16 novembre 2026, backlog n° 5) : un iPad ou un iPhone, qui ne peut
@@ -69,7 +76,16 @@ export async function listeRelais(db: Db, etablissementId: string, maintenant: D
 
 /** Dépose une impression pour une dalle relais de l'établissement. Refusée si la dalle ne répond pas. */
 export async function deposerImpression(db: Db, c: Appareil, corps: Record<string, unknown>, maintenant: Date): Promise<{ id: string }> {
-  const relaisId = typeof corps.relaisId === "string" ? corps.relaisId : "";
+  let relaisId = typeof corps.relaisId === "string" ? corps.relaisId : "";
+  // Imprimante de la liste de l'établissement (16 novembre 2026) : la dalle qui la porte l'imprime.
+  let imprimanteId: string | null = null;
+  if (corps.imprimanteId !== undefined) {
+    const [e] = await db.requete<{ imprimantes: ImprimanteEtablissement[] | null }>("select imprimantes from etablissements where id = $1", [c.etablissement_id]);
+    const i = (e?.imprimantes ?? []).find((x) => x.id === corps.imprimanteId);
+    if (!i || i.branchement.type === "epson") throw new ErreurHttp(404, "IMPRIMANTE_INCONNUE", "Imprimante inconnue ou jointe en direct : rechargez les réglages.");
+    imprimanteId = i.id;
+    relaisId = i.branchement.dalleId;
+  }
   const titre = typeof corps.titre === "string" ? corps.titre.slice(0, 80) : "";
   const recu = lireRecu(corps.recu);
   let destination: DestinationReseau | null = null;
@@ -81,15 +97,23 @@ export async function deposerImpression(db: Db, c: Appareil, corps: Record<strin
     destination = { adresse: d.adresse, sansAccents: d.sansAccents };
   }
   const relais = (await listeRelais(db, c.etablissement_id, maintenant)).find((r) => r.id === relaisId);
-  if (!relais) throw new ErreurHttp(404, "RELAIS_INCONNU", "Cette dalle n'imprime plus pour les autres appareils : choisissez une autre sortie dans les Réglages.");
+  if (!relais) {
+    throw new ErreurHttp(
+      404,
+      "RELAIS_INCONNU",
+      imprimanteId
+        ? "La dalle qui porte cette imprimante n'a pas encore ouvert la caisse depuis qu'elle la porte : ouvrez la caisse sur la dalle."
+        : "Cette dalle n'imprime plus pour les autres appareils : choisissez une autre sortie dans les Réglages.",
+    );
+  }
   if (!relais.enLigne) {
     throw new ErreurHttp(409, "RELAIS_HORS_LIGNE", `La dalle « ${relais.nom} » ne répond pas : vérifiez qu'elle est allumée, la caisse ouverte dans Chrome.`);
   }
   const id = `ir-${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
   await db.requete(
-    `insert into impressions_relayees (id, etablissement_id, relais_id, demandeur_id, titre, recu, etat, cree_le, destination)
-     values ($1, $2, $3, $4, $5, $6::jsonb, 'attente', $7, $8::jsonb)`,
-    [id, c.etablissement_id, relais.id, c.id, titre, JSON.stringify(recu), maintenant.toISOString(), destination ? JSON.stringify(destination) : null],
+    `insert into impressions_relayees (id, etablissement_id, relais_id, demandeur_id, titre, recu, etat, cree_le, destination, imprimante_id)
+     values ($1, $2, $3, $4, $5, $6::jsonb, 'attente', $7, $8::jsonb, $9)`,
+    [id, c.etablissement_id, relais.id, c.id, titre, JSON.stringify(recu), maintenant.toISOString(), destination ? JSON.stringify(destination) : null, imprimanteId],
   );
   return { id };
 }
@@ -103,10 +127,17 @@ export async function prendreImpressions(db: Db, c: Appareil, maintenant: Date):
   const vu = await db.requete<{ caisse_id: string }>("update relais_impression set vu_le = $2 where caisse_id = $1 returning caisse_id", [c.id, iso(t)]);
   if (!vu.length) return [];
   await db.requete("delete from impressions_relayees where etablissement_id = $1 and cree_le < $2", [c.etablissement_id, iso(t - PURGE_MS)]);
-  const lignes = await db.requete<{ id: string; titre: string; recu: unknown[] | string; cree_le: string; destination: DestinationReseau | string | null }>(
+  const lignes = await db.requete<{
+    id: string;
+    titre: string;
+    recu: unknown[] | string;
+    cree_le: string;
+    destination: DestinationReseau | string | null;
+    imprimante_id: string | null;
+  }>(
     `update impressions_relayees set etat = 'prise', prise_le = $2
      where id in (select id from impressions_relayees where relais_id = $1 and etat = 'attente' and cree_le >= $3 order by cree_le, id limit 5)
-     returning id, titre, recu, cree_le, destination`,
+     returning id, titre, recu, cree_le, destination, imprimante_id`,
     [c.id, iso(t), iso(t - ATTENTE_MAX_MS)],
   );
   return lignes
@@ -114,7 +145,7 @@ export async function prendreImpressions(db: Db, c: Appareil, maintenant: Date):
     .map((l) => {
       const recu = typeof l.recu === "string" ? (JSON.parse(l.recu) as unknown[]) : l.recu;
       const destination = typeof l.destination === "string" ? (JSON.parse(l.destination) as DestinationReseau) : l.destination;
-      return { id: l.id, titre: l.titre, recu, ...(destination ? { destination } : {}) };
+      return { id: l.id, titre: l.titre, recu, ...(destination ? { destination } : {}), ...(l.imprimante_id ? { imprimanteId: l.imprimante_id } : {}) };
     });
 }
 

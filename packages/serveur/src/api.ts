@@ -58,6 +58,8 @@ import {
   EMAIL_VALIDE,
   type ClientApi,
   posteValide,
+  erreurImprimantes,
+  type ImprimanteEtablissement,
   problemePlan,
   problemeMoments,
   problemeMotifsRemise,
@@ -95,7 +97,7 @@ import {
   type AccesAdminApi,
   type InvitationAdminApi,
 } from "./partage.js";
-import { migrer } from "./schema.js";
+import { migrer, repriseImprimantes } from "./schema.js";
 import { ALGORITHMES, depuisBase64Url, ErreurWebAuthn, verifierAssertion, verifierEnregistrement, type ReponseAssertion, type ReponseEnregistrement } from "./webauthn.js";
 import {
   aleatoire,
@@ -238,6 +240,8 @@ interface LigneEtablissement {
   note_auto?: boolean | null;
   postes_production: PostesProduction | null;
   imprimante_tickets: ImprimanteReseau | null;
+  imprimantes?: ImprimanteEtablissement[] | null;
+  postes_imprimantes?: Record<string, string> | null;
   zones: ZonePlan[] | null;
   plan_version: number | null;
   moments?: MomentJournee[] | null;
@@ -266,6 +270,8 @@ function versEtablissement(l: LigneEtablissement): EtablissementApi {
     noteAutomatique: l.note_auto !== false,
     postesProduction: l.postes_production ?? {},
     imprimanteTickets: l.imprimante_tickets?.adresse ? l.imprimante_tickets : null,
+    imprimantes: l.imprimantes ?? [],
+    postesImprimantes: l.postes_imprimantes ?? {},
     zones: l.zones ?? [],
     planVersion: l.plan_version ?? 0,
     moments: l.moments ?? [],
@@ -376,13 +382,73 @@ function lirePostes(v: unknown): PostesProduction {
   return postes;
 }
 
+/** Ancienne route des postes (caisses pas encore mises à jour) : reportée dans la liste des imprimantes. */
 async function majPostes(env: Environnement, etablissementId: string, corps: Record<string, unknown>): Promise<EtablissementApi> {
   const postes = lirePostes(corps.postes);
-  const [maj] = await env.db.requete<{ id: string }>(
-    "update etablissements set postes_production = $2::jsonb, maj_le = $3 where id = $1 returning id",
-    [etablissementId, JSON.stringify(postes), horloge(env).toISOString()],
+  const [l] = await env.db.requete<{ imprimantes: ImprimanteEtablissement[] | null }>("select imprimantes from etablissements where id = $1", [etablissementId]);
+  if (!l) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  const { imprimantes, postesImprimantes } = repriseImprimantes(l.imprimantes ?? [], postes, null);
+  await env.db.requete(
+    "update etablissements set postes_production = $2::jsonb, imprimantes = $3::jsonb, postes_imprimantes = $4::jsonb, maj_le = $5 where id = $1",
+    [etablissementId, JSON.stringify(postes), JSON.stringify(imprimantes), JSON.stringify(postesImprimantes), horloge(env).toISOString()],
   );
-  if (!maj) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  return etablissement(env.db, etablissementId);
+}
+
+/** Appareils de l'établissement qui peuvent porter une imprimante (dalles : tout appareil non révoqué). */
+async function dallesEtablissement(env: Environnement, etablissementId: string): Promise<Set<string>> {
+  const l = await env.db.requete<{ id: string }>("select id from caisses where etablissement_id = $1 and revoquee_le is null", [etablissementId]);
+  return new Set(l.map((c) => c.id));
+}
+
+/**
+ * Imprimantes de l'établissement et postes de production (16 novembre 2026). Les postes reliés à une
+ * Epson sont recopiés dans `postes_production` pour les caisses pas encore mises à jour.
+ */
+async function majImprimantes(
+  env: Environnement,
+  etablissementId: string,
+  corps: Record<string, unknown>,
+  auteur: { adminId: string | null; caisseId?: string },
+): Promise<EtablissementApi> {
+  const [avant] = await env.db.requete<{ imprimantes: ImprimanteEtablissement[] | null; postes_imprimantes: Record<string, string> | null }>(
+    "select imprimantes, postes_imprimantes from etablissements where id = $1",
+    [etablissementId],
+  );
+  if (!avant) throw new ErreurHttp(404, "ETABLISSEMENT_INCONNU", "Établissement introuvable.");
+  const erreur = erreurImprimantes(corps.imprimantes, corps.postes, await dallesEtablissement(env, etablissementId));
+  if (erreur) throw new ErreurHttp(400, "IMPRIMANTES_INVALIDES", erreur);
+  const imprimantes = (corps.imprimantes as ImprimanteEtablissement[]).map((i) => ({
+    id: i.id,
+    nom: i.nom,
+    branchement:
+      i.branchement.type === "epson"
+        ? { type: "epson" as const, adresse: i.branchement.adresse.trim() }
+        : i.branchement.type === "serie"
+          ? { type: "serie" as const, dalleId: i.branchement.dalleId }
+          : { type: "reseau" as const, adresse: i.branchement.adresse, dalleId: i.branchement.dalleId },
+    sansAccents: i.sansAccents,
+  }));
+  const postes = corps.postes as Record<string, string>;
+  const ancien: PostesProduction = {};
+  for (const [poste, id] of Object.entries(postes)) {
+    const b = imprimantes.find((i) => i.id === id)!;
+    if (b.branchement.type === "epson") ancien[poste] = { adresse: b.branchement.adresse, sansAccents: b.sansAccents };
+  }
+  await env.db.requete(
+    "update etablissements set imprimantes = $2::jsonb, postes_imprimantes = $3::jsonb, postes_production = $4::jsonb, maj_le = $5 where id = $1",
+    [etablissementId, JSON.stringify(imprimantes), JSON.stringify(postes), JSON.stringify(ancien), horloge(env).toISOString()],
+  );
+  if (JSON.stringify([avant.imprimantes ?? [], avant.postes_imprimantes ?? {}]) !== JSON.stringify([imprimantes, postes])) {
+    await journaliserAdmin(env, auteur.adminId, "imprimantes", {
+      etablissement: etablissementId,
+      ...(auteur.caisseId ? { caisse: auteur.caisseId } : {}),
+      imprimantes: imprimantes.map((i) => `${i.nom} (${i.branchement.type === "serie" ? `série, ${i.branchement.dalleId}` : i.branchement.adresse})`).join(", "),
+      postes: Object.entries(postes)
+        .map(([p, id]) => `${p} → ${imprimantes.find((i) => i.id === id)!.nom}`)
+        .join(", "),
+    });
+  }
   return etablissement(env.db, etablissementId);
 }
 
@@ -410,6 +476,17 @@ async function majImprimanteTickets(
     imprimante ? JSON.stringify(imprimante) : null,
     horloge(env).toISOString(),
   ]);
+  // Caisse pas encore mise à jour : l'imprimante rejoint aussi la liste de l'établissement.
+  if (imprimante) {
+    const [l] = await env.db.requete<{ imprimantes: ImprimanteEtablissement[] | null; postes_imprimantes: Record<string, string> | null }>(
+      "select imprimantes, postes_imprimantes from etablissements where id = $1",
+      [etablissementId],
+    );
+    const r = repriseImprimantes(l?.imprimantes ?? [], {}, imprimante);
+    if (r.imprimantes.length !== (l?.imprimantes ?? []).length) {
+      await env.db.requete("update etablissements set imprimantes = $2::jsonb where id = $1", [etablissementId, JSON.stringify(r.imprimantes)]);
+    }
+  }
   if (JSON.stringify(avant.imprimante_tickets ?? null) !== JSON.stringify(imprimante)) {
     await journaliserAdmin(env, auteur.adminId, "imprimante_tickets", {
       etablissement: etablissementId,
@@ -3555,6 +3632,10 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
       await rendreCompte(env.db, c, pimp[1]!, await lireJson<Record<string, unknown>>(requete), horloge(env));
       return json(200, { ok: true });
     }
+    if (chemin === "/api/caisse/imprimantes" && m === "PUT") {
+      const c = await caisseAuthentifiee(env, requete);
+      return json(200, { etablissement: await majImprimantes(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete), { adminId: null, caisseId: c.id }) });
+    }
     if (chemin === "/api/caisse/postes" && m === "PUT") {
       const c = await caisseAuthentifiee(env, requete);
       return json(200, { etablissement: await majPostes(env, c.etablissement_id, await lireJson<Record<string, unknown>>(requete)) });
@@ -3662,6 +3743,11 @@ export async function traiter(requete: Request, env: Environnement): Promise<Res
         const e = await majMotifsRemise(env, p[1]!, await lireJson<Record<string, unknown>>(requete));
         await journaliserAdmin(env, admin.id, "motifs_remise", { etablissement: e.id, motifs: (e.motifsRemise ?? []).join(", ") });
         return json(200, { etablissement: e });
+      }
+      p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/imprimantes$/.exec(chemin);
+      if (p && m === "PUT") {
+        const e = await etablissement(env.db, p[1]!);
+        return json(200, { etablissement: await majImprimantes(env, e.id, await lireJson<Record<string, unknown>>(requete), { adminId: admin.id }) });
       }
       p = /^\/api\/admin\/etablissements\/([a-z0-9-]+)\/postes$/.exec(chemin);
       if (p && m === "PUT") {

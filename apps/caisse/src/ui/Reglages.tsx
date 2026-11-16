@@ -3,13 +3,12 @@ import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { VERSION_NOYAU_FISCAL } from "@matalon/noyau-fiscal";
 import { postesDeLaCarte } from "@matalon/catalogue";
-import type { PostesProduction } from "@matalon/serveur/partage";
+import type { ImprimanteEtablissement } from "@matalon/serveur/partage";
 import { useEffect, useState } from "react";
 import {
   carteDe,
   hacherPin,
-  imprimanteDe,
-  retenirImprimante,
+  imprimantesRecues,
   identifiantAleatoire,
   type Configuration,
   type Etablissement,
@@ -18,13 +17,11 @@ import {
 } from "../donnees/configuration";
 import { ErreurApi } from "../serveur/client";
 import { VERSION_APPLICATION } from "../fiscal/caisse";
-import { envoyerEpson } from "../impression/epson";
-import { ImprimanteAdditions } from "./ImprimanteAdditions";
-import { ImprimanteRelais } from "./ImprimanteRelais";
-import { ImprimanteSerie } from "./ImprimanteSerie";
-import { gabaritBon, gabaritTest } from "../impression/gabarits";
+import { imprimerSur } from "../impression/imprimantes";
+import { EditeurImprimantes } from "./EditeurImprimantes";
+import { ImprimantesAppareil, ImprimantesPortees } from "./ImprimantesAppareil";
+import { gabaritBon } from "../impression/gabarits";
 import { nouvelleCommande } from "../metier/commande";
-import { EditeurPostes } from "./EditeurPostes";
 import { euros, useCaisse } from "./contexte";
 
 const CHAMPS: Array<[keyof Etablissement, string]> = [
@@ -51,12 +48,6 @@ export function Reglages(props: { onAssistant: () => void }) {
   const carte = carteDe(config);
   const [envoi, setEnvoi] = useState(false);
   const [etablissement, setEtablissement] = useState(config.etablissement);
-  const commune = config.imprimanteEtablissement ?? null;
-  // Imprimante de l'établissement par défaut ; « propre à cet appareil » seulement si elle diffère de celle de l'établissement.
-  const [pourTous, setPourTous] = useState(!config.imprimante.adresse || !commune || config.imprimante.adresse === commune.adresse);
-  const [imprimante, setImprimante] = useState(
-    config.imprimante.adresse ? config.imprimante : (commune ?? config.imprimante),
-  );
   const [seuil, setSeuil] = useState(config.seuilNoteAutomatique / 100);
   const [noteAuto, setNoteAuto] = useState(config.noteAutomatique !== false);
   const [nouveau, setNouveau] = useState<{ nom: string; role: Role; pin: string }>({ nom: "", role: "serveur", pin: "" });
@@ -68,18 +59,11 @@ export function Reglages(props: { onAssistant: () => void }) {
 
   const enregistrer = async () => {
     const seuilNote = Math.round(seuil * 100);
-    const choisie = { ...imprimante, adresse: imprimante.adresse.trim() };
-    let suivante: Configuration = { ...config, imprimante: pourTous ? { adresse: "", sansAccents: false } : choisie };
+    let suivante: Configuration = config;
     const partageModifie =
       JSON.stringify([etablissement, seuilNote, noteAuto]) !== JSON.stringify([config.etablissement, config.seuilNoteAutomatique, config.noteAutomatique !== false]);
-    const imprimanteCommuneModifiee =
-      pourTous && JSON.stringify(choisie.adresse ? choisie : null) !== JSON.stringify(commune ? { adresse: commune.adresse, sansAccents: commune.sansAccents } : null);
     setEnvoi(true);
     try {
-      if (imprimanteCommuneModifiee) {
-        const { etablissement: e } = await caisse.client.enregistrerImprimante(choisie.adresse ? choisie : null);
-        suivante = { ...suivante, imprimanteEtablissement: e.imprimanteTickets ?? null };
-      }
       if (partageModifie) {
         const { etablissement: e } = await caisse.client.enregistrerEtablissement({
           identite: { ...etablissement, siret: etablissement.siret.replace(/\s/g, "") },
@@ -90,10 +74,8 @@ export function Reglages(props: { onAssistant: () => void }) {
         suivante = { ...suivante, etablissement: e.identite, tables: e.tables, seuilNoteAutomatique: e.seuilNote, noteAutomatique: e.noteAutomatique !== false };
         setEtablissement(e.identite);
       }
-      await majConfig(retenirImprimante(suivante));
-      notifier(
-        partageModifie || imprimanteCommuneModifiee ? "Réglages enregistrés et partagés avec les autres caisses." : `Réglages de cet ${NOM_APPAREIL} enregistrés.`,
-      );
+      await majConfig(suivante);
+      notifier(partageModifie ? "Réglages enregistrés et partagés avec les autres caisses." : `Réglages de cet ${NOM_APPAREIL} enregistrés.`);
     } catch (e) {
       notifier(messageServeur(e), "erreur");
     } finally {
@@ -143,24 +125,31 @@ export function Reglages(props: { onAssistant: () => void }) {
     await enregistrerMembre({ ...u, pinHash: await hacherPin(u.id, pin) }, `Code PIN de ${u.nom} modifié.`);
   };
 
-  /** Les postes sont communs à l'établissement : enregistrés d'abord sur le serveur. */
-  const enregistrerPostes = async (postes: PostesProduction) => {
+  /** Les imprimantes sont communes à l'établissement : enregistrées d'abord sur le serveur. */
+  const enregistrerImprimantes = async (imprimantes: ImprimanteEtablissement[], postes: Record<string, string>) => {
     try {
-      const { etablissement: e } = await caisse.client.enregistrerPostes(postes);
-      await majConfig({ ...config, postesProduction: e.postesProduction ?? {} });
-      notifier("Imprimantes de production enregistrées pour toutes les caisses.");
+      const { etablissement: e } = await caisse.client.enregistrerImprimantes({ imprimantes, postes });
+      await majConfig({ ...config, ...imprimantesRecues(config, e) });
+      notifier("Imprimantes enregistrées pour tous les appareils de l'établissement.");
     } catch (e) {
       throw new Error(messageServeur(e));
     }
   };
 
-  const testerPoste = async (poste: string, adresse: string, sansAccents: boolean) => {
-    const bon = { poste, annulation: false, articles: [{ quantite: 1, libelle: "Bon d'essai", details: ["Imprimante de production"], suite: 0 as const }], ligneUids: [] };
+  const testerImprimante = async (i: ImprimanteEtablissement) => {
+    const bon = { poste: i.nom, annulation: false, articles: [{ quantite: 1, libelle: "Bon d'essai", details: [i.nom], suite: 0 as const }], ligneUids: [] };
     try {
-      await envoyerEpson(adresse, gabaritBon(bon, nouvelleCommande("comptoir", utilisateur.id), config, utilisateur.id), { sansAccents });
-      notifier(`Bon d'essai envoyé à ${poste}.`);
+      await imprimerSur({
+        config,
+        client: caisse.client,
+        imprimante: i,
+        recu: gabaritBon(bon, nouvelleCommande("comptoir", utilisateur.id), config, utilisateur.id),
+        titre: `Essai ${i.nom}`,
+        surEchec: (e) => notifier(`${i.nom} : ${e}`, "erreur"),
+      });
+      notifier(`Bon d'essai envoyé à « ${i.nom} ».`);
     } catch (e) {
-      notifier(`${poste} : ${e instanceof Error ? e.message : String(e)}`, "erreur");
+      notifier(`${i.nom} : ${e instanceof Error ? e.message : String(e)}`, "erreur");
     }
   };
 
@@ -186,67 +175,10 @@ export function Reglages(props: { onAssistant: () => void }) {
         </fieldset>
 
         <div>
-          <ImprimanteSerie />
-          <ImprimanteRelais />
-          <ImprimanteAdditions />
+          <ImprimantesAppareil onAssistant={props.onAssistant} />
+          <ImprimantesPortees />
           <fieldset>
-            <legend>Imprimante Epson</legend>
-            {config.imprimanteSerie && (
-              <p className="aide-champ">Cet {NOM_APPAREIL} imprime ses tickets sur l'imprimante série ci-dessus ; l'imprimante Epson sert aux autres appareils.</p>
-            )}
-            {!config.imprimanteSerie && config.imprimanteRelais && (
-              <p className="aide-champ">
-                Cet {NOM_APPAREIL} imprime ses tickets sur la dalle « {config.imprimanteRelais.nom} » ; l'imprimante Epson sert aux autres appareils.
-              </p>
-            )}
-            <div className="options" role="radiogroup" aria-label="Imprimante des tickets">
-              <button role="radio" aria-checked={pourTous} className={`bouton${pourTous ? " actif" : ""}`} onClick={() => setPourTous(true)}>
-                Tout l'établissement
-              </button>
-              <button role="radio" aria-checked={!pourTous} className={`bouton${!pourTous ? " actif" : ""}`} onClick={() => setPourTous(false)}>
-                Cet {NOM_APPAREIL} seulement
-              </button>
-            </div>
-            <p className="aide-champ">
-              {pourTous
-                ? `Commune à tous les appareils de l'établissement${commune ? ` (actuellement ${commune.adresse})` : ""} ; la modifier demande une connexion Internet. Chaque appareil accepte une fois le certificat de l'imprimante (assistant, étape « Autoriser »).`
-                : `Cet ${NOM_APPAREIL} imprime sur sa propre imprimante${commune ? ` au lieu de celle de l'établissement (${commune.adresse})` : ""}.`}
-            </p>
-            {!imprimanteDe(config) && config.imprimanteConnue && imprimante.adresse.trim() !== config.imprimanteConnue.adresse && (
-              <div className="imprimante-connue">
-                <span>Dernière imprimante utilisée sur cet {NOM_APPAREIL} : {config.imprimanteConnue.adresse}</span>
-                <button className="bouton" onClick={() => setImprimante(config.imprimanteConnue!)}>
-                  <AvecIcone icone={RefreshCw}>Rétablir</AvecIcone>
-                </button>
-              </div>
-            )}
-            <button className="bouton principal" onClick={props.onAssistant}>
-              <AvecIcone icone={Printer}>Assistant de connexion</AvecIcone>
-            </button>
-            <label className="champ">
-              <span>
-                Adresse IP
-                <small>Imprimez la page d'état (bouton Feed au démarrage) pour la trouver</small>
-              </span>
-              <input
-                value={imprimante.adresse}
-                placeholder="192.168.1.50"
-                inputMode="decimal"
-                onChange={(e) => setImprimante({ ...imprimante, adresse: e.target.value })}
-              />
-            </label>
-            <label className="case">
-              <input type="checkbox" checked={imprimante.sansAccents} onChange={(e) => setImprimante({ ...imprimante, sansAccents: e.target.checked })} />
-              Imprimer sans accents (si l'impression les déforme)
-            </label>
-            <button
-              className="bouton"
-              onClick={() =>
-                void imprimer(gabaritTest({ ...config, etablissement, imprimante: { ...imprimante, adresse: imprimante.adresse.trim() } }), "Test")
-              }
-            >
-              <AvecIcone icone={Printer}>Imprimer un test</AvecIcone>
-            </button>
+            <legend>Notes</legend>
             <label className="champ">
               <span>
                 Note due à partir de
@@ -264,23 +196,24 @@ export function Reglages(props: { onAssistant: () => void }) {
               </p>
             )}
           </fieldset>
-
-          <fieldset>
-            <legend>Imprimantes de production</legend>
-            <p className="aide-champ">
-              Chaque catégorie de la carte peut envoyer ses bons à un poste (bar, cuisine). Associez ici une imprimante à chaque poste :
-              « Envoyer » sur la commande imprime les nouveaux articles, le reste part à l'encaissement. Commun à toutes les caisses.
-            </p>
-            <EditeurPostes
-              postesCarte={carte ? postesDeLaCarte(carte) : []}
-              valeur={config.postesProduction ?? {}}
-              onEnregistrer={enregistrerPostes}
-              onTester={(p, a, s) => void testerPoste(p, a, s)}
-            />
-          </fieldset>
-
         </div>
       </div>
+
+      <fieldset>
+        <legend>Imprimantes de l'établissement</legend>
+        <p className="aide-champ">
+          Réglées une fois pour tous les appareils. Les postes de production (bar, cuisine) y choisissent leur imprimante : « Envoyer » sur la commande
+          imprime les nouveaux articles, le reste part à l'encaissement. Chaque appareil choisit ensuite celle de ses tickets et de ses additions.
+        </p>
+        <EditeurImprimantes
+          imprimantes={config.imprimantes ?? []}
+          postes={config.postesImprimantes ?? {}}
+          postesCarte={carte ? postesDeLaCarte(carte) : []}
+          appareils={{ ...config.appareils, [config.caisseId]: config.caisseNom }}
+          onEnregistrer={enregistrerImprimantes}
+          onTester={(i) => void testerImprimante(i)}
+        />
+      </fieldset>
 
       <fieldset>
         <legend>Équipe</legend>

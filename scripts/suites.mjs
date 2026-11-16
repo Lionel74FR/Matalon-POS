@@ -5,6 +5,7 @@
 // imprimantes sont simulées : le scénario intercepte les requêtes ePOS-Print.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/suites.mjs [dossier-captures]
+import { declarerImprimantes } from "./imprimantes-e2e.mjs";
 import { chromium } from "playwright";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
@@ -56,10 +57,7 @@ await clic("Plus tard");
 await p.locator(".puce-synchro.synchronise").waitFor({ timeout: 15000 });
 
 await p.getByRole("button", { name: /^Menu/ }).click().then(() => p.getByRole("menuitem", { name: "Réglages" }).click());
-await p.getByLabel("Adresse IP de l'imprimante Bar").fill(BAR);
-await p.getByLabel("Adresse IP de l'imprimante Cuisine").fill(CUISINE);
-await clic("Enregistrer les imprimantes");
-await p.getByText("Imprimantes de production enregistrées").waitFor();
+await declarerImprimantes(p, [{ nom: "Bar", type: "epson", adresse: BAR }, { nom: "Cuisine", type: "epson", adresse: CUISINE }], { Bar: "Bar", Cuisine: "Cuisine" });
 
 // ── Comptoir : pas de suites ──
 await p.getByRole("tab", { name: "Salle" }).click();

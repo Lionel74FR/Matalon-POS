@@ -2,7 +2,7 @@ import { ArrowLeft, ArrowRight, Ban, Banknote, Check, Clock, ExternalLink, Print
 import { AvecIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
 import { useEffect, useState } from "react";
-import { imprimanteDe, type Configuration } from "../donnees/configuration";
+import { imprimanteDe, sortieTickets, type Configuration } from "../donnees/configuration";
 import { ADRESSE_IPV4, envoyerEpson, ErreurImpression, testerEpson, type EtatImprimante } from "../impression/epson";
 import { gabaritTest } from "../impression/gabarits";
 import { Recu } from "../impression/recu";
@@ -29,8 +29,14 @@ export function AssistantImprimante(props: {
 }) {
   const [etape, setEtape] = useState(0);
   // Celle de l'appareil, sinon celle de l'établissement : sur un nouvel appareil, il ne reste qu'à autoriser le certificat.
-  const [adresse, setAdresse] = useState(imprimanteDe(props.config)?.adresse ?? "");
-  const [sansAccents, setSansAccents] = useState(imprimanteDe(props.config)?.sansAccents ?? false);
+  // L'Epson des tickets de cet appareil (liste de l'établissement), sinon l'ancien réglage.
+  const choisie = sortieTickets(props.config);
+  const actuelle =
+    choisie?.connexion === "liste" && choisie.imprimante.branchement.type === "epson"
+      ? { adresse: choisie.imprimante.branchement.adresse, sansAccents: choisie.imprimante.sansAccents }
+      : imprimanteDe(props.config);
+  const [adresse, setAdresse] = useState(actuelle?.adresse ?? "");
+  const [sansAccents, setSansAccents] = useState(actuelle?.sansAccents ?? false);
   const [test, setTest] = useState<Test | null>(null);
   const [impression, setImpression] = useState<"attente" | "envoyee" | "erreur">("attente");
   const [tiroir, setTiroir] = useState<"attente" | "envoye" | "bloque">("attente");

@@ -149,6 +149,14 @@ export interface EtablissementApi {
   postesProduction?: PostesProduction;
   /** Imprimante des tickets commune à l'établissement : sert à tout appareil qui n'en a pas une à lui. */
   imprimanteTickets?: ImprimanteReseau | null;
+  /**
+   * Imprimantes de l'établissement (16 novembre 2026) : la liste où les postes de production et chaque
+   * appareil (tickets, additions) choisissent. Remplace `postesProduction` et `imprimanteTickets`, gardés
+   * pour les caisses pas encore mises à jour.
+   */
+  imprimantes?: ImprimanteEtablissement[];
+  /** Poste de production de la carte → identifiant d'une imprimante de `imprimantes`. */
+  postesImprimantes?: Record<string, string>;
   /** Plan de salle : zones dimensionnées et décor (les tables sont dans `tables`). */
   zones?: ZonePlan[];
   planVersion?: number;
@@ -952,6 +960,8 @@ export interface ImpressionRelayee {
   recu: unknown[];
   /** Imprimante réseau ESC/POS que la dalle joint par son script local (additions) ; absente : son imprimante série. */
   destination?: DestinationReseau;
+  /** Imprimante de la liste de l'établissement que la dalle porte (16 novembre 2026). */
+  imprimanteId?: string;
 }
 
 /** Imprimante réseau ESC/POS du réseau local (Oxhoo de la salle du Chardon), port 9100. */
@@ -966,4 +976,67 @@ export function adresseLocale(a: unknown): a is string {
   const o = a.split(".").map(Number);
   if (o.some((x) => x > 255)) return false;
   return o[0] === 10 || (o[0] === 172 && o[1]! >= 16 && o[1]! <= 31) || (o[0] === 192 && o[1] === 168);
+}
+
+/**
+ * Branchement d'une imprimante de l'établissement : Epson jointe en direct par tout appareil (ePOS-Print),
+ * imprimante série sur le port COM d'une dalle, ou imprimante réseau ESC/POS jointe par le script d'une
+ * dalle (Oxhoo de la salle du Chardon). `dalleId` : l'appareil (caisse) qui la porte ; les autres appareils
+ * passent par lui (impression relayée).
+ */
+export type BranchementImprimante = { type: "epson"; adresse: string } | { type: "serie"; dalleId: string } | { type: "reseau"; adresse: string; dalleId: string };
+
+export interface ImprimanteEtablissement {
+  /** « imp- » suivi de 4 à 12 caractères. */
+  id: string;
+  nom: string;
+  branchement: BranchementImprimante;
+  sansAccents: boolean;
+}
+
+export const IMPRIMANTES_MAX = 20;
+const ID_IMPRIMANTE = /^imp-[a-z0-9]{4,12}$/;
+const ADRESSE_EPSON = /^[a-z0-9.:-]{1,100}$/i;
+
+/**
+ * Contrôle la liste des imprimantes et les postes (poste → imprimante). `dalles` : appareils de
+ * l'établissement qui peuvent porter une imprimante. Rend un message d'erreur, ou null.
+ */
+export function erreurImprimantes(imprimantes: unknown, postes: unknown, dalles: ReadonlySet<string>): string | null {
+  if (!Array.isArray(imprimantes)) return "Liste d'imprimantes attendue.";
+  if (imprimantes.length > IMPRIMANTES_MAX) return `${IMPRIMANTES_MAX} imprimantes au plus.`;
+  const ids = new Set<string>();
+  const noms = new Set<string>();
+  for (const i of imprimantes as Array<Record<string, unknown>>) {
+    if (!i || typeof i !== "object" || typeof i.id !== "string" || !ID_IMPRIMANTE.test(i.id) || ids.has(i.id)) return "Identifiant d'imprimante invalide.";
+    ids.add(i.id);
+    if (typeof i.nom !== "string" || !posteValide(i.nom)) return "Nom d'imprimante : 1 à 30 caractères.";
+    if (noms.has(i.nom.toLowerCase())) return `Deux imprimantes s'appellent « ${i.nom} ».`;
+    noms.add(i.nom.toLowerCase());
+    if (typeof i.sansAccents !== "boolean") return `${i.nom} : réglage des accents manquant.`;
+    const b = i.branchement as Record<string, unknown> | null;
+    if (!b || typeof b !== "object") return `${i.nom} : branchement manquant.`;
+    if (b.type === "epson") {
+      if (typeof b.adresse !== "string" || !ADRESSE_EPSON.test(b.adresse)) return `${i.nom} : adresse IP de l'imprimante Epson attendue.`;
+    } else if (b.type === "serie" || b.type === "reseau") {
+      if (typeof b.dalleId !== "string" || !dalles.has(b.dalleId)) return `${i.nom} : choisissez la dalle qui la porte.`;
+      if (b.type === "reseau" && !adresseLocale(b.adresse)) return `${i.nom} : adresse du réseau local attendue (192.168.x.x…).`;
+    } else return `${i.nom} : branchement inconnu.`;
+    if (Object.keys(b).some((k) => !["type", "adresse", "dalleId"].includes(k)) || (b.type === "serie" && "adresse" in b) || (b.type === "epson" && "dalleId" in b)) {
+      return `${i.nom} : branchement invalide.`;
+    }
+  }
+  if (typeof postes !== "object" || postes === null || Array.isArray(postes)) return "Postes de production invalides.";
+  const entrees = Object.entries(postes as Record<string, unknown>);
+  if (entrees.length > 12) return "12 postes de production au plus.";
+  for (const [nom, id] of entrees) {
+    if (!posteValide(nom)) return `Poste « ${nom} » : nom invalide.`;
+    if (typeof id !== "string" || !ids.has(id)) return `Poste « ${nom} » : imprimante inconnue.`;
+  }
+  return null;
+}
+
+/** Nouvel identifiant d'imprimante. */
+export function nouvelIdImprimante(): string {
+  return `imp-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`;
 }

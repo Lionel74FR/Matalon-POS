@@ -1,12 +1,13 @@
 // Additions sur l'imprimante réseau de la salle (backlog n° 5, 16 novembre 2026 : Oxhoo 192.168.1.248 du
 // Chardon). Chrome ne joint pas le port 9100 : le script de la dalle (simulé ici, même protocole que
-// public/outils/matalon-imprimante-reseau.ps1 sur 127.0.0.1:9181) transmet le ticket ESC/POS. La dalle
-// imprime ses additions par son script ; l'iPad les fait imprimer par la dalle relais ; les tickets
-// restent sur l'imprimante série. Sans dalle, l'iPad ne voit pas le réglage (Moka inchangé).
+// public/outils/matalon-imprimante-reseau.ps1 sur 127.0.0.1:9181) transmet le ticket ESC/POS. « Oxhoo
+// salle » (réseau par la dalle) est dans la liste de l'établissement : la dalle et l'iPad la choisissent
+// pour leurs additions ; l'iPad passe par la dalle ; les tickets restent sur l'imprimante série.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/impression-additions.mjs [dossier-captures]
 import { createServer } from "node:http";
 import { chromium } from "playwright";
+import { choisirImprimantes, declarerImprimantes } from "./imprimantes-e2e.mjs";
 import { preparerServeur } from "./preparer-caisse.mjs";
 
 const URL = process.env.URL ?? "http://localhost:4180";
@@ -100,34 +101,33 @@ const addition = async (p, n) => {
   await p.getByRole("button", { name: "Addition", exact: true }).click();
 };
 
-// ── iPad, sans dalle relais : pas de réglage des additions ──
+// ── iPad, avant toute imprimante : rien à choisir ──
 const ci = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
 await ci.addInitScript(() => delete Navigator.prototype.serial);
 const ipad = await ci.newPage();
 ipad.on("pageerror", (e) => erreurs.push(`ipad : ${e.message}`));
 await connexion(ipad, codeIpad, "Rattacher l'iPad");
-await reglages(ipad);
-await ipad.waitForTimeout(500);
-r.ipadSansReglage = (await ipad.getByText("Imprimante des additions").count()) === 0;
+r.ipadSansReglage = (await ipad.locator(".bandeau-info", { hasText: "Caisse sans imprimante" }).count()) === 1;
 
-// ── Dalle : imprimante série et relais, additions par son script ──
+// ── Dalle : Oxhoo série et Oxhoo réseau de la salle, envoyée par son script ──
 const cd = await b.newContext({ viewport: { width: 1366, height: 768 } });
 await cd.addInitScript(simulerPorts);
 const p = await cd.newPage();
 p.on("pageerror", (e) => erreurs.push(`dalle : ${e.message}`));
 await connexion(p, code, "Rattacher l'iPad");
 await reglages(p);
-const serie = p.locator("fieldset", { hasText: "Imprimante série (port COM)" });
-await serie.getByRole("button", { name: "Utiliser une imprimante série" }).click();
-await serie.locator(".imprimante-serie-etat").waitFor();
-await serie.getByLabel(/Imprimer aussi pour les iPad et iPhone/).click();
-await serie.locator(".succes", { hasText: "imprime aussi pour les iPad" }).waitFor();
-const bloc = p.locator("fieldset", { hasText: "Imprimante des additions" });
-await bloc.getByLabel(/Adresse IP de l'imprimante/).fill("192.168.1.248");
-await bloc.getByRole("radio", { name: "Cette dalle (script installé)" }).click();
-await bloc.getByRole("button", { name: "Vérifier le script" }).click();
+await declarerImprimantes(p, [
+  { nom: "Oxhoo bar", type: "serie", dalle: "Dalle bar" },
+  { nom: "Oxhoo salle", type: "reseau", adresse: "192.168.1.248", dalle: "Dalle bar" },
+]);
+const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
+await bloc.getByRole("button", { name: "Choisir le port" }).click();
+await bloc.locator(".succes", { hasText: "Port choisi" }).waitFor();
+await choisirImprimantes(p, "Oxhoo bar", "Oxhoo salle");
+const salle = bloc.locator(".imprimante-portee", { hasText: "Oxhoo salle" });
+await salle.getByRole("button", { name: "Vérifier le script" }).click();
 r.verification = await texte(bloc.locator(".succes"));
-await bloc.getByRole("button", { name: "Imprimer une addition d'essai" }).click();
+await salle.getByRole("button", { name: "Imprimer un essai" }).click();
 await attendreEnvois(1);
 await p.screenshot({ path: `${sortie}/ia01-dalle-additions.png` });
 r.essai = { ip: envois[0]?.ip, port: envois[0]?.port, debut: [...(envois[0]?.octets ?? [])].slice(0, 2).join(" "), test: envois[0]?.octets.toString("latin1").includes("Test") ?? false, coupe: [...(envois[0]?.octets ?? [])].slice(-3).join(" ") };
@@ -140,17 +140,16 @@ await attendreEnvois(2);
 r.additionDalle = { ip: envois[1]?.ip, cappuccino: envois[1]?.octets.toString("latin1").includes("Cappuccino") ?? false, serie: (await p.evaluate(() => window.__serie.filter((x) => x.quoi === "write").length)) };
 r.dalleSansApercu = (await p.locator(".apercu-recu").count()) === 0;
 
-// ── iPad : additions par la dalle relais ──
+// ── iPad : additions sur l'Oxhoo de la salle, par la dalle ──
 await ipad.reload();
 await ipad.locator(".carte-personne", { hasText: "Lionel" }).click();
 for (const x of "1234") await ipad.locator(".pave .touche", { hasText: new RegExp(`^${x}$`) }).last().click();
 const plusTard = ipad.getByRole("button", { name: "Plus tard", exact: true });
 await plusTard.waitFor({ timeout: 3000 }).then(() => plusTard.click()).catch(() => undefined);
 await reglages(ipad);
-const blocIpad = ipad.locator("fieldset", { hasText: "Imprimante des additions" });
-await blocIpad.getByLabel(/Adresse IP de l'imprimante/).fill("192.168.1.248");
-await blocIpad.getByRole("radio", { name: /Par Dalle bar/ }).click();
-r.ipadScriptCache = (await blocIpad.getByRole("button", { name: "Vérifier le script" }).count()) === 0;
+await ipad.getByRole("radiogroup", { name: "Imprimante des additions" }).getByRole("radio", { name: /^Oxhoo salle/ }).waitFor();
+await choisirImprimantes(ipad, "Oxhoo bar", "Oxhoo salle");
+r.ipadScriptCache = (await ipad.getByRole("button", { name: "Vérifier le script" }).count()) === 0;
 await ipad.screenshot({ path: `${sortie}/ia02-ipad-additions.png` });
 await ipad.keyboard.press("Escape");
 await addition(ipad, 5);
@@ -163,7 +162,7 @@ script.close();
 console.log(JSON.stringify({ ...r, erreurs }, null, 2));
 const ok =
   r.ipadSansReglage &&
-  /Script lancé sur cette dalle \(version 1\)/.test(r.verification) &&
+  /Script lancé sur cet ordinateur/.test(r.verification) &&
   r.essai.ip === "192.168.1.248" &&
   r.essai.port === "9100" &&
   r.essai.debut === "27 64" &&

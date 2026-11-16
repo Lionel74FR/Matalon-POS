@@ -28,10 +28,13 @@ export function cleLogo(config: Pick<Configuration, "etablissementId" | "logo">)
  * Logo d'un ticket série : « memoire » si ce logo-là est enregistré dans l'imprimante (envoi instantané),
  * sinon l'image à envoyer avec le ticket.
  */
-export async function logoTicketSerie(config: Pick<Configuration, "etablissementId" | "logo" | "imprimanteSerie">): Promise<LogoTicket> {
+export async function logoTicketSerie(
+  config: Pick<Configuration, "etablissementId" | "logo" | "imprimanteSerie">,
+  logoMemoire: string | undefined = config.imprimanteSerie?.logoMemoire,
+): Promise<LogoTicket> {
   const cle = cleLogo(config);
   if (!cle) return null;
-  if (config.imprimanteSerie?.logoMemoire === cle) return "memoire";
+  if (logoMemoire === cle) return "memoire";
   return logoSerie(config);
 }
 

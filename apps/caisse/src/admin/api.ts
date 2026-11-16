@@ -5,7 +5,7 @@ import type { ReglagesReservation, Reservation } from "@matalon/reservations";
 import type { CommandeFournisseur, EtatEnvoi, MomentJournee, ReponseCommandes, ReponseStatistiques, ReponseTickets } from "@matalon/serveur/partage";
 import type { MembreFidelite, MouvementFidelite, ProgrammeFidelite, ReglesFidelite } from "@matalon/serveur/fidelite";
 import type { OptionsConnexion, OptionsCreation } from "./cleAcces";
-import type { AccesAdminApi, InvitationAdminApi, AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
+import type { AccesAdminApi, InvitationAdminApi, AlerteApi, ClientApi, Derniers, EtablissementApi, ReponseComptes, IdentiteEtablissement, PostesProduction, ImprimanteEtablissement, CleApi, DocumentStock, EtatStock, LigneFactureApi, MouvementApi, RapportFoodCost, ReponseCarte, ReponseImport, ReponseStock, ReponseVentesCarte, ResumeCarte, Role, Table, UtilisateurApi, ZonePlan } from "@matalon/serveur/partage";
 
 export interface ResumeCloture {
   numero: number;
@@ -180,6 +180,8 @@ export const api = {
     appel<{ etablissement: EtablissementApi; historique: AdresseImprimante[] }>("PUT", `/etablissements/${etablissementId}/imprimante`, { imprimante }),
   historiqueImprimanteTickets: (etablissementId: string) =>
     appel<{ historique: AdresseImprimante[] }>("GET", `/etablissements/${etablissementId}/imprimante/historique`),
+  enregistrerImprimantes: (etablissementId: string, imprimantes: ImprimanteEtablissement[], postes: Record<string, string>) =>
+    appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/imprimantes`, { imprimantes, postes }),
   enregistrerPostes: (etablissementId: string, postes: PostesProduction) =>
     appel<{ etablissement: EtablissementApi }>("PUT", `/etablissements/${etablissementId}/postes`, { postes }),
   comptes: (etablissementId: string) => appel<ReponseComptes>("GET", `/etablissements/${etablissementId}/comptes`),

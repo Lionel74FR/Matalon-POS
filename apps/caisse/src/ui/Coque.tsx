@@ -43,6 +43,7 @@ import { StockCaisse } from "./StockCaisse";
 import { EditionCaisse } from "./EditionCaisse";
 import { ModaleFondDeCaisse } from "./modales/ModaleFondDeCaisse";
 import { AssistantImprimante } from "./AssistantImprimante";
+import { adopterEpson } from "../impression/imprimantes";
 import { Clotures } from "./Clotures";
 import { Comptes } from "./Comptes";
 import { euros, useCaisse } from "./contexte";
@@ -372,7 +373,9 @@ export function Coque() {
       {!sortieTickets(config) && utilisateur.role === "responsable" && (
         <div className="bandeau-info">
           <span className="bandeau-texte">
-            Caisse sans imprimante : les notes passent par QR code, les Z restent consultables dans Clôtures.
+            {config.imprimantes?.length
+              ? "Caisse sans imprimante : choisissez celle de cet appareil dans Réglages › Imprimantes de cet appareil. En attendant, les notes passent par QR code."
+              : "Caisse sans imprimante : les notes passent par QR code, les Z restent consultables dans Clôtures."}
           </span>
           <button className="bouton" onClick={() => setAssistant(true)}>
             <AvecIcone icone={Printer}>Connecter l'imprimante</AvecIcone>
@@ -432,19 +435,9 @@ export function Coque() {
             onTerminer={(imprimante) => {
               setAssistant(false);
               void (async () => {
-                // L'imprimante devient celle de l'établissement, sauf s'il en a déjà une autre (celle-ci reste alors propre à l'appareil).
-                const commune = config.imprimanteEtablissement;
-                if (!commune || commune.adresse === imprimante.adresse) {
-                  try {
-                    const { etablissement: e } = await caisse.client.enregistrerImprimante(imprimante);
-                    await majConfig({ ...config, imprimante: { adresse: "", sansAccents: false }, imprimanteEtablissement: e.imprimanteTickets ?? null, imprimanteConnue: imprimante });
-                    return notifier("Imprimante connectée, pour tous les appareils de l'établissement.");
-                  } catch {
-                    /* hors ligne : gardée sur cet appareil */
-                  }
-                }
-                await majConfig({ ...config, imprimante, imprimanteConnue: imprimante });
-                notifier("Imprimante connectée sur cet appareil.");
+                const r = await adopterEpson(caisse.client, config, imprimante);
+                await majConfig(r.config);
+                notifier(r.partagee ? "Imprimante connectée : imprimante des tickets de cet appareil, ajoutée à la liste de l'établissement." : "Imprimante connectée sur cet appareil.");
               })();
             }}
             onPlusTard={() => setAssistant(false)}

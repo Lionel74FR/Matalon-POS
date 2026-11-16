@@ -337,7 +337,7 @@ export function Accueil(props: { e: EtablissementAdmin; onAller: (r: Rubrique, o
             )}
           </Carte>
           <Carte titre="Appareils" lien={{ libelle: "Gérer", onClick: () => props.onAller("appareils") }}>
-            {actives.length === 0 && !e.imprimanteTickets ? (
+            {actives.length === 0 && !e.imprimantes?.length ? (
               <p className="accueil-vide">Aucun appareil rattaché.</p>
             ) : (
               <div className="accueil-appareils">
@@ -359,14 +359,15 @@ export function Accueil(props: { e: EtablissementAdmin; onAller: (r: Rubrique, o
                   );
                 })}
                 <div className="accueil-appareil">
-                  <strong>Imprimante des tickets</strong>
+                  <strong>Imprimantes</strong>
                   <small>
-                    {e.imprimanteTickets ? (
+                    {e.imprimantes?.length ? (
                       <>
-                        <span className="etat bon">● Réglée</span> <span className="chiffres">{e.imprimanteTickets.adresse}</span>
+                        <span className="etat bon">● {e.imprimantes.length === 1 ? "1 imprimante" : `${e.imprimantes.length} imprimantes`}</span>{" "}
+                        <span>{e.imprimantes.map((i) => i.nom).join(", ")}</span>
                       </>
                     ) : (
-                      <span className="etat attention">● Non réglée</span>
+                      <span className="etat attention">● Aucune</span>
                     )}
                   </small>
                 </div>

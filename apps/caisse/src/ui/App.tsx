@@ -17,9 +17,10 @@ import {
 } from "../fiscal/caisse";
 import { envoyerEpson } from "../impression/epson";
 import { logoTicketSerie } from "../impression/logo-serie";
-import { envoyerSerie } from "../impression/serie";
+import { envoyerSerie, serieDisponible } from "../impression/serie";
 import { demarrerRelais, imprimerParRelais } from "../impression/relais";
 import { imprimerReseau } from "../impression/reseau";
+import { adopterEpson, imprimanteParId, imprimantesPortees, imprimerSur } from "../impression/imprimantes";
 import type { Recu } from "../impression/recu";
 import { AssistantImprimante } from "./AssistantImprimante";
 import { Connexion } from "./Connexion";
@@ -198,7 +199,8 @@ export function App() {
   const caisseOuverte = phase.nom === "caisse" || phase.nom === "connexion" ? phase.caisse : null;
   const configRelais = useRef<Configuration | null>(null);
   configRelais.current = caisseOuverte?.config ?? null;
-  const estRelais = !!caisseOuverte?.config.imprimanteSerie?.relais;
+  // Une dalle qui porte une imprimante de la liste relaie d'office (16 novembre 2026).
+  const estRelais = !!caisseOuverte && (!!caisseOuverte.config.imprimanteSerie?.relais || (serieDisponible() && imprimantesPortees(caisseOuverte.config).length > 0));
   const clientRelais = caisseOuverte?.client;
   useEffect(() => {
     if (!estRelais || !clientRelais) return;
@@ -227,40 +229,32 @@ export function App() {
       notifier,
       imprimanteConfiguree: !!sortieTickets(caisse.config),
       async imprimer(recu: Recu, titre: string, o?: { addition?: boolean }) {
-        const additions = o?.addition ? caisse.config.imprimanteAdditions : undefined;
-        if (additions) {
-          const { adresse, sansAccents, relaisId, relaisNom } = additions;
-          try {
-            if (!relaisId) await imprimerReseau(recu, { adresse, sansAccents }, caisse.config);
-            else {
-              await imprimerParRelais(
-                caisse.client,
-                relaisId,
-                recu,
-                titre,
-                (erreur) => {
-                  notifier(`« ${titre} » n'est pas sorti sur l'imprimante ${adresse} (dalle ${relaisNom ?? ""}) : ${erreur}`, "erreur");
-                  setApercu({ recu, titre, erreur });
-                },
-                undefined,
-                { adresse, sansAccents },
-              );
-            }
-          } catch (e) {
-            setApercu({ recu, titre, erreur: e instanceof Error ? e.message : String(e) });
-          }
-          return;
-        }
-        const imprimante = sortieTickets(caisse.config);
-        if (!imprimante) return setApercu({ recu, titre });
+        const config = caisse.config;
+        const surEchec = (nom: string) => (erreur: string) => {
+          notifier(`« ${titre} » n'est pas sorti sur ${nom} : ${erreur}`, "erreur");
+          setApercu({ recu, titre, erreur });
+        };
         try {
-          if (imprimante.connexion === "serie") await envoyerSerie(recu, { ...imprimante, logo: await logoTicketSerie(caisse.config) });
-          else if (imprimante.connexion === "relais") {
-            await imprimerParRelais(caisse.client, imprimante.relaisId, recu, titre, (erreur) => {
-              notifier(`« ${titre} » n'est pas sorti sur la dalle ${imprimante.nom} : ${erreur}`, "erreur");
-              setApercu({ recu, titre, erreur });
-            });
-          } else await envoyerEpson(imprimante.adresse, recu, { sansAccents: imprimante.sansAccents });
+          // Addition : l'imprimante des additions de cet appareil s'il en a choisi une.
+          if (o?.addition) {
+            const i = imprimanteParId(config, config.imprimanteAdditionsId);
+            if (i) return await imprimerSur({ config, client: caisse.client, imprimante: i, recu, titre, surEchec: surEchec(`« ${i.nom} »`) });
+            const a = config.imprimanteAdditionsId === undefined && config.imprimanteTicketsId === undefined ? config.imprimanteAdditions : undefined;
+            if (a) {
+              if (!a.relaisId) return await imprimerReseau(recu, a, config);
+              return await imprimerParRelais(caisse.client, { relaisId: a.relaisId }, recu, titre, surEchec(`l'imprimante ${a.adresse}`), undefined, {
+                adresse: a.adresse,
+                sansAccents: a.sansAccents,
+              });
+            }
+          }
+          const sortie = sortieTickets(config);
+          if (!sortie) return setApercu({ recu, titre });
+          if (sortie.connexion === "liste") {
+            await imprimerSur({ config, client: caisse.client, imprimante: sortie.imprimante, recu, titre, surEchec: surEchec(`« ${sortie.imprimante.nom} »`) });
+          } else if (sortie.connexion === "serie") await envoyerSerie(recu, { ...sortie, logo: await logoTicketSerie(config) });
+          else if (sortie.connexion === "relais") await imprimerParRelais(caisse.client, { relaisId: sortie.relaisId }, recu, titre, surEchec(`la dalle ${sortie.nom}`));
+          else await envoyerEpson(sortie.adresse, recu, { sansAccents: sortie.sansAccents });
         } catch (e) {
           setApercu({ recu, titre, erreur: e instanceof Error ? e.message : String(e) });
         }
@@ -352,10 +346,11 @@ export function App() {
           <AssistantImprimante
             config={phase.caisse.config}
             onTerminer={(imprimante) =>
-              void enregistrerConfiguration(caisseCourante.current ?? phase.caisse, {
-                ...(caisseCourante.current ?? phase.caisse).config,
-                imprimante,
-              }).then((caisse) => setPhase({ nom: "connexion", caisse }))
+              void (async () => {
+                const c = caisseCourante.current ?? phase.caisse;
+                const r = await adopterEpson(c.client, c.config, imprimante);
+                setPhase({ nom: "connexion", caisse: await enregistrerConfiguration(c, r.config) });
+              })()
             }
             onPlusTard={() => setPhase({ nom: "connexion", caisse: phase.caisse })}
           />
