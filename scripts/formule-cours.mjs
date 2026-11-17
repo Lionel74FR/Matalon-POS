@@ -48,7 +48,7 @@ await appel("PUT", "/cartes/carte-automne-2026", { carte, version });
 
 // ── iPad : imprimantes de production simulées ──
 const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
-await ctx.route(/https:\/\/10\.0\.0\.2[12]\//, async (route) => {
+await ctx.route(/https?:\/\/10\.0\.0\.2[12]\//, async (route) => {
   const q = route.request();
   const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
   if (q.method() === "OPTIONS") return route.fulfill({ status: 200, headers: cors });

@@ -1,3 +1,4 @@
+import { typeDeCetAppareil } from "../donnees/appareil";
 import { aligner, LARGEUR, type Recu } from "./recu";
 
 const ENTITES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" };
@@ -97,8 +98,43 @@ export function lireReponse(xml: string): EtatImprimante & { succes: boolean; co
   return { succes, code, pret: succes && problemes.length === 0, problemes, papierBientotFini: (status & PAPIER_BIENTOT_FINI) !== 0 };
 }
 
+/**
+ * Sur un ordinateur (Chrome ou Edge, 17 novembre 2026, Chardon) : l'Epson est d'abord jointe en http.
+ * Chrome l'admet depuis une page https pour une adresse IP du réseau local (accès au réseau
+ * local autorisé), sans le certificat maison de l'imprimante qui fait marquer toute la page
+ * « Non sécurisé ». iPad et iPhone (Safari) restent en https : rien ne change au Moka.
+ */
+export function httpPossible(nav: Pick<Navigator, "userAgent" | "maxTouchPoints"> & { serial?: unknown } = navigator): boolean {
+  return typeDeCetAppareil(nav) === "Autre" && "serial" in nav && nav.serial !== undefined;
+}
+
+/** Protocole retenu par adresse pendant la session : http s'il a répondu, https s'il a été refusé. */
+const protocoles = new Map<string, "http" | "https">();
+
 async function poster(adresse: string, corps: string, delaiMs = 10_000): Promise<string> {
-  const url = `https://${adresse}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=${delaiMs}`;
+  const connu = protocoles.get(adresse);
+  if (connu === "https" || (connu === undefined && !httpPossible())) return posterEn("https", adresse, corps, delaiMs);
+  try {
+    const reponse = await posterEn("http", adresse, corps, delaiMs);
+    protocoles.set(adresse, "http");
+    return reponse;
+  } catch (e) {
+    // Refus immédiat (http désactivé sur l'imprimante, navigateur qui le bloque) : https, comme avant.
+    if (e instanceof ErreurImpression && e.cause_ === "certificat") {
+      protocoles.set(adresse, "https");
+      return posterEn("https", adresse, corps, delaiMs);
+    }
+    throw e;
+  }
+}
+
+/** Oublie les protocoles retenus (tests). */
+export function oublierProtocoles(): void {
+  protocoles.clear();
+}
+
+async function posterEn(protocole: "http" | "https", adresse: string, corps: string, delaiMs: number): Promise<string> {
+  const url = `${protocole}://${adresse}/cgi-bin/epos/service.cgi?devid=local_printer&timeout=${delaiMs}`;
   const controle = new AbortController();
   const minuterie = setTimeout(() => controle.abort(), delaiMs + 2_000);
   const debut = Date.now();
@@ -112,7 +148,9 @@ async function poster(adresse: string, corps: string, delaiMs = 10_000): Promise
       },
       body: corps,
       signal: controle.signal,
-    });
+      // Accès au réseau local de Chrome : la requête http vers l'imprimante n'est pas du contenu mixte.
+      ...(protocole === "http" ? { targetAddressSpace: "local" } : {}),
+    } as RequestInit);
     return await reponse.text();
   } catch {
     // Un refus en moins de 3 secondes vient du navigateur (certificat), pas du réseau.

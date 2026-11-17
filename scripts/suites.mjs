@@ -27,7 +27,7 @@ const recus = [];
 const b = await chromium.launch();
 const erreurs = [];
 const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
-await ctx.route(/https:\/\/10\.0\.0\.2[12]\//, async (route) => {
+await ctx.route(/https?:\/\/10\.0\.0\.2[12]\//, async (route) => {
   const r = route.request();
   const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
   if (r.method() === "OPTIONS") return route.fulfill({ status: 200, headers: cors });

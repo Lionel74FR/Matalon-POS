@@ -20,7 +20,7 @@ const b = await chromium.launch();
 
 async function appareil(nom, options, codeRattachement, bouton) {
   const ctx = await b.newContext(options);
-  await ctx.route(/https:\/\/10\.0\.0\.3[01]\//, async (route) => {
+  await ctx.route(/https?:\/\/10\.0\.0\.3[01]\//, async (route) => {
     const r = route.request();
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
     if (r.method() === "OPTIONS") return route.fulfill({ status: 200, headers: cors });
