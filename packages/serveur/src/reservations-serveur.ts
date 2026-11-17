@@ -11,15 +11,20 @@ import {
   decalerJour,
   dureeDe,
   HEURE_VALIDE,
+  heureDe,
   JOUR_VALIDE,
   joursLibres,
   maintenantParis,
   MESSAGES_REFUS,
   REGLAGES_DEFAUT,
   serviceDe,
+  CANAUX_EQUIPE,
+  temporaire,
   validerCoordonnees,
+  validerDetails,
   validerReglages,
   type Civilite,
+  type Details,
   type ReglagesReservation,
   type Reservation,
   type SourceReservation,
@@ -106,7 +111,7 @@ async function ecrire(db: Db, r: Reservation): Promise<void> {
 async function purger(db: Db, maintenant: Date): Promise<void> {
   const limite = decalerJour(maintenantParis(maintenant).jour, -CONSERVATION_JOURS);
   await db.requete(
-    `update reservations set contenu = (contenu - 'email' - 'commentaire' - 'civilite') || '{"prenom":"","nom":"(effacé)","telephone":""}'::jsonb, jeton_hash = null
+    `update reservations set contenu = (contenu - 'email' - 'commentaire' - 'civilite' - 'allergies' - 'memo') || '{"prenom":"","nom":"(effacé)","telephone":""}'::jsonb, jeton_hash = null
      where date < $1 and contenu->>'telephone' <> ''`,
     [limite],
   );
@@ -128,11 +133,13 @@ export interface SaisieReservation {
   tables?: string[];
   offresEmail?: boolean;
   offresSms?: boolean;
+  /** Détails posés par l'équipe (prise par, allergies, mémo, couleur, étiquettes) ; jamais par le module du site. */
+  details?: Details;
 }
 
 const CIVILITES: Civilite[] = ["Mme", "M.", "Mx"];
 
-function lireSaisie(corps: Record<string, unknown>, emailObligatoire: boolean): SaisieReservation {
+function lireSaisie(corps: Record<string, unknown>, emailObligatoire: boolean, passage = false): SaisieReservation {
   const date = String(corps.date ?? "");
   const heure = String(corps.heure ?? "");
   const couverts = Number(corps.couverts);
@@ -148,10 +155,12 @@ function lireSaisie(corps: Record<string, unknown>, emailObligatoire: boolean): 
       email: String(corps.email ?? ""),
       commentaire: String(corps.commentaire ?? ""),
     },
-    { emailObligatoire },
+    { emailObligatoire, passage },
   );
   if ("erreurs" in c) throw new ErreurHttp(400, "COORDONNEES_INVALIDES", c.erreurs.join(" "));
   const tables = Array.isArray(corps.tables) ? corps.tables.map(String).slice(0, 8) : undefined;
+  const d = validerDetails(corps);
+  if ("erreurs" in d) throw new ErreurHttp(400, "CHAMP_INVALIDE", d.erreurs.join(" "));
   return {
     date,
     heure,
@@ -161,6 +170,7 @@ function lireSaisie(corps: Record<string, unknown>, emailObligatoire: boolean): 
     ...(tables ? { tables } : {}),
     ...(corps.offresEmail === true ? { offresEmail: true } : {}),
     ...(corps.offresSms === true ? { offresSms: true } : {}),
+    ...(Object.keys(d.ok).length ? { details: d.ok } : {}),
   };
 }
 
@@ -177,15 +187,26 @@ export async function creerReservation(
   ctx: ContexteResa,
   etab: EtablissementApi,
   s: SaisieReservation,
-  options: { source: SourceReservation; par: string; forcer?: boolean },
+  options: {
+    source: SourceReservation;
+    par: string;
+    forcer?: boolean;
+    /** Statut de départ posé par l'équipe : sous option, liste d'attente, ou installée (client de passage). */
+    statut?: "confirmee" | "option" | "attente" | "arrivee";
+    /** Faux : pas d'e-mail de confirmation au client (choix de l'équipe à la saisie). */
+    notifier?: boolean;
+  },
 ): Promise<{ reservation: Reservation; jeton: string; conflits: Reservation[] }> {
   const { reglages } = await lireReglages(ctx.db, etab.id);
   const enLigne = options.source === "en_ligne";
+  const statut = enLigne ? "confirmee" : (options.statut ?? "confirmee");
+  // Sous option ou en liste d'attente : elle ne prend ni place ni table, rien à contrôler.
+  const compte = statut === "confirmee" || statut === "arrivee";
   if (enLigne && !reglages.actif) throw new ErreurHttp(403, "RESERVATION_FERMEE", "La réservation en ligne n'est pas ouverte.");
   const service = serviceDe(reglages, s.date, s.heure);
   const du = await reservationsDu(ctx.db, etab.id, s.date, s.date);
   const verifier = (liste: Reservation[]) => controler(reglages, liste, s, { maintenant: ctx.maintenant, enLigne });
-  const refus = verifier(du);
+  const refus = compte ? verifier(du) : null;
   // L'équipe peut passer outre (« Enregistrer quand même ») ; le client en ligne jamais.
   if (refus && !(options.forcer && !enLigne)) throw new ErreurHttp(409, refus, MESSAGES_REFUS[refus]);
   if (enLigne && du.some((r) => r.telephone === s.telephone && (r.statut === "confirmee" || r.statut === "arrivee"))) {
@@ -206,26 +227,41 @@ export async function creerReservation(
     telephone: s.telephone,
     ...(s.email ? { email: s.email } : {}),
     ...(s.commentaire ? { commentaire: s.commentaire } : {}),
-    statut: "confirmee",
+    statut,
     source: options.source,
     tables: [],
     ...(s.zone ? { zoneSouhaitee: s.zone } : {}),
     ...(s.offresEmail ? { offresEmail: true } : {}),
     ...(s.offresSms ? { offresSms: true } : {}),
+    ...(enLigne ? {} : (s.details ?? {})),
     creeLe: le,
     majLe: le,
-    historique: [{ le, par: options.par, action: refus ? `créée en dépassement (${MESSAGES_REFUS[refus]})` : "créée" }],
+    historique: [
+      {
+        le,
+        par: options.par,
+        action: refus
+          ? `créée en dépassement (${MESSAGES_REFUS[refus]})`
+          : statut === "option"
+            ? "créée sous option"
+            : statut === "attente"
+              ? "créée en liste d'attente"
+              : statut === "arrivee"
+                ? "créée et installée (client de passage)"
+                : "créée",
+      },
+    ],
   };
   const tablesVisibles = etab.tables.filter((t) => !t.masquee);
-  base.tables = s.tables?.length ? s.tables.filter((id) => tablesVisibles.some((t) => t.id === id)) : attribuerTable(tablesVisibles, du, base);
+  base.tables = s.tables?.length ? s.tables.filter((id) => tablesVisibles.some((t) => t.id === id)) : compte ? attribuerTable(tablesVisibles, du, base) : [];
   const jeton = nouveauJeton();
   const [ecrite] = await ctx.db.requete<{ seq: string }>(
     `insert into reservations (id, etablissement_id, date, contenu, statut, jeton_hash, cree_le, maj_le)
-     values ($1, $2, $3, $4::jsonb, 'confirmee', $5, $6, $6) returning seq`,
-    [base.id, etab.id, base.date, JSON.stringify(base), await sha256(jeton), le],
+     values ($1, $2, $3, $4::jsonb, $7, $5, $6, $6) returning seq`,
+    [base.id, etab.id, base.date, JSON.stringify(base), await sha256(jeton), le, base.statut],
   );
   // Course entre deux demandes : on revérifie contre les réservations écrites avant celle-ci.
-  if (!refus) {
+  if (!refus && compte) {
     const avant = (
       await ctx.db.requete<{ contenu: Reservation }>("select contenu from reservations where etablissement_id = $1 and date = $2 and seq < $3", [
         etab.id,
@@ -245,13 +281,29 @@ export async function creerReservation(
     }
   }
   await purger(ctx.db, ctx.maintenant);
-  if (base.email) await envoyerConfirmation(ctx, etab, reglages, base, jeton);
+  // Pas de confirmation pour une option, une attente ou un client déjà installé, ni quand l'équipe l'a décochée.
+  if (base.email && statut === "confirmee" && options.notifier !== false) await envoyerConfirmation(ctx, etab, reglages, base, jeton);
   if (enLigne && reglages.email) await prevenirEtablissement(ctx, etab, reglages, base, "Nouvelle réservation");
   return { reservation: base, jeton, conflits: conflitsTable(await reservationsDu(ctx.db, etab.id, base.date, base.date), base) };
 }
 
-const STATUTS: StatutReservation[] = ["confirmee", "arrivee", "absente", "annulee"];
-const LIBELLES_STATUT: Record<StatutReservation, string> = { confirmee: "confirmée", arrivee: "arrivée", absente: "absente", annulee: "annulée" };
+const STATUTS: StatutReservation[] = ["confirmee", "arrivee", "absente", "annulee", "option", "attente"];
+const LIBELLES_STATUT: Record<StatutReservation, string> = {
+  confirmee: "confirmée",
+  arrivee: "arrivée",
+  absente: "absente",
+  annulee: "annulée",
+  option: "sous option",
+  attente: "en liste d'attente",
+};
+const LIBELLES_CANAL: Record<SourceReservation, string> = { en_ligne: "en ligne", telephone: "téléphone", sur_place: "sur place", email: "e-mail", messagerie: "messagerie" };
+const LIBELLES_DETAIL: Record<keyof Details, string> = {
+  prisePar: "prise par modifiée",
+  allergies: "allergies modifiées",
+  memo: "mémo modifié",
+  couleur: "couleur modifiée",
+  tags: "étiquettes modifiées",
+};
 
 /** Modification par l'équipe : statut, table(s), heure, date, couverts, coordonnées, note. */
 export async function modifierReservation(
@@ -274,16 +326,19 @@ export async function modifierReservation(
     throw new ErreurHttp(400, "CHAMP_INVALIDE", "Date, heure ou nombre de personnes invalide.");
   }
   const deplacee = date !== r.date || heure !== r.heure || couverts !== r.couverts;
-  const reactivee = statut === "confirmee" && (r.statut === "annulee" || r.statut === "absente");
-  if (deplacee || reactivee) {
+  // Elle reprend une place : rétablie, ou confirmée (installée) depuis une option ou la liste d'attente.
+  const etaitTemporaire = temporaire(r);
+  const reactivee = (statut === "confirmee" || statut === "arrivee") && !(r.statut === "confirmee" || r.statut === "arrivee");
+  const compteApres = statut ? statut === "confirmee" || statut === "arrivee" : r.statut === "confirmee" || r.statut === "arrivee";
+  if ((deplacee && compteApres) || reactivee) {
     const du = await reservationsDu(ctx.db, etab.id, date, date);
     const refus = controler(reglages, du, { date, heure, couverts }, { maintenant: ctx.maintenant, enLigne: false, ignorer: r.id });
     if (refus && corps.forcer !== true) throw new ErreurHttp(409, refus, `${MESSAGES_REFUS[refus]} Enregistrer quand même ?`);
-    if (deplacee) {
-      const service = serviceDe(reglages, date, heure);
-      actions.push(`déplacée : ${r.date} ${r.heure} × ${r.couverts} → ${date} ${heure} × ${couverts}`);
-      Object.assign(r, { date, heure, couverts, serviceId: service?.id ?? "hors-service", dureeMinutes: dureeDe(reglages, service) });
-    }
+  }
+  if (deplacee) {
+    const service = serviceDe(reglages, date, heure);
+    actions.push(`déplacée : ${r.date} ${r.heure} × ${r.couverts} → ${date} ${heure} × ${couverts}`);
+    Object.assign(r, { date, heure, couverts, serviceId: service?.id ?? "hors-service", dureeMinutes: dureeDe(reglages, service) });
   }
   if (statut && statut !== r.statut) {
     actions.push(LIBELLES_STATUT[statut]);
@@ -295,7 +350,7 @@ export async function modifierReservation(
       actions.push(ids.length ? `table ${ids.map((t) => etab.tables.find((x) => x.id === t)?.nom ?? t).join(" + ")}` : "à placer");
       r.tables = ids;
     }
-  } else if (deplacee) {
+  } else if ((deplacee || reactivee) && compteApres) {
     const du = await reservationsDu(ctx.db, etab.id, r.date, r.date);
     const places = r.tables.reduce((n, t) => n + (etab.tables.find((x) => x.id === t)?.chaises ?? 4), 0);
     if (r.tables.length === 0 || places < r.couverts || conflitsTable(du, r).length > 0) {
@@ -310,7 +365,7 @@ export async function modifierReservation(
   }
   for (const champ of ["prenom", "nom", "telephone", "email", "commentaire"] as const) {
     if (corps[champ] === undefined) continue;
-    const c = validerCoordonnees({ prenom: r.prenom, nom: r.nom, telephone: r.telephone, email: r.email ?? "", commentaire: r.commentaire ?? "", [champ]: String(corps[champ]) }, { emailObligatoire: false });
+    const c = validerCoordonnees({ prenom: r.prenom, nom: r.nom, telephone: r.telephone, email: r.email ?? "", commentaire: r.commentaire ?? "", [champ]: String(corps[champ]) }, { emailObligatoire: false, passage: r.source === "sur_place" && !avant.telephone });
     if ("erreurs" in c) throw new ErreurHttp(400, "COORDONNEES_INVALIDES", c.erreurs.join(" "));
     Object.assign(r, { prenom: c.ok.prenom, nom: c.ok.nom, telephone: c.ok.telephone });
     if (c.ok.email) r.email = c.ok.email;
@@ -319,12 +374,45 @@ export async function modifierReservation(
     else delete r.commentaire;
     if (JSON.stringify([avant[champ]]) !== JSON.stringify([r[champ]])) actions.push(`${champ} modifié`);
   }
+  if (corps.civilite !== undefined) {
+    const c = corps.civilite === null || corps.civilite === "" ? undefined : CIVILITES.find((x) => x === corps.civilite);
+    if (corps.civilite && !c) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Civilité invalide.");
+    if (c !== r.civilite) {
+      if (c) r.civilite = c;
+      else delete r.civilite;
+      actions.push("civilité modifiée");
+    }
+  }
+  if (corps.source !== undefined && r.source !== "en_ligne") {
+    const canal = corps.source as SourceReservation;
+    if (!CANAUX_EQUIPE.includes(canal)) throw new ErreurHttp(400, "CHAMP_INVALIDE", "Canal invalide.");
+    if (canal !== r.source) {
+      actions.push(`canal ${LIBELLES_CANAL[canal]}`);
+      r.source = canal;
+    }
+  }
+  const d = validerDetails(corps);
+  if ("erreurs" in d) throw new ErreurHttp(400, "CHAMP_INVALIDE", d.erreurs.join(" "));
+  for (const cle of Object.keys(LIBELLES_DETAIL) as Array<keyof Details>) {
+    const avantV = JSON.stringify(r[cle] ?? null);
+    if (d.effaces.includes(cle)) delete r[cle];
+    else if (d.ok[cle] !== undefined) Object.assign(r, { [cle]: d.ok[cle] });
+    if (JSON.stringify(r[cle] ?? null) !== avantV) actions.push(LIBELLES_DETAIL[cle]);
+  }
+  for (const cle of ["offresEmail", "offresSms"] as const) {
+    if (typeof corps[cle] !== "boolean" || corps[cle] === !!r[cle]) continue;
+    if (corps[cle]) r[cle] = true;
+    else delete r[cle];
+    actions.push(`${cle === "offresEmail" ? "offres par e-mail" : "offres par SMS"} ${corps[cle] ? "acceptées" : "refusées"}`);
+  }
   if (actions.length === 0) return { reservation: r, conflits: conflitsTable(await reservationsDu(ctx.db, etab.id, r.date, r.date), r) };
   r.majLe = ctx.maintenant.toISOString();
   r.historique.push({ le: r.majLe, par, action: actions.join(" · ") });
   await ecrire(ctx.db, r);
-  if (r.email && r.statut === "annulee" && avant.statut !== "annulee") await envoyerAnnulation(ctx, etab, reglages, r, "etablissement");
-  else if (r.email && deplacee && r.statut === "confirmee") await envoyerConfirmation(ctx, etab, reglages, r, null);
+  const notifier = corps.notifier !== false;
+  // Une option ou une attente n'avait reçu aucun e-mail : son annulation n'en envoie pas non plus.
+  if (r.email && r.statut === "annulee" && avant.statut !== "annulee" && !temporaire(avant) && notifier) await envoyerAnnulation(ctx, etab, reglages, r, "etablissement");
+  else if (r.email && r.statut === "confirmee" && notifier && (deplacee || etaitTemporaire)) await envoyerConfirmation(ctx, etab, reglages, r, null);
   return { reservation: r, conflits: conflitsTable(await reservationsDu(ctx.db, etab.id, r.date, r.date), r) };
 }
 
@@ -618,6 +706,7 @@ export async function routePublique(ctx: ContexteResa, requete: Request, chemin:
     if (corps.conditions !== true) throw new ErreurHttp(400, "CONDITIONS", "Merci d'accepter les conditions d'utilisation du service.");
     const s = lireSaisie(corps, true);
     delete s.tables;
+    delete s.details;
     if (s.zone && !zonesDe(etab).includes(s.zone)) delete s.zone;
     const { reservation, jeton } = await creerReservation(ctx, etab, s, { source: "en_ligne", par: "client (en ligne)" });
     return json(201, { reservation: resume(etab, reservation, ctx.maintenant, ctx.origine), annulation: jeton });
@@ -632,9 +721,18 @@ export async function listeReservations(ctx: ContexteResa, etablissementId: stri
 }
 
 export async function saisieEquipe(ctx: ContexteResa, etab: EtablissementApi, corps: Record<string, unknown>, par: string) {
+  if (corps.passage === true) {
+    // Client de passage : installé maintenant (heure de Paris ramenée au créneau commencé), sans e-mail, même au-delà d'un plafond.
+    const { reglages } = await lireReglages(ctx.db, etab.id);
+    const ici = maintenantParis(ctx.maintenant);
+    const heure = heureDe(Math.floor(ici.minute / reglages.pasMinutes) * reglages.pasMinutes);
+    const s = lireSaisie({ ...corps, date: ici.jour, heure, nom: String(corps.nom ?? "").trim() || "Client de passage", email: "" }, false, true);
+    return creerReservation(ctx, etab, s, { source: "sur_place", par, forcer: true, statut: "arrivee", notifier: false });
+  }
   const s = lireSaisie(corps, false);
-  const source: SourceReservation = corps.source === "sur_place" ? "sur_place" : "telephone";
-  return creerReservation(ctx, etab, s, { source, par, forcer: corps.forcer === true });
+  const source: SourceReservation = CANAUX_EQUIPE.includes(corps.source as SourceReservation) ? (corps.source as SourceReservation) : "telephone";
+  const statut = (["option", "attente", "arrivee"] as const).find((x) => x === corps.statut) ?? "confirmee";
+  return creerReservation(ctx, etab, s, { source, par, forcer: corps.forcer === true, statut, notifier: corps.notifier !== false });
 }
 
 export async function enregistrerReglages(db: Db, etablissementId: string, corps: Record<string, unknown>, par: string, maintenant: Date) {

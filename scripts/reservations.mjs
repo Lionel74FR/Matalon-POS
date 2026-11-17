@@ -1,6 +1,7 @@
 // Réservations : services réglés dans l'administration, balise posée sur un site, réservation sur iPhone
 // (personnes, date, horaire, coordonnées), e-mail de confirmation et lien d'annulation, table attribuée
-// d'office et affichée sur le plan de l'iPad, installation de la table, saisie au téléphone depuis la caisse.
+// d'office et affichée sur le plan de l'iPad, installation de la table, saisie au téléphone depuis la caisse
+// (liste du jour et panneau de saisie façon Zenchef, 17 novembre 2026).
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
 //         URL=http://localhost:4180 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node scripts/reservations.mjs [dossier-captures]
 // Le service d'essai couvre toute la journée : le créneau réservé est le prochain quart d'heure (avant 23 h 30).
@@ -133,11 +134,11 @@ await direct.getByRole("button", { name: "Annuler ma réservation" }).click();
 await direct.getByText("Votre réservation est annulée").waitFor();
 await direct.screenshot({ path: `${sortie}/rv08-annulation.png` });
 
-// ── iPad : la table réservée sur le plan, installation ──
+// ── iPad : la table réservée sur le plan, la liste du jour à gauche (façon Zenchef), installation ──
 const ipad = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
 const p = await ipad.newPage();
 p.on("pageerror", (e) => erreurs.push(`caisse : ${e.message}`));
-p.on("dialog", (d) => void d.accept());
+await accepterConfirmations(p);
 const clic = (nom) => p.getByRole("button", { name: nom, exact: true }).first().click();
 await p.goto(URL);
 await p.locator(".champ-code input").fill(code);
@@ -149,92 +150,100 @@ await clic("Plus tard");
 await p.getByRole("button", { name: /^Réservations · 1/ }).waitFor();
 resultats.planTable = await p.locator(".plan-table.reservee").first().getAttribute("aria-label");
 verifier("table réservée sur le plan", /réservée à .* pour 4 \(Léa Martin\)/.test(resultats.planTable ?? ""), resultats.planTable);
+const liste = p.locator(".resa-liste");
+await liste.locator(".resa-ligne", { hasText: "MARTIN Léa" }).waitFor();
 await p.screenshot({ path: `${sortie}/rv09-plan.png` });
-// Saisie au téléphone depuis la caisse.
-await p.getByRole("button", { name: /^Réservations · / }).click();
-await clic("Nouvelle");
-const f = p.locator(".resa-caisse-saisie");
-await f.getByLabel("Heure").fill("23:30");
-await f.getByLabel("Personnes").fill("6");
-await f.getByLabel("Prénom").fill("Zoé");
-await f.getByLabel("Nom", { exact: true }).fill("Roux");
-await f.getByLabel("Téléphone").fill("0655555555");
-await f.getByRole("button", { name: "Enregistrer" }).click();
-await p.locator(".resa-caisse-ligne", { hasText: "Zoé Roux" }).waitFor();
-resultats.lignes = await p.locator(".resa-caisse-ligne").allInnerTexts();
+// Saisie au téléphone depuis la caisse, dans le panneau de droite.
+const panneau = p.locator(".resa-panneau");
+const saisir = async (c) => {
+  await liste.getByRole("button", { name: "Créer" }).click();
+  if (c.date) {
+    await panneau.getByRole("group", { name: "Jour" }).getByRole("button", { name: "Autre" }).click();
+    await panneau.locator(".resa-p-date input").fill(c.date);
+  }
+  await panneau.getByRole("group", { name: "Nombre de personnes" }).getByRole("button", { name: String(c.couverts), exact: true }).click();
+  await panneau.getByLabel("Autre heure").fill(c.heure);
+  await panneau.getByLabel("Prénom", { exact: true }).fill(c.prenom);
+  await panneau.getByLabel("Nom", { exact: true }).fill(c.nom);
+  await panneau.getByRole("textbox", { name: "Téléphone" }).fill(c.telephone);
+  await panneau.getByRole("button", { name: "Enregistrer" }).click();
+  await panneau.waitFor({ state: "detached" });
+};
+await saisir({ heure: "23:30", couverts: 6, prenom: "Zoé", nom: "Roux", telephone: "0655555555" });
+await liste.locator(".resa-ligne", { hasText: "ROUX Zoé" }).waitFor();
+resultats.lignes = await liste.locator(".resa-ligne").allInnerTexts();
 await p.screenshot({ path: `${sortie}/rv10-liste-caisse.png` });
 verifier("deux réservations à venir", resultats.lignes.length === 2, resultats.lignes);
-// Réservations des jours suivants depuis la caisse : saisie pour demain, vues « À venir » et « Par jour », fiche.
+// Réservations des jours suivants depuis la caisse : saisie pour demain, jour suivant, recherche, fiche.
 const demain = new Date(Date.now() + 86_400_000).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
-await clic("Nouvelle");
-await f.getByLabel("Date").fill(demain);
-await f.getByLabel("Heure").fill("20:00");
-await f.getByLabel("Personnes").fill("2");
-await f.getByLabel("Prénom").fill("Hugo");
-await f.getByLabel("Nom", { exact: true }).fill("Blanc");
-await f.getByLabel("Téléphone").fill("0644444444");
-await f.getByRole("button", { name: "Enregistrer" }).click();
-await p.getByText("Réservation de Hugo Blanc enregistrée.").waitFor();
-resultats.aujourdhuiSansDemain = await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).count();
-verifier("demain absent de la vue du jour", resultats.aujourdhuiSansDemain === 0, resultats.aujourdhuiSansDemain);
-await p.getByRole("button", { name: "À venir", exact: true }).click();
-await p.locator(".resa-caisse-groupe h3", { hasText: /^Demain/ }).waitFor();
-resultats.aVenirCaisse = (await p.locator(".resa-caisse-groupe h3").allInnerTexts()).map((t) => t.replace(/\s+/g, " "));
-verifier("à venir en caisse", resultats.aVenirCaisse.length === 2 && /^Aujourd'hui · 2 réservations/i.test(resultats.aVenirCaisse[0] ?? ""), resultats.aVenirCaisse);
-await p.screenshot({ path: `${sortie}/rv10b-a-venir-caisse.png` });
-await p.getByRole("button", { name: "Par jour", exact: true }).click();
-await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).waitFor();
-// La vue « Par jour » remplace la liste « À venir » : on attend qu'elle ne montre plus que le jour de Hugo.
-await p.waitForFunction(() => document.querySelectorAll(".resa-caisse-ligne").length === 1, null, { timeout: 5000 }).catch(() => undefined);
-resultats.parJourCaisse = await p.locator(".resa-caisse-ligne").count();
-verifier("par jour en caisse", resultats.parJourCaisse === 1, resultats.parJourCaisse);
-await p.getByRole("button", { name: "Modifier la réservation de Hugo Blanc" }).click();
-const ficheCaisse = p.locator(".modale", { has: p.getByRole("heading", { name: "Réservation de Hugo Blanc" }) });
-await ficheCaisse.getByLabel("Personnes").fill("3");
-await ficheCaisse.getByRole("button", { name: "Enregistrer" }).click();
-await p.locator(".resa-caisse-ligne", { hasText: "Hugo Blanc" }).filter({ hasText: "3 pers." }).waitFor();
+await saisir({ date: demain, heure: "20:00", couverts: 2, prenom: "Hugo", nom: "Blanc", telephone: "0644444444" });
+await p.getByText(/Réservation de Hugo Blanc enregistrée \(.*\), 20:00\./).waitFor();
+resultats.aujourdhuiSansDemain = await liste.locator(".resa-ligne", { hasText: "BLANC Hugo" }).count();
+verifier("demain absent de la liste du jour", resultats.aujourdhuiSansDemain === 0, resultats.aujourdhuiSansDemain);
+await liste.getByRole("button", { name: "Rechercher une réservation" }).click();
+await liste.getByLabel("Rechercher dans les réservations à venir").fill("0644");
+await liste.locator(".resa-groupe-tete", { hasText: /^Demain/ }).waitFor();
+resultats.rechercheCaisse = (await liste.locator(".resa-groupe-tete").allInnerTexts()).map((t) => t.replace(/\s+/g, " "));
+verifier("recherche dans les jours à venir", resultats.rechercheCaisse.length === 1, resultats.rechercheCaisse);
+await p.screenshot({ path: `${sortie}/rv10b-recherche-caisse.png` });
+await liste.getByRole("button", { name: "Fermer la recherche" }).click();
+await liste.getByRole("button", { name: "Jour suivant" }).click();
+await liste.locator(".resa-ligne", { hasText: "BLANC Hugo" }).waitFor();
+resultats.parJourCaisse = await liste.locator(".resa-ligne").count();
+verifier("jour suivant en caisse", resultats.parJourCaisse === 1, resultats.parJourCaisse);
+await liste.getByRole("button", { name: "Ouvrir la réservation de Hugo Blanc" }).click();
+await panneau.getByRole("heading", { name: "Réservation de Hugo Blanc" }).waitFor();
+await panneau.getByRole("group", { name: "Nombre de personnes" }).getByRole("button", { name: "3", exact: true }).click();
+await panneau.getByRole("button", { name: "Enregistrer" }).click();
+await liste.locator(".resa-ligne", { hasText: "BLANC Hugo" }).locator(".resa-couverts", { hasText: "3" }).waitFor();
 await p.screenshot({ path: `${sortie}/rv10c-fiche-caisse.png` });
-await p.getByRole("button", { name: "Aujourd'hui", exact: true }).click();
-await p.locator(".resa-caisse-ligne", { hasText: "Léa Martin" }).waitFor();
+await liste.getByRole("button", { name: "Jour précédent" }).click();
+await liste.locator(".resa-ligne", { hasText: "MARTIN Léa" }).waitFor();
 // Installer Léa : la table s'ouvre avec 4 couverts et la note.
-await p.locator(".resa-caisse-ligne", { hasText: "Léa Martin" }).getByRole("button", { name: "Installer" }).click();
+await liste.locator(".resa-ligne", { hasText: "MARTIN Léa" }).getByRole("button", { name: "Installer" }).click();
 await p.getByText(/4 couverts/).first().waitFor();
 resultats.note = await p.getByText(/Réservation Léa Martin/).first().textContent();
 verifier("note de la table", /Anniversaire/.test(resultats.note ?? ""), resultats.note);
 await p.screenshot({ path: `${sortie}/rv11-table-installee.png` });
 
-// ── Administration : la liste du jour ──
+// ── Administration : la même liste, le plan du jour ──
 await a.getByRole("tab", { name: /^Réservations/ }).click();
-await a.locator(".resa-table tbody tr").first().waitFor();
+const listeAdmin = a.locator(".resa-liste");
+await listeAdmin.locator(".resa-ligne").first().waitFor();
+await listeAdmin.getByRole("button", { name: "Filtres de la liste" }).click();
 await a.getByText("Annulées et absentes").click();
-resultats.admin = (await a.locator(".resa-table tbody tr").allInnerTexts()).map((l) => l.replace(/\s+/g, " ").trim());
-await a.screenshot({ path: `${sortie}/rv12-liste-admin.png`, fullPage: true });
-// Aujourd'hui (Léa, Paul, Zoé) et demain (Hugo, saisi depuis la caisse).
-verifier("liste de l'administration", resultats.admin.length === 4 && resultats.admin.some((l) => /Paul Durand/.test(l)) && resultats.admin.some((l) => /Hugo Blanc .* 3 /.test(l)), resultats.admin);
-const statuts = await a.locator(".resa-table tbody tr select[aria-label^='Statut']").evaluateAll((l) => l.map((s) => s.value).sort());
-verifier("statuts", statuts.join() === "annulee,arrivee,confirmee,confirmee", statuts);
+await a.keyboard.press("Escape");
+await listeAdmin.locator(".resa-ligne", { hasText: "DURAND Paul" }).waitFor();
+resultats.admin = (await listeAdmin.locator(".resa-ligne").allInnerTexts()).map((l) => l.replace(/\s+/g, " ").trim());
+await a.screenshot({ path: `${sortie}/rv12-liste-admin.png` });
+// Aujourd'hui : Léa, Paul (annulée) et Zoé ; Hugo est demain.
+verifier("liste de l'administration", resultats.admin.length === 3 && resultats.admin.some((l) => /DURAND Paul/.test(l)), resultats.admin);
+const statuts = await listeAdmin.locator("select.resa-statut").evaluateAll((l) => l.map((s) => s.value).sort());
+verifier("statuts", statuts.join() === "annulee,arrivee,confirmee", statuts);
 
-// Réservations à venir : recherche, fiche, modification (heure, personnes), puis annulation.
-await a.getByLabel("Rechercher une réservation").fill("roux");
-resultats.recherche = await a.locator(".resa-table tbody tr").count();
+// Recherche, fiche, modification (heure, personnes, message), puis annulation.
+await listeAdmin.getByRole("button", { name: "Rechercher une réservation" }).click();
+await listeAdmin.getByLabel("Rechercher dans les réservations à venir").fill("roux");
+await listeAdmin.locator(".resa-ligne", { hasText: "ROUX Zoé" }).waitFor();
+resultats.recherche = await listeAdmin.locator(".resa-ligne").count();
 verifier("recherche à venir", resultats.recherche === 1, resultats.recherche);
-await a.getByRole("button", { name: "Modifier la réservation de Zoé Roux" }).click();
-const fiche = a.locator(".modale");
-await fiche.getByLabel("Heure").fill("23:15");
-await fiche.getByLabel("Personnes").fill("4");
-await fiche.getByLabel("Note").fill("Table au calme");
+await listeAdmin.getByRole("button", { name: "Ouvrir la réservation de Zoé Roux" }).click();
+const fiche = a.locator(".resa-panneau");
+await fiche.getByLabel("Autre heure").fill("23:15");
+await fiche.getByRole("group", { name: "Nombre de personnes" }).getByRole("button", { name: "4", exact: true }).click();
+await fiche.getByLabel("Message du client").fill("Table au calme");
 await fiche.getByRole("button", { name: "Enregistrer" }).click();
-await a.locator(".resa-table tbody tr", { hasText: "Table au calme" }).waitFor();
-resultats.modifiee = (await a.locator(".resa-table tbody tr").first().innerText()).replace(/\s+/g, " ");
-verifier("réservation modifiée", /23:15/.test(resultats.modifiee) && /Zoé Roux/.test(resultats.modifiee), resultats.modifiee);
-await a.screenshot({ path: `${sortie}/rv14-a-venir.png`, fullPage: true });
-await a.getByRole("button", { name: "Modifier la réservation de Zoé Roux" }).click();
-await a.getByRole("button", { name: "Annuler la réservation" }).click();
-await a.locator(".modale").waitFor({ state: "detached" });
-await a.locator(".resa-table tbody tr.annule", { hasText: "Zoé Roux" }).waitFor();
-resultats.annulee = await a.locator(".resa-table tbody tr", { hasText: "Zoé Roux" }).locator("select[aria-label^='Statut']").inputValue();
+await listeAdmin.locator(".resa-ligne", { hasText: "Table au calme" }).waitFor();
+resultats.modifiee = (await listeAdmin.locator(".resa-ligne", { hasText: "ROUX Zoé" }).innerText()).replace(/\s+/g, " ");
+verifier("réservation modifiée", /^23:15 ROUX Zoé/.test(resultats.modifiee), resultats.modifiee);
+await a.screenshot({ path: `${sortie}/rv14-a-venir.png` });
+await listeAdmin.getByRole("button", { name: "Ouvrir la réservation de Zoé Roux" }).click();
+await fiche.getByRole("button", { name: "Annuler la réservation" }).click();
+await fiche.waitFor({ state: "detached" });
+await listeAdmin.locator(".resa-ligne.annulee", { hasText: "ROUX Zoé" }).waitFor();
+resultats.annulee = await listeAdmin.getByLabel("Statut de Zoé Roux").inputValue();
 verifier("annulée depuis la fiche", resultats.annulee === "annulee", resultats.annulee);
-await a.getByLabel("Rechercher une réservation").fill("");
+await listeAdmin.getByRole("button", { name: "Fermer la recherche" }).click();
 
 // Administration sur iPhone : rien ne dépasse, sur les trois onglets.
 await a.setViewportSize({ width: 390, height: 844 });

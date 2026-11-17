@@ -223,7 +223,9 @@ export function Coque() {
       const c = nouvelleCommande(tableId, utilisateur.id, r.couverts);
       const libres = jointes.filter((id) => !occupation.has(id));
       if (libres.length) c.jointes = libres;
-      c.note = [`Réservation ${r.prenom} ${r.nom}`.trim(), r.commentaire].filter(Boolean).join(" · ");
+      // Note de la table : le client, son message, ses allergies et le mémo de l'équipe.
+      const qui = r.telephone ? `Réservation ${r.prenom} ${r.nom}`.trim() : `${r.prenom} ${r.nom}`.trim();
+      c.note = [qui, r.commentaire, r.allergies ? `Allergies : ${r.allergies}` : "", r.memo].filter(Boolean).join(" · ");
       await enregistrerCommande(c, tableId);
     }
     try {

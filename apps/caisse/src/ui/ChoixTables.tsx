@@ -32,6 +32,8 @@ export function ChoixTables(props: {
   reservation?: Reservation;
   autres?: Reservation[];
   disabled?: boolean;
+  /** Classe ajoutée au bouton (saisie : « Attribution manuelle » active). */
+  classe?: string;
   onChange: (ids: string[]) => void;
 }) {
   const [ouvert, setOuvert] = useState(false);
@@ -55,7 +57,7 @@ export function ChoixTables(props: {
     <>
       <button
         type="button"
-        className={`bouton choix-tables${manque ? " manque" : ""}`}
+        className={`bouton choix-tables${manque ? " manque" : ""}${props.classe ? ` ${props.classe}` : ""}`}
         aria-label={`${props.libelle} : ${props.valeur.length ? `table${props.valeur.length > 1 ? "s" : ""} ${props.valeur.map(nom).join(" + ")}` : props.vide}`}
         disabled={props.disabled}
         onClick={ouvrir}

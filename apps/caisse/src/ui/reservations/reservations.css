@@ -1,0 +1,1130 @@
+/*
+ * Réservations façon Zenchef (17 novembre 2026) : liste à gauche, plan au centre, saisie à droite.
+ * Couleurs de la caisse (--espresso…) : l'administration les redirige vers son thème clair ou sombre.
+ */
+
+.resa-espace {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.resa-colonne {
+  flex: 0 0 400px;
+  max-width: 44%;
+  display: flex;
+  min-height: 0;
+  border-right: 1px solid var(--espresso-3);
+  background: var(--espresso-2);
+}
+
+.resa-colonne[hidden] {
+  display: none !important;
+}
+
+.resa-centre {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.resa-centre > .salle {
+  height: 100%;
+}
+
+/* ───────── Liste ───────── */
+
+.resa-liste {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.resa-barre-jour {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+
+.resa-jour {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--espresso-3);
+  border-radius: 10px;
+}
+
+.resa-jour .bouton-icone {
+  min-height: 44px;
+  min-width: 40px;
+  padding: 0 6px;
+  background: none;
+}
+
+.resa-jour-nom {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--mousse);
+  font: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resa-calendrier {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 44px;
+  color: var(--mousse);
+}
+
+/* Le champ date couvre l'icône : un toucher ouvre le calendrier du système. */
+.resa-calendrier input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: 0;
+}
+
+.resa-creer {
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+.resa-filtre-services {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 8px;
+}
+
+.resa-filtre-services .option {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--espresso-3);
+  background: none;
+}
+
+.resa-filtre-services .option.active {
+  background: var(--mousse);
+  border-color: var(--mousse);
+}
+
+.resa-filtre-services .resa-menu {
+  margin-left: auto;
+}
+
+.resa-compteurs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px 8px;
+  border-bottom: 1px solid var(--espresso-3);
+}
+
+.resa-compteurs .bouton-icone,
+.resa-filtre-services .bouton-icone {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 0 6px;
+}
+
+.resa-compteur {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  color: var(--sable);
+  font-family: var(--police-chiffres);
+  white-space: nowrap;
+}
+
+.resa-compteur strong {
+  color: var(--mousse);
+}
+
+.resa-compteur.principal {
+  border: 1px solid var(--espresso-3);
+  margin-right: 2px;
+}
+
+.resa-recherche {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+}
+
+.resa-compteurs > .resa-menu:first-of-type {
+  margin-left: auto;
+}
+
+.resa-menu {
+  position: relative;
+}
+
+.resa-menu-liste {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  display: grid;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--espresso-3);
+  background: var(--espresso-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.resa-menu-choix {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--mousse);
+  font: inherit;
+  text-align: left;
+}
+
+.resa-menu-choix:hover,
+.resa-menu-choix.actif {
+  background: var(--espresso-3);
+}
+
+.resa-menu-choix.actif {
+  font-weight: 700;
+}
+
+.resa-menu-case {
+  padding: 8px 10px;
+}
+
+.resa-defilant {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.resa-vide,
+.resa-erreur {
+  margin: 12px 4px;
+}
+
+.resa-groupe + .resa-groupe {
+  margin-top: 14px;
+}
+
+.resa-groupe-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--sable);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.resa-creneau-tete {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--espresso-3);
+  font-family: var(--police-chiffres);
+  font-size: 1rem;
+}
+
+.resa-creneau-tete > span:first-child {
+  flex: 1;
+}
+
+.resa-pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid var(--sable);
+  border-radius: 6px;
+  font-family: var(--police-chiffres);
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.resa-lignes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.resa-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "ouvrir table"
+    "infos infos"
+    "notes notes";
+  gap: 6px 8px;
+  padding: 10px 6px 10px 8px;
+  border-bottom: 1px solid var(--espresso-3);
+  border-left: 4px solid transparent;
+}
+
+.resa-ligne-ouvrir {
+  grid-area: ouvrir;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mousse);
+  font: inherit;
+  text-align: left;
+}
+
+.resa-heure,
+.resa-couverts {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--mousse);
+  color: var(--espresso);
+  font-family: var(--police-chiffres);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.resa-nom {
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resa-nom small {
+  margin-left: 8px;
+  color: var(--sable);
+  font-weight: 400;
+}
+
+.resa-ligne-table .choix-tables {
+  min-height: 40px;
+  min-width: 52px;
+  padding: 0 10px;
+  font-family: var(--police-chiffres);
+  font-size: 0.95rem;
+}
+
+.resa-ligne-table .choix-tables small {
+  display: none;
+}
+
+.resa-ligne-table {
+  grid-area: table;
+}
+
+.resa-ligne-infos {
+  grid-area: infos;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Pastille du statut : couleurs fixes, lisibles sur les deux thèmes (l'administration impose ses champs : !important). */
+select.resa-statut {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 32px;
+  padding: 0 28px 0 12px;
+  border: 0 !important;
+  border-radius: 999px;
+  background: #4f8a3c
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+    no-repeat right 10px center !important;
+  color: #fff !important;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+select.resa-statut.arrivee {
+  background-color: #3f6f8f !important;
+}
+select.resa-statut.option {
+  background-color: #a86f12 !important;
+}
+select.resa-statut.attente {
+  background-color: #6f5a9c !important;
+}
+select.resa-statut.absente {
+  background-color: #a8432f !important;
+}
+select.resa-statut.annulee {
+  background-color: #6d625a !important;
+}
+
+select.resa-statut option {
+  background: var(--espresso-2);
+  color: var(--mousse);
+}
+
+.resa-canal,
+.resa-appel {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--sable);
+}
+
+.resa-installer {
+  min-height: 38px;
+  margin-left: auto;
+  padding: 0 12px;
+}
+
+.resa-ligne-notes {
+  grid-area: notes;
+  display: grid;
+  gap: 3px;
+  font-size: 0.88rem;
+  color: var(--sable);
+}
+
+.resa-ligne-notes p {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.resa-ligne-notes .icone {
+  flex: none;
+  margin-top: 2px;
+}
+
+.resa-allergies {
+  color: var(--terre);
+  font-weight: 700;
+}
+
+.resa-tags {
+  flex-wrap: wrap;
+  gap: 4px !important;
+}
+
+.resa-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid var(--espresso-3);
+  border-radius: 999px;
+  background: none;
+  color: var(--mousse);
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.resa-ligne.annulee,
+.resa-ligne.absente {
+  opacity: 0.6;
+}
+
+.resa-ligne.annulee .resa-nom {
+  text-decoration: line-through;
+}
+
+.resa-ligne.arrivee .resa-heure {
+  background: #3f6f8f;
+  color: #fff;
+}
+
+.resa-ligne.option .resa-heure,
+.resa-ligne.attente .resa-heure {
+  background: none;
+  color: var(--mousse);
+  box-shadow: inset 0 0 0 1px var(--sable);
+}
+
+.resa-repartition {
+  width: 100%;
+  border-collapse: collapse;
+  border-top: 1px solid var(--espresso-3);
+  font-family: var(--police-chiffres);
+  text-align: center;
+}
+
+.resa-repartition th {
+  width: 40px;
+  padding: 4px 0;
+  color: var(--sable);
+}
+
+.resa-repartition td {
+  padding: 4px 0;
+}
+
+.resa-repartition tr:first-child td {
+  color: var(--sable);
+}
+
+/* ───────── Panneau de saisie ───────── */
+
+.resa-panneau {
+  flex: 0 0 440px;
+  max-width: 52%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--espresso-3);
+  background: var(--espresso-2);
+}
+
+.resa-p-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 0 12px;
+  border-bottom: 1px solid var(--espresso-3);
+}
+
+.resa-p-tete h2 {
+  flex: 1;
+  margin: 0;
+  padding: 12px 0;
+  font-size: 1.1rem;
+}
+
+.resa-p-onglets {
+  flex: 1;
+  display: flex;
+}
+
+.resa-p-onglets button {
+  flex: 1;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 0 6px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--sable);
+  font: inherit;
+  font-weight: 700;
+}
+
+.resa-p-onglets button.actif {
+  color: var(--mousse);
+  border-bottom-color: var(--terre);
+}
+
+.resa-p-recap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+}
+
+.resa-p-recap > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: var(--espresso-3);
+  font-family: var(--police-chiffres);
+  font-size: 0.88rem;
+}
+
+.resa-p-corps {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.resa-p-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--espresso-3);
+}
+
+.resa-p-section h3 {
+  font-size: 1rem;
+}
+
+.resa-panneau .champ {
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 0;
+}
+
+.resa-panneau .champ > span {
+  font-size: 0.85rem;
+  color: var(--sable);
+}
+
+.resa-panneau .champ input,
+.resa-panneau .champ select,
+.resa-panneau .champ textarea,
+.resa-p-telephone > select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: var(--rayon-petit);
+  border: 2px solid var(--espresso-3);
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+}
+
+.resa-panneau .champ textarea {
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.resa-panneau .champ select:focus,
+.resa-panneau .champ textarea:focus,
+.resa-p-telephone > select:focus {
+  border-color: var(--terre);
+  outline: none;
+}
+
+.resa-p-choix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.resa-p-choix .option {
+  flex: 1 1 0;
+  min-width: 44px;
+  min-height: 46px;
+  padding: 0 8px;
+  border: 1px solid var(--espresso-3);
+  background: var(--espresso);
+}
+
+.resa-p-choix .option.active {
+  background: var(--mousse);
+  border-color: var(--mousse);
+}
+
+.resa-p-personnes .option {
+  min-width: 36px;
+}
+
+.resa-p-filtres,
+.resa-p-grille,
+.resa-p-attribution {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.resa-p-creneaux {
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.resa-p-creneau {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--espresso-3);
+  border-radius: 10px;
+  background: var(--espresso);
+  color: var(--mousse);
+  font: inherit;
+  text-align: left;
+}
+
+.resa-p-creneau strong {
+  flex: 1;
+  font-family: var(--police-chiffres);
+  font-size: 1.05rem;
+}
+
+.resa-p-creneau > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 82px;
+  color: var(--sable);
+  font-family: var(--police-chiffres);
+  font-size: 0.88rem;
+}
+
+.resa-p-creneau.actif {
+  border-color: var(--terre);
+  box-shadow: inset 0 0 0 2px var(--terre);
+}
+
+.resa-p-creneau.complet strong,
+.resa-p-complet {
+  color: var(--rouge);
+}
+
+.resa-p-autres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.resa-p-autres .bouton {
+  flex: 1;
+  min-height: 46px;
+}
+
+.resa-p-heure {
+  flex: 0 0 140px;
+}
+
+.resa-p-attribution .bouton,
+.resa-p-attribution .choix-tables {
+  min-height: 48px;
+  justify-content: center;
+}
+
+.resa-p-attribution .bouton.actif,
+.resa-p-attribution .choix-tables.actif {
+  box-shadow: inset 0 0 0 2px var(--terre);
+}
+
+.resa-p-astuce {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.resa-p-alerte {
+  margin: 0;
+  color: var(--terre);
+}
+
+.resa-p-telephone {
+  display: grid;
+  grid-template-columns: 116px 1fr;
+  gap: 8px;
+  align-items: end;
+}
+
+.resa-p-rgpd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.resa-p-rgpd legend {
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+
+.resa-p-rgpd .case {
+  padding: 6px 0;
+}
+
+.resa-p-notification {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.resa-p-notification small {
+  width: 100%;
+  color: var(--sable);
+}
+
+.interrupteur {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-weight: 700;
+}
+
+.interrupteur input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 46px;
+  height: 28px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--espresso-3);
+  transition: background 0.15s;
+}
+
+.interrupteur input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.interrupteur input:checked {
+  background: var(--vert);
+}
+
+.interrupteur input:checked::after {
+  transform: translateX(18px);
+}
+
+.interrupteur input:disabled {
+  opacity: 0.5;
+}
+
+.resa-p-canal-notif {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--espresso-3);
+  color: var(--sable);
+  font-size: 0.85rem;
+}
+
+.resa-p-canal-notif.actif {
+  border-color: var(--terre);
+  color: var(--mousse);
+}
+
+.resa-p-icone {
+  position: relative;
+}
+
+.resa-p-icone > .icone {
+  position: absolute;
+  left: 12px;
+  bottom: 14px;
+  color: var(--sable);
+  pointer-events: none;
+}
+
+.resa-panneau .resa-p-icone input,
+.resa-panneau .resa-p-icone textarea {
+  padding-left: 40px;
+}
+
+.resa-p-tags-bouton {
+  width: 100%;
+  min-height: 46px;
+  justify-content: flex-start;
+  text-align: left;
+  font-weight: 400;
+}
+
+.resa-p-tags-bouton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resa-p-tags-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.resa-p-tags-liste .resa-tag {
+  min-height: 38px;
+  padding: 0 12px;
+  font-size: 0.9rem;
+}
+
+.resa-tag.actif {
+  border-color: var(--terre);
+  background: var(--terre);
+  color: #fff;
+}
+
+.resa-p-couleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resa-p-couleur {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 2px solid transparent;
+}
+
+.resa-p-couleur.aucune {
+  display: grid;
+  place-items: center;
+  border-color: var(--espresso-3);
+  background: var(--espresso);
+  color: var(--sable);
+}
+
+.resa-p-couleur.actif {
+  border-color: var(--mousse);
+  box-shadow: inset 0 0 0 2px var(--espresso-2);
+}
+
+.resa-p-temporaire h4 {
+  margin: 4px 0 6px;
+  font-size: 0.95rem;
+}
+
+.resa-p-temporaire p {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+}
+
+.resa-panneau .resa-historique {
+  margin-top: 12px;
+}
+
+.resa-p-erreur {
+  margin: 8px 16px 0;
+}
+
+.resa-p-pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--espresso-3);
+}
+
+.resa-p-pied .bouton {
+  min-height: 48px;
+}
+
+.resa-p-espace {
+  flex: 1;
+}
+
+/* ───────── Plan pendant la saisie, autre jour ───────── */
+
+.salle-autre-jour {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--espresso-2);
+  color: var(--mousse);
+}
+
+.salle-selection {
+  border: 1px dashed var(--terre);
+}
+
+.bouton-resa {
+  white-space: nowrap;
+}
+
+.salle-autre-jour .lien-action {
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--terre);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.bouton-resa.actif {
+  box-shadow: inset 0 0 0 2px var(--terre);
+}
+
+/* ───────── Administration ───────── */
+
+.resa-admin {
+  position: relative;
+}
+
+.resa-admin .resa-espace {
+  height: calc(100dvh - 210px);
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid var(--espresso-3);
+  border-radius: 14px;
+  background: var(--espresso-2);
+}
+
+.resa-admin .resa-colonne,
+.resa-admin .resa-panneau {
+  background: var(--espresso-2);
+}
+
+.resa-admin .resa-centre {
+  background: var(--espresso);
+}
+
+.resa-admin-message {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  max-width: min(480px, calc(100vw - 48px));
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--espresso-2);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.resa-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 14px;
+}
+
+.resa-plan-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.resa-plan-tete strong::first-letter {
+  text-transform: uppercase;
+}
+
+.resa-plan-tete .resa-filtre-services {
+  padding: 0;
+}
+
+.resa-plan-dessin {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border-radius: var(--rayon);
+}
+
+.resa-plan-vide {
+  margin: 24px;
+}
+
+/* ───────── iPhone ───────── */
+
+@media (max-width: 700px) {
+  /* Caisse : liste et panneau en plein écran, par-dessus la salle. */
+  .resa-espace:not(.integre) .resa-colonne,
+  .resa-panneau {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    max-width: none;
+    border: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .resa-espace:not(.integre) .resa-colonne {
+    background: var(--espresso);
+  }
+
+  .resa-p-astuce {
+    display: none;
+  }
+
+  /* Administration : la liste dans la page, sans le plan. */
+  .resa-admin .resa-espace {
+    height: auto;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .resa-espace.integre .resa-centre {
+    display: none;
+  }
+
+  .resa-espace.integre .resa-colonne {
+    flex: 1 1 auto;
+    max-width: none;
+    border: 0;
+  }
+
+  .resa-espace.integre .resa-defilant {
+    overflow: visible;
+  }
+
+  .resa-p-filtres,
+  .resa-p-attribution {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tables choisies pendant une saisie : bord terracotta épais, par-dessus l'état de la table (réservée, occupée). */
+.plan-salle .plan-table.choisi .plan-plateau {
+  stroke: var(--terre);
+  stroke-width: 0.36;
+  stroke-dasharray: none;
+}

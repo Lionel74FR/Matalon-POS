@@ -322,6 +322,15 @@ export const MIGRATIONS: string[] = [
     maj_le text not null
   )`,
   `create index if not exists reservations_jour on reservations (etablissement_id, date)`,
+  // Statuts temporaires de l'équipe (17 novembre 2026) : sous option, liste d'attente.
+  `do $$ begin
+    if exists (select 1 from pg_constraint where conname = 'reservations_statut_check') then
+      alter table reservations drop constraint reservations_statut_check;
+    end if;
+    if not exists (select 1 from pg_constraint where conname = 'reservations_statut_v2') then
+      alter table reservations add constraint reservations_statut_v2 check (statut in ('confirmee', 'arrivee', 'absente', 'annulee', 'option', 'attente'));
+    end if;
+  end $$`,
   // Secrets d'un établissement (clé Resend…), chiffrés avec la clé maîtresse de l'hébergement (CLE_SECRETS).
   `create table if not exists secrets_etablissement (
     etablissement_id text not null references etablissements(id),

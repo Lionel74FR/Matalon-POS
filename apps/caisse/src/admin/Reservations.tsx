@@ -1,11 +1,13 @@
-import { maintenantParis, REGLAGES_DEFAUT, validerReglages, type ReglagesReservation, type Reservation, type ServiceReservation, type StatutReservation } from "@matalon/reservations";
-import type { EtatEnvoi, Table } from "@matalon/serveur/partage";
-import { ChevronLeft, ChevronRight, Copy, ExternalLink, KeyRound, Pencil, Plus, Save, Search, Send, Trash2, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { maintenantParis, REGLAGES_DEFAUT, validerReglages, type ReglagesReservation, type ServiceReservation } from "@matalon/reservations";
+import type { EtatEnvoi } from "@matalon/serveur/partage";
+import { Copy, ExternalLink, KeyRound, Plus, Save, Send, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { placerTables, zonesDuPlan } from "../metier/plan";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
-import { api, ErreurAdmin, type EtablissementAdmin } from "./api";
-import { dateLongue, decaler, FicheReservation, JOURS_A_VENIR, LIBELLES_SOURCE, LIBELLES_STATUT } from "../ui/FicheReservation";
-import { ChoixTables } from "../ui/ChoixTables";
+import { PlanSalle } from "../ui/PlanSalle";
+import { EspaceReservations, type CentreReservations } from "../ui/reservations/EspaceReservations";
+import { dateLongue, etatsDuJour, type AccesReservations, type ContexteReservations } from "../ui/reservations/commun";
+import { api, type EtablissementAdmin } from "./api";
 import { EntetePage, Onglets, type DefOnglet } from "./Page";
 import { confirmer } from "./Panneau";
 
@@ -86,283 +88,83 @@ export function Reservations(props: { etablissements: EtablissementAdmin[]; ongl
   );
 }
 
-// ───────── Liste du jour ─────────
+// ───────── Liste et plan du jour (façon Zenchef, 17 novembre 2026) ─────────
 
-/** Jours montrés par « À venir » : la fenêtre de réservation en ligne, au moins 60 jours. */
-
+/**
+ * Liste des réservations du jour à gauche, plan de salle du jour au centre (chaque table montre
+ * ses réservations), saisie dans un panneau à droite : le même espace qu'en caisse.
+ */
 function Liste(props: { etab: EtablissementAdmin; reglages: ReglagesReservation }) {
   const { etab, reglages } = props;
-  const aujourdhui = maintenantParis(new Date()).jour;
-  const [mode, setMode] = useState<"avenir" | "jour">("avenir");
-  const [jour, setJour] = useState(aujourdhui);
-  const [liste, setListe] = useState<Reservation[] | null>(null);
-  const [erreur, setErreur] = useState("");
-  const [saisie, setSaisie] = useState(false);
-  const [annulees, setAnnulees] = useState(false);
-  const [recherche, setRecherche] = useState("");
-  const [edition, setEdition] = useState<Reservation | null>(null);
-  const charger = useCallback(async () => {
-    try {
-      const r = mode === "jour" ? await api.reservations(etab.id, jour) : await api.reservations(etab.id, aujourdhui, decaler(aujourdhui, JOURS_A_VENIR(reglages)));
-      setListe(r.reservations);
-      setErreur("");
-    } catch (e) {
-      setErreur(message(e));
-    }
-  }, [etab.id, jour, mode, aujourdhui, reglages]);
-  useEffect(() => void charger(), [charger]);
-
-  const modifier = async (r: Reservation, corps: Record<string, unknown>) => {
-    try {
-      await api.modifierReservation(etab.id, r.id, corps);
-    } catch (e) {
-      if (e instanceof ErreurAdmin && e.statut === 409 && (await confirmer({ titre: "Enregistrer quand même ?", message: e.message, confirmer: "Enregistrer quand même" })))
-        await api.modifierReservation(etab.id, r.id, { ...corps, forcer: true });
-      else setErreur(message(e));
-    }
-    await charger();
+  const [message, setMessage] = useState("");
+  const ctx: ContexteReservations = {
+    aujourdhui: maintenantParis(new Date()).jour,
+    reglages,
+    tables: etab.tables,
+    zones: etab.zones ?? [],
+    equipe: etab.utilisateurs.filter((u) => u.actif).map((u) => u.nom),
   };
-
-  const q = recherche
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-  const visibles = (liste ?? [])
-    .filter((r) => annulees || (r.statut !== "annulee" && r.statut !== "absente"))
-    .filter(
-      (r) =>
-        !q ||
-        `${r.prenom} ${r.nom} ${r.telephone} ${r.email ?? ""} ${r.commentaire ?? ""}`
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase()
-          .includes(q) ||
-        r.telephone.replace(/\D/g, "").includes(q.replace(/\D/g, "") || "§"),
-    );
-  const couverts = (l: Reservation[]) => l.filter((r) => r.statut === "confirmee" || r.statut === "arrivee").reduce((n, r) => n + r.couverts, 0);
-  const pl = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
-
-  /** Groupes affichés : par service pour un jour, par jour (puis heure) pour « À venir ». */
-  const groupes =
-    mode === "jour"
-      ? [...reglages.services.map((s) => ({ id: s.id, nom: s.nom, max: s.couvertsMax })), { id: "hors-service", nom: "Hors service", max: 0 }]
-          .map((s) => {
-            const l = visibles.filter((r) => r.serviceId === s.id || (s.id === "hors-service" && !reglages.services.some((x) => x.id === r.serviceId)));
-            return { cle: s.id, titre: `${s.nom} · ${pl(couverts(l), "couvert")}${s.max ? ` sur ${s.max}` : ""}`, liste: l };
-          })
-          .filter((g) => g.liste.length > 0)
-      : [...new Set(visibles.map((r) => r.date))].sort().map((d) => {
-          const l = visibles.filter((r) => r.date === d).sort((a, b) => a.heure.localeCompare(b.heure));
-          return { cle: d, titre: `${dateLongue(d)} · ${pl(l.length, "réservation")} · ${pl(couverts(l), "couvert")}`, liste: l };
-        });
-
+  const acces: AccesReservations = useMemo(
+    () => ({
+      lister: async (du, au) => (await api.reservations(etab.id, du, au)).reservations,
+      creer: (corps) => api.creerReservation(etab.id, corps),
+      modifier: (id, corps) => api.modifierReservation(etab.id, id, corps),
+    }),
+    [etab.id],
+  );
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(() => setMessage(""), 5000);
+    return () => clearTimeout(t);
+  }, [message]);
   return (
-    <section className="admin-section">
-      <div className="admin-ligne resa-jour">
-        <div className="options" role="group" aria-label="Affichage">
-          <button className={`option${mode === "avenir" ? " active" : ""}`} aria-pressed={mode === "avenir"} onClick={() => setMode("avenir")}>
-            À venir
-          </button>
-          <button className={`option${mode === "jour" ? " active" : ""}`} aria-pressed={mode === "jour"} onClick={() => setMode("jour")}>
-            Par jour
-          </button>
-        </div>
-        {mode === "jour" && (
-          <>
-            <BoutonIcone icone={ChevronLeft} libelle="Jour précédent" variante="discret" onClick={() => setJour(decaler(jour, -1))} />
-            <input type="date" value={jour} aria-label="Jour" onChange={(e) => e.target.value && setJour(e.target.value)} />
-            <BoutonIcone icone={ChevronRight} libelle="Jour suivant" variante="discret" onClick={() => setJour(decaler(jour, 1))} />
-            <strong className="resa-date">{dateLongue(jour)}</strong>
-          </>
-        )}
-        <button className="bouton principal" onClick={() => setSaisie((o) => !o)}>
-          <AvecIcone icone={saisie ? X : Plus}>{saisie ? "Fermer" : "Nouvelle réservation"}</AvecIcone>
-        </button>
-      </div>
-      <div className="admin-ligne resa-filtres">
-        <label className="recherche-client resa-recherche">
-          <Search size={20} aria-hidden="true" />
-          <input type="search" value={recherche} placeholder="Nom, téléphone, e-mail, note…" aria-label="Rechercher une réservation" onChange={(e) => setRecherche(e.target.value)} />
-        </label>
-        <label className="case">
-          <input type="checkbox" checked={annulees} onChange={(e) => setAnnulees(e.target.checked)} /> Annulées et absentes
-        </label>
-      </div>
-      {saisie && (
-        <Saisie
-          etab={etab}
-          jour={jour}
-          onFaite={() => {
-            setSaisie(false);
-            void charger();
-          }}
-        />
+    <section className="admin-section resa-admin">
+      {message && (
+        <p className="succes resa-admin-message" role="status">
+          {message}
+        </p>
       )}
-      {erreur && <p className="erreur">{erreur}</p>}
-      {!liste ? (
-        <p>Chargement…</p>
-      ) : groupes.length === 0 ? (
-        <p className="explication">{mode === "jour" ? "Aucune réservation ce jour-là." : q ? "Aucune réservation ne correspond." : "Aucune réservation à venir."}</p>
-      ) : (
-        groupes.map((g) => (
-          <div key={g.cle} className="resa-service">
-            <h2 className="resa-groupe">{g.titre}</h2>
-            <table className="tableau admin-tableau resa-table">
-              <thead>
-                <tr>
-                  <th>Heure</th>
-                  <th>Client</th>
-                  <th className="nombre">Pers.</th>
-                  <th>Table</th>
-                  <th>Statut</th>
-                  <th>Note</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {g.liste.map((r) => (
-                  <tr key={r.id} className={r.statut === "annulee" || r.statut === "absente" ? "annule" : ""}>
-                    <td>
-                      <strong>{r.heure}</strong>
-                      <small>{r.dureeMinutes} min</small>
-                    </td>
-                    <td>
-                      {`${r.civilite ? `${r.civilite} ` : ""}${r.prenom} ${r.nom}`}
-                      <small>
-                        <a href={`tel:${r.telephone}`}>{r.telephone}</a>
-                        {r.email ? ` · ${r.email}` : ""} · {LIBELLES_SOURCE[r.source]}
-                      </small>
-                    </td>
-                    <td className="nombre">{r.couverts}</td>
-                    <td>
-                      <ChoixTables
-                        tables={etab.tables}
-                        valeur={r.tables}
-                        couverts={r.couverts}
-                        vide="À placer"
-                        libelle={`Tables de ${r.prenom} ${r.nom}`}
-                        reservation={r}
-                        autres={(liste ?? []).filter((x) => x.date === r.date)}
-                        disabled={r.statut === "annulee"}
-                        onChange={(ids) => void modifier(r, { tables: ids })}
-                      />
-                    </td>
-                    <td>
-                      <select aria-label={`Statut de ${r.prenom} ${r.nom}`} value={r.statut} onChange={(e) => void modifier(r, { statut: e.target.value })}>
-                        {(Object.keys(LIBELLES_STATUT) as StatutReservation[]).map((st) => (
-                          <option key={st} value={st}>
-                            {LIBELLES_STATUT[st]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      {r.commentaire ?? ""}
-                      {r.offresEmail && <small>Accepte les offres par e-mail</small>}
-                    </td>
-                    <td className="resa-actions">
-                      <BoutonIcone icone={Pencil} variante="discret" libelle={`Modifier la réservation de ${r.prenom} ${r.nom}`} onClick={() => setEdition(r)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))
-      )}
-      {edition && (
-        <FicheReservation
-          reservation={edition}
-          modifier={(corps) => api.modifierReservation(etab.id, edition.id, corps).then(() => undefined)}
-          onFermer={() => setEdition(null)}
-          onFaite={() => {
-            setEdition(null);
-            void charger();
-          }}
-        />
-      )}
+      <EspaceReservations ctx={ctx} acces={acces} colonne integre notifier={setMessage} centre={(c) => <PlanDuJour etab={etab} centre={c} />} />
     </section>
   );
 }
 
-/** Réservation prise par l'équipe (téléphone, sur place) : pas tenue par le délai ni la taille de groupe du site. */
-export function Saisie(props: { etab: { id: string; tables: Table[] }; jour: string; onFaite: () => void; creer?: (corps: Record<string, unknown>) => Promise<unknown> }) {
-  const [erreur, setErreur] = useState("");
-  /** Tables choisies à la saisie (vide : la plus petite table libre, attribuée d'office). */
-  const [tables, setTables] = useState<string[]>([]);
-  const [couverts, setCouverts] = useState(2);
-  const creer = props.creer ?? ((corps: Record<string, unknown>) => api.creerReservation(props.etab.id, corps));
-  const envoyer = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-    const corps = { ...f, couverts: Number(f.couverts), source: f.source || "telephone", ...(tables.length ? { tables } : {}) };
-    try {
-      await creer(corps);
-      props.onFaite();
-    } catch (err) {
-      if (err instanceof Error && "statut" in err && (err as ErreurAdmin).statut === 409 && (await confirmer({ titre: "Enregistrer quand même ?", message: err.message, confirmer: "Enregistrer quand même" }))) {
-        try {
-          await creer({ ...corps, forcer: true });
-          props.onFaite();
-        } catch (e2) {
-          setErreur(message(e2));
-        }
-      } else setErreur(message(err));
-    }
-  };
+/** Plan du jour dans l'administration : zones en onglets, tables avec leurs réservations ; un toucher ouvre la réservation (ou choisit la table pendant une saisie). */
+function PlanDuJour(props: { etab: EtablissementAdmin; centre: CentreReservations }) {
+  const { etab, centre } = props;
+  const zones = zonesDuPlan(etab.zones, etab.tables);
+  const [zoneNom, setZoneNom] = useState<string | null>(null);
+  const zone = zones.find((z) => z.nom === zoneNom) ?? zones[0];
+  if (!zone || etab.tables.filter((t) => !t.masquee).length === 0) {
+    return <p className="explication resa-plan-vide">Le plan de salle s'affiche ici une fois dessiné (Réglages › Plan de salle).</p>;
+  }
+  const etats = etatsDuJour(etab.tables, centre.reservations, centre.filtreService);
   return (
-    <form className="resa-saisie" onSubmit={(e) => void envoyer(e)}>
-      <label className="champ">
-        <span>Date</span>
-        <input name="date" type="date" defaultValue={props.jour} required />
-      </label>
-      <label className="champ">
-        <span>Heure</span>
-        <input name="heure" type="time" step={900} defaultValue="20:00" required />
-      </label>
-      <label className="champ">
-        <span>Personnes</span>
-        <input name="couverts" type="number" min={1} max={200} defaultValue={2} required onChange={(e) => setCouverts(Number(e.target.value) || 0)} />
-      </label>
-      <div className="champ">
-        <span>Tables</span>
-        <ChoixTables tables={props.etab.tables} valeur={tables} couverts={couverts} vide="Attribuée d'office" libelle="Tables de la nouvelle réservation" onChange={setTables} />
+    <div className="resa-plan">
+      <div className="resa-plan-tete">
+        <strong>{dateLongue(centre.date)}</strong>
+        {zones.length > 1 && (
+          <div className="resa-filtre-services" role="tablist" aria-label="Zones">
+            {zones.map((z) => (
+              <button key={z.nom} type="button" role="tab" aria-selected={z.nom === zone.nom} className={`option${z.nom === zone.nom ? " active" : ""}`} onClick={() => setZoneNom(z.nom)}>
+                {z.nom}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      <label className="champ">
-        <span>Prénom</span>
-        <input name="prenom" required maxLength={60} />
-      </label>
-      <label className="champ">
-        <span>Nom</span>
-        <input name="nom" required maxLength={60} />
-      </label>
-      <label className="champ">
-        <span>Téléphone</span>
-        <input name="telephone" type="tel" required />
-      </label>
-      <label className="champ">
-        <span>E-mail (confirmation)</span>
-        <input name="email" type="email" />
-      </label>
-      <label className="champ">
-        <span>Prise</span>
-        <select name="source" defaultValue="telephone">
-          <option value="telephone">Au téléphone</option>
-          <option value="sur_place">Sur place</option>
-        </select>
-      </label>
-      <label className="champ resa-large">
-        <span>Note</span>
-        <input name="commentaire" maxLength={500} placeholder="Allergies, anniversaire, chaise haute…" />
-      </label>
-      {erreur && <p className="erreur resa-large">{erreur}</p>}
-      <div className="resa-large">
-        <button className="bouton principal" type="submit">
-          <AvecIcone icone={Save}>Enregistrer la réservation</AvecIcone>
-        </button>
+      {centre.selection && <p className="salle-autre-jour salle-selection">Touchez les tables de la réservation sur le plan.</p>}
+      <div className="resa-plan-dessin">
+        <PlanSalle
+          zone={zone}
+          tables={placerTables(zone, etab.tables)}
+          etats={etats}
+          onTable={(id) => (centre.basculerTable ? centre.basculerTable(id) : centre.ouvrirTable(id))}
+          {...(centre.selection ? { selection: centre.selection } : {})}
+          ajuste
+        />
       </div>
-    </form>
+    </div>
   );
 }
 

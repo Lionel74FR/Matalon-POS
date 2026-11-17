@@ -24,10 +24,11 @@ const a = await bureau.newPage();
 a.on("pageerror", (e) => erreurs.push(`admin : ${e.message}`));
 await accepterConfirmations(a);
 await a.goto(`${URL}/admin#/moka/reservations`);
-await a.getByRole("button", { name: "Nouvelle réservation" }).click();
-const f = a.locator(".resa-saisie");
-await f.getByLabel("Heure").fill("23:45");
-await f.getByLabel("Personnes").fill("15");
+await a.locator(".resa-liste").getByRole("button", { name: "Créer" }).click();
+const f = a.locator(".resa-panneau");
+await f.getByLabel("Autre heure").fill("23:45");
+await f.getByRole("group", { name: "Nombre de personnes" }).getByRole("button", { name: "Plus" }).click();
+await f.locator(".resa-p-plus input").fill("15");
 r.avant = await texte(f.getByRole("button", { name: /^Tables de la nouvelle réservation/ }));
 await f.getByRole("button", { name: /^Tables de la nouvelle réservation/ }).click();
 let fenetre = a.getByRole("dialog", { name: "Tables · 15 personnes" });
@@ -38,11 +39,12 @@ r.quatreTables = await texte(fenetre.locator(".choix-tables-total"));
 await a.screenshot({ path: `${sortie}/rg01-choix-tables.png` });
 await fenetre.getByRole("button", { name: "Valider" }).click();
 r.boutonSaisie = await f.getByRole("button", { name: /^Tables de la nouvelle réservation/ }).getAttribute("aria-label");
-await f.getByLabel("Prénom").fill("Groupe");
+await f.getByLabel("Prénom", { exact: true }).fill("Groupe");
 await f.getByLabel("Nom", { exact: true }).fill("Anniversaire");
 await f.getByRole("textbox", { name: "Téléphone" }).fill("0611223344");
-await f.getByRole("button", { name: "Enregistrer la réservation" }).click();
-const ligne = a.locator(".resa-table tbody tr", { hasText: "Groupe Anniversaire" });
+await f.getByLabel("Prise par", { exact: true }).selectOption("Lionel");
+await f.getByRole("button", { name: "Enregistrer" }).click();
+const ligne = a.locator(".resa-ligne", { hasText: "ANNIVERSAIRE Groupe" });
 await ligne.waitFor({ timeout: 15000 });
 r.liste = await texte(ligne.locator(".choix-tables"));
 
@@ -61,7 +63,7 @@ await a.screenshot({ path: `${sortie}/rg02-liste-admin.png` });
 const ctx = await b.newContext({ viewport: { width: 1180, height: 820 }, hasTouch: true });
 const p = await ctx.newPage();
 p.on("pageerror", (e) => erreurs.push(`ipad : ${e.message}`));
-p.on("dialog", (d) => void d.accept());
+await accepterConfirmations(p);
 const clic = (n) => p.getByRole("button", { name: n, exact: true }).first().click();
 await p.goto(URL);
 await p.locator(".champ-code input").fill(code);
@@ -71,27 +73,27 @@ await p.locator(".carte-personne", { hasText: "Lionel" }).click();
 for (const x of "1234") await p.locator(".pave .touche", { hasText: new RegExp(`^${x}$`) }).last().click();
 await clic("Plus tard");
 await p.getByRole("button", { name: /^Réservations · 1/ }).waitFor({ timeout: 20000 });
-await p.getByRole("button", { name: /^Réservations · / }).click();
-const ligneCaisse = p.locator(".resa-caisse-ligne", { hasText: "Groupe Anniversaire" });
+const ligneCaisse = p.locator(".resa-ligne", { hasText: "ANNIVERSAIRE Groupe" });
 await ligneCaisse.waitFor();
 r.caisse = await texte(ligneCaisse.locator(".choix-tables"));
 
 // Saisie à la caisse : 10 personnes sur les tables 7, 8 et 9.
-await clic("Nouvelle");
-const fc = p.locator(".resa-caisse-saisie");
-await fc.getByLabel("Heure").fill("23:45");
-await fc.getByLabel("Personnes").fill("10");
+await p.locator(".resa-liste").getByRole("button", { name: "Créer" }).click();
+const fc = p.locator(".resa-panneau");
+await fc.getByLabel("Autre heure").fill("23:45");
+await fc.getByRole("group", { name: "Nombre de personnes" }).getByRole("button", { name: "Plus" }).click();
+await fc.locator(".resa-p-plus input").fill("10");
 await fc.getByRole("button", { name: /^Tables de la nouvelle réservation/ }).click();
 fenetre = p.getByRole("dialog", { name: "Tables · 10 personnes" });
 for (const n of ["7", "8"]) await table(fenetre, n).click();
 r.caisseManque = await texte(fenetre.locator(".choix-tables-total"));
 await table(fenetre, "9").click();
 await fenetre.getByRole("button", { name: "Valider" }).click();
-await fc.getByLabel("Prénom").fill("Club");
+await fc.getByLabel("Prénom", { exact: true }).fill("Club");
 await fc.getByLabel("Nom", { exact: true }).fill("Rando");
-await fc.getByLabel("Téléphone").fill("0699887766");
+await fc.getByRole("textbox", { name: "Téléphone" }).fill("0699887766");
 await fc.getByRole("button", { name: "Enregistrer" }).click();
-const ligneClub = p.locator(".resa-caisse-ligne", { hasText: "Club Rando" });
+const ligneClub = p.locator(".resa-ligne", { hasText: "RANDO Club" });
 await ligneClub.waitFor({ timeout: 15000 });
 r.club = await texte(ligneClub.locator(".choix-tables"));
 await p.screenshot({ path: `${sortie}/rg03-caisse.png` });
@@ -105,7 +107,7 @@ await b.close();
 
 console.log(JSON.stringify({ ...r, erreurs }, null, 2));
 const ok =
-  r.avant === "Attribuée d'office" &&
+  r.avant === "Attribution manuelle" &&
   r.troisTables === "12 places pour 15 personnes : ajoutez une table" &&
   r.quatreTables === "16 places pour 15 personnes" &&
   r.boutonSaisie === "Tables de la nouvelle réservation : tables 1 + 2 + 3 + 4" &&

@@ -54,9 +54,33 @@ export interface ReglagesReservation {
   confidentialite?: string;
 }
 
-export type StatutReservation = "confirmee" | "arrivee" | "absente" | "annulee";
-export type SourceReservation = "en_ligne" | "telephone" | "sur_place";
+/**
+ * « option » (sous option) et « attente » (liste d'attente), 17 novembre 2026 : statuts temporaires
+ * posés par l'équipe ; ils ne prennent ni place ni table tant que la réservation n'est pas confirmée.
+ */
+export type StatutReservation = "confirmee" | "arrivee" | "absente" | "annulee" | "option" | "attente";
+/** Canal par lequel la réservation est arrivée : le site, ou l'équipe (téléphone, sur place, e-mail, messagerie). */
+export type SourceReservation = "en_ligne" | "telephone" | "sur_place" | "email" | "messagerie";
 export type Civilite = "Mme" | "M." | "Mx";
+
+/** Couleur posée par l'équipe sur une réservation (repère dans la liste). */
+export const COULEURS_RESERVATION = ["rose", "violet", "bleu", "vert", "jaune", "orange", "rouge", "gris"] as const;
+export type CouleurReservation = (typeof COULEURS_RESERVATION)[number];
+
+/** Étiquettes d'une réservation, choisies par l'équipe. */
+export const TAGS_RESERVATION = [
+  "Anniversaire",
+  "Client habitué",
+  "VIP",
+  "Première visite",
+  "Professionnel",
+  "Chaise haute",
+  "Poussette",
+  "Mobilité réduite",
+  "Animal",
+  "Au calme",
+  "Terrasse souhaitée",
+] as const;
 
 export interface Reservation {
   id: string;
@@ -79,6 +103,14 @@ export interface Reservation {
   zoneSouhaitee?: string;
   offresEmail?: boolean;
   offresSms?: boolean;
+  /** Membre de l'équipe qui a pris la réservation (nom). */
+  prisePar?: string;
+  /** Allergies et régimes signalés. */
+  allergies?: string;
+  /** Mémo pour l'équipe, distinct du message du client (`commentaire`). */
+  memo?: string;
+  couleur?: CouleurReservation;
+  tags?: string[];
   creeLe: string;
   majLe: string;
   historique: Array<{ le: string; par: string; action: string }>;

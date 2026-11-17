@@ -430,37 +430,8 @@ code.cle-api {
   font-size: 1.1rem;
 }
 
-.resa-jour input[type="date"] {
-  flex: 0 0 190px;
-  min-height: 44px;
-}
-
-.resa-jour .case {
-  white-space: nowrap;
-}
-
-.resa-date {
-  margin-right: auto;
-}
-
-.resa-date::first-letter,
 .resa-fermetures .pastille::first-letter {
   text-transform: uppercase;
-}
-
-.resa-service h2 {
-  margin-top: 18px;
-}
-
-.resa-table td small {
-  display: block;
-  color: var(--sable);
-  font-size: 0.85rem;
-}
-
-.resa-table select {
-  min-height: 40px;
-  max-width: 220px;
 }
 
 
@@ -584,40 +555,6 @@ code.cle-api {
   font-family: ui-monospace, Menlo, monospace;
 }
 
-.resa-filtres {
-  margin-top: 8px;
-}
-
-.resa-recherche {
-  flex: 1 1 280px;
-  margin-bottom: 0;
-}
-
-.resa-groupe::first-letter {
-  text-transform: uppercase;
-}
-
-.resa-actions {
-  width: 1%;
-  white-space: nowrap;
-}
-
-
-@media (max-width: 700px) {
-  .resa-recherche {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-  .resa-recherche input {
-    min-width: 0;
-  }
-  .resa-jour .options {
-    flex: 1 1 100%;
-  }
-  .resa-actions {
-    width: auto;
-  }
-}
 
 /* Imprimante des tickets : adresses déjà utilisées, à reprendre d'un toucher. */
 .imprimante-historique {

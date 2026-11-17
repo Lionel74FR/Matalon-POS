@@ -382,8 +382,10 @@ export function Accueil(props: { e: EtablissementAdmin; onAller: (r: Rubrique, o
 function LigneResa(props: { r: Reservation; tables: string; maintenant: number }) {
   const { r } = props;
   const passee = r.statut === "arrivee" || r.statut === "absente";
-  const etat = r.statut === "arrivee" ? "Arrivée" : r.statut === "absente" ? "Absente" : r.tables.length ? "Confirmée" : "À placer";
-  const ton = passee ? "neutre" : r.tables.length ? "bon" : "attention";
+  const temporaire = r.statut === "option" || r.statut === "attente";
+  const etat =
+    r.statut === "arrivee" ? "Arrivée" : r.statut === "absente" ? "Absente" : r.statut === "option" ? "Sous option" : r.statut === "attente" ? "Liste d'attente" : r.tables.length ? "Confirmée" : "À placer";
+  const ton = passee || temporaire ? "neutre" : r.tables.length ? "bon" : "attention";
   return (
     <li className={`accueil-resa${passee ? " passee" : ""}`}>
       <span className="chiffres accueil-resa-heure">{r.heure}</span>

@@ -204,7 +204,8 @@ describe("réservations", () => {
     expect((await appel("PATCH", `/api/caisse/reservations/${id}`, { statut: "absente", par: "u-inconnu" }, bearer)).statut).toBe(403);
 
     const jour = await appel("GET", "/api/caisse/reservations", undefined, bearer);
-    expect(jour.corps).toMatchObject({ date: "2026-10-15", dureeMinutes: 90, actif: true });
+    expect(jour.corps).toMatchObject({ date: "2026-10-15", dureeMinutes: 90, actif: true, pasMinutes: 30, fermetures: [] });
+    expect(jour.corps.services.map((s: any) => s.id)).toEqual(["dej", "din"]);
     expect(jour.corps.reservations.map((r: any) => [r.prenom, r.statut])).toEqual([
       ["Paul", "arrivee"],
       ["Zoé", "confirmee"],
@@ -218,12 +219,83 @@ describe("réservations", () => {
   it("efface les coordonnées un an après la date", async () => {
     const cookie = await admin();
     await appel("PUT", "/api/admin/etablissements/moka/reservations/reglages", { reglages: REGLAGES, version: 0 }, cookie);
-    await appel("POST", "/api/admin/etablissements/moka/reservations", { date: "2026-10-16", heure: "12:00", couverts: 2, prenom: "Ana", nom: "Lopez", telephone: "0666666666" }, cookie);
+    await appel(
+      "POST",
+      "/api/admin/etablissements/moka/reservations",
+      { date: "2026-10-16", heure: "12:00", couverts: 2, prenom: "Ana", nom: "Lopez", telephone: "0666666666", allergies: "Arachides", memo: "Cliente fidèle" },
+      cookie,
+    );
     instant = Date.parse("2027-10-20T08:00:00Z");
     // Une réservation un an plus tard déclenche l'effacement (la session d'administration a expiré : réservation en ligne).
     expect((await appel("POST", "/api/public/reservation/moka", { date: "2027-10-20", heure: "12:00", couverts: 2, ...CLIENT })).statut).toBe(201);
     const [ancienne] = await db.requete<{ contenu: any; jeton_hash: string | null }>("select contenu, jeton_hash from reservations where date = '2026-10-16'");
     expect(ancienne!.contenu).toMatchObject({ prenom: "", nom: "(effacé)", telephone: "", couverts: 2 });
     expect(ancienne!.jeton_hash).toBeNull();
+    expect(ancienne!.contenu.allergies).toBeUndefined();
+    expect(ancienne!.contenu.memo).toBeUndefined();
+  });
+
+  it("garde les détails de l'équipe et les statuts temporaires (sous option, liste d'attente)", async () => {
+    const cookie = await admin();
+    await appel("PUT", "/api/admin/etablissements/moka/reservations/reglages", { reglages: REGLAGES, version: 0 }, cookie);
+    const base = { date: "2026-10-15", heure: "12:00", couverts: 4, prenom: "Ana", nom: "Lopez", telephone: "0666666666", email: "ana@exemple.fr" };
+    // Le service du déjeuner (10 couverts) est presque plein.
+    expect((await appel("POST", "/api/admin/etablissements/moka/reservations", { ...base, heure: "12:30", couverts: 7, prenom: "Hugo", email: "", forcer: true }, cookie)).statut).toBe(201);
+    courriels = [];
+    // Sous option : rien n'est contrôlé, aucune table, aucun e-mail ; les détails sont gardés.
+    const option = await appel(
+      "POST",
+      "/api/admin/etablissements/moka/reservations",
+      { ...base, statut: "option", source: "email", prisePar: "Léa", allergies: "Arachides", memo: "Rappeler jeudi", couleur: "vert", tags: ["VIP", "Anniversaire"] },
+      cookie,
+    );
+    expect(option.statut).toBe(201);
+    expect(option.corps.reservation).toMatchObject({
+      statut: "option",
+      source: "email",
+      tables: [],
+      prisePar: "Léa",
+      allergies: "Arachides",
+      memo: "Rappeler jeudi",
+      couleur: "vert",
+      tags: ["Anniversaire", "VIP"],
+    });
+    expect(option.corps.reservation.historique[0].action).toBe("créée sous option");
+    expect(courriels).toHaveLength(0);
+    const attente = await appel("POST", "/api/admin/etablissements/moka/reservations", { ...base, prenom: "Max", statut: "attente" }, cookie);
+    expect(attente.corps.reservation).toMatchObject({ statut: "attente", tables: [] });
+    // Étiquette ou couleur inconnue : refusée.
+    expect((await appel("POST", "/api/admin/etablissements/moka/reservations", { ...base, tags: ["Inconnue"] }, cookie)).statut).toBe(400);
+    // Confirmer l'option : la capacité se contrôle (7 + 4 > 10), puis « quand même » ; une table, un e-mail de confirmation.
+    const id = option.corps.reservation.id;
+    expect((await appel("PATCH", `/api/admin/etablissements/moka/reservations/${id}`, { statut: "confirmee" }, cookie)).corps.code).toBe("SERVICE_COMPLET");
+    const confirmee = await appel("PATCH", `/api/admin/etablissements/moka/reservations/${id}`, { statut: "confirmee", forcer: true }, cookie);
+    expect(confirmee.corps.reservation.statut).toBe("confirmee");
+    expect(confirmee.corps.reservation.tables).toHaveLength(1);
+    expect(courriels.map((c) => [c.a, c.sujet.split(" · ")[0]])).toEqual([["ana@exemple.fr", "Réservation confirmée"]]);
+    // Détails modifiés et effacés, canal changé : tracés à l'historique.
+    const modif = await appel("PATCH", `/api/admin/etablissements/moka/reservations/${id}`, { memo: "", couleur: null, tags: ["VIP"], source: "telephone", civilite: "Mme" }, cookie);
+    expect(modif.corps.reservation).toMatchObject({ tags: ["VIP"], source: "telephone", civilite: "Mme" });
+    expect(modif.corps.reservation.memo).toBeUndefined();
+    expect(modif.corps.reservation.couleur).toBeUndefined();
+    expect(modif.corps.reservation.historique.at(-1).action).toBe("civilité modifiée · canal téléphone · mémo modifié · couleur modifiée · étiquettes modifiées");
+    // Annulation d'une attente : pas d'e-mail (le client n'en avait reçu aucun).
+    courriels = [];
+    await appel("PATCH", `/api/admin/etablissements/moka/reservations/${attente.corps.reservation.id}`, { statut: "annulee" }, cookie);
+    expect(courriels).toHaveLength(0);
+    // Saisie sans notification : réservation confirmée, aucun e-mail.
+    await appel("POST", "/api/admin/etablissements/moka/reservations", { ...base, heure: "19:00", notifier: false }, cookie);
+    expect(courriels).toHaveLength(0);
+    // Client de passage : installé à l'heure du créneau commencé (10 h → 10:00, hors service : accepté), sans coordonnées.
+    const passage = await appel("POST", "/api/admin/etablissements/moka/reservations", { passage: true, couverts: 3, tables: ["t2"] }, cookie);
+    expect(passage.statut).toBe(201);
+    expect(passage.corps.reservation).toMatchObject({ date: "2026-10-15", heure: "10:00", statut: "arrivee", source: "sur_place", nom: "Client de passage", prenom: "", telephone: "", tables: ["t2"] });
+    // Le module du site ignore les détails de l'équipe.
+    const enLigne = await appel("POST", "/api/public/reservation/moka", { date: "2026-10-15", heure: "19:30", couverts: 2, ...CLIENT, memo: "x", statut: "option", tags: ["VIP"] });
+    expect(enLigne.statut).toBe(201);
+    const [ecrite] = await db.requete<{ contenu: any; statut: string }>("select contenu, statut from reservations where id = $1", [enLigne.corps.reservation.id]);
+    expect(ecrite!.statut).toBe("confirmee");
+    expect(ecrite!.contenu.memo).toBeUndefined();
+    expect(ecrite!.contenu.tags).toBeUndefined();
   });
 });
