@@ -47,6 +47,10 @@ export async function envoyerReseau(octets: Uint8Array, adresse: string, port = 
 }
 
 /** Imprime un reçu sur une imprimante réseau ESC/POS (logo de l'établissement envoyé avec le ticket). */
-export async function imprimerReseau(recu: Recu, o: { adresse: string; sansAccents: boolean }, config: Pick<Configuration, "etablissementId" | "logo">): Promise<void> {
-  await envoyerReseau(versEscPos(recu, { sansAccents: o.sansAccents, logo: await logoSerie(config) }), o.adresse);
+export async function imprimerReseau(
+  recu: Recu,
+  o: { adresse: string; sansAccents: boolean; coupePartielle?: boolean },
+  config: Pick<Configuration, "etablissementId" | "logo">,
+): Promise<void> {
+  await envoyerReseau(versEscPos(recu, { sansAccents: o.sansAccents, logo: await logoSerie(config), coupePartielle: o.coupePartielle }), o.adresse);
 }

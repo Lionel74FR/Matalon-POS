@@ -1,6 +1,6 @@
 // Impression série des caisses du Chardon (backlog n° 4, 15 novembre 2026) : sur une dalle Windows sous
 // Chrome (port série simulé : COM1 tireuse, COM2 imprimante Oxhoo), Réglages › Imprimantes de l'établissement (« Oxhoo bar », série sur la dalle), port choisi
-// COM2 ; l'essai part en ESC/POS (ESC @, PC858, €, coupe GS V 0) après DTR et RTS baissés ; une vente
+// COM2 ; l'essai part en ESC/POS (ESC @, PC858, €, coupe partielle GS V 1) après DTR et RTS baissés ; une vente
 // en espèces ouvre le tiroir sur ce port ; un duplicata s'y imprime. Sur l'iPad (pas de port série), le
 // réglage n'apparaît pas et rien ne change.
 // Usage : serveur local vierge (apps/caisse : node scripts/serveur-local.mjs 4180), puis
@@ -86,7 +86,7 @@ const p = await cd.newPage();
 p.on("pageerror", (e) => erreurs.push(`dalle : ${e.message}`));
 const clic = await connexion(p, code, "Rattacher l'iPad");
 await reglages(p);
-await declarerImprimantes(p, [{ nom: "Oxhoo bar", type: "serie", dalle: "Dalle 1" }]);
+await declarerImprimantes(p, [{ nom: "Oxhoo bar", type: "serie", dalle: "Dalle 1", coupe: "partielle" }]);
 await ongletReglages(p, "Cet appareil");
 const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: /^Imprimantes portées par/ }) });
 await bloc.getByRole("button", { name: "Choisir le port" }).click();
@@ -148,7 +148,8 @@ const ok =
   JSON.stringify(r.essai.entete) === JSON.stringify([27, 64, 27, 116, 19]) &&
   r.essai.euro &&
   r.essai.eAigu &&
-  JSON.stringify(r.essai.coupe) === JSON.stringify([29, 86, 0]) &&
+  // Coupe partielle choisie dans la liste (backlog n° 6) : GS V 1.
+  JSON.stringify(r.essai.coupe) === JSON.stringify([29, 86, 1]) &&
   r.tiroir.length === 1 &&
   r.tiroir[0] === "27 64 27 116 19 27 112 0 25 250" &&
   r.duplicata.cappuccino &&

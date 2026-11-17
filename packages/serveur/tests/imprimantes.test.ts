@@ -104,6 +104,30 @@ describe("imprimantes de l'établissement (16 novembre 2026)", () => {
     expect((await appel("POST", "/api/caisse/impressions", { imprimanteId: "imp-epson01", recu }, ipad)).corps.code).toBe("IMPRIMANTE_INCONNUE");
   });
 
+  it("garde la coupe partielle des imprimantes ESC/POS, jamais celle d'une Epson (backlog n° 6)", async () => {
+    const { ipad } = await preparer();
+    const r = await appel(
+      "PUT",
+      "/api/caisse/imprimantes",
+      {
+        imprimantes: [
+          { id: "imp-epson01", nom: "Epson", branchement: { type: "epson", adresse: "192.168.1.50" }, sansAccents: false, coupe: "partielle" },
+          { id: "imp-oxhoo01", nom: "Oxhoo", branchement: { type: "serie", dalleId: "ipad-0000000d" }, sansAccents: false, coupe: "partielle" },
+          { id: "imp-oxhoo02", nom: "Oxhoo 2", branchement: { type: "serie", dalleId: "ipad-0000000d" }, sansAccents: false, coupe: "totale" },
+        ],
+        postes: {},
+      },
+      ipad,
+    );
+    expect(r.corps.etablissement.imprimantes.map((i: any) => [i.nom, i.coupe])).toEqual([
+      ["Epson", undefined],
+      ["Oxhoo", "partielle"],
+      ["Oxhoo 2", undefined],
+    ]);
+    const refus = await appel("PUT", "/api/caisse/imprimantes", { imprimantes: [{ id: "imp-oxhoo01", nom: "Oxhoo", branchement: { type: "serie", dalleId: "ipad-0000000d" }, sansAccents: false, coupe: "demi" }], postes: {} }, ipad);
+    expect(refus.corps.message).toContain("coupe inconnue");
+  });
+
   it("l'ancienne route des postes (caisse pas encore mise à jour) alimente la liste", async () => {
     const { ipad } = await preparer();
     const r = await appel("PUT", "/api/caisse/postes", { postes: { Bar: { adresse: "10.0.0.21", sansAccents: false } } }, ipad);

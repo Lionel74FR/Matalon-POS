@@ -11,7 +11,7 @@ export async function ongletReglages(p, nom) {
   await p.getByRole("navigation", { name: "Réglages" }).getByRole("button", { name: new RegExp(`^${nom}`) }).click();
 }
 
-// liste : [{ nom, type: "epson" | "serie" | "reseau", adresse?, dalle? }] ; postes : { Bar: "Nom de l'imprimante" }.
+// liste : [{ nom, type: "epson" | "serie" | "reseau", adresse?, dalle?, coupe?: "partielle" }] ; postes : { Bar: "Nom de l'imprimante" }.
 export async function declarerImprimantes(p, liste, postes = {}) {
   await ongletReglages(p, "Imprimantes");
   const bloc = p.locator("fieldset", { has: p.locator("legend", { hasText: "Imprimantes de l'établissement" }) });
@@ -25,6 +25,7 @@ export async function declarerImprimantes(p, liste, postes = {}) {
     await ligne.locator("select").first().selectOption({ label: types[i.type] });
     if (i.adresse) await ligne.getByLabel(/^Adresse IP de/).fill(i.adresse);
     if (i.dalle) await ligne.getByLabel(/^Dalle de/).selectOption({ label: i.dalle });
+    if (i.coupe) await ligne.getByLabel(/^Coupe de/).selectOption(i.coupe);
   }
   for (const [poste, nom] of Object.entries(postes)) await bloc.getByLabel(`Imprimante du poste ${poste}`).selectOption({ label: nom });
   await bloc.getByRole("button", { name: "Enregistrer les imprimantes" }).click();

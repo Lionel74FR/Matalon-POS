@@ -105,6 +105,6 @@ async function ecrire(octets: Uint8Array, o: { rang: number; bauds?: number }): 
 }
 
 /** Imprime un reçu sur l'imprimante série (commandes ESC/POS, page PC858). */
-export function envoyerSerie(r: Recu, o: { rang: number; bauds?: number; sansAccents: boolean; logo?: LogoTicket }): Promise<void> {
-  return envoyerOctets(versEscPos(r, { sansAccents: o.sansAccents, logo: o.logo ?? null }), o);
+export function envoyerSerie(r: Recu, o: { rang: number; bauds?: number; sansAccents: boolean; logo?: LogoTicket; coupePartielle?: boolean }): Promise<void> {
+  return envoyerOctets(versEscPos(r, { sansAccents: o.sansAccents, logo: o.logo ?? null, coupePartielle: o.coupePartielle }), o);
 }

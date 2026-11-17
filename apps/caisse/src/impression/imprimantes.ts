@@ -47,12 +47,13 @@ export async function imprimerIci(config: Configuration, i: ImprimanteEtablissem
   const b = i.branchement;
   if (b.type === "epson") return envoyerEpson(b.adresse, recu, { sansAccents: i.sansAccents });
   if (b.dalleId !== config.caisseId) throw new ErreurImpression(`« ${i.nom} » est portée par un autre appareil.`, "injoignable");
-  if (b.type === "reseau") return imprimerReseau(recu, { adresse: b.adresse, sansAccents: i.sansAccents }, config);
+  const coupePartielle = i.coupe === "partielle";
+  if (b.type === "reseau") return imprimerReseau(recu, { adresse: b.adresse, sansAccents: i.sansAccents, coupePartielle }, config);
   const port = config.portsSerie?.[i.id];
   if (!port) {
     throw new ErreurImpression(`Port COM de « ${i.nom} » pas encore choisi sur cet appareil : Réglages › Imprimantes portées par cet appareil.`, "injoignable");
   }
-  return envoyerSerie(recu, { rang: port.rang, bauds: port.bauds, sansAccents: i.sansAccents, logo: await logoTicketSerie(config, port.logoMemoire) });
+  return envoyerSerie(recu, { rang: port.rang, bauds: port.bauds, sansAccents: i.sansAccents, coupePartielle, logo: await logoTicketSerie(config, port.logoMemoire) });
 }
 
 /**

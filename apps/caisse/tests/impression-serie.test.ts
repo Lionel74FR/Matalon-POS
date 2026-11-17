@@ -32,6 +32,14 @@ describe("commandes ESC/POS", () => {
   });
 });
 
+describe("coupe partielle (backlog n° 6)", () => {
+  it("coupe totale par défaut (GS V 0), partielle sur demande (GS V 1), toujours après 8 lignes", () => {
+    const recu = new Recu().texte("Merci");
+    expect([...versEscPos(recu, { sansAccents: false })].slice(-11)).toEqual([...Array(8).fill(0x0a), 0x1d, 0x56, 0]);
+    expect([...versEscPos(recu, { sansAccents: false, coupePartielle: true })].slice(-11)).toEqual([...Array(8).fill(0x0a), 0x1d, 0x56, 1]);
+  });
+});
+
 describe("logo en tête du ticket série", () => {
   it("passe l'image en points noirs : sombre et opaque = noir, transparent ou clair = blanc", () => {
     // 10 × 2 pixels : ligne 1 noire opaque, ligne 2 noire transparente sauf le dernier pixel, gris clair au milieu.

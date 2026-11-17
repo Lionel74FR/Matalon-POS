@@ -45,7 +45,11 @@ export function EditeurImprimantes(props: {
   const changerType = (i: ImprimanteEtablissement, type: BranchementImprimante["type"]) => {
     const adresse = "adresse" in i.branchement ? i.branchement.adresse : "";
     const dalleId = "dalleId" in i.branchement ? i.branchement.dalleId : (dalles[0]?.[0] ?? "");
-    maj(i.id, { branchement: type === "epson" ? { type, adresse } : type === "serie" ? { type, dalleId } : { type, adresse, dalleId } });
+    // L'Epson coupe toujours en entier : la coupe partielle ne vaut que pour les imprimantes ESC/POS.
+    maj(i.id, {
+      branchement: type === "epson" ? { type, adresse } : type === "serie" ? { type, dalleId } : { type, adresse, dalleId },
+      ...(type === "epson" ? { coupe: undefined } : {}),
+    });
   };
   const ajouter = () => {
     setFait("");
@@ -59,8 +63,9 @@ export function EditeurImprimantes(props: {
     setPostes(Object.fromEntries(Object.entries(postes).filter(([, id]) => id !== i.id)));
   };
   const enregistrer = async () => {
-    const nettes = liste.map((i) => ({
+    const nettes = liste.map(({ coupe, ...i }) => ({
       ...i,
+      ...(coupe === "partielle" && i.branchement.type !== "epson" ? { coupe } : {}),
       nom: i.nom.trim(),
       branchement: "adresse" in i.branchement ? { ...i.branchement, adresse: i.branchement.adresse.trim() } : i.branchement,
     })) as ImprimanteEtablissement[];
@@ -91,6 +96,7 @@ export function EditeurImprimantes(props: {
             <span role="columnheader">Adresse IP</span>
             <span role="columnheader">Dalle qui la porte</span>
             <span role="columnheader">Accents</span>
+            <span role="columnheader">Coupe</span>
             <span role="columnheader" />
           </div>
           {liste.map((i) => {
@@ -140,6 +146,21 @@ export function EditeurImprimantes(props: {
                   <input type="checkbox" checked={!i.sansAccents} onChange={(e) => maj(i.id, { sansAccents: !e.target.checked })} />
                   <span>Avec accents</span>
                 </label>
+                {b.type === "epson" ? (
+                  <span className="sans-objet">totale</span>
+                ) : (
+                  <select
+                    aria-label={`Coupe de ${i.nom}`}
+                    value={i.coupe ?? "totale"}
+                    onChange={(e) => {
+                      const { coupe: _, ...sans } = i;
+                      maj(i.id, e.target.value === "partielle" ? { coupe: "partielle" } : { ...sans, coupe: undefined });
+                    }}
+                  >
+                    <option value="totale">Totale</option>
+                    <option value="partielle">Partielle (ticket accroché)</option>
+                  </select>
+                )}
                 <span className="imprimante-actions">
                   {props.onTester && (
                     <BoutonIcone icone={Printer} variante="discret" libelle={`Imprimer un essai sur ${i.nom}`} disabled={modifie} onClick={() => props.onTester!(i)} />

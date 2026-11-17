@@ -429,6 +429,8 @@ async function majImprimantes(
           ? { type: "serie" as const, dalleId: i.branchement.dalleId }
           : { type: "reseau" as const, adresse: i.branchement.adresse, dalleId: i.branchement.dalleId },
     sansAccents: i.sansAccents,
+    // Coupe partielle : imprimantes ESC/POS seulement (l'Epson coupe toujours en entier).
+    ...(i.coupe === "partielle" && i.branchement.type !== "epson" ? { coupe: "partielle" as const } : {}),
   }));
   const postes = corps.postes as Record<string, string>;
   const ancien: PostesProduction = {};

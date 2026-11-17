@@ -997,6 +997,12 @@ export interface ImprimanteEtablissement {
   nom: string;
   branchement: BranchementImprimante;
   sansAccents: boolean;
+  /**
+   * Coupe partielle (17 novembre 2026, backlog n° 6) : le ticket reste accroché à l'imprimante par un
+   * petit point, comme avec l'ancien logiciel du Chardon. Absente : coupe totale. Imprimantes ESC/POS
+   * (série ou réseau) seulement : l'Epson du Moka n'annonce que la coupe totale.
+   */
+  coupe?: "partielle";
 }
 
 export const IMPRIMANTES_MAX = 20;
@@ -1027,6 +1033,7 @@ export function erreurImprimantes(imprimantes: unknown, postes: unknown, dalles:
       if (typeof b.dalleId !== "string" || !dalles.has(b.dalleId)) return `${i.nom} : choisissez la dalle qui la porte.`;
       if (b.type === "reseau" && !adresseLocale(b.adresse)) return `${i.nom} : adresse du réseau local attendue (192.168.x.x…).`;
     } else return `${i.nom} : branchement inconnu.`;
+    if (i.coupe !== undefined && i.coupe !== "partielle" && i.coupe !== "totale") return `${i.nom} : coupe inconnue.`;
     if (Object.keys(b).some((k) => !["type", "adresse", "dalleId"].includes(k)) || (b.type === "serie" && "adresse" in b) || (b.type === "epson" && "dalleId" in b)) {
       return `${i.nom} : branchement invalide.`;
     }

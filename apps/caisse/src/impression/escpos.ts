@@ -117,7 +117,7 @@ export const LIGNES_AVANT_COUPE = 8;
 /** Logo du ticket : l'image à envoyer, « memoire » s'il est enregistré dans l'imprimante, null : aucun. */
 export type LogoTicket = LogoRaster | "memoire" | null;
 
-export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket }): Uint8Array {
+export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket; coupePartielle?: boolean }): Uint8Array {
   const out: number[] = [ESC, 0x40];
   if (!o.sansAccents) out.push(ESC, 0x74, 19);
   const style = (gras: boolean, grand: boolean) => out.push(ESC, 0x45, gras ? 1 : 0, GS, 0x21, grand ? 0x11 : 0x00);
@@ -167,7 +167,8 @@ export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket
     // et sort en haut du ticket suivant (Oxhoo du Chardon, 16 novembre). Lignes vides en LF simples,
     // comprises par toutes les imprimantes, puis coupe.
     for (let i = 0; i < LIGNES_AVANT_COUPE; i++) out.push(LF);
-    out.push(GS, 0x56, 0);
+    // GS V 0 : coupe totale ; GS V 1 : coupe partielle, le ticket reste accroché par un point (backlog n° 6).
+    out.push(GS, 0x56, o.coupePartielle ? 1 : 0);
   }
   return Uint8Array.from(out);
 }
