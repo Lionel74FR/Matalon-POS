@@ -1,5 +1,5 @@
 import type { Catalogue } from "@matalon/catalogue";
-import { lignesActives, suiteDe, type Commande, type LigneCommande, type Suite, type SuiteAttente } from "./commande";
+import { lignesActives, suiteComposant, suiteDe, suitesLigne, type Commande, type LigneCommande, type Suite, type SuiteAttente } from "./commande";
 
 /**
  * Bons de production : chaque catégorie de la carte peut désigner un poste
@@ -40,13 +40,19 @@ function repartir(l: LigneCommande, carte: Catalogue): Array<{ poste: string; ar
   const posteLigne = posteArticle(carte, l.articleId);
   const note = { ...(l.note ? { note: l.note } : {}), suite: suiteDe(l) };
   if (l.composants?.length) {
-    const parPoste = new Map<string, string[]>();
+    // Par poste et par cours : une formule découpée envoie chaque choix sous son cours.
+    const groupes = new Map<string, { poste: string; suite: Suite; details: string[] }>();
     for (const c of l.composants) {
       // Choix d'une catégorie sans poste : il suit la formule.
       const poste = posteCategorie(carte, c.categorieId) ?? posteLigne;
-      if (poste) parPoste.set(poste, [...(parPoste.get(poste) ?? []), c.libelle]);
+      if (!poste) continue;
+      const suite = suiteComposant(l, c);
+      const cle = `${poste}|${suite}`;
+      const g = groupes.get(cle) ?? { poste, suite, details: [] };
+      g.details.push(c.libelle);
+      groupes.set(cle, g);
     }
-    return [...parPoste].map(([poste, details]) => ({ poste, article: { quantite: l.quantite, libelle: l.libelle, details, ...note } }));
+    return [...groupes.values()].map(({ poste, suite, details }) => ({ poste, article: { quantite: l.quantite, libelle: l.libelle, details, ...note, suite } }));
   }
   return posteLigne ? [{ poste: posteLigne, article: { quantite: l.quantite, libelle: l.libelle, details: l.details, ...note } }] : [];
 }
@@ -85,8 +91,9 @@ function parSuite(b: Bon): Bon {
 export function bonsReclame(c: Commande, carte: Catalogue, suite: SuiteAttente): Bon[] {
   const bons = new Map<string, Bon>();
   for (const l of lignesActives(c)) {
-    if (!l.envoyee || suiteDe(l) !== suite) continue;
+    if (!l.envoyee || !suitesLigne(l).includes(suite)) continue;
     for (const { poste, article } of repartir(l, carte)) {
+      if (article.suite !== suite) continue;
       const bon = bons.get(poste) ?? { poste, annulation: false, reclame: suite, articles: [], ligneUids: [] };
       bon.articles.push(article);
       if (!bon.ligneUids.includes(l.uid)) bon.ligneUids.push(l.uid);

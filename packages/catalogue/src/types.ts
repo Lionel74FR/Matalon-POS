@@ -36,6 +36,12 @@ export interface ChoixFormule {
   /** Catégories ou articles proposés. */
   categories?: string[];
   articles?: string[];
+  /**
+   * Cours du choix (17 novembre 2026, Lionel : les menus respectent les cours) : absent pour « En direct »,
+   * 1 à 3 pour « À suivre 1 » à « À suivre 3 ». Une formule entrée, plat, dessert part ainsi en Direct,
+   * AS1, AS2 : chaque choix est envoyé et réclamé avec son cours.
+   */
+  suite?: 1 | 2 | 3;
 }
 
 export interface Article {

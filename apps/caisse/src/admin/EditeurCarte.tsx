@@ -1139,6 +1139,12 @@ function FicheArticle(props: {
           </button>
 
           <h3>Formule (choix inclus dans le prix)</h3>
+          {(a.formule?.length ?? 0) > 1 && (
+            <p className="explication">
+              Le cours de chaque choix (Direct, À suivre 1, À suivre 2) découpe la formule en caisse : l'entrée part en Direct, le plat est réclamé en
+              À suivre 1, le dessert en À suivre 2.
+            </p>
+          )}
           {(a.formule ?? []).map((c, i) => (
             <ChoixFormuleEditeur
               key={c.id}
@@ -1255,6 +1261,25 @@ function ChoixFormuleEditeur(props: {
       <div className="admin-ligne sous-ligne">
         <input value={c.nom} placeholder="Nom du choix (ex. Boisson chaude)" onChange={(e) => props.onChange({ ...c, nom: e.target.value })} />
         <BoutonIcone icone={Trash2} variante="discret" libelle={`Retirer le choix ${c.nom}`} onClick={props.onRetirer} />
+      </div>
+      <div className="cours-choix">
+        <span className="explication">Cours :</span>
+        <div className="options" role="radiogroup" aria-label={`Cours du choix ${c.nom || "sans nom"}`}>
+          {([undefined, 1, 2, 3] as const).map((s) => (
+            <button
+              key={s ?? 0}
+              role="radio"
+              aria-checked={c.suite === s}
+              className={`option${c.suite === s ? " active" : ""}`}
+              onClick={() => {
+                const { suite: _, ...sans } = c;
+                props.onChange(s ? { ...sans, suite: s } : sans);
+              }}
+            >
+              {s ? `À suivre ${s}` : "Direct"}
+            </button>
+          ))}
+        </div>
       </div>
       {(() => {
         const cats = new Set(props.carte.categories.map((x) => x.id));

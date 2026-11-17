@@ -32,8 +32,11 @@ export interface LigneCommande {
    * disparaît simplement : la commande n'est qu'un brouillon.
    */
   retiree?: { le: string; par: string };
-  /** Formule : catégorie de chaque choix, pour envoyer chacun à son poste de production. */
-  composants?: Array<{ libelle: string; categorieId: string }>;
+  /**
+   * Formule : catégorie de chaque choix, pour envoyer chacun à son poste de production, et son cours
+   * (`suite`, réglé dans la carte, 17 novembre 2026) : la formule se découpe alors entre ses cours.
+   */
+  composants?: Array<{ libelle: string; categorieId: string; suite?: SuiteAttente | 0 }>;
   /** Commande validée (« Envoyer », ou d'office à l'encaissement) ; bons de production imprimés s'il y a des imprimantes. */
   envoyee?: { le: string; par: string };
   /** Ligne retirée après envoi : bon d'annulation imprimé. */
@@ -79,6 +82,19 @@ export type Suite = 0 | SuiteAttente;
 export const SUITES: readonly Suite[] = [0, 1, 2, 3];
 
 export const suiteDe = (l: Pick<LigneCommande, "suite">): Suite => l.suite ?? 0;
+
+/** Cours d'un choix de formule : le sien s'il en a un (carte), sinon celui de la ligne. */
+export const suiteComposant = (l: Pick<LigneCommande, "suite">, c: { suite?: Suite }): Suite => (c.suite !== undefined ? c.suite : suiteDe(l));
+
+/** Formule découpée entre plusieurs cours (choix à cours réglé dans la carte). */
+export const formuleDecoupee = (l: Pick<LigneCommande, "composants">): boolean => !!l.composants?.some((c) => c.suite !== undefined);
+
+/** Cours où une ligne sert, dans l'ordre : une formule découpée en a plusieurs. */
+export function suitesLigne(l: Pick<LigneCommande, "suite" | "composants">): Suite[] {
+  if (!formuleDecoupee(l)) return [suiteDe(l)];
+  const s = new Set(l.composants!.map((c) => suiteComposant(l, c)));
+  return SUITES.filter((x) => s.has(x));
+}
 
 /** « En direct », « À suivre 1 »… */
 export const nomSuite = (s: Suite): string => (s === 0 ? "En direct" : `À suivre ${s}`);
@@ -439,7 +455,7 @@ export function fusionnerCommandes(cible: Commande, source: Commande): Commande 
 function reclamesFusion(cible: Commande, source: Commande): Reclame[] {
   const reclames: Reclame[] = [];
   for (const s of [1, 2, 3] as const) {
-    const cotes = [cible, source].filter((c) => lignesActives(c).some((l) => suiteDe(l) === s));
+    const cotes = [cible, source].filter((c) => lignesActives(c).some((l) => suitesLigne(l).includes(s)));
     const r = cotes.map((c) => reclameDe(c, s));
     if (cotes.length && r.every(Boolean)) reclames.push(r.reduce((a, b) => (a!.le > b!.le ? a : b))!);
   }
@@ -457,7 +473,7 @@ export function reclameDe(c: Commande, s: Suite): Reclame | null {
 
 /** Suites présentes dans la commande (articles non retirés), dans l'ordre de service. */
 export function suitesDe(c: Commande): Suite[] {
-  const presentes = new Set(lignesActives(c).map(suiteDe));
+  const presentes = new Set(lignesActives(c).flatMap(suitesLigne));
   return SUITES.filter((s) => presentes.has(s));
 }
 
@@ -474,7 +490,7 @@ export function reclamer(c: Commande, suite: SuiteAttente, par: string, le = new
 
 /** Lignes regroupées par suite, dans l'ordre de service ; l'ordre de saisie est gardé dans chaque suite. */
 export function lignesParSuite(c: Commande): Array<{ suite: Suite; lignes: LigneCommande[] }> {
-  return SUITES.map((suite) => ({ suite, lignes: c.lignes.filter((l) => suiteDe(l) === suite) })).filter((g) => g.lignes.length > 0);
+  return SUITES.map((suite) => ({ suite, lignes: c.lignes.filter((l) => suitesLigne(l).includes(suite)) })).filter((g) => g.lignes.length > 0);
 }
 
 /**

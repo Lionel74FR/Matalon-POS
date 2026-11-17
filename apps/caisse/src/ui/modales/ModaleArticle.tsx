@@ -75,6 +75,8 @@ export function ModaleArticle(props: {
         composants: choixFormule.map((c) => ({
           libelle: selections[c.choix.id]!,
           categorieId: c.options.find((o) => o.libelle === selections[c.choix.id])?.categorieId ?? "",
+          // Cours réglé dans la carte : la formule se découpe entre ses cours (Direct, AS1, AS2).
+          ...(a.formule!.some((x) => x.suite) ? { suite: c.choix.suite ?? 0 } : {}),
         })),
         quantite,
         prixUnitaireTTC: a.prixTTC!,

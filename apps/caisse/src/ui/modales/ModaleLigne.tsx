@@ -1,7 +1,18 @@
 import { Check, Minus, Plus, Trash2 } from "lucide-react";
 import { AvecIcone } from "../icones";
 import { useState } from "react";
-import { avecQuantite, montantLigne, montantRemise, nomCourtSuite, SUITES, suiteDe, type LigneCommande, type Suite } from "../../metier/commande";
+import {
+  avecQuantite,
+  formuleDecoupee,
+  montantLigne,
+  montantRemise,
+  nomCourtSuite,
+  SUITES,
+  suiteComposant,
+  suiteDe,
+  type LigneCommande,
+  type Suite,
+} from "../../metier/commande";
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros, useCaisse } from "../contexte";
 import { MOTIFS_REMISE_DEFAUT } from "@matalon/serveur/partage";
@@ -39,6 +50,9 @@ export function ModaleLigne(props: {
   const [erreur, setErreur] = useState("");
   const [note, setNote] = useState(l.note ?? "");
   const [suite, setSuite] = useState<Suite>(suiteDe(l));
+  // Formule découpée entre les cours : le cours de chaque choix se change ici (17 novembre 2026).
+  const decoupee = formuleDecoupee(l);
+  const [suitesChoix, setSuitesChoix] = useState<Suite[]>(() => (l.composants ?? []).map((c) => suiteComposant(l, c)));
   /** Retrait d'un article déjà envoyé, en attente de son motif (puis du code d'un responsable). */
   const [retrait, setRetrait] = useState<{ unites: number; suite: () => void } | null>(null);
 
@@ -99,7 +113,9 @@ export function ModaleLigne(props: {
     }
     const unites = Math.max(0, l.quantite - quantite);
     const { suite: _, ...sansSuite } = l;
-    const maj = avecQuantite({ ...sansSuite, ...(suite ? { suite } : {}), remise: undefined, note: note.trim() || undefined }, quantite);
+    const suiteLigne = decoupee ? Math.min(...suitesChoix) : suite;
+    const maj = avecQuantite({ ...sansSuite, ...(suiteLigne ? { suite: suiteLigne as Exclude<Suite, 0> } : {}), remise: undefined, note: note.trim() || undefined }, quantite);
+    if (decoupee) maj.composants = l.composants!.map((c, i) => ({ ...c, suite: suitesChoix[i]! }));
     if (enEuros && montantEuros > 0) maj.remise = { pourcentage: 0, enEuros: true, motif, accordeePar, montantTTC: montantEuros };
     else if (!enEuros && pourcentage > 0) maj.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(brut, pourcentage) };
     retirer(unites, () => props.onChange(maj, unites));
@@ -158,7 +174,30 @@ export function ModaleLigne(props: {
           </button>
         </div>
       </section>
-      {props.avecSuites && !l.envoyee && (
+      {props.avecSuites && !l.envoyee && decoupee && (
+        <section className="groupe-choix">
+          <h3>Cours de chaque choix</h3>
+          {l.composants!.map((c, i) => (
+            <div key={i} className="cours-choix">
+              <span>{c.libelle}</span>
+              <div className="options compactes" role="radiogroup" aria-label={`Cours de ${c.libelle}`}>
+                {SUITES.map((x) => (
+                  <button
+                    key={x}
+                    role="radio"
+                    aria-checked={suitesChoix[i] === x}
+                    className={`option${suitesChoix[i] === x ? " active" : ""}`}
+                    onClick={() => setSuitesChoix(suitesChoix.map((s, j) => (j === i ? x : s)))}
+                  >
+                    {nomCourtSuite(x)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+      {props.avecSuites && !l.envoyee && !decoupee && (
         <section className="groupe-choix">
           <h3>Suite</h3>
           <div className="options compactes">

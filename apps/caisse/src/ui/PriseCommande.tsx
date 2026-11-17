@@ -13,7 +13,10 @@ import {
   commandeAGarder,
   diviserParArticles,
   lignesDues,
+  formuleDecoupee,
   lignesParSuite,
+  suiteComposant,
+  suitesLigne,
   modifierLigne,
   montantLigne,
   nomCourtSuite,
@@ -265,7 +268,12 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                 </div>
               )}
               <ol>
-                {g.lignes.map((l) => (
+                {g.lignes.map((l) => {
+                  // Formule découpée entre les cours : sous chaque cours, ses choix ; le prix sous le premier.
+                  const decoupee = formuleDecoupee(l);
+                  const premier = suitesLigne(l)[0] === g.suite;
+                  const details = decoupee ? l.composants!.filter((x) => suiteComposant(l, x) === g.suite).map((x) => x.libelle) : l.details;
+                  return (
                   <li key={l.uid}>
                     <button
                       className={`ticket-ligne${l.retiree ? " retiree" : ""}${l.reglee ? " reglee" : ""}`}
@@ -276,7 +284,8 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                       <span className="qte">{l.quantite}</span>
                       <span className="libelle">
                         <span className="libelle-texte">{l.libelle}</span>
-                        {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
+                        {details.length > 0 && <small>{details.join(" · ")}</small>}
+                        {decoupee && !premier && <small className="mention-suite-formule">Suite de la formule</small>}
                         {l.note && <small className="note-ligne">{l.note}</small>}
                         {l.retiree && <small className="mention-retiree">Retiré de la commande</small>}
                         {l.reglee && <small className="mention-reglee">Réglé à {heure(l.reglee.le)}</small>}
@@ -289,10 +298,11 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                           </small>
                         )}
                       </span>
-                      <span className="montant">{euros(montantLigne(l))}</span>
+                      <span className="montant">{decoupee && !premier ? "" : euros(montantLigne(l))}</span>
                     </button>
                   </li>
-                ))}
+                  );
+                })}
               </ol>
             </li>
           ))}

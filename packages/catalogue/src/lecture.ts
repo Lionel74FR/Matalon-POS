@@ -126,6 +126,10 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
           const arts = liste(fo.articles, `${ou}, choix : articles`).map((a2) => ident(a2, `${ou}, choix : article`));
           if (cats.length) choix.categories = cats;
           if (arts.length) choix.articles = arts;
+          if (fo.suite !== undefined && fo.suite !== null) {
+            if (fo.suite === 1 || fo.suite === 2 || fo.suite === 3) choix.suite = fo.suite;
+            else erreurs.push(`${ou}, choix « ${choix.nom} » : cours inconnu (1 à 3 pour À suivre 1 à 3)`);
+          }
           if (!cats.length && !arts.length) erreurs.push(`${ou}, choix « ${choix.nom} » : aucune catégorie ni article proposé`);
           return choix;
         });

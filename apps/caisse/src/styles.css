@@ -3885,3 +3885,21 @@ a.bouton {
 .connexion-epson .etat.attention {
   color: var(--terre);
 }
+/* Cours des choix de formule (17 novembre 2026). */
+.cours-choix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.cours-choix .options {
+  margin: 0;
+}
+.cours-choix > span {
+  min-width: 8em;
+}
+.mention-suite-formule {
+  opacity: 0.7;
+  font-style: italic;
+}
