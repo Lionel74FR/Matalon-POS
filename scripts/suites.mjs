@@ -67,6 +67,9 @@ await p.getByRole("button", { name: "Retour à la salle" }).click();
 
 // ── Table 5 : direct, AS1, AS2 ──
 await p.getByRole("button", { name: /^Table 5,/ }).click();
+// Couverts exigés dès que la cuisine est servie (17 novembre 2026).
+await p.getByRole("button", { name: "Indiquer les couverts" }).click();
+await p.getByRole("dialog", { name: "Couverts" }).getByRole("button", { name: "2", exact: true }).click();
 const parDefaut = await p.locator(".selecteur-suite [aria-checked=true]").textContent();
 await tuile("Cappuccino");
 await tuile("Cappuccino");

@@ -75,6 +75,9 @@ const essai = recus.at(-1);
 // ── Table 5 : envoi par poste ──
 await p.getByRole("tab", { name: "Salle" }).click();
 await p.getByRole("button", { name: /^Table 5,/ }).click();
+// Couverts exigés dès que la cuisine est servie (17 novembre 2026).
+await p.getByRole("button", { name: "Indiquer les couverts" }).click();
+await p.getByRole("dialog", { name: "Couverts" }).getByRole("button", { name: "2", exact: true }).click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await p.locator(".tuile", { hasText: "Cappuccino" }).first().click();
 await p.getByRole("tab", { name: "Cuisine", exact: true }).click();

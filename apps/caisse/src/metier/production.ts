@@ -145,3 +145,16 @@ export function validerEnvoi(
     }),
   };
 }
+
+/** Poste de cuisine : son nom contient « cuisine » (« Cuisine », « Cuisine chaude »…), accents et casse ignorés. */
+export const posteCuisine = (poste: string): boolean => /cuisine/i.test(poste.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+
+/**
+ * Couverts exigés (17 novembre 2026, Lionel) : une table dont des articles partent ou sont partis en
+ * cuisine doit avoir ses couverts. Vrai si la commande n'en a pas et qu'une ligne active (formule
+ * comprise) va à un poste de cuisine.
+ */
+export function couvertsExiges(c: Commande, carte: Catalogue): boolean {
+  if (c.couverts != null) return false;
+  return lignesActives(c).some((l) => repartir(l, carte).some(({ poste }) => posteCuisine(poste)));
+}

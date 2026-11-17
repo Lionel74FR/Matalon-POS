@@ -1,4 +1,5 @@
-// Formules découpées entre les cours (17 novembre 2026, Lionel : les menus respectent Direct, AS1, AS2).
+// Formules découpées entre les cours (17 novembre 2026, Lionel : les menus respectent Direct, AS1, AS2),
+// et couverts exigés avant d'envoyer en cuisine.
 // Administration : cours de chaque choix du « Déjeuner Moka » (plat en Direct, dessert en À suivre 1,
 // boisson chaude en À suivre 2). iPad : la formule se montre sous chaque cours (prix sous le premier),
 // « Envoyer » range chaque choix sous son cours sur les bons, « Réclamer AS1 » ne rappelle que le dessert.
@@ -88,8 +89,14 @@ r.groupes = await p.locator(".groupe-suite").evaluateAll((gs) =>
   })),
 );
 await p.locator(".ticket").first().screenshot({ path: `${sortie}/fc02-commande.png` }).catch(() => p.screenshot({ path: `${sortie}/fc02-commande.png` }));
+// Couverts exigés : des articles partent en cuisine (17 novembre 2026).
 await p.getByRole("button", { name: /^Envoyer/ }).click();
+const fenetre = p.getByRole("dialog", { name: "Couverts" });
+await fenetre.waitFor();
+r.couverts = { exiges: await fenetre.getByText("Des articles partent en cuisine").count(), avantEnvoi: recus.length, sansCouverts: await fenetre.getByRole("button", { name: "Sans couverts" }).count() };
+await fenetre.getByRole("button", { name: "2", exact: true }).click();
 await p.getByText("Envoyé").first().waitFor();
+r.couverts.titre = await p.locator(".ticket-titre").textContent();
 await p.waitForTimeout(500);
 r.envoi = recus.map((x) => `${x.poste}: ${x.textes}`);
 const avant = recus.length;
@@ -104,6 +111,10 @@ console.log(JSON.stringify({ ...r, erreurs }, null, 2));
 const tout = r.envoi.join(" | ");
 const ok =
   r.carte.join() === "plat:0,dessert:1,boisson-chaude:2" &&
+  r.couverts.exiges === 1 &&
+  r.couverts.avantEnvoi === 0 &&
+  r.couverts.sansCouverts === 0 &&
+  /2 couverts/.test(r.couverts.titre) &&
   JSON.stringify(r.groupes.map((g) => g.suite)) === JSON.stringify(["En direct", "À suivre 1", "À suivre 2"]) &&
   /Plat du jour/.test(r.groupes[0].ligne[0][0]) &&
   /19,00/.test(r.groupes[0].ligne[0][1]) &&

@@ -9,20 +9,27 @@ const RAPIDES = Array.from({ length: 12 }, (_, i) => i + 1);
  * Nombre de couverts : un toucher suffit de 1 à 12 ; au-delà, plus et moins.
  * Utilisable avant toute commande (table installée, rien commandé encore).
  */
-export function ModaleCouverts(props: { valeur: number | null; onValider: (n: number | null) => void; onFermer: () => void }) {
+export function ModaleCouverts(props: {
+  valeur: number | null;
+  onValider: (n: number | null) => void;
+  onFermer: () => void;
+  /** Des articles partent (ou sont partis) en cuisine : couverts exigés, pas de « Sans couverts » (17 novembre 2026). */
+  obligatoire?: boolean;
+}) {
   const [n, setN] = useState(Math.max(props.valeur ?? 13, 13));
   return (
     <Modale
       titre="Couverts"
       onFermer={props.onFermer}
       pied={
-        props.valeur != null ? (
+        props.valeur != null && !props.obligatoire ? (
           <button className="bouton" onClick={() => props.onValider(null)}>
             <AvecIcone icone={X}>Sans couverts</AvecIcone>
           </button>
         ) : undefined
       }
     >
+      {props.obligatoire && <p className="explication">Des articles partent en cuisine : indiquez le nombre de couverts de la table.</p>}
       <div className="couverts-grille" role="group" aria-label="Nombre de couverts">
         {RAPIDES.map((x) => (
           <button key={x} className={`couverts-choix${props.valeur === x ? " actif" : ""}`} onClick={() => props.onValider(x)}>

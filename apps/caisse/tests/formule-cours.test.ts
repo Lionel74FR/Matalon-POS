@@ -80,3 +80,15 @@ describe("formule découpée entre les cours", () => {
     expect(bonsReclame(c, carte, 2).map((b) => b.articles.map((a) => a.details.join(", ")))).toEqual([["Tarte"]]);
   });
 });
+
+describe("couverts exigés dès que la cuisine est servie (17 novembre 2026)", () => {
+  it("une table avec un article ou un choix de formule en cuisine doit avoir ses couverts ; le bar seul, non", async () => {
+    const { couvertsExiges, posteCuisine } = await import("../src/metier/production");
+    const vin = ajouterLigne(nouvelleCommande("t1", "u1"), { articleId: "verre", libelle: "Verre de rouge", details: [], quantite: 1, prixUnitaireTTC: 600, tauxTVA: 2000, ajouteePar: "u1" });
+    expect(couvertsExiges(vin, carte)).toBe(false);
+    const avecMenu = menu(vin);
+    expect(couvertsExiges(avecMenu, carte)).toBe(true);
+    expect(couvertsExiges({ ...avecMenu, couverts: 2 }, carte)).toBe(false);
+    expect([posteCuisine("Cuisine"), posteCuisine("CUISINE chaude"), posteCuisine("Bar")]).toEqual([true, true, false]);
+  });
+});

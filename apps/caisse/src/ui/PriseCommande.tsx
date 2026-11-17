@@ -14,6 +14,7 @@ import {
   diviserParArticles,
   lignesDues,
   formuleDecoupee,
+  lignesActives,
   lignesParSuite,
   suiteComposant,
   suitesLigne,
@@ -30,7 +31,7 @@ import {
   type LigneCommande,
   type Suite,
 } from "../metier/commande";
-import { nbLignesAEnvoyer } from "../metier/production";
+import { couvertsExiges, nbLignesAEnvoyer } from "../metier/production";
 import { Vide } from "./communs";
 import { euros, useCaisse } from "./contexte";
 import { ModaleArticle } from "./modales/ModaleArticle";
@@ -146,13 +147,24 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
   const avecSuites = groupes.some((g) => g.suite !== 0);
   const aReclamer = new Set(suitesAReclamer(c));
 
-  const reclamer = async (s: Exclude<Suite, 0>) => {
+  const reclamer = async (s: Exclude<Suite, 0>, commande: Commande = c) => {
     setEnvoiEnCours(true);
     try {
-      props.onMaj(await reclamerSuite(c, CARTE, s));
+      props.onMaj(await reclamerSuite(commande, CARTE, s));
     } finally {
       setEnvoiEnCours(false);
     }
+  };
+
+  /**
+   * Couverts obligatoires dès que des articles partent en cuisine (17 novembre 2026, Lionel) : avant
+   * « Envoyer », une réclame ou l'encaissement, la fenêtre des couverts s'ouvre, puis l'action reprend.
+   */
+  const [apresCouverts, setApresCouverts] = useState<((c: Commande) => void) | null>(null);
+  const avecCouverts = (action: (c: Commande) => void) => {
+    if (estComptoir || !couvertsExiges(c, CARTE)) return action(c);
+    setApresCouverts(() => action);
+    setCouvertsOuvert(true);
   };
 
   const envoyer = async (commande: Commande, o: { annulationsSeules?: boolean } = {}) => {
@@ -261,7 +273,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                   {reclameDe(c, g.suite) ? (
                     <span className="etat-suite">Réclamée à {heure(reclameDe(c, g.suite)!.le)}</span>
                   ) : g.suite !== 0 && aReclamer.has(g.suite) ? (
-                    <button className="bouton reclamer" disabled={envoiEnCours} onClick={() => void reclamer(g.suite as Exclude<Suite, 0>)}>
+                    <button className="bouton reclamer" disabled={envoiEnCours} onClick={() => avecCouverts((x) => void reclamer(g.suite as Exclude<Suite, 0>, x))}>
                       <AvecIcone icone={BellRing} taille={16}>{`Réclamer ${nomCourtSuite(g.suite)}`}</AvecIcone>
                     </button>
                   ) : null}
@@ -320,7 +332,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
             <strong>{euros(totaux.totalTTC - verse)}</strong>
           </div>
           <div className="ticket-actions">
-            <button className="bouton" disabled={nbAEnvoyer === 0 || envoiEnCours} onClick={() => void envoyer(c)}>
+            <button className="bouton" disabled={nbAEnvoyer === 0 || envoiEnCours} onClick={() => avecCouverts((x) => void envoyer(x))}>
               <AvecIcone icone={Send}>{nbAEnvoyer ? `Envoyer (${nbAEnvoyer})` : c.lignes.some((l) => l.envoyee) ? "Envoyé" : "Envoyer"}</AvecIcone>
             </button>
             {!estComptoir && (
@@ -329,7 +341,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
               </button>
             )}
             {!estComptoir && (
-              <button className="bouton" disabled={nbActives === 0} onClick={() => setDivisionOuverte(true)}>
+              <button className="bouton" disabled={nbActives === 0} onClick={() => avecCouverts(() => setDivisionOuverte(true))}>
                 <AvecIcone icone={Split}>Diviser</AvecIcone>
               </button>
             )}
@@ -338,7 +350,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                 <AvecIcone icone={DoorOpen}>{estComptoir ? "Vider" : "Libérer la table"}</AvecIcone>
               </button>
             ) : (
-              <button className="bouton principal" disabled={nbActives === 0 && !acomptes.length} onClick={() => setEncaissement({})}>
+              <button className="bouton principal" disabled={nbActives === 0 && !acomptes.length} onClick={() => avecCouverts(() => setEncaissement({}))}>
                 <AvecIcone icone={CreditCard}>Encaisser</AvecIcone>
               </button>
             )}
@@ -515,11 +527,19 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
       {couvertsOuvert && (
         <ModaleCouverts
           valeur={c.couverts}
+          obligatoire={!!apresCouverts || (lignesActives(c).some((l) => l.envoyee) && couvertsExiges({ ...c, couverts: null }, CARTE))}
           onValider={(n) => {
-            props.onChange({ ...c, couverts: n });
+            const suite = { ...c, couverts: n };
+            props.onChange(suite);
             setCouvertsOuvert(false);
+            const action = apresCouverts;
+            setApresCouverts(null);
+            if (action && n != null) action(suite);
           }}
-          onFermer={() => setCouvertsOuvert(false)}
+          onFermer={() => {
+            setCouvertsOuvert(false);
+            setApresCouverts(null);
+          }}
         />
       )}
       {divisionOuverte && (
