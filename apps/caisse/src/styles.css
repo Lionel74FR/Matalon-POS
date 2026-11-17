@@ -2080,6 +2080,14 @@ a.bouton {
   .barre-marque {
     flex: 1;
   }
+  /* iPhone : le logo seul, le nom de l'établissement prendrait toute la ligne (17 novembre 2026). */
+  .barre-marque span {
+    display: none;
+  }
+  /* Le menu ne montre que son icône : la rubrique ouverte est déjà le titre de la page. */
+  .menu-onglets-bouton > span {
+    display: none;
+  }
   .barre-onglets {
     order: 10;
     flex: 1 1 100%;
@@ -3902,4 +3910,51 @@ a.bouton {
 .mention-suite-formule {
   opacity: 0.7;
   font-style: italic;
+}
+
+/* Petit iPhone (17 novembre 2026) : le ticket ouvert tient dans la largeur de l'écran. */
+@media (max-width: 700px) {
+  .ticket-papier.ouvert {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: hidden;
+  }
+  .ticket-tete {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  /* Première ligne : retour et titre (table, couverts) ; outils et carte en dessous. */
+  .ticket-tete > .ticket-titre {
+    flex: 1 1 calc(100% - 64px);
+  }
+  .ticket-tete h1 {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ticket-tete .ticket-outils {
+    margin-left: auto;
+  }
+  .ticket-titre .lien {
+    white-space: nowrap;
+  }
+  .ticket-outils {
+    flex-wrap: wrap;
+  }
+  .selecteur-suite {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .selecteur-suite .option {
+    min-width: 0;
+    padding-inline: 4px;
+  }
+  .ticket-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ticket-actions .bouton {
+    min-width: 0;
+  }
+  .ticket-total strong {
+    white-space: nowrap;
+    font-size: 2rem;
+  }
 }
