@@ -24,7 +24,8 @@ async function appareil(nom, options, codeRattachement, bouton) {
     const r = route.request();
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
     if (r.method() === "OPTIONS") return route.fulfill({ status: 200, headers: cors });
-    recus.push(`${nom}→${new globalThis.URL(r.url()).hostname}`);
+    // La vérification de connexion (rubrique Cet appareil) n'imprime rien : seuls les tickets comptent.
+    if ((r.postData() ?? "").includes("<text")) recus.push(`${nom}→${new globalThis.URL(r.url()).hostname}`);
     return route.fulfill({
       status: 200,
       headers: { ...cors, "content-type": "text/xml" },
@@ -96,6 +97,10 @@ await iphone.reglages();
 await iphone.p.screenshot({ path: `${sortie}/ie02a-iphone-menu-reglages.png` });
 r.menuIphone = await iphone.p.locator(".menu-reglages-entree strong").allTextContents();
 await ongletReglages(iphone.p, "Cet appareil");
+const connexion = iphone.p.locator("fieldset", { has: iphone.p.locator("legend", { hasText: "Connexion aux imprimantes Epson" }) });
+await connexion.getByText("● connectée").first().waitFor({ timeout: 8000 });
+r.connexionIphone = { autoriser: await connexion.getByRole("link", { name: "Autoriser" }).count(), connectees: await connexion.getByText("● connectée").count() };
+await connexion.screenshot({ path: `${sortie}/ie02b-iphone-connexion-epson.png` });
 r.listeIphone = await iphone.p.getByLabel("Imprimante des tickets", { exact: true }).locator("option").allTextContents();
 await choisirImprimantes(iphone.p, "Epson bar", "Epson salle");
 await iphone.p.getByRole("button", { name: "Imprimer un essai", exact: true }).first().click();
@@ -126,6 +131,8 @@ const ok =
   r.listeIphone.length === 3 &&
   JSON.stringify(r.menuIphone) === JSON.stringify(["Cet appareil", "Imprimantes", "Établissement", "Équipe"]) &&
   r.listeIphone[0] === "À choisir" &&
+  r.connexionIphone.autoriser === 2 &&
+  r.connexionIphone.connectees === 2 &&
   r.listeIphone[1] === "Epson salle (Epson)" &&
   !r.debordementIphone &&
   JSON.stringify(r.serveur) === JSON.stringify(["Epson salle 10.0.0.30", "Epson bar 10.0.0.31"]) &&

@@ -3853,3 +3853,35 @@ a.bouton {
   justify-self: start;
   margin-bottom: 4px;
 }
+/* Connexion aux imprimantes Epson depuis cet appareil (17 novembre 2026). */
+.connexions-epson {
+  display: grid;
+  gap: 8px;
+}
+.connexion-epson {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+}
+.connexion-epson > span {
+  display: grid;
+  gap: 2px;
+}
+.connexion-epson small {
+  color: var(--sable);
+}
+@media (max-width: 600px) {
+  .connexion-epson {
+    grid-template-columns: 1fr 1fr;
+  }
+  .connexion-epson > span {
+    grid-column: 1 / -1;
+  }
+}
+.connexion-epson .etat.bon {
+  color: var(--vert);
+}
+.connexion-epson .etat.attention {
+  color: var(--terre);
+}

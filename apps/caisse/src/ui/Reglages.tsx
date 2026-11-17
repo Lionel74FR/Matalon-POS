@@ -19,6 +19,7 @@ import {
 import { ErreurApi } from "../serveur/client";
 import { VERSION_APPLICATION } from "../fiscal/caisse";
 import { imprimerSur } from "../impression/imprimantes";
+import { ConnexionEpson } from "./ConnexionEpson";
 import { EditeurImprimantes } from "./EditeurImprimantes";
 import { ImprimantesAppareil, ImprimantesPortees } from "./ImprimantesAppareil";
 import { gabaritBon } from "../impression/gabarits";
@@ -231,6 +232,7 @@ export function Reglages(props: { onAssistant: () => void }) {
         <div className="formulaire-colonnes">
           <div>
             <ImprimantesAppareil onAssistant={props.onAssistant} />
+            <ConnexionEpson />
             <ImprimantesPortees />
           </div>
         <fieldset>
@@ -318,6 +320,7 @@ export function Reglages(props: { onAssistant: () => void }) {
             nomsAppareils={tous}
             onEnregistrer={enregistrerImprimantes}
             onTester={(i) => void testerImprimante(i)}
+            autoriserEpson
           />
         </fieldset>
       )}

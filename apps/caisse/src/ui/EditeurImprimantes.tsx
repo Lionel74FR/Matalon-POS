@@ -22,6 +22,8 @@ export function EditeurImprimantes(props: {
   onEnregistrer: (imprimantes: ImprimanteEtablissement[], postes: Record<string, string>) => Promise<void>;
   /** Bon d'essai (caisse seulement : l'administration n'est pas sur le réseau de l'établissement). */
   onTester?: (imprimante: ImprimanteEtablissement) => void;
+  /** Caisse : lien pour accepter le certificat d'une Epson sur cet appareil. */
+  autoriserEpson?: boolean;
 }) {
   const [liste, setListe] = useState(props.imprimantes);
   const [postes, setPostes] = useState(props.postes);
@@ -147,6 +149,15 @@ export function EditeurImprimantes(props: {
                 {dalleInvalide && (
                   <p className="erreur imprimante-note">
                     Seul un ordinateur (dalle, caisse ouverte dans Chrome) peut porter « {i.nom} » : un iPad ou un iPhone n'a ni port COM ni script.
+                  </p>
+                )}
+                {b.type === "epson" && props.autoriserEpson && b.adresse.trim() && (
+                  <p className="aide-champ imprimante-note">
+                    Sur chaque iPad ou iPhone qui l'utilise, une fois :{" "}
+                    <a href={`https://${b.adresse.trim()}/`} target="_blank" rel="noreferrer">
+                      autoriser la connexion
+                    </a>{" "}
+                    (Safari : « Afficher les détails », puis « consulter ce site web »). État : rubrique Cet appareil.
                   </p>
                 )}
                 {b.type === "reseau" && !dalleInvalide && (
