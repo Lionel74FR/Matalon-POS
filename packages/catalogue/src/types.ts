@@ -44,6 +44,22 @@ export interface ChoixFormule {
   suite?: 1 | 2 | 3;
 }
 
+/**
+ * Groupe de commentaires (17 novembre 2026, Lionel : cuissons des viandes) : précisions proposées en caisse
+ * sur les articles qui le citent, imprimées sur le bon de production, jamais sur le ticket ni dans le prix.
+ */
+export interface GroupeCommentaires {
+  id: string;
+  /** « Cuisson », « Sauce » : titre en caisse. */
+  nom: string;
+  /** Libellés proposés, dans l'ordre (« Bleu », « Saignant », « À point », « Bien cuit »). */
+  commentaires: string[];
+  /** Choix exigé avant d'ajouter l'article. */
+  obligatoire?: boolean;
+  /** Plusieurs commentaires du groupe à la fois (sinon un seul). */
+  plusieurs?: boolean;
+}
+
 export interface Article {
   id: string;
   nom: string;
@@ -67,6 +83,8 @@ export interface Article {
   indisponible?: boolean;
   /** Fiche technique : la recette ou le produit vendu tel quel, et la quantité (module stock). */
   fiche?: Fiche;
+  /** Groupes de commentaires proposés en caisse (identifiants de `Catalogue.commentaires`), dans l'ordre. */
+  commentaires?: string[];
 }
 
 export interface Categorie {
@@ -95,6 +113,8 @@ export interface Catalogue {
   /** Établissement à qui la carte appartient (une carte n'est jamais partagée, 16 novembre 2026). */
   etablissementId: string;
   categories: Categorie[];
+  /** Groupes de commentaires de la carte, liés aux articles par leur identifiant. */
+  commentaires?: GroupeCommentaires[];
 }
 
 /** Taux de TVA acceptés en caisse, en points de base. */

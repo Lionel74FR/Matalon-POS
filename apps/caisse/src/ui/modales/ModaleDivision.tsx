@@ -1,6 +1,6 @@
 import { Check, Minus, Plus, Split, Users } from "lucide-react";
 import { useState } from "react";
-import { acomptesActifs, avecQuantite, lignesDues, montantLigne, type Commande, type LigneCommande } from "../../metier/commande";
+import { acomptesActifs, avecQuantite, detailsLigne, lignesDues, montantLigne, type Commande, type LigneCommande } from "../../metier/commande";
 import { AvecIcone, BoutonIcone } from "../icones";
 import { Modale } from "../communs";
 import { euros } from "../contexte";
@@ -89,7 +89,7 @@ export function SelectionArticles(props: { lignes: LigneCommande[]; selection: R
               {l.quantite > 1 ? `${l.quantite} × ` : ""}
               {l.libelle}
             </span>
-            {l.details.length > 0 && <small>{l.details.join(" · ")}</small>}
+            {detailsLigne(l).length > 0 && <small>{detailsLigne(l).join(" · ")}</small>}
           </button>
           {l.quantite > 1 && (
             <span className="division-qte">

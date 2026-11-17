@@ -3958,3 +3958,11 @@ a.bouton {
     font-size: 2rem;
   }
 }
+
+/* Commentaires d'articles (cuisson, sauce…), 17 novembre 2026. */
+.groupe-commentaires h3 small {
+  margin-left: 6px;
+  font-weight: 400;
+  font-size: 0.8em;
+  color: var(--sable);
+}

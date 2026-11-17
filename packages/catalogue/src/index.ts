@@ -1,5 +1,5 @@
 import type { Fiche } from "@matalon/stock";
-import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type Supplement, type Variante } from "./types.js";
+import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type GroupeCommentaires, type Supplement, type Variante } from "./types.js";
 
 export * from "./types.js";
 export { lireCatalogue, LIMITES_CARTE } from "./lecture.js";
@@ -318,7 +318,27 @@ export function validerCatalogue(c: Catalogue): string[] {
       }
     }
   }
+  // Groupes de commentaires (17 novembre 2026) : identifiants uniques, commentaires distincts, articles qui citent un groupe existant.
+  const groupes = new Set<string>();
+  for (const g of c.commentaires ?? []) {
+    if (groupes.has(g.id)) erreurs.push(`groupe de commentaires en double : ${g.id}`);
+    groupes.add(g.id);
+    if (new Set(g.commentaires).size !== g.commentaires.length) erreurs.push(`groupe de commentaires ${g.nom} : commentaire en double`);
+  }
+  for (const a of articles) {
+    const vus = new Set<string>();
+    for (const id of a.commentaires ?? []) {
+      if (!groupes.has(id)) erreurs.push(`${a.id} : groupe de commentaires inconnu ${id}`);
+      if (vus.has(id)) erreurs.push(`${a.id} : groupe de commentaires ${id} en double`);
+      vus.add(id);
+    }
+  }
   return erreurs;
+}
+
+/** Groupes de commentaires proposés pour un article, dans son ordre (inconnus ignorés). */
+export function groupesCommentaires(c: Catalogue, a: Pick<Article, "commentaires"> | undefined): GroupeCommentaires[] {
+  return (a?.commentaires ?? []).flatMap((id) => c.commentaires?.find((g) => g.id === id) ?? []);
 }
 
 /** Nombre d'articles d'une carte. */

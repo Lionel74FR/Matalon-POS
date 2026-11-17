@@ -3,7 +3,7 @@ import { unite } from "@matalon/serveur/fidelite";
 import type { Reservation } from "../donnees/partage";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { NOM_APPAREIL } from "../donnees/appareil";
-import { articleVendable, liensDeCategorie, rechercherArticles, tuilesDeCategorie, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
+import { articleVendable, groupesCommentaires, liensDeCategorie, rechercherArticles, tuilesDeCategorie, type Article, type Catalogue, type Categorie } from "@matalon/catalogue";
 import { useEffect, useMemo, useState } from "react";
 import { carteDe, ID_COMPTOIR } from "../donnees/configuration";
 import { gabaritAddition } from "../impression/gabarits";
@@ -16,7 +16,7 @@ import {
   formuleDecoupee,
   lignesActives,
   lignesParSuite,
-  suiteComposant,
+  detailsLigne,
   suitesLigne,
   modifierLigne,
   montantLigne,
@@ -186,7 +186,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
     if (a.prixTTC == null && !a.variantes?.some((v) => v.prixTTC != null)) {
       return notifier(`${a.nom} n'a pas encore de prix : à compléter dans la carte.`, "erreur");
     }
-    if (a.variantes?.length || a.supplements?.length || a.formule?.length) return setArticleOuvert(a);
+    if (a.variantes?.length || a.supplements?.length || a.formule?.length || groupesCommentaires(CARTE, a).length) return setArticleOuvert(a);
     ajouter({ articleId: a.id, libelle: a.nom, details: [], quantite: 1, prixUnitaireTTC: a.prixTTC!, tauxTVA: a.tauxTVA });
   };
 
@@ -284,7 +284,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
                   // Formule découpée entre les cours : sous chaque cours, ses choix ; le prix sous le premier.
                   const decoupee = formuleDecoupee(l);
                   const premier = suitesLigne(l)[0] === g.suite;
-                  const details = decoupee ? l.composants!.filter((x) => suiteComposant(l, x) === g.suite).map((x) => x.libelle) : l.details;
+                  const details = detailsLigne(l, decoupee ? g.suite : undefined);
                   return (
                   <li key={l.uid}>
                     <button
@@ -468,6 +468,7 @@ function PriseCommandeCarte(props: ProprietesCommande & { carte: Catalogue }) {
         <ModaleLigne
           ligne={ligneOuverte}
           tableId={c.tableId}
+          carte={CARTE}
           avecSuites={!estComptoir}
           onChange={(nouvelle, unitesRetirees) => {
             const suite = modifierLigne(c, ligneOuverte.uid, nouvelle, unitesRetirees, utilisateur.id);

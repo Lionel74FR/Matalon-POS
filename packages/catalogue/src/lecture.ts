@@ -1,5 +1,5 @@
 import { lireFiche } from "@matalon/stock";
-import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type Supplement, type Variante } from "./types.js";
+import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type ChoixFormule, type GroupeCommentaires, type Supplement, type Variante } from "./types.js";
 
 /**
  * Lecture stricte d'une carte venue de l'extérieur (administration, réseau) :
@@ -7,7 +7,7 @@ import { TAUX_TVA_AUTORISES, type Article, type Catalogue, type Categorie, type 
  * reconstruite et la liste des erreurs, en français, lisibles par un humain.
  */
 /** Plafonds : une carte de restaurant reste loin de ces volumes, servis à chaque iPad. */
-export const LIMITES_CARTE = { categories: 100, articlesParCategorie: 200, articles: 1500, options: 40, choixFormule: 12 } as const;
+export const LIMITES_CARTE = { categories: 100, articlesParCategorie: 200, articles: 1500, options: 40, choixFormule: 12, groupesCommentaires: 30, commentairesParGroupe: 20 } as const;
 
 export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreurs: string[] } {
   const erreurs: string[] = [];
@@ -145,9 +145,24 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
         if (ao.prixLibre === true) article.prixLibre = true;
         const fa = fiche(ao.fiche, ou);
         if (fa) article.fiche = fa;
+        const groupes = liste(ao.commentaires, `${ou} : commentaires`, LIMITES_CARTE.groupesCommentaires).map((g) => ident(g, `${ou} : groupe de commentaires`));
+        if (groupes.length) article.commentaires = groupes;
         return article;
       }),
     };
+  });
+  const commentaires = liste(o.commentaires, "commentaires", LIMITES_CARTE.groupesCommentaires).map((g, i): GroupeCommentaires => {
+    const go = objet(g, `groupe de commentaires ${i + 1}`);
+    const ou = `groupe de commentaires « ${typeof go.nom === "string" ? go.nom : i + 1} »`;
+    const groupe: GroupeCommentaires = {
+      id: ident(go.id, `${ou} : identifiant`),
+      nom: texte(go.nom, `${ou} : nom`, 60),
+      commentaires: liste(go.commentaires, `${ou} : commentaires`, LIMITES_CARTE.commentairesParGroupe).map((x) => texte(x, `${ou} : commentaire`, 40)),
+    };
+    if (!groupe.commentaires.length) erreurs.push(`${ou} : au moins un commentaire`);
+    if (go.obligatoire === true) groupe.obligatoire = true;
+    if (go.plusieurs === true) groupe.plusieurs = true;
+    return groupe;
   });
   const total = categories.reduce((n, c) => n + c.articles.length, 0);
   if (total > LIMITES_CARTE.articles) erreurs.push(`carte : ${LIMITES_CARTE.articles} articles au plus`);
@@ -157,6 +172,7 @@ export function lireCatalogue(v: unknown): { catalogue: Catalogue | null; erreur
     source: texte(o.source ?? "", "carte : source", 120, false),
     etablissementId: texte(o.etablissementId ?? "", "carte : établissement", 60, false),
     categories,
+    ...(commentaires.length ? { commentaires } : {}),
   };
   return { catalogue: erreurs.length ? null : catalogue, erreurs };
 }

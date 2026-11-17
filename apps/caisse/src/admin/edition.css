@@ -782,3 +782,31 @@
 .editeur-raccourcis h3:not(:first-child) {
   margin-top: 14px;
 }
+
+/* Groupes de commentaires (cuisson, sauce…), 17 novembre 2026. */
+.editeur-commentaires {
+  width: 100%;
+  justify-content: flex-start;
+  margin: 4px 0 8px;
+}
+.options-cases {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16em, 1fr));
+  gap: 0 18px;
+}
+.options-cases .case small {
+  display: block;
+  opacity: 0.7;
+}
+.groupe-commentaires-edition {
+  border: 1px solid var(--bordure, rgba(0, 0, 0, 0.15));
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 0 0 14px;
+}
+.groupe-commentaires-edition textarea {
+  width: 100%;
+  font: inherit;
+  padding: 8px;
+  resize: vertical;
+}

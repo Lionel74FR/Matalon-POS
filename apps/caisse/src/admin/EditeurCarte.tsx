@@ -14,10 +14,11 @@ import {
   type Catalogue,
   type Categorie,
   type ChoixFormule,
+  type GroupeCommentaires,
   type Supplement,
   type Variante,
 } from "@matalon/catalogue";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Copy, FolderOpen, Merge, Pencil, Plus, Printer, RotateCw, Save, Search, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChefHat, Copy, FolderOpen, Merge, MessageSquare, Pencil, Plus, Printer, RotateCw, Save, Search, Trash2, Undo2, X } from "lucide-react";
 import { AvecIcone, BoutonIcone } from "../ui/icones";
 import type { ReponseStock, ReponseVentesCarte, ResumeCarte } from "@matalon/serveur/partage";
 import { Couts, foodCost } from "@matalon/stock";
@@ -364,6 +365,8 @@ export function EditeurCarte(props: {
   /** Recherche d'un article par son nom, en tête de la liste des catégories (16 novembre 2026) ; null : fermée. */
   const [recherche, setRecherche] = useState<string | null>(null);
   const [erreurRayon, setErreurRayon] = useState("");
+  /** Fenêtre des groupes de commentaires (cuissons…), 17 novembre 2026. */
+  const [commentairesOuverts, setCommentairesOuverts] = useState(false);
   /** Stock et ventes : fiches techniques, coûts et part du CA couverte (facultatifs : l'éditeur marche sans). */
   const [stock, setStock] = useState<ReponseStock | null>(null);
   const [ventes, setVentes] = useState<ReponseVentesCarte | null>(null);
@@ -660,6 +663,11 @@ export function EditeurCarte(props: {
               onClick={() => setRecherche((x) => (x === null ? "" : null))}
             />
           </div>
+          <button className="bouton discret editeur-commentaires" onClick={() => setCommentairesOuverts(true)}>
+            <AvecIcone icone={MessageSquare} taille={18}>
+              {`Commentaires${carte.commentaires?.length ? ` (${carte.commentaires.length} groupe${carte.commentaires.length > 1 ? "s" : ""})` : ""}`}
+            </AvecIcone>
+          </button>
           {recherche !== null && (
             <div className="editeur-recherche">
               <input autoFocus value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Nom de l'article" aria-label="Article à chercher" />
@@ -940,6 +948,33 @@ export function EditeurCarte(props: {
         </section>
       </div>
 
+      {commentairesOuverts && (
+        <EditeurCommentaires
+          carte={carte}
+          onValider={(groupes) => {
+            // Un groupe supprimé quitte les articles qui le proposaient.
+            const ids = new Set(groupes.map((g) => g.id));
+            const { commentaires: _, ...reste } = carte;
+            setCarte({
+              ...reste,
+              ...(groupes.length ? { commentaires: groupes } : {}),
+              categories: carte.categories.map((c) => ({
+                ...c,
+                articles: c.articles.map((a) => {
+                  if (!a.commentaires) return a;
+                  const gardes = a.commentaires.filter((id) => ids.has(id));
+                  const { commentaires: __, ...art } = a;
+                  return gardes.length ? { ...art, commentaires: gardes } : art;
+                }),
+              })),
+            });
+            setEtat("");
+            setCommentairesOuverts(false);
+          }}
+          onFermer={() => setCommentairesOuverts(false)}
+        />
+      )}
+
       {articleOuvert && (
         <FicheArticle
           carte={carte}
@@ -1020,7 +1055,9 @@ function FicheArticle(props: {
       if (!c.categories?.length && !c.articles?.length) return setErreur(`Le choix « ${c.nom} » ne propose rien.`);
     }
     const propre: Article = { ...a, nom: a.nom.trim(), prixTTC: p, variantes, supplements };
-    for (const cle of ["variantes", "supplements", "formule"] as const) if (!propre[cle]?.length) delete propre[cle];
+    // Une formule n'a pas de commentaires à elle : ce sont ceux des articles choisis.
+    if (propre.formule?.length) delete propre.commentaires;
+    for (const cle of ["variantes", "supplements", "formule", "commentaires"] as const) if (!propre[cle]?.length) delete propre[cle];
     for (const cle of ["description", "aCompleter"] as const) if (!propre[cle]?.trim()) delete propre[cle];
     props.onValider(cat, propre);
   };
@@ -1138,6 +1175,42 @@ function FicheArticle(props: {
             <AvecIcone icone={Plus}>Supplément</AvecIcone>
           </button>
 
+          {!a.formule?.length && (
+            <>
+              <h3>Commentaires proposés en caisse</h3>
+              {props.carte.commentaires?.length ? (
+                <div className="options-cases" role="group" aria-label="Commentaires proposés en caisse">
+                  {props.carte.commentaires.map((g) => (
+                    <label key={g.id} className="case">
+                      <input
+                        type="checkbox"
+                        checked={!!a.commentaires?.includes(g.id)}
+                        onChange={(e) => {
+                          const choisis = new Set(a.commentaires ?? []);
+                          if (e.target.checked) choisis.add(g.id);
+                          else choisis.delete(g.id);
+                          // Ordre des groupes de la carte.
+                          const ids = props.carte.commentaires!.map((x) => x.id).filter((id) => choisis.has(id));
+                          const { commentaires: _, ...reste } = a;
+                          setA(ids.length ? { ...reste, commentaires: ids } : reste);
+                        }}
+                      />
+                      <span>
+                        {g.nom}
+                        <small>
+                          {g.commentaires.join(", ")}
+                          {g.obligatoire ? " · obligatoire" : ""}
+                        </small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="explication">Aucun groupe de commentaires : créez-les avec le bouton « Commentaires » de la carte (cuisson, sauce…).</p>
+              )}
+            </>
+          )}
+
           <h3>Formule (choix inclus dans le prix)</h3>
           {(a.formule?.length ?? 0) > 1 && (
             <p className="explication">
@@ -1234,6 +1307,110 @@ function FicheArticle(props: {
         <footer className="modale-pied">
           <button className="bouton danger" onClick={props.onSupprimer} title="Supprimer l'article">
             <AvecIcone icone={Trash2}>Supprimer</AvecIcone>
+          </button>
+          <button className="bouton principal" onClick={valider}>
+            <AvecIcone icone={Check}>Valider</AvecIcone>
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// ───────── Groupes de commentaires ─────────
+
+/**
+ * Groupes de commentaires de la carte (17 novembre 2026, Lionel : cuissons des viandes) : nom, commentaires
+ * (un par ligne), obligatoire, plusieurs à la fois. Les articles les choisissent dans leur fiche.
+ */
+function EditeurCommentaires(props: { carte: Catalogue; onValider: (groupes: GroupeCommentaires[]) => void; onFermer: () => void }) {
+  type Brouillon = { id: string; nom: string; texte: string; obligatoire: boolean; plusieurs: boolean };
+  const [groupes, setGroupes] = useState<Brouillon[]>(() =>
+    (props.carte.commentaires ?? []).map((g) => ({ id: g.id, nom: g.nom, texte: g.commentaires.join("\n"), obligatoire: !!g.obligatoire, plusieurs: !!g.plusieurs })),
+  );
+  const [erreur, setErreur] = useState("");
+  const utilisations = (id: string) => tousLesArticles(props.carte).filter((a) => a.commentaires?.includes(id)).length;
+  const maj = (i: number, champ: Partial<Brouillon>) => setGroupes((l) => l.map((g, j) => (j === i ? { ...g, ...champ } : g)));
+
+  const valider = () => {
+    const propres: GroupeCommentaires[] = [];
+    const existants = new Set((props.carte.commentaires ?? []).map((g) => g.id));
+    for (const g of groupes) {
+      const nom = g.nom.trim();
+      const commentaires = [...new Set(g.texte.split("\n").map((x) => x.trim()).filter(Boolean))];
+      if (!nom) return setErreur("Chaque groupe doit avoir un nom.");
+      if (!commentaires.length) return setErreur(`Le groupe « ${nom} » n'a aucun commentaire : un par ligne.`);
+      const long = commentaires.find((x) => x.length > 40);
+      if (long) return setErreur(`« ${long.slice(0, 20)}… » : 40 caractères au plus par commentaire.`);
+      // Groupe créé dans cette fenêtre : identifiant tiré de son nom (aucun article ne le cite encore).
+      const id = existants.has(g.id) ? g.id : identifiantDepuisNom(nom, [...existants, ...propres.map((x) => x.id)]);
+      propres.push({ id, nom, commentaires, ...(g.obligatoire ? { obligatoire: true } : {}), ...(g.plusieurs ? { plusieurs: true } : {}) });
+    }
+    props.onValider(propres);
+  };
+
+  return (
+    <div className="voile" onPointerDown={(e) => e.target === e.currentTarget && props.onFermer()}>
+      <div className="modale large editeur-groupes-commentaires" role="dialog" aria-modal="true" aria-label="Commentaires">
+        <header className="modale-tete">
+          <h2>Commentaires</h2>
+          <BoutonIcone icone={X} variante="discret" libelle="Fermer" onClick={props.onFermer} />
+        </header>
+        <div className="modale-corps">
+          <p className="explication">
+            Précisions proposées en caisse sur les articles qui les choisissent dans leur fiche (cuisson, sauce, garniture). Elles s'impriment sur le bon de
+            production, jamais sur le ticket, et ne changent pas le prix.
+          </p>
+          {groupes.map((g, i) => (
+            <fieldset key={g.id} className="groupe-commentaires-edition">
+              <legend>{g.nom || "Nouveau groupe"}</legend>
+              <div className="formulaire-colonnes">
+                <div>
+                  <label className="champ">
+                    <span>Nom</span>
+                    <input value={g.nom} maxLength={60} placeholder="Ex. Cuisson" onChange={(e) => maj(i, { nom: e.target.value })} />
+                  </label>
+                  <label className="case">
+                    <input type="checkbox" checked={g.obligatoire} onChange={(e) => maj(i, { obligatoire: e.target.checked })} />
+                    Obligatoire (à choisir avant d'ajouter l'article)
+                  </label>
+                  <label className="case">
+                    <input type="checkbox" checked={g.plusieurs} onChange={(e) => maj(i, { plusieurs: e.target.checked })} />
+                    Plusieurs à la fois
+                  </label>
+                  <p className="explication">
+                    {utilisations(g.id) ? `Proposé sur ${utilisations(g.id)} article${utilisations(g.id) > 1 ? "s" : ""}.` : "Proposé sur aucun article pour l'instant."}
+                  </p>
+                  <button className="bouton discret danger" onClick={() => setGroupes((l) => l.filter((_, j) => j !== i))}>
+                    <AvecIcone icone={Trash2}>Supprimer le groupe</AvecIcone>
+                  </button>
+                </div>
+                <label className="champ">
+                  <span>
+                    Commentaires
+                    <small>Un par ligne, dans l'ordre de la caisse</small>
+                  </span>
+                  <textarea rows={6} value={g.texte} aria-label={`Commentaires du groupe ${g.nom}`} placeholder={"Bleu\nSaignant\nÀ point\nBien cuit"} onChange={(e) => maj(i, { texte: e.target.value })} />
+                </label>
+              </div>
+            </fieldset>
+          ))}
+          <button
+            className="bouton"
+            onClick={() =>
+              setGroupes((l) => [
+                ...l,
+                { id: identifiantDepuisNom(`groupe-${l.length + 1}`, l.map((x) => x.id)), nom: "", texte: "", obligatoire: false, plusieurs: false },
+              ])
+            }
+          >
+            <AvecIcone icone={Plus}>Groupe de commentaires</AvecIcone>
+          </button>
+          {erreur && <p className="erreur">{erreur}</p>}
+        </div>
+        <footer className="modale-pied">
+          <button className="bouton" onClick={props.onFermer}>
+            Annuler
           </button>
           <button className="bouton principal" onClick={valider}>
             <AvecIcone icone={Check}>Valider</AvecIcone>

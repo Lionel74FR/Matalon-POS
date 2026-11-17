@@ -1,20 +1,22 @@
 import { Minus, Plus } from "lucide-react";
 import { AvecIcone } from "../icones";
-import { ligneDepuisArticle, ligneSupplement, type Article, type Catalogue, type ChoixFormule, optionsChoix, PRIX_LIBRE_MAX } from "@matalon/catalogue";
+import { groupesCommentaires, ligneDepuisArticle, ligneSupplement, type Article, type Catalogue, type ChoixFormule, optionsChoix, PRIX_LIBRE_MAX } from "@matalon/catalogue";
 import { useEffect, useMemo, useState } from "react";
 import type { LigneCommande } from "../../metier/commande";
 import { appliquerToucheMontant, Modale, Pave } from "../communs";
 import { euros } from "../contexte";
+import { commentairesChoisis, groupeManquant, type SelectionCommentaires } from "../../metier/commentaires";
+import { ChoixCommentaires } from "./ChoixCommentaires";
 
 type NouvelleLigne = Omit<LigneCommande, "uid" | "ajouteeLe" | "ajouteePar">;
 
 /** Options proposées pour un choix de formule : articles des catégories visées, variantes dépliées. */
-function optionsDuChoix(carte: Catalogue, choix: ChoixFormule): Array<{ libelle: string; categorieId: string }> {
+function optionsDuChoix(carte: Catalogue, choix: ChoixFormule): Array<{ libelle: string; categorieId: string; article: Article }> {
   const articles = optionsChoix(carte, choix);
   return articles.flatMap((a) =>
     a.variantes?.length
-      ? a.variantes.map((v) => ({ libelle: v.libelle ?? `${a.nom} ${v.nom}`, categorieId: a.categorieId }))
-      : [{ libelle: a.nom, categorieId: a.categorieId }],
+      ? a.variantes.map((v) => ({ libelle: v.libelle ?? `${a.nom} ${v.nom}`, categorieId: a.categorieId, article: a }))
+      : [{ libelle: a.nom, categorieId: a.categorieId, article: a }],
   );
 }
 
@@ -36,11 +38,22 @@ export function ModaleArticle(props: {
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [prixSaisi, setPrixSaisi] = useState(0);
   const libre = !!a.prixLibre;
+  // Commentaires (cuisson…) : ceux de l'article, et ceux de l'article retenu pour chaque choix de formule.
+  // Une formule n'a pas de commentaires à elle : ce sont ceux des articles choisis.
+  const groupesArticle = useMemo(() => (a.formule?.length ? [] : groupesCommentaires(props.carte, a)), [a, props.carte]);
+  const [commentaires, setCommentaires] = useState<SelectionCommentaires>({});
+  const [commentairesChoix, setCommentairesChoix] = useState<Record<string, SelectionCommentaires>>({});
+  const groupesDuChoix = (c: (typeof choixFormule)[number]) =>
+    groupesCommentaires(props.carte, c.options.find((o) => o.libelle === selections[c.choix.id])?.article);
 
   const varianteManquante = !!a.variantes?.length && !varianteId;
   const choixManquant = choixFormule.find((c) => !selections[c.choix.id]);
   const prixManquant = libre && (prixSaisi <= 0 || prixSaisi > PRIX_LIBRE_MAX);
-  const pret = !varianteManquante && !choixManquant && !prixManquant;
+  const commentaireManquant =
+    groupeManquant(groupesArticle, commentaires)?.nom ??
+    choixFormule.map((c) => groupeManquant(groupesDuChoix(c), commentairesChoix[c.choix.id] ?? {})?.nom).find(Boolean) ??
+    null;
+  const pret = !varianteManquante && !choixManquant && !prixManquant && !commentaireManquant;
 
   const toucherPrix = (t: string) => setPrixSaisi((x) => appliquerToucheMontant(x, t));
   // Clavier physique (dalle tactile, PC) : chiffres, retour arrière, Entrée.
@@ -72,12 +85,16 @@ export function ModaleArticle(props: {
         articleId: a.id,
         libelle: a.nom,
         details: choixFormule.map((c) => selections[c.choix.id]!),
-        composants: choixFormule.map((c) => ({
-          libelle: selections[c.choix.id]!,
-          categorieId: c.options.find((o) => o.libelle === selections[c.choix.id])?.categorieId ?? "",
-          // Cours réglé dans la carte : la formule se découpe entre ses cours (Direct, AS1, AS2).
-          ...(a.formule!.some((x) => x.suite) ? { suite: c.choix.suite ?? 0 } : {}),
-        })),
+        composants: choixFormule.map((c) => {
+          const choisis = commentairesChoisis(groupesDuChoix(c), commentairesChoix[c.choix.id] ?? {});
+          return {
+            libelle: selections[c.choix.id]!,
+            categorieId: c.options.find((o) => o.libelle === selections[c.choix.id])?.categorieId ?? "",
+            // Cours réglé dans la carte : la formule se découpe entre ses cours (Direct, AS1, AS2).
+            ...(a.formule!.some((x) => x.suite) ? { suite: c.choix.suite ?? 0 } : {}),
+            ...(choisis ? { commentaires: choisis } : {}),
+          };
+        }),
         quantite,
         prixUnitaireTTC: a.prixTTC!,
         tauxTVA: a.tauxTVA,
@@ -87,6 +104,9 @@ export function ModaleArticle(props: {
     } else {
       lignes.push({ ...ligneDepuisArticle(a, { ...(varianteId ? { varianteId } : {}), quantite }), details: [] });
     }
+    // Commentaires de l'article : sur sa ligne (pas sur celles des suppléments).
+    const choisis = commentairesChoisis(groupesArticle, commentaires);
+    if (choisis) lignes[0] = { ...lignes[0]!, commentaires: choisis };
     for (const s of (a.supplements ?? []).filter((x) => supplements.includes(x.id))) {
       lignes.push({ ...ligneSupplement(a, s, quantite), details: [] });
     }
@@ -119,7 +139,9 @@ export function ModaleArticle(props: {
                     : "Saisissez le prix"
                   : varianteManquante
                     ? "Choisissez une variante"
-                    : `Choisissez : ${choixManquant!.choix.nom}`}
+                    : choixManquant
+                      ? `Choisissez : ${choixManquant.choix.nom}`
+                      : `Choisissez : ${commentaireManquant}`}
             </AvecIcone>
           </button>
         </>
@@ -169,22 +191,41 @@ export function ModaleArticle(props: {
           </div>
         </section>
       ) : null}
-      {choixFormule.map(({ choix, options }) => (
-        <section key={choix.id} className="groupe-choix">
-          <h3>{choix.nom}</h3>
-          <div className="options compactes">
-            {options.map(({ libelle: o }) => (
-              <button
-                key={o}
-                className={`option${selections[choix.id] === o ? " active" : ""}`}
-                onClick={() => setSelections((s) => ({ ...s, [choix.id]: o }))}
-              >
-                {o}
-              </button>
-            ))}
+      {groupesArticle.length > 0 && <ChoixCommentaires groupes={groupesArticle} selection={commentaires} onChange={setCommentaires} />}
+      {choixFormule.map((c) => {
+        const { choix, options } = c;
+        const groupes = groupesDuChoix(c);
+        return (
+          <div key={choix.id}>
+            <section className="groupe-choix">
+              <h3>{choix.nom}</h3>
+              <div className="options compactes">
+                {options.map(({ libelle: o }) => (
+                  <button
+                    key={o}
+                    className={`option${selections[choix.id] === o ? " active" : ""}`}
+                    onClick={() => {
+                      // Autre article : ses commentaires repartent de zéro.
+                      if (selections[choix.id] !== o) setCommentairesChoix((x) => ({ ...x, [choix.id]: {} }));
+                      setSelections((s) => ({ ...s, [choix.id]: o }));
+                    }}
+                  >
+                    {o}
+                  </button>
+                ))}
+              </div>
+            </section>
+            {groupes.length > 0 && (
+              <ChoixCommentaires
+                groupes={groupes}
+                pour={selections[choix.id]}
+                selection={commentairesChoix[choix.id] ?? {}}
+                onChange={(s) => setCommentairesChoix((x) => ({ ...x, [choix.id]: s }))}
+              />
+            )}
           </div>
-        </section>
-      ))}
+        );
+      })}
     </Modale>
   );
 }

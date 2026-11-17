@@ -1,5 +1,6 @@
 import type { Catalogue } from "@matalon/catalogue";
-import { lignesActives, suiteComposant, suiteDe, suitesLigne, type Commande, type LigneCommande, type Suite, type SuiteAttente } from "./commande";
+import { avecCommentaires } from "./commentaires";
+import { detailsLigne, lignesActives, suiteComposant, suiteDe, suitesLigne, type Commande, type LigneCommande, type Suite, type SuiteAttente } from "./commande";
 
 /**
  * Bons de production : chaque catégorie de la carte peut désigner un poste
@@ -49,12 +50,12 @@ function repartir(l: LigneCommande, carte: Catalogue): Array<{ poste: string; ar
       const suite = suiteComposant(l, c);
       const cle = `${poste}|${suite}`;
       const g = groupes.get(cle) ?? { poste, suite, details: [] };
-      g.details.push(c.libelle);
+      g.details.push(avecCommentaires(c.libelle, c.commentaires));
       groupes.set(cle, g);
     }
     return [...groupes.values()].map(({ poste, suite, details }) => ({ poste, article: { quantite: l.quantite, libelle: l.libelle, details, ...note, suite } }));
   }
-  return posteLigne ? [{ poste: posteLigne, article: { quantite: l.quantite, libelle: l.libelle, details: l.details, ...note } }] : [];
+  return posteLigne ? [{ poste: posteLigne, article: { quantite: l.quantite, libelle: l.libelle, details: detailsLigne(l), ...note } }] : [];
 }
 
 const aEnvoyer = (l: LigneCommande) => !l.retiree && !l.envoyee;

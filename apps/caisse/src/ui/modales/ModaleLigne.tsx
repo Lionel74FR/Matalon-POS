@@ -1,8 +1,12 @@
 import { Check, Minus, Plus, Trash2 } from "lucide-react";
 import { AvecIcone } from "../icones";
 import { useState } from "react";
+import { groupesCommentaires, trouverArticle, type Catalogue } from "@matalon/catalogue";
+import { commentairesChoisis, groupeManquant, selectionDepuis } from "../../metier/commentaires";
+import { ChoixCommentaires } from "./ChoixCommentaires";
 import {
   avecQuantite,
+  detailsLigne,
   formuleDecoupee,
   montantLigne,
   montantRemise,
@@ -32,6 +36,8 @@ export function ModaleLigne(props: {
   tableId: string;
   /** Table (pas le comptoir) : la suite d'un article pas encore envoyé se change ici. */
   avecSuites?: boolean;
+  /** Carte : commentaires de l'article (cuisson…) modifiables avant envoi. */
+  carte?: Catalogue;
   /** `unitesRetirees` : quantité retirée, qui restera affichée barrée. */
   onChange: (l: LigneCommande | null, unitesRetirees: number) => void;
   onFermer: () => void;
@@ -53,6 +59,10 @@ export function ModaleLigne(props: {
   // Formule découpée entre les cours : le cours de chaque choix se change ici (17 novembre 2026).
   const decoupee = formuleDecoupee(l);
   const [suitesChoix, setSuitesChoix] = useState<Suite[]>(() => (l.composants ?? []).map((c) => suiteComposant(l, c)));
+  // Commentaires de l'article (17 novembre 2026) : modifiables tant que la ligne n'est pas envoyée.
+  const groupes =
+    props.carte && !l.envoyee && !l.composants?.length ? groupesCommentaires(props.carte, trouverArticle(props.carte, l.articleId.split(/[:+]/)[0]!)) : [];
+  const [commentaires, setCommentaires] = useState(() => selectionDepuis(groupes, l.commentaires));
   /** Retrait d'un article déjà envoyé, en attente de son motif (puis du code d'un responsable). */
   const [retrait, setRetrait] = useState<{ unites: number; suite: () => void } | null>(null);
 
@@ -99,6 +109,8 @@ export function ModaleLigne(props: {
   };
 
   const valider = async () => {
+    const manquant = groupeManquant(groupes, commentaires);
+    if (manquant) return setErreur(`Choisissez : ${manquant.nom}.`);
     if (enEuros && montantEuros > brut) return setErreur(`La remise dépasse le montant de la ligne (${euros(brut)}).`);
     if (avecRemise && !motif) return setErreur("Choisissez le motif de la remise.");
     let accordeePar = l.remise?.accordeePar ?? utilisateur.id;
@@ -116,6 +128,11 @@ export function ModaleLigne(props: {
     const suiteLigne = decoupee ? Math.min(...suitesChoix) : suite;
     const maj = avecQuantite({ ...sansSuite, ...(suiteLigne ? { suite: suiteLigne as Exclude<Suite, 0> } : {}), remise: undefined, note: note.trim() || undefined }, quantite);
     if (decoupee) maj.composants = l.composants!.map((c, i) => ({ ...c, suite: suitesChoix[i]! }));
+    if (groupes.length) {
+      const choisis = commentairesChoisis(groupes, commentaires);
+      if (choisis) maj.commentaires = choisis;
+      else delete maj.commentaires;
+    }
     if (enEuros && montantEuros > 0) maj.remise = { pourcentage: 0, enEuros: true, motif, accordeePar, montantTTC: montantEuros };
     else if (!enEuros && pourcentage > 0) maj.remise = { pourcentage, motif, accordeePar, montantTTC: montantRemise(brut, pourcentage) };
     retirer(unites, () => props.onChange(maj, unites));
@@ -161,7 +178,8 @@ export function ModaleLigne(props: {
         </>
       }
     >
-      {l.details.length > 0 && <p className="explication">{l.details.join(" · ")}</p>}
+      {!groupes.length && detailsLigne(l).length > 0 && <p className="explication">{detailsLigne(l).join(" · ")}</p>}
+      {groupes.length > 0 && <ChoixCommentaires groupes={groupes} selection={commentaires} onChange={setCommentaires} />}
       <section className="groupe-choix">
         <h3>Quantité</h3>
         <div className="quantite">

@@ -1,5 +1,6 @@
 import { calculerLigne, ventiler, type ModePaiement, type Paiement, type SaisieLigne, type VentilationTVA } from "@matalon/noyau-fiscal";
 import type { UtilisationFidelite } from "@matalon/serveur/fidelite";
+import { avecCommentaires, memesCommentaires } from "./commentaires";
 
 /**
  * Commande ouverte (table ou comptoir). Données de travail, hors périmètre
@@ -23,6 +24,8 @@ export interface LigneCommande {
   remise?: { pourcentage: number; montantTTC: number; motif: string; accordeePar: string; enEuros?: boolean };
   /** Précision libre pour le service (« sans sucre », « allergie fruits à coque ») : ni prix ni ticket. */
   note?: string;
+  /** Commentaires choisis dans les groupes de l'article (« Saignant ») : bon de production, ni prix ni ticket. */
+  commentaires?: string[];
   ajouteePar: string;
   ajouteeLe: string;
   /**
@@ -36,7 +39,7 @@ export interface LigneCommande {
    * Formule : catégorie de chaque choix, pour envoyer chacun à son poste de production, et son cours
    * (`suite`, réglé dans la carte, 17 novembre 2026) : la formule se découpe alors entre ses cours.
    */
-  composants?: Array<{ libelle: string; categorieId: string; suite?: SuiteAttente | 0 }>;
+  composants?: Array<{ libelle: string; categorieId: string; suite?: SuiteAttente | 0; commentaires?: string[] }>;
   /** Commande validée (« Envoyer », ou d'office à l'encaissement) ; bons de production imprimés s'il y a des imprimantes. */
   envoyee?: { le: string; par: string };
   /** Ligne retirée après envoi : bon d'annulation imprimé. */
@@ -85,6 +88,17 @@ export const suiteDe = (l: Pick<LigneCommande, "suite">): Suite => l.suite ?? 0;
 
 /** Cours d'un choix de formule : le sien s'il en a un (carte), sinon celui de la ligne. */
 export const suiteComposant = (l: Pick<LigneCommande, "suite">, c: { suite?: Suite }): Suite => (c.suite !== undefined ? c.suite : suiteDe(l));
+
+/**
+ * Ce qui s'affiche sous la ligne et part sur le bon : choix de la formule avec leurs commentaires
+ * (« Entrecôte (Saignant) »), ou détails puis commentaires de l'article. `suite` : les choix de ce cours seulement.
+ */
+export function detailsLigne(l: Pick<LigneCommande, "details" | "composants" | "commentaires" | "suite">, suite?: Suite): string[] {
+  if (l.composants?.length) {
+    return l.composants.filter((c) => suite === undefined || suiteComposant(l, c) === suite).map((c) => avecCommentaires(c.libelle, c.commentaires));
+  }
+  return [...l.details, ...(l.commentaires ?? [])];
+}
 
 /** Formule découpée entre plusieurs cours (choix à cours réglé dans la carte). */
 export const formuleDecoupee = (l: Pick<LigneCommande, "composants">): boolean => !!l.composants?.some((c) => c.suite !== undefined);
@@ -348,7 +362,7 @@ export function montantRemise(brutTTC: number, pourcentage: number): number {
 
 /**
  * Ajoute une ligne ; regroupe avec une ligne identique sans remise ni
- * détail pour garder un ticket lisible (2 × Cappuccino).
+ * détail, aux mêmes commentaires, pour garder un ticket lisible (2 × Cappuccino).
  */
 export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajouteeLe">): Commande {
   const identique = c.lignes.find(
@@ -363,6 +377,8 @@ export function ajouterLigne(c: Commande, l: Omit<LigneCommande, "uid" | "ajoute
       !x.note &&
       x.details.length === 0 &&
       l.details.length === 0 &&
+      // Deux entrecôtes saignantes se regroupent, une saignante et une à point non.
+      memesCommentaires(x.commentaires, l.commentaires) &&
       suiteDe(x) === suiteDe(l),
   );
   if (identique) {
