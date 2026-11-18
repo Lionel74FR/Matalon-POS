@@ -2,7 +2,7 @@ import { BellRing, CalendarCheck, Clock, Coffee, LayoutList, Link2, Map as Icone
 import { useMemo, useState } from "react";
 import { ID_COMPTOIR, type Table } from "../donnees/configuration";
 import { nomCourtSuite, nomSuite, resteAPayer, suitesDe, suiviSuites, tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
-import { chaisesDe, placerTables, zonesDuPlan } from "../metier/plan";
+import { chaisesDe, placerTables, tablesParNumero, zonesDuPlan } from "../metier/plan";
 import { euros, useCaisse } from "./contexte";
 import { EditeurPlan, type PlanEditable } from "./EditeurPlan";
 import { AvecIcone, BoutonIcone } from "./icones";
@@ -250,10 +250,11 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
   );
 }
 
-/** Vue en liste, par zone : la plus rapide sur iPhone. */
+/** Vue en liste, par zone : la plus rapide sur iPhone. Tables triées par numéro, du plus petit au plus grand. */
 function ListeTables(props: { tables: Table[]; commandeDe: Map<string, Commande>; resas: Map<string, Reservation>; nom: (id: string) => string; onOuvrir: (id: string) => void }) {
-  const tables = props.tables.filter((t) => !t.masquee);
-  const zones = [...new Set(tables.map((t) => t.zone))];
+  const tables = tablesParNumero(props.tables.filter((t) => !t.masquee));
+  // Zones dans l'ordre du plan, pas dans celui des numéros.
+  const zones = [...new Set(props.tables.filter((t) => !t.masquee).map((t) => t.zone))];
   return (
     <>
       {zones.map((zone) => (

@@ -175,3 +175,11 @@ export function nomSuivant(tables: Table[]): string {
   while (tables.some((t) => t.nom === String(n))) n++;
   return String(n);
 }
+
+/** Ordre des noms de table : numérique (2 avant 10 avant 100), puis alphabétique (Lionel, 18 novembre 2026). */
+const ORDRE_TABLES = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
+
+/** Tables triées par numéro, du plus petit au plus grand (vue en liste de la salle). */
+export function tablesParNumero<T extends { nom: string }>(tables: readonly T[]): T[] {
+  return [...tables].sort((a, b) => ORDRE_TABLES.compare(a.nom, b.nom));
+}
