@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { definirLogoMemoire, encoderPc858, rasterDepuisRgba, versEscPos } from "../src/impression/escpos";
+import { definirLogoMemoire, encoderPc858, rasterDepuisRgba, versEscPos, COUPES_PARTIELLES_ESSAI } from "../src/impression/escpos";
 import { Recu } from "../src/impression/recu";
 import { delaiVidange, envoyerSerie, serieDisponible } from "../src/impression/serie";
 
@@ -37,6 +37,15 @@ describe("coupe partielle (backlog n° 6)", () => {
     const recu = new Recu().texte("Merci");
     expect([...versEscPos(recu, { sansAccents: false })].slice(-11)).toEqual([...Array(8).fill(0x0a), 0x1d, 0x56, 0]);
     expect([...versEscPos(recu, { sansAccents: false, coupePartielle: true })].slice(-11)).toEqual([...Array(8).fill(0x0a), 0x1d, 0x56, 1]);
+  });
+
+  it("essai des coupes : chaque commande essayée termine son ticket, après les 8 lignes (18 novembre 2026)", () => {
+    const recu = new Recu().texte("Coupe");
+    for (const c of COUPES_PARTIELLES_ESSAI) {
+      const octets = [...versEscPos(recu, { sansAccents: false, commandeCoupe: c.octets })];
+      expect(octets.slice(-(8 + c.octets.length))).toEqual([...Array(8).fill(0x0a), ...c.octets]);
+    }
+    expect(COUPES_PARTIELLES_ESSAI.map((c) => c.octets)).toEqual([[0x1d, 0x56, 1], [0x1d, 0x56, 66, 0], [0x1b, 0x6d], [0x1d, 0x56, 49]]);
   });
 });
 

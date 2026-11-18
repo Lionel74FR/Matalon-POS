@@ -1,9 +1,9 @@
-import { Cable, Download, Image, Printer, RefreshCw, Vault } from "lucide-react";
+import { Cable, Download, Image, Printer, RefreshCw, Scissors, Vault } from "lucide-react";
 import { useEffect, useState } from "react";
 import { sortieTickets } from "../donnees/configuration";
 import { definirLogoMemoire } from "../impression/escpos";
 import { gabaritTest } from "../impression/gabarits";
-import { descriptionBranchement, imprimantesPortees, imprimerIci, type ImprimanteEtablissement } from "../impression/imprimantes";
+import { descriptionBranchement, essaiCoupesPartielles, imprimantesPortees, imprimerIci, type ImprimanteEtablissement } from "../impression/imprimantes";
 import { cleLogo, logoSerie } from "../impression/logo-serie";
 import { Recu } from "../impression/recu";
 import { etatScriptReseau, URL_SCRIPT_RESEAU } from "../impression/reseau";
@@ -127,6 +127,9 @@ export function ImprimantesPortees() {
     }
   };
   const cle = cleLogo(config);
+  // Quatre petits tickets, un par commande de coupe partielle : Lionel dit lequel reste accroché (18 novembre 2026).
+  const essaiCoupes = (i: ImprimanteEtablissement) =>
+    agir(() => essaiCoupesPartielles(config, i), `Quatre tickets envoyés à « ${i.nom} » (A, B, C, D) : notez celui qui reste accroché.`);
   const essai = (i: ImprimanteEtablissement) => agir(() => imprimerIci(config, i, gabaritTest(config)), `Essai envoyé à « ${i.nom} ».`);
 
   return (
@@ -174,6 +177,9 @@ export function ImprimantesPortees() {
                 <button className="bouton" disabled={enCours} onClick={() => void essai(i)}>
                   <AvecIcone icone={Printer}>Imprimer un essai</AvecIcone>
                 </button>
+                <button className="bouton" disabled={enCours} onClick={() => void essaiCoupes(i)}>
+                  <AvecIcone icone={Scissors}>Essai des coupes</AvecIcone>
+                </button>
               </div>
             </div>
           );
@@ -207,6 +213,9 @@ export function ImprimantesPortees() {
                 <>
                   <button className="bouton" disabled={enCours} onClick={() => void essai(i)}>
                     <AvecIcone icone={Printer}>Imprimer un essai</AvecIcone>
+                  </button>
+                  <button className="bouton" disabled={enCours} onClick={() => void essaiCoupes(i)}>
+                    <AvecIcone icone={Scissors}>Essai des coupes</AvecIcone>
                   </button>
                   <button
                     className="bouton"

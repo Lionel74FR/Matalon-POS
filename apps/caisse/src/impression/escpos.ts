@@ -117,7 +117,18 @@ export const LIGNES_AVANT_COUPE = 8;
 /** Logo du ticket : l'image à envoyer, « memoire » s'il est enregistré dans l'imprimante, null : aucun. */
 export type LogoTicket = LogoRaster | "memoire" | null;
 
-export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket; coupePartielle?: boolean }): Uint8Array {
+/**
+ * Commandes de coupe partielle essayées sur une imprimante (18 novembre 2026 : l'Oxhoo du Chardon coupe
+ * entièrement malgré GS V 1 ; DominoFR, sur la même imprimante, laisse le ticket accroché).
+ */
+export const COUPES_PARTIELLES_ESSAI: ReadonlyArray<{ nom: string; octets: number[] }> = [
+  { nom: "A · GS V 1", octets: [GS, 0x56, 1] },
+  { nom: "B · GS V 66 0", octets: [GS, 0x56, 66, 0] },
+  { nom: "C · ESC m", octets: [ESC, 0x6d] },
+  { nom: "D · GS V 49", octets: [GS, 0x56, 49] },
+];
+
+export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket; coupePartielle?: boolean; commandeCoupe?: number[] }): Uint8Array {
   const out: number[] = [ESC, 0x40];
   if (!o.sansAccents) out.push(ESC, 0x74, 19);
   const style = (gras: boolean, grand: boolean) => out.push(ESC, 0x45, gras ? 1 : 0, GS, 0x21, grand ? 0x11 : 0x00);
@@ -168,7 +179,8 @@ export function versEscPos(r: Recu, o: { sansAccents: boolean; logo?: LogoTicket
     // comprises par toutes les imprimantes, puis coupe.
     for (let i = 0; i < LIGNES_AVANT_COUPE; i++) out.push(LF);
     // GS V 0 : coupe totale ; GS V 1 : coupe partielle, le ticket reste accroché par un point (backlog n° 6).
-    out.push(GS, 0x56, o.coupePartielle ? 1 : 0);
+    if (o.commandeCoupe) out.push(...o.commandeCoupe);
+    else out.push(GS, 0x56, o.coupePartielle ? 1 : 0);
   }
   return Uint8Array.from(out);
 }

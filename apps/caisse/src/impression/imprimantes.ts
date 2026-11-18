@@ -3,10 +3,11 @@ import { imprimantesRecues, type Configuration } from "../donnees/configuration"
 import type { ClientApi } from "../serveur/client";
 import { envoyerEpson, ErreurImpression } from "./epson";
 import { logoTicketSerie } from "./logo-serie";
-import type { Recu } from "./recu";
+import { Recu } from "./recu";
 import { imprimerParRelais } from "./relais";
-import { imprimerReseau } from "./reseau";
-import { envoyerSerie } from "./serie";
+import { envoyerReseau, imprimerReseau } from "./reseau";
+import { envoyerOctets, envoyerSerie } from "./serie";
+import { COUPES_PARTIELLES_ESSAI, versEscPos } from "./escpos";
 
 export type { ImprimanteEtablissement };
 
@@ -54,6 +55,25 @@ export async function imprimerIci(config: Configuration, i: ImprimanteEtablissem
     throw new ErreurImpression(`Port COM de « ${i.nom} » pas encore choisi sur cet appareil : Réglages › Imprimantes portées par cet appareil.`, "injoignable");
   }
   return envoyerSerie(recu, { rang: port.rang, bauds: port.bauds, sansAccents: i.sansAccents, coupePartielle, logo: await logoTicketSerie(config, port.logoMemoire) });
+}
+
+/**
+ * Essai des commandes de coupe partielle (18 novembre 2026) : un petit ticket par commande, sa lettre en grand,
+ * pour repérer celle que l'imprimante comprend (le ticket reste accroché).
+ */
+export async function essaiCoupesPartielles(config: Configuration, i: ImprimanteEtablissement): Promise<void> {
+  const b = i.branchement;
+  if (b.type === "epson") throw new ErreurImpression("Une Epson ne fait que la coupe totale.", "refus");
+  for (const c of COUPES_PARTIELLES_ESSAI) {
+    const recu = new Recu().texte(`Coupe ${c.nom}`, { gras: true, grand: true, align: "centre" }).texte("Le ticket reste-t-il accroché ?", { align: "centre" });
+    const octets = versEscPos(recu, { sansAccents: i.sansAccents, commandeCoupe: c.octets });
+    if (b.type === "reseau") await envoyerReseau(octets, b.adresse);
+    else {
+      const port = config.portsSerie?.[i.id];
+      if (!port) throw new ErreurImpression(`Port COM de « ${i.nom} » pas encore choisi sur cet appareil.`, "injoignable");
+      await envoyerOctets(octets, port);
+    }
+  }
 }
 
 /**
