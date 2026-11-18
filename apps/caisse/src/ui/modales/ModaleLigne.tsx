@@ -61,7 +61,7 @@ export function ModaleLigne(props: {
   const [suitesChoix, setSuitesChoix] = useState<Suite[]>(() => (l.composants ?? []).map((c) => suiteComposant(l, c)));
   // Commentaires de l'article (17 novembre 2026) : modifiables tant que la ligne n'est pas envoyée.
   const groupes =
-    props.carte && !l.envoyee && !l.composants?.length ? groupesCommentaires(props.carte, trouverArticle(props.carte, l.articleId.split(/[:+]/)[0]!)) : [];
+    props.carte && !l.envoyee ? groupesCommentaires(props.carte, trouverArticle(props.carte, l.articleId.split(/[:+]/)[0]!)) : [];
   const [commentaires, setCommentaires] = useState(() => selectionDepuis(groupes, l.commentaires));
   /** Retrait d'un article déjà envoyé, en attente de son motif (puis du code d'un responsable). */
   const [retrait, setRetrait] = useState<{ unites: number; suite: () => void } | null>(null);
@@ -178,7 +178,7 @@ export function ModaleLigne(props: {
         </>
       }
     >
-      {!groupes.length && detailsLigne(l).length > 0 && <p className="explication">{detailsLigne(l).join(" · ")}</p>}
+      {(!groupes.length || !!l.composants?.length) && detailsLigne(l).length > 0 && <p className="explication">{detailsLigne(l).join(" · ")}</p>}
       {groupes.length > 0 && <ChoixCommentaires groupes={groupes} selection={commentaires} onChange={setCommentaires} />}
       <section className="groupe-choix">
         <h3>Quantité</h3>

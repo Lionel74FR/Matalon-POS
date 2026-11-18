@@ -39,8 +39,7 @@ export function ModaleArticle(props: {
   const [prixSaisi, setPrixSaisi] = useState(0);
   const libre = !!a.prixLibre;
   // Commentaires (cuisson…) : ceux de l'article, et ceux de l'article retenu pour chaque choix de formule.
-  // Une formule n'a pas de commentaires à elle : ce sont ceux des articles choisis.
-  const groupesArticle = useMemo(() => (a.formule?.length ? [] : groupesCommentaires(props.carte, a)), [a, props.carte]);
+  const groupesArticle = useMemo(() => groupesCommentaires(props.carte, a), [a, props.carte]);
   const [commentaires, setCommentaires] = useState<SelectionCommentaires>({});
   const [commentairesChoix, setCommentairesChoix] = useState<Record<string, SelectionCommentaires>>({});
   const groupesDuChoix = (c: (typeof choixFormule)[number]) =>

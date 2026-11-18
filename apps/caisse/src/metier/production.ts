@@ -53,6 +53,13 @@ function repartir(l: LigneCommande, carte: Catalogue): Array<{ poste: string; ar
       g.details.push(avecCommentaires(c.libelle, c.commentaires));
       groupes.set(cle, g);
     }
+    // Commentaires de la formule elle-même (cuisson d'une bavette à garniture au choix) : en tête, sous son poste et son cours.
+    if (l.commentaires?.length && posteLigne) {
+      const cle = `${posteLigne}|${suiteDe(l)}`;
+      const g = groupes.get(cle);
+      if (g) g.details.unshift(...l.commentaires);
+      else return [{ poste: posteLigne, article: { quantite: l.quantite, libelle: l.libelle, details: [...l.commentaires], ...note } }, ...[...groupes.values()].map(({ poste, suite, details }) => ({ poste, article: { quantite: l.quantite, libelle: l.libelle, details, ...note, suite } }))];
+    }
     return [...groupes.values()].map(({ poste, suite, details }) => ({ poste, article: { quantite: l.quantite, libelle: l.libelle, details, ...note, suite } }));
   }
   return posteLigne ? [{ poste: posteLigne, article: { quantite: l.quantite, libelle: l.libelle, details: detailsLigne(l), ...note } }] : [];

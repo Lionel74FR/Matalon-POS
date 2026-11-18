@@ -89,4 +89,22 @@ describe("commentaires sur la commande", () => {
     // Le ticket garde le libellé de la formule que relit le stock (« Menu (Entrecôte, Tarte) »).
     expect(versSaisie(c.lignes[1]!).libelle).toBe("Menu (Entrecôte, Tarte)");
   });
+
+  it("une formule a aussi ses commentaires (Chardon : bavette à garniture au choix), en tête du bon et sous la ligne", () => {
+    let c = nouvelleCommande("t1", "u1");
+    c = ajouterLigne(c, {
+      articleId: "entrecote",
+      libelle: "Bavette",
+      details: ["Frites"],
+      composants: [{ libelle: "Frites", categorieId: "desserts" }],
+      commentaires: ["Saignant"],
+      quantite: 1,
+      prixUnitaireTTC: 2500,
+      tauxTVA: 1000,
+      ajouteePar: "u1",
+    });
+    expect(detailsLigne(c.lignes[0]!)).toEqual(["Saignant", "Frites"]);
+    expect(bonsAEnvoyer(c, carte)[0]!.articles.map((a) => [a.libelle, a.details])).toEqual([["Bavette", ["Saignant", "Frites"]]]);
+    expect(versSaisie(c.lignes[0]!).libelle).toBe("Bavette (Frites)");
+  });
 });

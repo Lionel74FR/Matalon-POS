@@ -95,7 +95,9 @@ export const suiteComposant = (l: Pick<LigneCommande, "suite">, c: { suite?: Sui
  */
 export function detailsLigne(l: Pick<LigneCommande, "details" | "composants" | "commentaires" | "suite">, suite?: Suite): string[] {
   if (l.composants?.length) {
-    return l.composants.filter((c) => suite === undefined || suiteComposant(l, c) === suite).map((c) => avecCommentaires(c.libelle, c.commentaires));
+    // Commentaires de la formule elle-même (cuisson de la bavette) en tête, sous son propre cours.
+    const propres = suite === undefined || suite === suiteDe(l) ? (l.commentaires ?? []) : [];
+    return [...propres, ...l.composants.filter((c) => suite === undefined || suiteComposant(l, c) === suite).map((c) => avecCommentaires(c.libelle, c.commentaires))];
   }
   return [...l.details, ...(l.commentaires ?? [])];
 }

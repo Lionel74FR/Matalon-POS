@@ -1055,8 +1055,6 @@ function FicheArticle(props: {
       if (!c.categories?.length && !c.articles?.length) return setErreur(`Le choix « ${c.nom} » ne propose rien.`);
     }
     const propre: Article = { ...a, nom: a.nom.trim(), prixTTC: p, variantes, supplements };
-    // Une formule n'a pas de commentaires à elle : ce sont ceux des articles choisis.
-    if (propre.formule?.length) delete propre.commentaires;
     for (const cle of ["variantes", "supplements", "formule", "commentaires"] as const) if (!propre[cle]?.length) delete propre[cle];
     for (const cle of ["description", "aCompleter"] as const) if (!propre[cle]?.trim()) delete propre[cle];
     props.onValider(cat, propre);
@@ -1175,42 +1173,37 @@ function FicheArticle(props: {
             <AvecIcone icone={Plus}>Supplément</AvecIcone>
           </button>
 
-          {!a.formule?.length && (
-            <>
-              <h3>Commentaires proposés en caisse</h3>
-              {props.carte.commentaires?.length ? (
-                <div className="options-cases" role="group" aria-label="Commentaires proposés en caisse">
-                  {props.carte.commentaires.map((g) => (
-                    <label key={g.id} className="case">
-                      <input
-                        type="checkbox"
-                        checked={!!a.commentaires?.includes(g.id)}
-                        onChange={(e) => {
-                          const choisis = new Set(a.commentaires ?? []);
-                          if (e.target.checked) choisis.add(g.id);
-                          else choisis.delete(g.id);
-                          // Ordre des groupes de la carte.
-                          const ids = props.carte.commentaires!.map((x) => x.id).filter((id) => choisis.has(id));
-                          const { commentaires: _, ...reste } = a;
-                          setA(ids.length ? { ...reste, commentaires: ids } : reste);
-                        }}
-                      />
-                      <span>
-                        {g.nom}
-                        <small>
-                          {g.commentaires.join(", ")}
-                          {g.obligatoire ? " · obligatoire" : ""}
-                        </small>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <p className="explication">Aucun groupe de commentaires : créez-les avec le bouton « Commentaires » de la carte (cuisson, sauce…).</p>
-              )}
-            </>
+          <h3>Commentaires proposés en caisse</h3>
+          {props.carte.commentaires?.length ? (
+            <div className="options-cases" role="group" aria-label="Commentaires proposés en caisse">
+              {props.carte.commentaires.map((g) => (
+                <label key={g.id} className="case">
+                  <input
+                    type="checkbox"
+                    checked={!!a.commentaires?.includes(g.id)}
+                    onChange={(e) => {
+                      const choisis = new Set(a.commentaires ?? []);
+                      if (e.target.checked) choisis.add(g.id);
+                      else choisis.delete(g.id);
+                      // Ordre des groupes de la carte.
+                      const ids = props.carte.commentaires!.map((x) => x.id).filter((id) => choisis.has(id));
+                      const { commentaires: _, ...reste } = a;
+                      setA(ids.length ? { ...reste, commentaires: ids } : reste);
+                    }}
+                  />
+                  <span>
+                    {g.nom}
+                    <small>
+                      {g.commentaires.join(", ")}
+                      {g.obligatoire ? " · obligatoire" : ""}
+                    </small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="explication">Aucun groupe de commentaires : créez-les avec le bouton « Commentaires » de la carte (cuisson, sauce…).</p>
           )}
-
           <h3>Formule (choix inclus dans le prix)</h3>
           {(a.formule?.length ?? 0) > 1 && (
             <p className="explication">
