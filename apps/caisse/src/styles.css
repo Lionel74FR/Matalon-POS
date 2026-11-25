@@ -829,6 +829,11 @@ code {
   justify-content: space-between;
 }
 
+/* iPhone : les zones (Intérieur, Terrasse) respirent sous la case Comptoir (Lionel, 25 novembre 2026). */
+.table.comptoir + .categories {
+  margin-top: 14px;
+}
+
 .table-nom {
   font-family: var(--police-chiffres);
   font-size: 1.6rem;
