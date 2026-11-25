@@ -39,6 +39,8 @@ interface Proprietes {
   zoom?: number;
   /** Le plan tient dans son conteneur, en largeur comme en hauteur (salle de la caisse). */
   ajuste?: boolean;
+  /** Tables choisies hors édition (saisie d'une réservation) : marquées comme sélectionnées. */
+  selection?: Set<string>;
 }
 
 const LIBELLES_DECOR: Record<ElementDecor["type"], string> = { bar: "Bar", porte: "Porte", mur: "" };
@@ -169,7 +171,7 @@ export function PlanSalle(props: Proprietes) {
         const classes = [
           "plan-table",
           etat?.statut ?? "libre",
-          choisi(e) ? "choisi" : "",
+          choisi(e) || props.selection?.has(t.id) ? "choisi" : "",
           edition?.enConflit.has(t.id) ? "conflit" : "",
           etat?.alerte ? "alerte" : "",
           etat?.imminente ? "imminente" : "",
@@ -190,6 +192,7 @@ export function PlanSalle(props: Proprietes) {
             role="button"
             tabIndex={0}
             aria-label={etat?.description ?? `Table ${t.nom}`}
+            {...(props.selection ? { "aria-pressed": props.selection.has(t.id) } : {})}
             onPointerDown={(ev) => debut(ev, e, t.x, t.y)}
             onClick={() => !edition && props.onTable?.(t.id)}
             onKeyDown={(ev) => {

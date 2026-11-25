@@ -9,7 +9,9 @@ import {
   presenceMax,
   prochainesParTable,
   REGLAGES_DEFAUT,
+  remplissageDuJour,
   validerCoordonnees,
+  validerDetails,
   validerReglages,
   type ReglagesReservation,
   type Reservation,
@@ -163,6 +165,41 @@ describe("validation", () => {
     });
     expect(validerCoordonnees({ prenom: "", nom: "M", telephone: "x" }, { emailObligatoire: true })).toEqual({
       erreurs: ["Prénom obligatoire (60 caractères au plus).", "Numéro de téléphone invalide.", "Adresse e-mail obligatoire."],
+    });
+  });
+});
+
+describe("statuts temporaires et détails (17 novembre 2026)", () => {
+  it("une option ou une attente ne compte ni dans les capacités ni pour les tables", () => {
+    const tables: TableResa[] = [{ id: "t1", nom: "1", zone: "Salle", chaises: 4 }];
+    const enOption = resa("12:00", 8, { statut: "option", tables: ["t1"] });
+    const enAttente = resa("12:00", 8, { statut: "attente" });
+    expect(controler(REGLAGES, [enOption, enAttente], { date: "2026-10-15", heure: "12:00", couverts: 8 }, opts)).toBeNull();
+    expect(attribuerTable(tables, [enOption], { id: "x", date: "2026-10-15", heure: "12:00", dureeMinutes: 90, couverts: 2 })).toEqual(["t1"]);
+  });
+
+  it("donne le remplissage de chaque créneau et du service pour l'équipe", () => {
+    const liste = [resa("12:00", 3), resa("12:00", 2, { statut: "option" }), resa("12:30", 4), resa("19:00", 6)];
+    const [dej, din] = remplissageDuJour(REGLAGES, liste, "2026-10-15", 2);
+    expect(dej!.service.id).toBe("dej");
+    expect(dej!.couverts).toBe(7);
+    expect(dej!.creneaux.map((c) => `${c.heure}:${c.arrivees}`)).toEqual(["12:00:3", "12:30:4", "13:00:0", "13:30:0"]);
+    expect(dej!.creneaux.every((c) => c.refus === null)).toBe(true);
+    expect(din!.couverts).toBe(6);
+    // 7 personnes à 12:00 : 3 + 7 > 8 arrivées par créneau.
+    expect(remplissageDuJour(REGLAGES, liste, "2026-10-15", 7)[0]!.creneaux[0]!.refus).toBe("CRENEAU_COMPLET");
+    // Jour fermé à la semaine (lundi) : aucun service.
+    expect(remplissageDuJour(REGLAGES, liste, "2026-10-19", 2)).toEqual([]);
+  });
+
+  it("valide les détails posés par l'équipe", () => {
+    expect(validerDetails({ prisePar: " Léa ", allergies: "Arachides", memo: "", couleur: "vert", tags: ["VIP", "Anniversaire", "VIP"] })).toEqual({
+      ok: { prisePar: "Léa", allergies: "Arachides", couleur: "vert", tags: ["Anniversaire", "VIP"] },
+      effaces: ["memo"],
+    });
+    expect(validerDetails({ couleur: null, tags: [] })).toEqual({ ok: {}, effaces: ["couleur", "tags"] });
+    expect(validerDetails({ couleur: "fuchsia", tags: ["Inconnue"], memo: "x".repeat(501) })).toEqual({
+      erreurs: ["Mémo : 500 caractères au plus.", "Couleur inconnue.", "Étiquette inconnue."],
     });
   });
 });

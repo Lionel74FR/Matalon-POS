@@ -427,9 +427,9 @@
       <li>Administration › <span class="bouton">Réservations</span> › Services et réglages : ajoutez un Déjeuner et un Dîner (jours, heures d'arrivée, plafonds), la durée par défaut, cochez « Réservation en ligne ouverte », enregistrez.</li>
       <li>Onglet « Sur votre site » : copiez la balise et collez-la dans une page de test du site (ou ouvrez « Voir le module »).</li>
       <li>Sur un iPhone : « Réserver une table » › 4 couverts › une date › un horaire › Réserver › coordonnées (avec votre e-mail) › Réserver.</li>
-      <li>Sur l'iPad, Salle : repérez la table réservée (heure et nom), puis <span class="bouton">Réservations</span> › <span class="bouton">Installer</span>.</li>
+      <li>Sur l'iPad, Salle : repérez la table réservée (heure et nom) et la réservation dans la liste à gauche du plan, puis <span class="bouton">Installer</span> sur sa ligne.</li>
       <li>Ouvrez le lien « Annuler ma réservation » de l'e-mail sur une seconde réservation.</li>
-      <li>Dans la fenêtre Réservations de la caisse, touchez « À venir » : les réservations des prochains jours s'affichent par jour. « Par jour » montre un jour au choix ; le crayon ouvre la fiche (modifier, annuler).</li>
+      <li>Dans la liste de la caisse, les flèches et le calendrier changent de jour (le plan montre alors les réservations de ce jour-là, « Revenir au service ») ; la loupe cherche dans toutes les réservations à venir ; un toucher sur le nom ouvre la fiche à droite (modifier, annuler).</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> les créneaux complets sont barrés « Complet » ; la réservation arrive confirmée, avec un e-mail au client et une copie à l'établissement ; la plus petite table libre lui est donnée ; « Installer » ouvre la table avec 4 couverts et une note au nom du client ; l'annulation libère le créneau et la table. Au-delà du groupe maximum, le module invite à appeler.</p>
   </section>
@@ -437,11 +437,23 @@
   <section class="scenario" data-id="s6u">
     <label><input type="checkbox">Réservation de groupe sur plusieurs tables</label>
     <ol>
-      <li>Administration › <span class="bouton">Réservations</span> › <span class="bouton">Nouvelle réservation</span> : 15 personnes, puis le bouton <b>Tables</b> (« Attribuée d'office ») : touchez trois tables de 4, lisez le total, ajoutez-en une quatrième, <span class="bouton">Valider</span>, complétez et enregistrez.</li>
+      <li>Administration › <span class="bouton">Réservations</span> › <span class="bouton">Créer</span> : « Plus » et 15 personnes, puis <b>Attribution manuelle</b> : touchez trois tables de 4, lisez le total, ajoutez-en une quatrième, <span class="bouton">Valider</span>, complétez et enregistrez.</li>
       <li>Dans la liste, touchez les tables de la réservation : retirez-en une, ajoutez-en une autre, validez.</li>
-      <li>Sur l'iPad, <span class="bouton">Réservations</span> › <span class="bouton">Nouvelle</span> : un groupe de 10 sur trois tables. Puis <span class="bouton">Installer</span> le groupe de 15.</li>
+      <li>Sur l'iPad, <span class="bouton">Créer</span> en tête de la liste des réservations : un groupe de 10 sur trois tables. Puis <span class="bouton">Installer</span> le groupe de 15.</li>
     </ol>
     <p class="attendu"><b>Attendu :</b> « 12 places pour 15 personnes : ajoutez une table », puis « 16 places pour 15 personnes » ; la liste affiche « 1 + 2 + 3 + 4 · 16 places », et une table déjà réservée sur le même créneau est signalée (heure et nom) dans la fenêtre. À l'installation, la commande s'ouvre sur « Table 1 + 2 + 3 + 5 » avec 15 couverts, les tables assemblées occupées ensemble sur le plan.</p>
+  </section>
+
+  <section class="scenario" data-id="s7v">
+    <label><input type="checkbox">Réservations façon Zenchef : liste, plan et saisie</label>
+    <ol>
+      <li>Sur l'iPad, Salle : la liste des réservations du jour est à gauche du plan (bouton <span class="bouton">Réservations</span> pour la replier). Lisez les services, les créneaux (réservations et arrivées sur le plafond), les compteurs (total, à venir, installés, attente) et la répartition par taille de table en bas ; touchez « Dîner » pour ne garder que ce service.</li>
+      <li><span class="bouton">Créer</span> : « Auj. », 2 personnes, un créneau (son remplissage s'affiche), puis touchez une table sur le plan. Civilité, prénom, nom, téléphone (indicatif du pays), e-mail ; Prise par, canal, allergies, étiquettes, mémo et couleur ; enregistrez.</li>
+      <li>Créez une seconde réservation « Sous option » pour demain, puis, dans la liste du lendemain, passez sa pastille de statut à « Confirmée ».</li>
+      <li><span class="bouton">Installer</span> la première ; puis <span class="bouton">Créer</span> › « Client(e) de passage » : 2 personnes, une table sur le plan, <span class="bouton">Installer</span>.</li>
+      <li>Dans l'administration, Réservations : la même liste, le plan du jour au centre ; sur iPhone, la liste en plein écran.</li>
+    </ol>
+    <p class="attendu"><b>Attendu :</b> pendant la saisie, la liste s'efface et la table touchée s'entoure ; la ligne enregistrée montre heure, nom, personnes, statut, canal, table, allergies (en couleur), mémo et étiquettes, avec un liseré de sa couleur. Sous option, elle ne compte que dans le sablier, sans table ni e-mail ; confirmée, elle compte et reçoit une table. Installée, la table s'ouvre avec une note qui reprend les allergies et le mémo. Le client de passage s'installe aussitôt, sans coordonnées.</p>
   </section>
 
   <section class="scenario" data-id="s7u">

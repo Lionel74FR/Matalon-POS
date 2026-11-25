@@ -1,4 +1,4 @@
-import type { Reservation } from "@matalon/reservations";
+import type { Reservation, ServiceReservation } from "@matalon/reservations";
 import type { Ticket } from "@matalon/noyau-fiscal";
 import type { Catalogue } from "@matalon/catalogue";
 import type { Recette } from "@matalon/stock";
@@ -268,7 +268,16 @@ export class ClientApi {
   /** Réservations d'un jour (aujourd'hui par défaut), ou du jour `date` au jour `au`. */
   reservations(date?: string, au?: string) {
     const q = [date ? `date=${date}` : "", au ? `au=${au}` : ""].filter(Boolean).join("&");
-    return this.appel<{ date: string; reservations: Reservation[]; dureeMinutes: number; actif: boolean; horizonJours?: number }>(
+    return this.appel<{
+      date: string;
+      reservations: Reservation[];
+      dureeMinutes: number;
+      actif: boolean;
+      horizonJours?: number;
+      services?: ServiceReservation[];
+      pasMinutes?: 15 | 30;
+      fermetures?: string[];
+    }>(
       "GET",
       `/api/caisse/reservations${q ? `?${q}` : ""}`,
     );

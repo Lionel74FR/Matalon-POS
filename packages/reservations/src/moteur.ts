@@ -35,6 +35,9 @@ export function maintenantParis(instant: Date): { jour: Jour; minute: number } {
 /** Une réservation compte (capacité, tables) tant qu'elle n'est ni annulée ni absente. */
 export const active = (r: Pick<Reservation, "statut">) => r.statut === "confirmee" || r.statut === "arrivee";
 
+/** Sous option ou en liste d'attente : visible de l'équipe, sans place ni table tant qu'elle n'est pas confirmée. */
+export const temporaire = (r: Pick<Reservation, "statut">) => r.statut === "option" || r.statut === "attente";
+
 export const dureeDe = (reglages: ReglagesReservation, service: ServiceReservation | undefined) => service?.dureeMinutes ?? reglages.dureeMinutes;
 
 const intervalle = (r: Pick<Reservation, "heure" | "dureeMinutes">) => [minutes(r.heure), minutes(r.heure) + r.dureeMinutes] as const;
@@ -161,6 +164,47 @@ export function creneauxDuJour(reglages: ReglagesReservation, reservations: Rese
       return { serviceId: s.id, nom: s.nom, creneaux };
     })
     .filter((s) => s.creneaux.length > 0);
+}
+
+/** Créneau vu par l'équipe : couverts qui arrivent à cette heure et refus éventuel pour la demande. */
+export interface CreneauEquipe {
+  heure: Heure;
+  /** Couverts des réservations actives qui arrivent à cette heure. */
+  arrivees: number;
+  /** Refus pour ce nombre de couverts (l'équipe peut passer outre), null : ça passe. */
+  refus: Refus | null;
+}
+
+export interface RemplissageService {
+  service: ServiceReservation;
+  /** Couverts des réservations actives du service ce jour-là. */
+  couverts: number;
+  creneaux: CreneauEquipe[];
+}
+
+/**
+ * Remplissage d'un jour, service par service, pour la saisie de l'équipe : chaque créneau
+ * avec ses arrivées face au plafond par créneau, et le total du service face à son plafond
+ * (« 12:00 · 3/20 · 3/100 »). Ni délai ni horizon : l'équipe saisit à toute heure.
+ */
+export function remplissageDuJour(reglages: ReglagesReservation, reservations: Reservation[], date: Jour, couverts: number, ignorer?: string): RemplissageService[] {
+  const j = jourSemaine(date);
+  const du = reservations.filter((r) => r.date === date && active(r) && r.id !== ignorer);
+  return reglages.services
+    .filter((s) => s.jours.includes(j))
+    .sort((a, b) => minutes(a.debut) - minutes(b.debut))
+    .map((service) => {
+      const creneaux: CreneauEquipe[] = [];
+      for (let m = minutes(service.debut); m <= minutes(service.fin); m += reglages.pasMinutes) {
+        const heure = heureDe(m);
+        creneaux.push({
+          heure,
+          arrivees: du.filter((r) => r.serviceId === service.id && r.heure === heure).reduce((s, r) => s + r.couverts, 0),
+          refus: controler(reglages, du, { date, heure, couverts }, { maintenant: new Date(0), enLigne: false }),
+        });
+      }
+      return { service, couverts: du.filter((r) => r.serviceId === service.id).reduce((s, r) => s + r.couverts, 0), creneaux };
+    });
 }
 
 /** Jours de la période qui ont au moins un créneau libre pour ce nombre de couverts. */

@@ -3492,6 +3492,10 @@ async function reservationsCaisse(env: Environnement, requete: Request, chemin: 
       dureeMinutes: reglages.dureeMinutes,
       actif: reglages.actif,
       horizonJours: reglages.horizonJours,
+      // Services, écart entre créneaux et fermetures : la liste se range par service et la saisie montre le remplissage.
+      services: reglages.services,
+      pasMinutes: reglages.pasMinutes,
+      fermetures: reglages.fermetures,
     });
   }
   if (chemin === "/api/caisse/reservations" && m === "POST") {

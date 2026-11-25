@@ -1,5 +1,5 @@
 import { HEURE_VALIDE, JOUR_VALIDE, minutes } from "./moteur.js";
-import type { Civilite, ReglagesReservation } from "./types.js";
+import { COULEURS_RESERVATION, TAGS_RESERVATION, type Civilite, type CouleurReservation, type ReglagesReservation, type SourceReservation } from "./types.js";
 
 const entier = (n: unknown, min: number, max: number) => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
 
@@ -59,16 +59,19 @@ export interface Coordonnees {
 }
 
 /** Coordonnées propres (espaces, téléphone normalisé) ou la liste des erreurs. */
-export function validerCoordonnees(c: Partial<Coordonnees>, options: { emailObligatoire: boolean }): { ok: Coordonnees } | { erreurs: string[] } {
+export function validerCoordonnees(
+  c: Partial<Coordonnees>,
+  options: { emailObligatoire: boolean; /** Client de passage : prénom et téléphone facultatifs. */ passage?: boolean },
+): { ok: Coordonnees } | { erreurs: string[] } {
   const erreurs: string[] = [];
   const prenom = (c.prenom ?? "").trim();
   const nom = (c.nom ?? "").trim();
   const email = (c.email ?? "").trim().toLowerCase();
   const commentaire = (c.commentaire ?? "").trim();
-  if (!prenom || prenom.length > 60) erreurs.push("Prénom obligatoire (60 caractères au plus).");
+  if ((!prenom && !options.passage) || prenom.length > 60) erreurs.push("Prénom obligatoire (60 caractères au plus).");
   if (!nom || nom.length > 60) erreurs.push("Nom obligatoire (60 caractères au plus).");
-  const telephone = normaliserTelephone(c.telephone ?? "");
-  if (!telephone) erreurs.push("Numéro de téléphone invalide.");
+  const telephone = options.passage && !(c.telephone ?? "").trim() ? "" : normaliserTelephone(c.telephone ?? "");
+  if (telephone === null) erreurs.push("Numéro de téléphone invalide.");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) erreurs.push("Adresse e-mail invalide.");
   if (!email && options.emailObligatoire) erreurs.push("Adresse e-mail obligatoire.");
   if (commentaire.length > 500) erreurs.push("Commentaire : 500 caractères au plus.");
@@ -79,9 +82,54 @@ export function validerCoordonnees(c: Partial<Coordonnees>, options: { emailObli
       ...(c.civilite ? { civilite: c.civilite } : {}),
       prenom,
       nom,
-      telephone: telephone!,
+      telephone: telephone ?? "",
       ...(email ? { email } : {}),
       ...(commentaire ? { commentaire } : {}),
     },
   };
+}
+
+/** Canaux qu'une saisie de l'équipe peut indiquer (« en ligne » est réservé au module du site). */
+export const CANAUX_EQUIPE: SourceReservation[] = ["telephone", "sur_place", "email", "messagerie"];
+
+/** Détails posés par l'équipe : qui l'a prise, allergies, mémo, couleur, étiquettes. */
+export interface Details {
+  prisePar?: string;
+  allergies?: string;
+  memo?: string;
+  couleur?: CouleurReservation;
+  tags?: string[];
+}
+
+/**
+ * Détails propres ou la liste des erreurs. Un champ vide (ou une liste vide) s'efface :
+ * la clé est alors absente du résultat, et `effaces` dit lesquels l'ont été.
+ */
+export function validerDetails(d: Record<string, unknown>): { ok: Details; effaces: Array<keyof Details> } | { erreurs: string[] } {
+  const erreurs: string[] = [];
+  const ok: Details = {};
+  const effaces: Array<keyof Details> = [];
+  const texte = (cle: "prisePar" | "allergies" | "memo", max: number, nom: string) => {
+    if (d[cle] === undefined) return;
+    const v = String(d[cle] ?? "").trim();
+    if (v.length > max) erreurs.push(`${nom} : ${max} caractères au plus.`);
+    else if (v) ok[cle] = v;
+    else effaces.push(cle);
+  };
+  texte("prisePar", 60, "Prise par");
+  texte("allergies", 200, "Allergies");
+  texte("memo", 500, "Mémo");
+  if (d.couleur !== undefined) {
+    if (d.couleur === null || d.couleur === "") effaces.push("couleur");
+    else if (COULEURS_RESERVATION.includes(d.couleur as CouleurReservation)) ok.couleur = d.couleur as CouleurReservation;
+    else erreurs.push("Couleur inconnue.");
+  }
+  if (d.tags !== undefined) {
+    const tags = Array.isArray(d.tags) ? [...new Set(d.tags.map(String))] : null;
+    if (!tags) erreurs.push("Étiquettes illisibles.");
+    else if (tags.some((t) => !(TAGS_RESERVATION as readonly string[]).includes(t))) erreurs.push("Étiquette inconnue.");
+    else if (tags.length) ok.tags = TAGS_RESERVATION.filter((t) => tags.includes(t));
+    else effaces.push("tags");
+  }
+  return erreurs.length ? { erreurs } : { ok, effaces };
 }

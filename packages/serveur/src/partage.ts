@@ -915,7 +915,7 @@ export interface ResumePublic {
   couverts: number;
   prenom: string;
   nom: string;
-  statut: "confirmee" | "arrivee" | "absente" | "annulee";
+  statut: "confirmee" | "arrivee" | "absente" | "annulee" | "option" | "attente";
   etablissement: { id: string; nom: string; adresse: string; codePostalVille: string; telephone: string; logo?: string };
   /** Le client peut encore annuler en ligne (réservation à venir, confirmée). */
   annulable: boolean;

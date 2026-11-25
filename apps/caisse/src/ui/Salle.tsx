@@ -1,4 +1,4 @@
-import { BellRing, CalendarCheck, Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
+import { BellRing, CalendarCheck, CalendarDays, Clock, Coffee, LayoutList, Link2, Map as IconePlan, PencilRuler, Printer, StickyNote, Users, ZoomIn, ZoomOut } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ID_COMPTOIR, type Table } from "../donnees/configuration";
 import { nomCourtSuite, nomSuite, resteAPayer, suitesDe, suiviSuites, tablesDeCommande, totauxCommande, type Commande } from "../metier/commande";
@@ -8,8 +8,10 @@ import { EditeurPlan, type PlanEditable } from "./EditeurPlan";
 import { AvecIcone, BoutonIcone } from "./icones";
 import { PlanSalle, type EtatTable } from "./PlanSalle";
 import { messageServeur } from "./Reglages";
-import { minutes, type Reservation } from "@matalon/reservations";
-import { aVenirParTable, minuteParis, nomClient, PanneauReservations, useReservationsDuJour } from "./ReservationsCaisse";
+import { maintenantParis, minutes, REGLAGES_DEFAUT, type Reservation } from "@matalon/reservations";
+import { aVenirParTable, minuteParis, nomClient, useReservationsDuJour } from "./ReservationsCaisse";
+import { EspaceReservations, type CentreReservations } from "./reservations/EspaceReservations";
+import { dateLongue, etatsDuJour, type AccesReservations, type ContexteReservations } from "./reservations/commun";
 
 function depuis(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
@@ -40,11 +42,23 @@ const lireVue = (): "plan" | "liste" => {
 };
 const ZOOMS = [1, 1.5, 2, 3];
 
+/** Liste des réservations à gauche du plan : choix gardé sur l'appareil ; par défaut ouverte sur iPad, fermée sur iPhone. */
+const CLE_COLONNE = "matalon.salle.reservations";
+const lireColonne = (): boolean => {
+  try {
+    const v = localStorage.getItem(CLE_COLONNE);
+    if (v) return v === "1";
+  } catch {
+    /* stockage indisponible */
+  }
+  return typeof window.matchMedia !== "function" || !window.matchMedia("(max-width: 700px)").matches;
+};
+
 /** Salle : plan des tables (ou liste), libres et occupées, et le comptoir. */
 export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tableId: string) => void; onInstaller: (r: Reservation) => Promise<void> }) {
-  const { caisse, config, majConfig, notifier, demanderResponsable } = useCaisse();
+  const { caisse, config, utilisateur, majConfig, notifier, demanderResponsable } = useCaisse();
   const { jour, horsLigne, recharger } = useReservationsDuJour();
-  const [panneauResa, setPanneauResa] = useState(false);
+  const [colonne, setColonne] = useState(lireColonne);
   const resas = useMemo(() => aVenirParTable(jour?.reservations ?? []), [jour]);
   const [vue, setVue] = useState(lireVue);
   const [edition, setEdition] = useState(false);
@@ -107,6 +121,42 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
   const visibles = new Set(config.tables.filter((t) => !t.masquee).map((t) => t.id));
   const horsPlan = occupees.filter((c) => !visibles.has(c.tableId));
 
+  const montrerColonne = (v: boolean) => {
+    setColonne(v);
+    try {
+      localStorage.setItem(CLE_COLONNE, v ? "1" : "0");
+    } catch {
+      /* stockage indisponible : le choix vaut pour la session */
+    }
+  };
+
+  const aujourdhui = jour?.date ?? maintenantParis(new Date()).jour;
+  const ctxResa: ContexteReservations = {
+    aujourdhui,
+    reglages: {
+      actif: jour?.actif ?? false,
+      services: jour?.services ?? [],
+      pasMinutes: jour?.pasMinutes ?? REGLAGES_DEFAUT.pasMinutes,
+      dureeMinutes: jour?.dureeMinutes ?? REGLAGES_DEFAUT.dureeMinutes,
+      fermetures: jour?.fermetures ?? [],
+      horizonJours: jour?.horizonJours ?? REGLAGES_DEFAUT.horizonJours,
+    },
+    tables: config.tables,
+    zones: config.zones ?? [],
+    equipe: config.utilisateurs.filter((u) => u.actif).map((u) => u.nom),
+    priseParDefaut: utilisateur.nom,
+    horsLigne,
+  };
+  const acces: AccesReservations = useMemo(
+    () => ({
+      lister: async (du, au) => (await caisse.client.reservations(du, au)).reservations,
+      creer: (corps) => caisse.client.creerReservation({ ...corps, par: utilisateur.id }),
+      modifier: (id, corps) => caisse.client.modifierReservation(id, { ...corps, par: utilisateur.id }),
+    }),
+    [caisse.client, utilisateur.id],
+  );
+  const moduleResa = !!jour && (jour.actif || jour.reservations.length > 0 || (jour.services?.length ?? 0) > 0);
+
   const changerVue = (v: "plan" | "liste") => {
     setVue(v);
     try {
@@ -147,7 +197,15 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
   const placees = zone ? placerTables(zone, config.tables) : [];
   const liens: Array<[string, string]> = occupees.flatMap((c) => (c.jointes ?? []).map((j): [string, string] => [c.tableId, j]));
 
-  return (
+  /**
+   * Plan au centre de l'espace des réservations. Jour du service : l'état réel des tables.
+   * Autre jour : ses réservations sur les tables. Saisie ouverte : un toucher choisit la table.
+   */
+  const centre = (c: CentreReservations) => {
+    const autreJour = c.date !== aujourdhui;
+    const etatsPlan = autreJour ? etatsDuJour(config.tables, c.reservations, c.filtreService) : etats;
+    const toucher = (id: string) => (c.basculerTable ? c.basculerTable(id) : autreJour ? c.ouvrirTable(id) : props.onOuvrir(id));
+    return (
     <div className={`salle${vue === "plan" ? " avec-plan" : ""}`}>
       <header className="salle-tete">
         <h1>Salle</h1>
@@ -157,8 +215,8 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
             : `${occupees.length} table${occupees.length > 1 ? "s" : ""} ouverte${occupees.length > 1 ? "s" : ""} · ${euros(enCours)} en cours`}
         </p>
         <div className="salle-outils">
-          {(jour?.actif || (jour?.reservations.length ?? 0) > 0) && (
-            <button className="bouton discret bouton-resa" onClick={() => setPanneauResa(true)}>
+          {moduleResa && (
+            <button className={`bouton discret bouton-resa${colonne ? " actif" : ""}`} aria-pressed={colonne} onClick={() => montrerColonne(!colonne)}>
               <AvecIcone icone={CalendarCheck}>
                 {`Réservations · ${(jour?.reservations ?? []).filter((x) => x.statut === "confirmee").length}`}
               </AvecIcone>
@@ -179,6 +237,15 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
           <BoutonIcone icone={PencilRuler} variante="discret" libelle="Modifier le plan de salle" onClick={() => void modifierPlan()} />
         </div>
       </header>
+      {autreJour && (
+        <p className="salle-autre-jour" role="status">
+          <AvecIcone icone={CalendarDays} taille={18}>{`Plan du ${dateLongue(c.date)} : les tables montrent ses réservations.`}</AvecIcone>
+          <button type="button" className="lien-action" onClick={c.revenirAujourdhui}>
+            Revenir au service
+          </button>
+        </p>
+      )}
+      {c.selection && <p className="salle-autre-jour salle-selection">Touchez les tables de la réservation sur le plan.</p>}
       {/* Case Comptoir : sur iPhone seulement, où la barre du haut n'a pas « Vente Directe » (masquée sur iPad, styles.css). */}
       <button className={`table comptoir${comptoir ? " occupee" : ""}`} onClick={() => props.onOuvrir(ID_COMPTOIR)}>
         <span className="table-nom">
@@ -206,31 +273,17 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
             <PlanSalle
               zone={zone}
               tables={placees}
-              etats={etats}
-              liens={liens}
-              onTable={props.onOuvrir}
+              etats={etatsPlan}
+              liens={autreJour ? [] : liens}
+              onTable={toucher}
+              {...(c.selection ? { selection: c.selection } : {})}
               ajuste
               {...(ZOOMS[zoom]! > 1 ? { zoom: ZOOMS[zoom]! } : {})}
             />
           </div>
         </>
       ) : (
-        <ListeTables tables={config.tables} commandeDe={commandeDe} resas={resas} nom={nom} onOuvrir={props.onOuvrir} />
-      )}
-
-      {panneauResa && (
-        <PanneauReservations
-          jour={jour}
-          horsLigne={horsLigne}
-          occupees={new Set(commandeDe.keys())}
-          onRecharger={recharger}
-          onInstaller={async (r) => {
-            await props.onInstaller(r);
-            setPanneauResa(false);
-            await recharger();
-          }}
-          onFermer={() => setPanneauResa(false)}
-        />
+        <ListeTables tables={config.tables} commandeDe={commandeDe} resas={resas} nom={nom} onOuvrir={toucher} />
       )}
 
       {horsPlan.length > 0 && (
@@ -247,6 +300,24 @@ export function Salle(props: { commandes: Map<string, Commande>; onOuvrir: (tabl
         </section>
       )}
     </div>
+    );
+  };
+
+  return (
+    <EspaceReservations
+      ctx={ctxResa}
+      acces={acces}
+      {...(jour ? { jourCaisse: { date: jour.date, reservations: jour.reservations, recharger } } : {})}
+      colonne={moduleResa && colonne}
+      onColonne={montrerColonne}
+      centre={centre}
+      notifier={(m) => notifier(m)}
+      installer={async (r) => {
+        await props.onInstaller(r);
+        await recharger();
+      }}
+      occupees={new Set(commandeDe.keys())}
+    />
   );
 }
 
